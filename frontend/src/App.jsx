@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import PrivateRoute from "./auth/PrivateRoute";
-import NavbarApp from "./components/NavbarApp";
+import AppLayout from "./components/AppLayout";
 
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -14,52 +14,17 @@ export default function App() {
       <Route path="/login" element={<Login />} />
 
       <Route
-        path="/"
         element={
           <PrivateRoute>
-            <>
-              <NavbarApp />
-              <Dashboard />
-            </>
+            <AppLayout />
           </PrivateRoute>
         }
-      />
-
-      <Route
-        path="/pacientes"
-        element={
-          <PrivateRoute>
-            <>
-              <NavbarApp />
-              <Pacientes />
-            </>
-          </PrivateRoute>
-        }
-      />
-
-      <Route
-        path="/citas"
-        element={
-          <PrivateRoute>
-            <>
-              <NavbarApp />
-              <Citas />
-            </>
-          </PrivateRoute>
-        }
-      />
-
-      <Route
-        path="/chat-ia"
-        element={
-          <PrivateRoute>
-            <>
-              <NavbarApp />
-              <ChatIA />
-            </>
-          </PrivateRoute>
-        }
-      />
+      >
+        <Route path="/" element={<Dashboard />} />
+        <Route path="/pacientes" element={<Pacientes />} />
+        <Route path="/citas" element={<Citas />} />
+        <Route path="/chat-ia" element={<ChatIA />} />
+      </Route>
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
