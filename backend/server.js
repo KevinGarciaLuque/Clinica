@@ -1,7 +1,8 @@
 const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
+const cors    = require("cors");
+const helmet  = require("helmet");
+const morgan  = require("morgan");
+const path    = require("path");
 require("dotenv").config();
 
 const app = express();
@@ -28,6 +29,11 @@ app.use(helmet());
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+
+// ===== Archivos estáticos de uploads =====
+// Protegido: sólo cuando el usuario tiene sesión (el frontend usa /api/pacientes/:id/documentos/:docId/view)
+// La carpeta uploads/ NO se expone directamente al público
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ===== Middleware Multi-clínica SIMPLE =====
 // Hoy: por header (x-clinica-id o x-clinica-slug)
@@ -69,11 +75,23 @@ app.get("/", (req, res) => {
   });
 });
 
-app.use("/api/auth", require("./routes/auth"));
-app.use("/api/clinicas", require("./routes/clinicas"));
-app.use("/api/pacientes", require("./routes/pacientes"));
-app.use("/api/citas", require("./routes/citas"));
-app.use("/api/ia", require("./routes/ia"));
+app.use("/api/auth",           require("./routes/auth"));
+app.use("/api/clinicas",       require("./routes/clinicas"));
+app.use("/api/usuarios",       require("./routes/usuarios"));
+app.use("/api/horarios",       require("./routes/horarios"));
+app.use("/api/servicios",      require("./routes/servicios"));
+app.use("/api/pacientes",      require("./routes/pacientes"));
+// Documentos anidados bajo pacientes
+app.use("/api/pacientes/:pacienteId/documentos", require("./routes/documentos"));
+app.use("/api/citas",          require("./routes/citas"));
+app.use("/api/ia",             require("./routes/ia"));
+app.use("/api/dashboard",      require("./routes/dashboard"));
+app.use("/api/historias",      require("./routes/historias"));
+app.use("/api/prescripciones", require("./routes/prescripciones"));
+app.use("/api/estudios",       require("./routes/estudios"));
+app.use("/api/medicamentos",   require("./routes/medicamentos"));
+// Registro público self-service (sin auth)
+app.use("/api/registro",       require("./routes/registro"));
 
 // ===== Manejo de errores =====
 app.use((err, req, res, next) => {

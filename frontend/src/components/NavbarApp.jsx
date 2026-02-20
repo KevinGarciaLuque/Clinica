@@ -1,53 +1,58 @@
-import { Link, useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+
+const ROLE_COLOR = {
+  SUPER_ADMIN:   "danger",
+  ADMIN:         "warning",
+  MEDICO:        "success",
+  ENFERMERA:     "info",
+  RECEPCIONISTA: "secondary",
+};
 
 export default function NavbarApp() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
 
-  const salir = () => {
-    logout();
-    navigate("/login");
-  };
+  const salir = () => { logout(); navigate("/login"); };
+
+  const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
 
   return (
-    <nav className="navbar navbar-expand-lg navbar-dark bg-dark">
-      <div className="container">
-        <Link className="navbar-brand" to="/">
-          MULTI-CLÍNICA
-        </Link>
+    <nav
+      className="navbar navbar-dark bg-dark px-3 d-flex align-items-center justify-content-between"
+      style={{ height: 56, minHeight: 56 }}
+    >
+      {/* Brand */}
+      <span className="navbar-brand mb-0 fw-bold d-flex align-items-center gap-2">
+        <i className="bi bi-hospital-fill text-primary fs-5" />
+        Multi-Clínica
+      </span>
 
-        <button
-          className="navbar-toggler"
-          type="button"
-          data-bs-toggle="collapse"
-          data-bs-target="#nav"
-        >
-          <span className="navbar-toggler-icon"></span>
-        </button>
-
-        <div className="collapse navbar-collapse" id="nav">
-          <ul className="navbar-nav me-auto">
-            <li className="nav-item">
-              <Link className="nav-link" to="/pacientes">Pacientes</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/citas">Citas</Link>
-            </li>
-            <li className="nav-item">
-              <Link className="nav-link" to="/chat-ia">Chat IA</Link>
-            </li>
-          </ul>
-
-          <div className="d-flex align-items-center gap-2">
-            <span className="text-white small">
-              {user?.nombres} {user?.apellidos} ({user?.tipo})
+      {/* Right side: user + logout */}
+      <div className="d-flex align-items-center gap-3">
+        <div className="d-flex align-items-center gap-2">
+          <div
+            className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+            style={{ width: 32, height: 32, fontSize: "0.75rem" }}
+          >
+            {initials}
+          </div>
+          <div className="d-none d-md-block" style={{ lineHeight: 1.2 }}>
+            <div className="text-white fw-semibold" style={{ fontSize: "0.82rem" }}>
+              {user?.nombres} {user?.apellidos}
+            </div>
+            <span
+              className={`badge bg-${ROLE_COLOR[user?.tipo] ?? "secondary"}`}
+              style={{ fontSize: "0.6rem" }}
+            >
+              {user?.tipo}
             </span>
-            <button className="btn btn-outline-light btn-sm" onClick={salir}>
-              Salir
-            </button>
           </div>
         </div>
+        <button className="btn btn-outline-light btn-sm" onClick={salir}>
+          <i className="bi bi-box-arrow-right me-1" />
+          Salir
+        </button>
       </div>
     </nav>
   );

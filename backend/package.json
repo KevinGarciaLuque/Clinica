@@ -15,7 +15,13 @@
         "helmet": "^7.2.0",
         "jsonwebtoken": "^9.0.2",
         "morgan": "^1.10.0",
-        "mysql2": "^3.16.2"
+        "multer": "^2.0.2",
+        "mysql2": "^3.16.2",
+        "nodemailer": "^8.0.1",
+        "openai": "^6.22.0",
+        "pdfkit": "^0.17.2",
+        "qrcode": "^1.5.4",
+        "uuid": "^13.0.0"
     },
     "devDependencies": {
         "nodemon": "^3.1.4"
