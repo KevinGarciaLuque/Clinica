@@ -53,17 +53,13 @@ router.get("/stats", auth(), async (req, res) => {
       ),
     ]);
 
-    // Agrupar estados del día
-    const estados = {};
-    porEstadoHoy.forEach(r => { estados[r.estado] = r.total; });
-
     res.json({
       ok: true,
       data: {
         total_pacientes:      totalPacientes[0].total,
         citas_hoy:            citasHoy[0].total,
         citas_semana:         citasSemana[0].total,
-        estados_hoy:          estados,
+        estados_hoy:          porEstadoHoy,   // array [{estado, total}, ...]
         ultimos_pacientes:    ultimosPacientes,
       },
     });
@@ -80,9 +76,9 @@ router.get("/sala-espera", auth(), async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
-              p.id AS paciente_id, p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
-              p.telefono AS pac_tel, p.dni AS pac_dni,
-              u.id AS medico_id, u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+              p.id AS paciente_id, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
+              p.telefono AS paciente_tel, p.dni AS paciente_dni,
+              u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
               e.nombre AS especialidad
        FROM citas c
        JOIN pacientes p  ON p.id = c.paciente_id

@@ -228,14 +228,14 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
     case "buscar_especialidades": {
       const [rows] = await pool.query(
         `SELECT DISTINCT
-           COALESCE(e.nombre, u.especialidad) AS especialidad,
+           e.nombre AS especialidad,
            COUNT(u.id) AS cantidad_medicos
          FROM usuarios u
          LEFT JOIN especialidades e ON e.id = u.especialidad_id
          WHERE u.clinica_id = ? AND u.tipo = 'MEDICO' AND u.activo = 1
-           AND COALESCE(e.nombre, u.especialidad) IS NOT NULL
-         GROUP BY 1
-         ORDER BY 1`,
+           AND e.nombre IS NOT NULL
+         GROUP BY e.nombre
+         ORDER BY e.nombre`,
         [clinicaId]
       );
       return rows;
@@ -245,9 +245,10 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
       const desde = args.desde || new Date().toISOString().slice(0, 10);
       const [rows] = await pool.query(
         `SELECT c.id, c.inicio, c.fin, c.tipo_consulta, c.estado, c.motivo,
-                u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.especialidad
+                u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
          FROM citas c
          JOIN usuarios u ON u.id = c.medico_id
+         LEFT JOIN especialidades e ON e.id = u.especialidad_id
          WHERE c.clinica_id = ? AND c.paciente_id = ?
            AND DATE(c.inicio) >= ?
            AND c.estado NOT IN ('CANCELADA','COMPLETADA')

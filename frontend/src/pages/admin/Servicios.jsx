@@ -2,7 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
 
 const CATEGORIAS = ["consulta", "procedimiento", "examen", "vacuna", "otro"];
-const EMPTY = { nombre: "", descripcion: "", categoria: "consulta", precio: "", moneda: "PEN", duracion_min: 30 };
+const EMPTY = { nombre: "", descripcion: "", categoria: "consulta", precio: "", moneda: "HNL", duracion_min: 30 };
 
 export default function Servicios() {
   const [servicios, setServicios] = useState([]);
@@ -16,7 +16,7 @@ export default function Servicios() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const res = await api.get("/api/servicios?activo=all");
+      const res = await api.get("/servicios?activo=all");
       setServicios(res.data.data);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -44,9 +44,9 @@ export default function Servicios() {
     e.preventDefault(); setError("");
     try {
       if (editId) {
-        await api.put(`/api/servicios/${editId}`, form);
+        await api.put(`/servicios/${editId}`, form);
       } else {
-        await api.post("/api/servicios", form);
+        await api.post("/servicios", form);
       }
       setShowModal(false); cargar();
     } catch (e) {
@@ -56,7 +56,7 @@ export default function Servicios() {
 
   const toggleActivo = async (s) => {
     try {
-      await api.put(`/api/servicios/${s.id}`, { activo: s.activo ? 0 : 1 });
+      await api.put(`/servicios/${s.id}`, { activo: s.activo ? 0 : 1 });
       cargar();
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -169,7 +169,14 @@ export default function Servicios() {
                       <label className="form-label">Moneda</label>
                       <select className="form-select" value={form.moneda}
                         onChange={(e) => setForm({ ...form, moneda: e.target.value })}>
-                        {["PEN","USD","EUR","COP","MXN"].map((m) => <option key={m}>{m}</option>)}
+                        {[
+                          { code: "HNL", label: "HNL - Lps" },
+                          { code: "PEN", label: "PEN - S/" },
+                          { code: "USD", label: "USD - $" },
+                          { code: "EUR", label: "EUR - €" },
+                          { code: "COP", label: "COP - $" },
+                          { code: "MXN", label: "MXN - $" },
+                        ].map(({ code, label }) => <option key={code} value={code}>{label}</option>)}
                       </select>
                     </div>
                   </div>

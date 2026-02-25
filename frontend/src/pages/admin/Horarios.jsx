@@ -17,7 +17,7 @@ export default function Horarios() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const mRes = await api.get("/api/usuarios/medicos");
+      const mRes = await api.get("/usuarios/medicos");
       setMedicos(mRes.data.data);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -30,7 +30,7 @@ export default function Horarios() {
     if (!medicoId) { setHorarios([]); return; }
     setCargando(true);
     try {
-      const res = await api.get(`/api/horarios?medico_id=${medicoId}`);
+      const res = await api.get(`/horarios?medico_id=${medicoId}`);
       setHorarios(res.data.data);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -52,7 +52,7 @@ export default function Horarios() {
   const guardar = async (e) => {
     e.preventDefault(); setError("");
     try {
-      await api.post("/api/horarios", form);
+      await api.post("/horarios", form);
       setShowModal(false);
       cargarHorarios(medicoSel);
     } catch (e) {
@@ -63,7 +63,7 @@ export default function Horarios() {
   const eliminar = async (id) => {
     if (!confirm("¿Eliminar este bloque horario?")) return;
     try {
-      await api.delete(`/api/horarios/${id}`);
+      await api.delete(`/horarios/${id}`);
       cargarHorarios(medicoSel);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);

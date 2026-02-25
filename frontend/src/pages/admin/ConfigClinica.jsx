@@ -4,6 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 
 export default function ConfigClinica() {
   const { user } = useAuth();
+  const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID;
   const [clinica, setClinica] = useState(null);
   const [form, setForm]       = useState({});
   const [config, setConfig]   = useState({});
@@ -14,8 +15,13 @@ export default function ConfigClinica() {
 
   useEffect(() => {
     const cargar = async () => {
+      if (!clinicaId) {
+        setMsg({ tipo: "danger", texto: "No hay clínica seleccionada" });
+        setCargando(false);
+        return;
+      }
       try {
-        const res = await api.get(`/api/clinicas/${user.clinica_id}`);
+        const res = await api.get(`/clinicas/${clinicaId}`);
         const data = res.data.data;
         setClinica(data);
         setForm({
@@ -24,7 +30,7 @@ export default function ConfigClinica() {
           telefono:  data.telefono || "",
           direccion: data.direccion || "",
           ciudad:    data.ciudad || "",
-          pais:      data.pais || "PE",
+          pais:      data.pais || "HN",
           ruc:       data.ruc || "",
           logo_url:  data.logo_url || "",
         });
@@ -39,12 +45,12 @@ export default function ConfigClinica() {
       }
     };
     cargar();
-  }, [user.clinica_id]);
+  }, [clinicaId]);
 
   const guardarGeneral = async (e) => {
     e.preventDefault(); setGuardando(true); setMsg({ tipo: "", texto: "" });
     try {
-      await api.put(`/api/clinicas/${user.clinica_id}`, form);
+      await api.put(`/clinicas/${clinicaId}`, form);
       setMsg({ tipo: "success", texto: "Datos guardados correctamente" });
     } catch (e) {
       setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
@@ -56,7 +62,7 @@ export default function ConfigClinica() {
   const guardarConfig = async (e) => {
     e.preventDefault(); setGuardando(true); setMsg({ tipo: "", texto: "" });
     try {
-      await api.put(`/api/clinicas/${user.clinica_id}/config`, { config });
+      await api.put(`/clinicas/${clinicaId}/config`, { config });
       setMsg({ tipo: "success", texto: "Configuración guardada correctamente" });
     } catch (e) {
       setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
@@ -125,7 +131,7 @@ export default function ConfigClinica() {
               <label className="form-label">País</label>
               <select className="form-select" value={form.pais}
                 onChange={(e) => setForm({ ...form, pais: e.target.value })}>
-                {[["PE","Perú"],["CO","Colombia"],["MX","México"],["EC","Ecuador"],
+                {[["HN","Honduras"],["PE","Perú"],["CO","Colombia"],["MX","México"],["EC","Ecuador"],
                   ["AR","Argentina"],["CL","Chile"],["VE","Venezuela"]].map(([v,l]) => (
                   <option key={v} value={v}>{l}</option>
                 ))}

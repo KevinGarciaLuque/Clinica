@@ -136,6 +136,9 @@ CREATE TABLE IF NOT EXISTS pacientes (
   telefono         VARCHAR(30),
   email            VARCHAR(120),
   direccion        VARCHAR(250),
+  foto_perfil      VARCHAR(255),
+  ciudad           VARCHAR(100),
+  pais             VARCHAR(100)  DEFAULT 'Peru',
   -- Portal self-service
   portal_password_hash VARCHAR(255) COMMENT 'Si el paciente usa el portal web',
   portal_verificado    TINYINT(1)   DEFAULT 0,
@@ -143,6 +146,9 @@ CREATE TABLE IF NOT EXISTS pacientes (
   portal_token_exp     DATETIME,
   -- Datos médicos básicos
   grupo_sanguineo  VARCHAR(5),
+  email_verificado TINYINT(1)   DEFAULT 0,
+  registro_self    TINYINT(1)   DEFAULT 0,
+  notas            TEXT,
   contacto_emergencia_nombre   VARCHAR(120),
   contacto_emergencia_telefono VARCHAR(30),
   activo           TINYINT(1)   DEFAULT 1,

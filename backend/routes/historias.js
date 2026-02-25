@@ -32,10 +32,11 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
              h.subjetivo, h.objetivo, h.diagnostico_cie, h.plan, h.examen_fisico,
              h.diagnosticos_secundarios,
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
-             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.especialidad
+             u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
       FROM historias_clinicas h
       JOIN pacientes p ON p.id = h.paciente_id
       JOIN usuarios  u ON u.id = h.medico_id
+      LEFT JOIN especialidades e ON e.id = u.especialidad_id
       WHERE h.clinica_id = ?`;
     const params = [cid];
 
@@ -64,10 +65,11 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
     const [[hist]] = await pool.query(
       `SELECT h.*, p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.sexo, p.telefono AS pac_tel, p.email AS pac_email,
-              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.especialidad
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
        FROM historias_clinicas h
        JOIN pacientes p ON p.id = h.paciente_id
        JOIN usuarios  u ON u.id = h.medico_id
+       LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE h.id = ? AND h.clinica_id = ?`,
       [id, cid]
     );

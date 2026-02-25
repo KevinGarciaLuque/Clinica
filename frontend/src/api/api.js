@@ -9,8 +9,8 @@ api.interceptors.request.use((config) => {
   const token = localStorage.getItem("token");
   const user  = JSON.parse(localStorage.getItem("user") || "{}");
 
-  // Prioridad: clinica_id del usuario logueado, luego variable de entorno
-  const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID || "1";
+  // SUPER_ADMIN puede no tener clinica_id propio; usar env var si está definida
+  const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID || null;
 
   if (token) config.headers.Authorization = `Bearer ${token}`;
   if (clinicaId) config.headers["x-clinica-id"] = String(clinicaId);

@@ -56,10 +56,11 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
       `SELECT pr.*,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.dni,
-              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.especialidad
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
        FROM prescripciones pr
        JOIN pacientes p ON p.id = pr.paciente_id
        JOIN usuarios  u ON u.id = pr.medico_id
+       LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE pr.id = ? AND pr.clinica_id = ?`,
       [req.params.id, cid]
     );
@@ -182,13 +183,14 @@ router.get("/:id/pdf", auth(), async (req, res) => {
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
               p.fecha_nacimiento,           p.dni,
               u.nombres   AS med_nombres,   u.apellidos   AS med_apellidos,
-              u.especialidad,
+              e.nombre    AS especialidad,
               c.nombre    AS clinica_nombre, c.direccion   AS clinica_direccion,
               c.telefono  AS clinica_telefono
        FROM prescripciones pr
        JOIN pacientes  p ON p.id = pr.paciente_id
        JOIN usuarios   u ON u.id = pr.medico_id
        JOIN clinicas   c ON c.id = pr.clinica_id
+       LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE pr.id = ? AND pr.clinica_id = ?`,
       [req.params.id, cid]
     );

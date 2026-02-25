@@ -18,7 +18,7 @@ export default function Clinicas() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const res = await api.get("/api/clinicas");
+      const res = await api.get("/clinicas");
       setClinicas(res.data.data);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -45,9 +45,9 @@ export default function Clinicas() {
     e.preventDefault(); setError("");
     try {
       if (editId) {
-        await api.put(`/api/clinicas/${editId}`, form);
+        await api.put(`/clinicas/${editId}`, form);
       } else {
-        await api.post("/api/clinicas", form);
+        await api.post("/clinicas", form);
       }
       setShowModal(false); cargar();
     } catch (e) {
@@ -58,9 +58,9 @@ export default function Clinicas() {
   const toggleActivo = async (c) => {
     try {
       if (c.activo) {
-        await api.delete(`/api/clinicas/${c.id}`);
+        await api.delete(`/clinicas/${c.id}`);
       } else {
-        await api.put(`/api/clinicas/${c.id}`, { activo: 1 });
+        await api.put(`/clinicas/${c.id}`, { activo: 1 });
       }
       cargar();
     } catch (e) {

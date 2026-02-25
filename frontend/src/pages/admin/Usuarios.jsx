@@ -23,8 +23,8 @@ export default function Usuarios() {
     setCargando(true);
     try {
       const [uRes, eRes] = await Promise.all([
-        api.get("/api/usuarios"),
-        api.get("/api/usuarios/especialidades"),
+        api.get("/usuarios"),
+        api.get("/usuarios/especialidades"),
       ]);
       setUsuarios(uRes.data.data);
       setEspecialidades(eRes.data.data);
@@ -66,9 +66,9 @@ export default function Usuarios() {
       if (!payload.especialidad_id) delete payload.especialidad_id;
 
       if (editId) {
-        await api.put(`/api/usuarios/${editId}`, payload);
+        await api.put(`/usuarios/${editId}`, payload);
       } else {
-        await api.post("/api/usuarios", payload);
+        await api.post("/usuarios", payload);
       }
       setShowModal(false);
       cargar();
@@ -79,7 +79,7 @@ export default function Usuarios() {
 
   const toggleActivo = async (u) => {
     try {
-      await api.put(`/api/usuarios/${u.id}`, { activo: u.activo ? 0 : 1 });
+      await api.put(`/usuarios/${u.id}`, { activo: u.activo ? 0 : 1 });
       cargar();
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -89,7 +89,7 @@ export default function Usuarios() {
   const guardarResetPass = async () => {
     setError("");
     try {
-      await api.post(`/api/usuarios/${resetPass.id}/reset-password`, {
+      await api.post(`/usuarios/${resetPass.id}/reset-password`, {
         nueva_password: resetPass.pass,
       });
       setResetPass({ id: null, pass: "" });

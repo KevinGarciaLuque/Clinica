@@ -55,8 +55,10 @@ router.get("/especialidades", auth(), async (req, res) => {
 router.get("/medicos", auth(), async (req, res) => {
   try {
     const clinicaId = req.user.super
-      ? (req.query.clinica_id || req.tenant?.clinica_id)
+      ? (req.tenant?.clinica_id || req.query.clinica_id)
       : req.user.clinica_id;
+
+    if (!clinicaId) return res.json({ ok: true, data: [] });
 
     const [rows] = await pool.query(
       `SELECT u.id, u.nombres, u.apellidos, e.nombre AS especialidad
