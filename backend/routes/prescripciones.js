@@ -29,9 +29,10 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
       FROM prescripciones pr
       JOIN pacientes p ON p.id = pr.paciente_id
       JOIN usuarios  u ON u.id = pr.medico_id
-      WHERE pr.clinica_id = ?`;
-    const params = [cid];
+      WHERE 1=1`;
+    const params = [];
 
+    if (cid)         { sql += " AND pr.clinica_id = ?";  params.push(cid); }
     if (paciente_id) { sql += " AND pr.paciente_id = ?"; params.push(paciente_id); }
     if (historia_id) { sql += " AND pr.historia_id = ?"; params.push(historia_id); }
 
@@ -52,6 +53,9 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
   try {
     const cid = clinicaOf(req);
 
+    const condicion = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
+    const paramsPr  = cid ? [req.params.id, cid] : [req.params.id];
+
     const [[pr]] = await pool.query(
       `SELECT pr.*,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
@@ -61,8 +65,8 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
        JOIN pacientes p ON p.id = pr.paciente_id
        JOIN usuarios  u ON u.id = pr.medico_id
        LEFT JOIN especialidades e ON e.id = u.especialidad_id
-       WHERE pr.id = ? AND pr.clinica_id = ?`,
-      [req.params.id, cid]
+       WHERE ${condicion}`,
+      paramsPr
     );
     if (!pr) return res.status(404).json({ ok: false, msg: "No encontrado" });
 
@@ -89,12 +93,18 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
     await conn.beginTransaction();
-    const cid = clinicaOf(req);
-    if (!cid) throw new Error("Falta clinica_id");
+    let cid = clinicaOf(req);
 
     const { historia_id, cita_id, paciente_id, notas, items = [] } = req.body;
     if (!paciente_id) throw new Error("paciente_id requerido");
     if (!items.length)  throw new Error("Debe incluir al menos un medicamento");
+
+    // Si es SUPER_ADMIN sin clinica_id, derivarlo del paciente
+    if (!cid) {
+      const [[pac]] = await conn.query("SELECT clinica_id FROM pacientes WHERE id = ? LIMIT 1", [paciente_id]);
+      if (!pac) throw new Error("Paciente no encontrado");
+      cid = pac.clinica_id;
+    }
 
     const codigo_qr = crypto.randomBytes(8).toString("hex").toUpperCase();
 
@@ -142,10 +152,12 @@ router.patch("/:id/estado", auth("MEDICO","RECEPCIONISTA","ADMIN","SUPER_ADMIN")
     const validos = ["ACTIVA","ENTREGADA","CANCELADA"];
     if (!validos.includes(estado)) return res.status(400).json({ ok: false, msg: "Estado inválido" });
 
-    await pool.query(
-      "UPDATE prescripciones SET estado=? WHERE id=? AND clinica_id=?",
-      [estado, req.params.id, cid]
-    );
+    const sql = cid
+      ? "UPDATE prescripciones SET estado=? WHERE id=? AND clinica_id=?"
+      : "UPDATE prescripciones SET estado=? WHERE id=?";
+    const params = cid ? [estado, req.params.id, cid] : [estado, req.params.id];
+
+    await pool.query(sql, params);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -158,10 +170,11 @@ router.patch("/:id/estado", auth("MEDICO","RECEPCIONISTA","ADMIN","SUPER_ADMIN")
 router.delete("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
-    await pool.query(
-      "UPDATE prescripciones SET estado='CANCELADA' WHERE id=? AND clinica_id=?",
-      [req.params.id, cid]
-    );
+    const sql = cid
+      ? "UPDATE prescripciones SET estado='CANCELADA' WHERE id=? AND clinica_id=?"
+      : "UPDATE prescripciones SET estado='CANCELADA' WHERE id=?";
+    const params = cid ? [req.params.id, cid] : [req.params.id];
+    await pool.query(sql, params);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -178,6 +191,8 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const cid = clinicaOf(req);
 
     // 1. Datos de la prescripción, paciente y médico
+    const condPdf  = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
+    const paramsPdf = cid ? [req.params.id, cid] : [req.params.id];
     const [[pr]] = await pool.query(
       `SELECT pr.*,
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
@@ -191,8 +206,8 @@ router.get("/:id/pdf", auth(), async (req, res) => {
        JOIN usuarios   u ON u.id = pr.medico_id
        JOIN clinicas   c ON c.id = pr.clinica_id
        LEFT JOIN especialidades e ON e.id = u.especialidad_id
-       WHERE pr.id = ? AND pr.clinica_id = ?`,
-      [req.params.id, cid]
+       WHERE ${condPdf}`,
+      paramsPdf
     );
     if (!pr) return res.status(404).json({ ok: false, msg: "No encontrado" });
 
