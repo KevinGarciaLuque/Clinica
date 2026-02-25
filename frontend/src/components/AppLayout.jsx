@@ -4,22 +4,30 @@ import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
 
 export default function AppLayout() {
-  const [mobileOpen,  setMobileOpen]  = useState(false);
-  const [collapsed,   setCollapsed]   = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+  const [collapsed,  setCollapsed]  = useState(false);
 
   const W = collapsed ? 64 : 240;
 
   return (
-    <div className="d-flex flex-column" style={{ minHeight: "100vh" }}>
+    <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+      {/* ── Navbar fija arriba ── */}
       <NavbarApp onMenuClick={() => setMobileOpen(o => !o)} />
 
-      <div className="d-flex flex-grow-1" style={{ overflow: "hidden" }}>
+      {/* ── Cuerpo debajo del navbar ── */}
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
 
         {/* Overlay móvil */}
         {mobileOpen && (
           <div
             onClick={() => setMobileOpen(false)}
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.45)", zIndex: 1040 }}
+            style={{
+              position: "absolute",
+              inset: 0,
+              background: "rgba(0,0,0,.45)",
+              zIndex: 1040,
+            }}
           />
         )}
 
@@ -28,18 +36,17 @@ export default function AppLayout() {
           style={{
             width: W,
             minWidth: W,
-            height: "calc(100vh - 56px)",
-            position: "sticky",
-            top: 56,
+            flexShrink: 0,
+            height: "100%",
             display: "flex",
             flexDirection: "column",
             background: "#fff",
-            borderRight: "1px solid #dee2e6",
+            borderRight: "1px solid #e9ecef",
             transition: "width 0.25s ease, min-width 0.25s ease, transform 0.28s ease",
             overflow: "hidden",
             zIndex: 1045,
-            flexShrink: 0,
           }}
+          className="sidebar-aside"
         >
           <Sidebar
             collapsed={collapsed}
@@ -51,9 +58,9 @@ export default function AppLayout() {
         {/* Estilos responsivos */}
         <style>{`
           @media (max-width: 991.98px) {
-            aside {
-              position: fixed !important;
-              top: 56px !important;
+            .sidebar-aside {
+              position: absolute !important;
+              top: 0 !important;
               left: 0 !important;
               width: 240px !important;
               min-width: 240px !important;
@@ -63,10 +70,10 @@ export default function AppLayout() {
           }
         `}</style>
 
-        {/* Contenido principal */}
+        {/* ── Contenido principal ── */}
         <main
           className="flex-grow-1 p-3 p-md-4"
-          style={{ overflowY: "auto", background: "#f1f5f9", minWidth: 0 }}
+          style={{ overflowY: "auto", background: "#f1f5f9", minWidth: 0, height: "100%" }}
         >
           <Outlet />
         </main>
