@@ -18,6 +18,9 @@ const router  = require("express").Router();
 const pool    = require("../db");
 const { v4: uuidv4 } = require("uuid");
 const { enviarEmail, templateVerificacion, templateBienvenida } = require("../utils/mailer");
+const upload  = require("../middlewares/upload");
+const fs      = require("fs");
+const path    = require("path");
 
 // ── Helper: crea token y envía email ──────────────────────
 async function crearYEnviarToken(pacienteId, clinicaId, email, nombres, apellidos, conn) {
@@ -211,6 +214,48 @@ router.post("/reenviar", async (req, res) => {
     res.status(500).json({ ok: false, msg: e.message });
   } finally {
     conn.release();
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/registro/:id/foto  — Foto de perfil durante registro (sin auth)
+// ══════════════════════════════════════════════════════════
+router.post("/:id/foto", upload.single("foto"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
+
+    const { id }        = req.params;
+    const { clinica_id } = req.body;
+    if (!clinica_id) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(400).json({ ok: false, msg: "clinica_id requerido" });
+    }
+
+    const [[p]] = await pool.query(
+      "SELECT id, foto_perfil FROM pacientes WHERE id=? AND clinica_id=?",
+      [id, clinica_id]
+    );
+    if (!p) {
+      fs.unlink(req.file.path, () => {});
+      return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    }
+
+    // Eliminar foto anterior si existe
+    if (p.foto_perfil) {
+      const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
+      if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
+    }
+
+    const relativePath = "pacientes/" + req.file.filename;
+    await pool.query(
+      "UPDATE pacientes SET foto_perfil=? WHERE id=?",
+      [relativePath, id]
+    );
+
+    res.json({ ok: true, foto_perfil: relativePath });
+  } catch (e) {
+    if (req.file) fs.unlink(req.file.path, () => {});
+    res.status(500).json({ ok: false, msg: e.message });
   }
 });
 

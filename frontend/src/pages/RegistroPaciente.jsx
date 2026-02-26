@@ -6,15 +6,15 @@
  * Paso 2 → Subida de documentos (opcional)
  * Paso 3 → Confirmación (email de verificación enviado)
  */
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 
-const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
+const BASE     = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 
 // ── helpers ──────────────────────────────────────────────
 function ProgressBar({ paso }) {
-  const pasos = ["Datos personales", "Documentos", "Confirmación"];
+  const pasos = ["Datos personales", "Tu foto", "Documentos", "Confirmación"];
   return (
     <div className="d-flex align-items-center gap-0 mb-4">
       {pasos.map((label, i) => (
@@ -52,6 +52,71 @@ export default function RegistroPaciente() {
   const [error,   setError]   = useState("");
   const [pacienteId, setPacienteId] = useState(null);
 
+  // ── Foto (paso 1) ────────────────────────────────
+  const [camActiva,    setCamActiva]    = useState(false);
+  const [camStream,    setCamStream]    = useState(null);
+  const [fotoBlob,     setFotoBlob]     = useState(null);
+  const [fotoPreview,  setFotoPreview]  = useState(null);
+  const [fotoSubiendo, setFotoSubiendo] = useState(false);
+  const videoRef   = useRef();
+  const canvasRef  = useRef();
+  const fotoInput  = useRef();
+
+  const abrirCamara = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      setCamStream(stream);
+      setCamActiva(true);
+      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
+    } catch {
+      setError("No se pudo acceder a la cámara. Usa 'Seleccionar imagen' en su lugar.");
+    }
+  };
+
+  const cerrarCamara = useCallback(() => {
+    if (camStream) camStream.getTracks().forEach(t => t.stop());
+    setCamStream(null);
+    setCamActiva(false);
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, [camStream]);
+
+  const tomarFoto = () => {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      const file = new File([blob], "foto-perfil.jpg", { type: "image/jpeg" });
+      setFotoBlob(file);
+      setFotoPreview(URL.createObjectURL(blob));
+      cerrarCamara();
+    }, "image/jpeg", 0.9);
+  };
+
+  const seleccionarArchivo = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFotoBlob(file);
+    setFotoPreview(URL.createObjectURL(file));
+  };
+
+  const subirFotoYAvanzar = async () => {
+    if (!fotoBlob || !pacienteId) { setPaso(2); return; }
+    setFotoSubiendo(true);
+    try {
+      const fd = new FormData();
+      fd.append("foto", fotoBlob);
+      fd.append("clinica_id", clinicaId);
+      await axios.post(`${BASE}/registro/${pacienteId}/foto`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+    } catch { /* no bloquear el flujo si falla la foto */ }
+    setFotoSubiendo(false);
+    setPaso(2);
+  };
+
   // ── Paso 1: datos personales ─────────────────────────
   const [form, setForm] = useState({
     nombres: "", apellidos: "", dni: "",
@@ -86,8 +151,8 @@ export default function RegistroPaciente() {
     }
   };
 
-  // ── PASO 2: Avanzar confirmación ────────────────────
-  const avanzarConfirmacion = () => setPaso(2);
+  // ── PASO 2 y 3: Avanzar confirmación ────────────────────
+  const avanzarConfirmacion = () => setPaso(3);
 
   // ════════════════ RENDER ════════════════════════════
   return (
@@ -196,8 +261,85 @@ export default function RegistroPaciente() {
             </form>
           )}
 
-          {/* ─── PASO 1: Documentos ────────────────────── */}
+          {/* ─── PASO 1: Foto ─────────────────────────── */}
           {paso === 1 && (
+            <div className="text-center">
+              <p className="text-muted mb-4">
+                <i className="bi bi-camera-fill me-1 text-primary" />
+                Toma o sube una foto tuya para que el personal pueda identificarte rápidamente.
+                <span className="text-muted" style={{ fontSize: "0.8rem", display: "block" }}>Este paso es opcional, puedes omitirlo.</span>
+              </p>
+
+              {/* Preview */}
+              {fotoPreview && (
+                <div className="mb-3">
+                  <img
+                    src={fotoPreview}
+                    alt="Tu foto"
+                    className="rounded-circle border border-3 border-primary"
+                    style={{ width: 160, height: 160, objectFit: "cover" }}
+                  />
+                </div>
+              )}
+
+              {/* Cámara en vivo */}
+              {camActiva && (
+                <div className="mb-3">
+                  <video
+                    ref={videoRef}
+                    autoPlay
+                    playsInline
+                    muted
+                    className="rounded-3 border w-100"
+                    style={{ maxHeight: 280, background: "#000", objectFit: "cover" }}
+                  />
+                  <canvas ref={canvasRef} className="d-none" />
+                  <div className="d-flex gap-2 justify-content-center mt-2">
+                    <button type="button" className="btn btn-success" onClick={tomarFoto}>
+                      <i className="bi bi-camera me-1" />Capturar foto
+                    </button>
+                    <button type="button" className="btn btn-outline-secondary" onClick={cerrarCamara}>
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {!camActiva && <canvas ref={canvasRef} className="d-none" />}
+
+              {/* Botones cuando cámara no está activa */}
+              {!camActiva && (
+                <div className="d-flex flex-column align-items-center gap-3 my-3">
+                  <button type="button" className="btn btn-outline-primary px-4" onClick={abrirCamara}>
+                    <i className="bi bi-camera me-2" />Usar cámara
+                  </button>
+                  <button type="button" className="btn btn-outline-secondary px-4" onClick={() => fotoInput.current?.click()}>
+                    <i className="bi bi-image me-2" />Subir imagen
+                  </button>
+                  <input ref={fotoInput} type="file" accept="image/*" className="d-none" onChange={seleccionarArchivo} />
+                </div>
+              )}
+
+              <div className="d-flex justify-content-between mt-4">
+                <button type="button" className="btn btn-link text-muted" onClick={() => setPaso(2)}>
+                  Omitir este paso
+                </button>
+                <button
+                  type="button"
+                  className="btn btn-primary px-4"
+                  onClick={subirFotoYAvanzar}
+                  disabled={fotoSubiendo}
+                >
+                  {fotoSubiendo
+                    ? <><span className="spinner-border spinner-border-sm me-2" />Subiendo...</>
+                    : <>Continuar <i className="bi bi-arrow-right ms-1" /></>}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* ─── PASO 2: Documentos ─────────────────────── */}
+          {paso === 2 && (
             <div>
               <p className="text-muted mb-4">
                 <i className="bi bi-info-circle me-1 text-primary" />
@@ -235,8 +377,8 @@ export default function RegistroPaciente() {
             </div>
           )}
 
-          {/* ─── PASO 2: Confirmación ─────────────────── */}
-          {paso === 2 && (
+          {/* ─── PASO 3: Confirmación ───────────────────── */}
+          {paso === 3 && (
             <div className="text-center py-3">
               <div
                 className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-4"

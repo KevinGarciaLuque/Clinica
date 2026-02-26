@@ -1,3 +1,7 @@
 Email: super@plataforma.com
 
 Password: Admin12345*
+
+Clinicas
+Ana Perez
+123456789
