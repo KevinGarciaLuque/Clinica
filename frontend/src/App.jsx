@@ -24,6 +24,13 @@ import ConfigClinica from "./pages/admin/ConfigClinica";
 import Clinicas  from "./pages/superadmin/Clinicas";
 import Database  from "./pages/superadmin/Database";
 
+// Módulos de Cirugía Estética
+import GaleriaEstetica         from "./pages/estetica/GaleriaEstetica";
+import Presupuestos            from "./pages/estetica/Presupuestos";
+import ConsentimientosEsteticos from "./pages/estetica/ConsentimientosEsteticos";
+import SeguimientoPostOp       from "./pages/estetica/SeguimientoPostOp";
+import FichaEstetica           from "./pages/estetica/FichaEstetica";
+
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
   const raw = localStorage.getItem("user");
@@ -92,6 +99,13 @@ export default function App() {
             <Database />
           </RolRoute>
         } />
+
+        {/* ── Módulos Cirugía Estética ── */}
+        <Route path="/estetica/galeria"          element={<GaleriaEstetica />} />
+        <Route path="/estetica/presupuestos"     element={<Presupuestos />} />
+        <Route path="/estetica/consentimientos"  element={<ConsentimientosEsteticos />} />
+        <Route path="/estetica/seguimiento"      element={<SeguimientoPostOp />} />
+        <Route path="/estetica/ficha"            element={<FichaEstetica />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

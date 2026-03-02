@@ -17,7 +17,7 @@ const C = {
 };
 
 const EMPTY_C = {
-  nombre: "", slug: "", email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
+  nombre: "", slug: "", tipo_id: "", email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
 };
 const EMPTY_A = { admin_nombres: "", admin_apellidos: "", admin_email: "", admin_password: "" };
 
@@ -44,6 +44,7 @@ const inputSt = {
 
 export default function Clinicas() {
   const [clinicas, setClinicas]   = useState([]);
+  const [tipos, setTipos]         = useState([]);
   const [form, setForm]           = useState({ ...EMPTY_C, ...EMPTY_A });
   const [editId, setEditId]       = useState(null);
   const [busqueda, setBusqueda]   = useState("");
@@ -55,8 +56,12 @@ export default function Clinicas() {
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
-      const res = await api.get("/clinicas");
-      setClinicas(res.data.data);
+      const [rC, rT] = await Promise.all([
+        api.get("/clinicas"),
+        api.get("/clinicas/tipos"),
+      ]);
+      setClinicas(rC.data.data);
+      setTipos(rT.data.data);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     } finally {
@@ -71,9 +76,11 @@ export default function Clinicas() {
   };
 
   const abrirEditar = (c) => {
-    setForm({ nombre: c.nombre, slug: c.slug, email: c.email||"",
-              telefono: c.telefono||"", direccion: c.direccion||"",
-              ciudad: c.ciudad||"", pais: c.pais||"PE", ruc: c.ruc||"",
+    setForm({ nombre: c.nombre, slug: c.slug,
+              tipo_id: c.tipo_id != null ? String(c.tipo_id) : "",
+              email: c.email||"", telefono: c.telefono||"",
+              direccion: c.direccion||"", ciudad: c.ciudad||"",
+              pais: c.pais||"PE", ruc: c.ruc||"",
               ...EMPTY_A });
     setEditId(c.id); setError(""); setShowModal(true);
   };
@@ -264,13 +271,26 @@ export default function Clinicas() {
                                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                       {c.nombre}
                     </div>
-                    <div style={{
-                      display: "inline-flex", alignItems: "center", gap: 5,
-                      background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
-                      borderRadius: 6, padding: "2px 8px", marginTop: 4,
-                    }}>
-                      <i className="bi bi-link-45deg" style={{ fontSize: 12, color: C.muted }} />
-                      <span style={{ fontSize: 12, color: C.muted, fontFamily: "monospace" }}>{c.slug}</span>
+                    <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                      <div style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                        borderRadius: 6, padding: "2px 8px",
+                      }}>
+                        <i className="bi bi-link-45deg" style={{ fontSize: 12, color: C.muted }} />
+                        <span style={{ fontSize: 12, color: C.muted, fontFamily: "monospace" }}>{c.slug}</span>
+                      </div>
+                      {c.tipo_nombre && (
+                        <div style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          background: `${c.tipo_color}22`,
+                          border: `1px solid ${c.tipo_color}55`,
+                          borderRadius: 6, padding: "2px 8px",
+                        }}>
+                          <i className={`bi ${c.tipo_icono}`} style={{ fontSize: 11, color: c.tipo_color }} />
+                          <span style={{ fontSize: 11, color: c.tipo_color, fontWeight: 600 }}>{c.tipo_nombre}</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                   <span style={{
@@ -476,6 +496,48 @@ export default function Clinicas() {
                         onBlur={(e)  => e.target.style.borderColor = C.border}
                         pattern="[a-z0-9\-]+" required />
                     </Field>
+
+                    {/* ── Selector de Especialidad / Tipo ── */}
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="Especialidad / Tipo de Clínica" hint="(define los módulos disponibles)">
+                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(148px, 1fr))", gap: 10 }}>
+                          {tipos.map((t) => {
+                            const sel = String(form.tipo_id) === String(t.id);
+                            return (
+                              <button
+                                key={t.id}
+                                type="button"
+                                onClick={() => setForm({ ...form, tipo_id: sel ? "" : String(t.id) })}
+                                style={{
+                                  background: sel ? `${t.color}22` : "rgba(255,255,255,.03)",
+                                  border: `2px solid ${sel ? t.color : C.border}`,
+                                  borderRadius: 10, padding: "10px 12px",
+                                  cursor: "pointer", textAlign: "left",
+                                  transition: "all .18s",
+                                  display: "flex", alignItems: "center", gap: 10,
+                                }}
+                                onMouseEnter={(e) => !sel && (e.currentTarget.style.borderColor = `${t.color}88`)}
+                                onMouseLeave={(e) => !sel && (e.currentTarget.style.borderColor = C.border)}
+                              >
+                                <div style={{
+                                  width: 32, height: 32, borderRadius: 8, flexShrink: 0,
+                                  background: sel ? t.color : `${t.color}33`,
+                                  display: "flex", alignItems: "center", justifyContent: "center",
+                                  transition: "background .18s",
+                                }}>
+                                  <i className={`bi ${t.icono}`} style={{ fontSize: 14, color: sel ? "#fff" : t.color }} />
+                                </div>
+                                <div>
+                                  <div style={{ fontSize: 12, fontWeight: 700, color: sel ? t.color : C.text, lineHeight: 1.3 }}>{t.nombre}</div>
+                                </div>
+                                {sel && <i className="bi bi-check-circle-fill ms-auto" style={{ color: t.color, fontSize: 14 }} />}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </Field>
+                    </div>
+
                     <Field label="Email">
                       <input style={inputSt} type="email" value={form.email}
                         onChange={(e) => setForm({ ...form, email: e.target.value })}

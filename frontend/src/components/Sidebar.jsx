@@ -16,7 +16,8 @@ const C = {
   avatarBg:    "linear-gradient(135deg,#2196f3,#0d47a1)",
 };
 
-const base = [
+/* ─── Módulos base de reserva (si aún no se cargaron del API) ─────── */
+const BASE_FALLBACK = [
   { to: "/",          label: "Dashboard",        icon: "bi-speedometer2" },
   { to: "/pacientes", label: "Pacientes",         icon: "bi-people-fill" },
   { to: "/citas",     label: "Citas",             icon: "bi-calendar-check-fill" },
@@ -36,10 +37,22 @@ const superItems = [
   { to: "/superadmin/database",  label: "Base de Datos",    icon: "bi-database-fill-gear" },
 ];
 
-function getMenuSections(tipo) {
-  if (tipo === "SUPER_ADMIN") return { super: superItems, main: base, admin: adminItems };
-  if (tipo === "ADMIN")       return { super: [],          main: base, admin: adminItems };
-  return                              { super: [],          main: base, admin: [] };
+/** Convierte respuesta del API de módulos a items del sidebar */
+function modulosToItems(modulos) {
+  return modulos.map(m => ({
+    to:    m.ruta,
+    label: m.nombre,
+    icon:  m.icono,
+  }));
+}
+
+function getMenuSections(tipo, modulos) {
+  const hasDynamic = modulos && modulos.length > 0;
+  const mainItems  = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
+
+  if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: adminItems };
+  if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: adminItems };
+  return                              { super: [],          main: mainItems, admin: [] };
 }
 
 /* ─── Sección de menú ────────────────────────────────────────────── */
@@ -105,8 +118,8 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
 
 /* ─── Sidebar principal ──────────────────────────────────────────── */
 export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
-  const { user } = useAuth();
-  const { super: sItems, main, admin } = getMenuSections(user?.tipo);
+  const { user, modulos } = useAuth();
+  const { super: sItems, main, admin } = getMenuSections(user?.tipo, modulos);
 
   return (
     <>
