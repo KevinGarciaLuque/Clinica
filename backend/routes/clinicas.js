@@ -4,21 +4,82 @@ const auth   = require("../middlewares/auth");
 const argon2 = require("argon2");
 
 // ──────────────────────────────────────────────
+//  GET /api/clinicas/tipos  → catálogo de tipos de clínica
+// ──────────────────────────────────────────────
+router.get("/tipos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT id, clave, nombre, icono, color, descripcion FROM tipos_clinica WHERE activo=1 ORDER BY nombre"
+    );
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+//  GET /api/clinicas/modulos  → módulos activos de la clínica del usuario
+// ──────────────────────────────────────────────
+router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+  try {
+    // SUPER_ADMIN tiene acceso a todos los módulos base
+    if (req.user.super) {
+      const [rows] = await pool.query(
+        "SELECT clave, nombre, icono, ruta FROM modulos_sistema WHERE disponible=1 ORDER BY id"
+      );
+      return res.json({ ok: true, data: rows });
+    }
+
+    // Para usuarios de clínica: módulos según el tipo de su clínica
+    const [rows] = await pool.query(`
+      SELECT ms.clave, ms.nombre, ms.icono, ms.ruta
+      FROM modulos_sistema ms
+      INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id
+      INNER JOIN clinicas c ON c.tipo_id = tcm.tipo_id
+      WHERE c.id = ? AND ms.disponible = 1
+      ORDER BY ms.id
+    `, [req.user.clinica_id]);
+
+    // Si la clínica no tiene tipo asignado, devolver módulos base
+    if (!rows.length) {
+      const [base] = await pool.query(
+        "SELECT clave, nombre, icono, ruta FROM modulos_sistema WHERE clave IN (?,?,?,?,?,?) AND disponible=1 ORDER BY id",
+        ["dashboard","pacientes","citas","historia_clinica","chat_ia","estudios"]
+      );
+      return res.json({ ok: true, data: base });
+    }
+
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 //  GET /api/clinicas  → lista (SUPER_ADMIN ve todas; ADMIN ve la suya)
 // ──────────────────────────────────────────────
 router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
     if (req.user.super) {
-      const [rows] = await pool.query(
-        "SELECT id, nombre, slug, logo_url, email, telefono, direccion, ciudad, pais, ruc, activo, creado_en FROM clinicas ORDER BY nombre"
-      );
+      const [rows] = await pool.query(`
+        SELECT c.id, c.nombre, c.slug, c.logo_url, c.email, c.telefono,
+               c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
+               t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
+        FROM clinicas c
+        LEFT JOIN tipos_clinica t ON t.id = c.tipo_id
+        ORDER BY c.nombre
+      `);
       return res.json({ ok: true, data: rows });
     }
     // No-super: solo puede ver la suya
-    const [rows] = await pool.query(
-      "SELECT id, nombre, slug, logo_url, email, telefono, direccion, ciudad, pais, ruc, activo, creado_en FROM clinicas WHERE id=?",
-      [req.user.clinica_id]
-    );
+    const [rows] = await pool.query(`
+      SELECT c.id, c.nombre, c.slug, c.logo_url, c.email, c.telefono,
+             c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
+             t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
+      FROM clinicas c
+      LEFT JOIN tipos_clinica t ON t.id = c.tipo_id
+      WHERE c.id=?
+    `, [req.user.clinica_id]);
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -49,7 +110,7 @@ router.get("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 // POST /api/clinicas  → solo SUPER_ADMIN puede crear clínicas
 router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
   try {
-    const { nombre, slug, email, telefono, direccion, ciudad, pais, ruc,
+    const { nombre, slug, tipo_id, email, telefono, direccion, ciudad, pais, ruc,
             admin_nombres, admin_apellidos, admin_email, admin_password } = req.body;
 
     if (!nombre || !slug) {
@@ -62,9 +123,9 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
 
     // Insertar clínica
     const [r] = await pool.query(
-      `INSERT INTO clinicas (nombre, slug, email, telefono, direccion, ciudad, pais, ruc)
-       VALUES (?,?,?,?,?,?,?,?)`,
-      [nombre, slug, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
+      `INSERT INTO clinicas (nombre, slug, tipo_id, email, telefono, direccion, ciudad, pais, ruc)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [nombre, slug, tipo_id||null, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
     );
     const clinicaId = r.insertId;
 
@@ -89,7 +150,7 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
 router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
-    const { nombre, slug, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo } = req.body;
+    const { nombre, slug, tipo_id, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo } = req.body;
 
     if (slug) {
       const [exist] = await pool.query("SELECT id FROM clinicas WHERE slug=? AND id!=?", [slug, id]);
@@ -98,12 +159,16 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     await pool.query(
       `UPDATE clinicas SET
-         nombre=COALESCE(?,nombre), slug=COALESCE(?,slug), email=COALESCE(?,email),
+         nombre=COALESCE(?,nombre), slug=COALESCE(?,slug),
+         tipo_id=IF(?=-1, tipo_id, ?),
+         email=COALESCE(?,email),
          telefono=COALESCE(?,telefono), direccion=COALESCE(?,direccion),
          ciudad=COALESCE(?,ciudad), pais=COALESCE(?,pais), ruc=COALESCE(?,ruc),
          logo_url=COALESCE(?,logo_url), activo=COALESCE(?,activo)
        WHERE id=?`,
-      [nombre||null, slug||null, email||null, telefono||null, direccion||null,
+      [nombre||null, slug||null,
+       tipo_id !== undefined ? tipo_id : -1, tipo_id !== undefined ? tipo_id : -1,
+       email||null, telefono||null, direccion||null,
        ciudad||null, pais||null, ruc||null, logo_url||null,
        activo !== undefined ? activo : null, id]
     );

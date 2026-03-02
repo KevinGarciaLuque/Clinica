@@ -6,7 +6,7 @@ const jwt = require("jsonwebtoken");
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, password, clinica_slug } = req.body;
 
     if (!email || !password) {
       return res
@@ -14,39 +14,44 @@ router.post("/login", async (req, res) => {
         .json({ ok: false, msg: "Email y contraseña son obligatorios" });
     }
 
-    const clinicaId = req.tenant?.clinica_id || null;
+    // Resolver clinica_id: puede venir del header, del body (slug) o null
+    let clinicaId = req.tenant?.clinica_id || null;
+    if (!clinicaId && clinica_slug) {
+      const [slugRows] = await pool.query(
+        "SELECT id FROM clinicas WHERE slug=? AND activo=1 LIMIT 1",
+        [clinica_slug]
+      );
+      if (slugRows.length) clinicaId = slugRows[0].id;
+    }
 
-    // 1) Intentar login como SUPER_ADMIN (sin clinica_id)
+    // 1) Buscar como SUPER_ADMIN
     let user = null;
-
     const [superRows] = await pool.query(
       "SELECT id, clinica_id, email, password_hash, tipo, activo, nombres, apellidos FROM usuarios WHERE email=? AND tipo='SUPER_ADMIN' LIMIT 1",
       [email],
     );
-
     if (superRows.length > 0) {
       user = superRows[0];
     } else {
-      // 2) Si no es super, entonces SÍ exigimos clinica_id
-      if (!clinicaId) {
-        return res.status(400).json({
-          ok: false,
-          msg: "Falta clinica_id. Envia header x-clinica-id",
-        });
+      // 2) Buscar en la clínica indicada (header/slug)
+      if (clinicaId) {
+        const [rows] = await pool.query(
+          "SELECT id, clinica_id, email, password_hash, tipo, activo, nombres, apellidos FROM usuarios WHERE clinica_id=? AND email=? LIMIT 1",
+          [clinicaId, email],
+        );
+        if (rows.length) user = rows[0];
       }
-
-      const [rows] = await pool.query(
-        "SELECT id, clinica_id, email, password_hash, tipo, activo, nombres, apellidos FROM usuarios WHERE clinica_id=? AND email=? LIMIT 1",
-        [clinicaId, email],
-      );
-
-      if (rows.length === 0) {
-        return res
-          .status(401)
-          .json({ ok: false, msg: "Credenciales inválidas" });
+      // 3) Si no se indicó clínica, buscar el email en cualquier clínica (único)
+      if (!user) {
+        const [anyRows] = await pool.query(
+          "SELECT id, clinica_id, email, password_hash, tipo, activo, nombres, apellidos FROM usuarios WHERE email=? AND tipo != 'SUPER_ADMIN' LIMIT 1",
+          [email],
+        );
+        if (anyRows.length) user = anyRows[0];
       }
-
-      user = rows[0];
+      if (!user) {
+        return res.status(401).json({ ok: false, msg: "Credenciales inválidas" });
+      }
     }
 
     // Validaciones comunes

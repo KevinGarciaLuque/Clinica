@@ -4,4 +4,20 @@ Password: Admin12345*
 
 Clinicas
 Ana Perez
+ana@gmail.com
+123456789
+
+
+
+
+cirugia@gmail.com
+cirugia1@gmail.com
+
+
+
+
+cirugia-estetica
+ciru@gmail.com
+pedro@gmail.com
+
 123456789
