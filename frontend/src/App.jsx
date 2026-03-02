@@ -21,7 +21,8 @@ import Horarios    from "./pages/admin/Horarios";
 import ConfigClinica from "./pages/admin/ConfigClinica";
 
 // Super Admin
-import Clinicas from "./pages/superadmin/Clinicas";
+import Clinicas  from "./pages/superadmin/Clinicas";
+import Database  from "./pages/superadmin/Database";
 
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
@@ -84,6 +85,11 @@ export default function App() {
         <Route path="/superadmin/clinicas" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <Clinicas />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/database" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <Database />
           </RolRoute>
         } />
       </Route>

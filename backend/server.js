@@ -25,7 +25,9 @@ app.use(
   })
 );
 
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" },
+}));
 app.use(morgan("dev"));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
@@ -92,6 +94,8 @@ app.use("/api/estudios",       require("./routes/estudios"));
 app.use("/api/medicamentos",   require("./routes/medicamentos"));
 // Registro público self-service (sin auth)
 app.use("/api/registro",       require("./routes/registro"));
+// Base de datos (export / import) — SUPER_ADMIN only
+app.use("/api/database",       require("./routes/database"));
 
 // ===== Manejo de errores =====
 app.use((err, req, res, next) => {

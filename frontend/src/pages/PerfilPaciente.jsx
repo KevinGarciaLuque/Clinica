@@ -2,9 +2,11 @@
  * Perfil completo de un paciente — edición + documentos
  * URL: /pacientes/:id/perfil
  */
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import api from "../api/api";
+
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
 const TIPOS_DOC = [
   { value: "dni_frente",    label: "DNI frente"         },
@@ -53,6 +55,17 @@ export default function PerfilPaciente() {
   const [tipoDoc,   setTipoDoc]   = useState("otro");
   const [archivo,   setArchivo]   = useState(null);
   const [subiendo,  setSubiendo]  = useState(false);
+
+  // Foto perfil
+  const [fotoModal,    setFotoModal]    = useState(false);
+  const [camActiva,    setCamActiva]    = useState(false);
+  const [camStream,    setCamStream]    = useState(null);
+  const [fotoSubiendo, setFotoSubiendo] = useState(false);
+  const [fotoPreview,  setFotoPreview]  = useState(null); // blob URL para previsualizar
+  const [fotoBlob,     setFotoBlob]     = useState(null); // File object listo para subir
+  const videoRef    = useRef();
+  const canvasRef   = useRef();
+  const fotoInput   = useRef();
 
   // ── Carga inicial ──────────────────────────────────
   useEffect(() => { cargarTodo(); }, [id]);
@@ -114,7 +127,87 @@ export default function PerfilPaciente() {
       setSubiendo(false);
     }
   };
+  // ── Cámara: abrir / tomar / cerrar ───────────────────────
+  const abrirCamara = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false });
+      setCamStream(stream);
+      setCamActiva(true);
+      // Asignar stream al video después de que el DOM actualice
+      setTimeout(() => { if (videoRef.current) videoRef.current.srcObject = stream; }, 100);
+    } catch {
+      setMsg({ tipo: "danger", texto: "No se pudo acceder a la cámara. Sube un archivo en su lugar." });
+    }
+  };
 
+  const cerrarCamara = useCallback(() => {
+    if (camStream) { camStream.getTracks().forEach(t => t.stop()); }
+    setCamStream(null);
+    setCamActiva(false);
+    if (videoRef.current) videoRef.current.srcObject = null;
+  }, [camStream]);
+
+  const tomarFoto = () => {
+    const video  = videoRef.current;
+    const canvas = canvasRef.current;
+    if (!video || !canvas) return;
+    canvas.width  = video.videoWidth  || 640;
+    canvas.height = video.videoHeight || 480;
+    canvas.getContext("2d").drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      const file = new File([blob], "foto-perfil.jpg", { type: "image/jpeg" });
+      setFotoBlob(file);
+      setFotoPreview(URL.createObjectURL(blob));
+      cerrarCamara();
+    }, "image/jpeg", 0.9);
+  };
+
+  const seleccionarArchivo = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setFotoBlob(file);
+    setFotoPreview(URL.createObjectURL(file));
+  };
+
+  const subirFoto = async () => {
+    if (!fotoBlob) return;
+    setFotoSubiendo(true);
+    try {
+      const fd = new FormData();
+      fd.append("foto", fotoBlob);
+      const r = await api.post(`/pacientes/${id}/foto`, fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setFotoPreview(null);
+      setFotoBlob(null);
+      setFotoModal(false);
+      setMsg({ tipo: "success", texto: "Foto actualizada correctamente" });
+      await cargarTodo();
+    } catch (err) {
+      setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error al subir foto" });
+    } finally {
+      setFotoSubiendo(false);
+    }
+  };
+
+  const eliminarFoto = async () => {
+    if (!window.confirm("¿Eliminar la foto de perfil?")) return;
+    try {
+      await api.delete(`/pacientes/${id}/foto`);
+      setFotoModal(false);
+      setMsg({ tipo: "success", texto: "Foto eliminada" });
+      await cargarTodo();
+    } catch {
+      setMsg({ tipo: "danger", texto: "Error al eliminar foto" });
+    }
+  };
+
+  const cerrarModalFoto = () => {
+    cerrarCamara();
+    setFotoModal(false);
+    setFotoPreview(null);
+    setFotoBlob(null);
+  };
   // ── Eliminar documento ─────────────────────────────
   const eliminarDoc = async (docId) => {
     if (!window.confirm("¿Eliminar este documento?")) return;
@@ -145,6 +238,7 @@ export default function PerfilPaciente() {
   const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   return (
+    <>
     <div className="container-fluid py-2" style={{ maxWidth: 900 }}>
       {/* Breadcrumb */}
       <nav className="mb-3" aria-label="breadcrumb">
@@ -166,11 +260,34 @@ export default function PerfilPaciente() {
       <div className="card border-0 shadow-sm rounded-4 mb-4">
         <div className="card-body p-4">
           <div className="d-flex align-items-center gap-3">
+            {/* Avatar clickeable */}
             <div
-              className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
-              style={{ width: 60, height: 60, fontSize: "1.4rem" }}
+              className="position-relative flex-shrink-0"
+              style={{ width: 64, height: 64, cursor: "pointer" }}
+              onClick={() => setFotoModal(true)}
+              title="Ver / cambiar foto"
             >
-              {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
+              {paciente.foto_perfil ? (
+                <img
+                  src={`${API_BASE}/uploads/${paciente.foto_perfil}`}
+                  alt="Foto"
+                  className="rounded-circle border border-2 border-primary"
+                  style={{ width: 64, height: 64, objectFit: "cover" }}
+                />
+              ) : (
+                <div
+                  className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold"
+                  style={{ width: 64, height: 64, fontSize: "1.4rem" }}
+                >
+                  {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
+                </div>
+              )}
+              <span
+                className="position-absolute bottom-0 end-0 bg-white border border-secondary rounded-circle d-flex align-items-center justify-content-center"
+                style={{ width: 22, height: 22 }}
+              >
+                <i className="bi bi-camera-fill" style={{ fontSize: "0.65rem", color: "#555" }} />
+              </span>
             </div>
             <div className="flex-grow-1">
               <h5 className="fw-bold mb-0">{paciente.nombres} {paciente.apellidos}</h5>
@@ -389,5 +506,131 @@ export default function PerfilPaciente() {
         </div>
       </div>
     </div>
+
+    {/* ═══ MODAL FOTO PERFIL ═══════════════════════════════ */}
+    {fotoModal && (
+      <>
+        <div className="modal-backdrop fade show" style={{ zIndex: 1040 }} onClick={cerrarModalFoto} />
+        <div
+          className="modal fade show d-block"
+          tabIndex="-1"
+          style={{ zIndex: 1050 }}
+          onClick={e => { if (e.target === e.currentTarget) cerrarModalFoto(); }}
+        >
+          <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: 480 }}>
+            <div className="modal-content rounded-4 border-0 shadow">
+
+              <div className="modal-header border-0 pb-0">
+                <h6 className="modal-title fw-bold">
+                  <i className="bi bi-person-circle me-2 text-primary" />
+                  Foto de perfil
+                </h6>
+                <button type="button" className="btn-close" onClick={cerrarModalFoto} />
+              </div>
+
+              <div className="modal-body pt-3">
+
+                {/* Preview o foto actual */}
+                <div className="text-center mb-3">
+                  {fotoPreview ? (
+                    <img
+                      src={fotoPreview}
+                      alt="Preview"
+                      className="rounded-circle border border-3 border-primary"
+                      style={{ width: 160, height: 160, objectFit: "cover" }}
+                    />
+                  ) : paciente.foto_perfil ? (
+                    <img
+                      src={`${API_BASE}/uploads/${paciente.foto_perfil}`}
+                      alt="Foto actual"
+                      className="rounded-circle border border-3 border-primary"
+                      style={{ width: 160, height: 160, objectFit: "cover" }}
+                    />
+                  ) : (
+                    <div
+                      className="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold mx-auto"
+                      style={{ width: 160, height: 160, fontSize: "3rem" }}
+                    >
+                      {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
+                    </div>
+                  )}
+                </div>
+
+                {/* Cámara en tiempo real */}
+                {camActiva && (
+                  <div className="text-center mb-3">
+                    <video
+                      ref={videoRef}
+                      autoPlay
+                      playsInline
+                      muted
+                      className="rounded-3 border"
+                      style={{ width: "100%", maxHeight: 260, background: "#000", objectFit: "cover" }}
+                    />
+                    <canvas ref={canvasRef} className="d-none" />
+                    <div className="d-flex gap-2 justify-content-center mt-2">
+                      <button className="btn btn-success btn-sm" onClick={tomarFoto}>
+                        <i className="bi bi-camera me-1" />Capturar
+                      </button>
+                      <button className="btn btn-outline-secondary btn-sm" onClick={cerrarCamara}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {/* Canvas oculto para captura */}
+                {!camActiva && <canvas ref={canvasRef} className="d-none" />}
+
+                {/* Botones de acción */}
+                {!camActiva && (
+                  <div className="d-flex flex-column gap-2">
+                    <button className="btn btn-outline-primary btn-sm w-100" onClick={abrirCamara}>
+                      <i className="bi bi-camera me-2" />Usar cámara
+                    </button>
+                    <button
+                      className="btn btn-outline-secondary btn-sm w-100"
+                      onClick={() => fotoInput.current?.click()}
+                    >
+                      <i className="bi bi-image me-2" />Seleccionar imagen
+                    </button>
+                    <input
+                      ref={fotoInput}
+                      type="file"
+                      accept="image/*"
+                      className="d-none"
+                      onChange={seleccionarArchivo}
+                    />
+                  </div>
+                )}
+
+              </div>
+
+              <div className="modal-footer border-0 pt-0 d-flex justify-content-between">
+                <div>
+                  {paciente.foto_perfil && !fotoPreview && (
+                    <button className="btn btn-outline-danger btn-sm" onClick={eliminarFoto}>
+                      <i className="bi bi-trash me-1" />Eliminar foto
+                    </button>
+                  )}
+                </div>
+                <div className="d-flex gap-2">
+                  <button className="btn btn-secondary btn-sm" onClick={cerrarModalFoto}>Cancelar</button>
+                  {fotoPreview && (
+                    <button className="btn btn-primary btn-sm" onClick={subirFoto} disabled={fotoSubiendo}>
+                      {fotoSubiendo
+                        ? <><span className="spinner-border spinner-border-sm me-1" />Subiendo...</>
+                        : <><i className="bi bi-floppy me-1" />Guardar foto</>}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+      </>
+    )}
+    </>
   );
 }

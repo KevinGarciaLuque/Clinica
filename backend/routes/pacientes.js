@@ -1,6 +1,9 @@
 const router = require("express").Router();
-const pool = require("../db");
-const auth = require("../middlewares/auth");
+const pool   = require("../db");
+const auth   = require("../middlewares/auth");
+const upload = require("../middlewares/upload");
+const fs     = require("fs");
+const path   = require("path");
 
 // GET /api/pacientes
 router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
@@ -120,5 +123,78 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
     res.status(500).json({ ok: false, msg: e.message });
   }
 });
+
+// ── POST /api/pacientes/:id/foto ─────────────────────────
+router.post(
+  "/:id/foto",
+  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  upload.single("foto"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
+
+      const clinicaId = req.tenant?.clinica_id;
+      const { id }    = req.params;
+
+      // Verificar que el paciente pertenece a la clínica
+      const [[p]] = await pool.query(
+        "SELECT id, foto_perfil FROM pacientes WHERE id=? AND clinica_id=?",
+        [id, clinicaId]
+      );
+      if (!p) {
+        fs.unlink(req.file.path, () => {});
+        return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+      }
+
+      // Eliminar foto anterior si existe
+      if (p.foto_perfil) {
+        const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
+        if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
+      }
+
+      // Guardar ruta relativa (pacientes/filename.jpg)
+      const relativePath = "pacientes/" + req.file.filename;
+      await pool.query(
+        "UPDATE pacientes SET foto_perfil=? WHERE id=? AND clinica_id=?",
+        [relativePath, id, clinicaId]
+      );
+
+      res.json({ ok: true, foto_perfil: relativePath });
+    } catch (e) {
+      if (req.file) fs.unlink(req.file.path, () => {});
+      res.status(500).json({ ok: false, msg: e.message });
+    }
+  }
+);
+
+// ── DELETE /api/pacientes/:id/foto ───────────────────────
+router.delete(
+  "/:id/foto",
+  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  async (req, res) => {
+    try {
+      const clinicaId = req.tenant?.clinica_id;
+      const { id }    = req.params;
+
+      const [[p]] = await pool.query(
+        "SELECT id, foto_perfil FROM pacientes WHERE id=? AND clinica_id=?",
+        [id, clinicaId]
+      );
+      if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+
+      if (p.foto_perfil) {
+        const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
+        if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
+        await pool.query(
+          "UPDATE pacientes SET foto_perfil=NULL WHERE id=? AND clinica_id=?",
+          [id, clinicaId]
+        );
+      }
+      res.json({ ok: true });
+    } catch (e) {
+      res.status(500).json({ ok: false, msg: e.message });
+    }
+  }
+);
 
 module.exports = router;

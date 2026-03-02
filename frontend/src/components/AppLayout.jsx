@@ -40,8 +40,8 @@ export default function AppLayout() {
             height: "100%",
             display: "flex",
             flexDirection: "column",
-            background: "#fff",
-            borderRight: "1px solid #e9ecef",
+            background: "#0d1b2e",
+            borderRight: "1px solid rgba(255,255,255,0.07)",
             transition: "width 0.25s ease, min-width 0.25s ease, transform 0.28s ease",
             overflow: "hidden",
             zIndex: 1045,
@@ -65,7 +65,7 @@ export default function AppLayout() {
               width: 240px !important;
               min-width: 240px !important;
               transform: ${mobileOpen ? "translateX(0)" : "translateX(-100%)"};
-              box-shadow: ${mobileOpen ? "4px 0 20px rgba(0,0,0,.18)" : "none"};
+              box-shadow: ${mobileOpen ? "4px 0 24px rgba(0,0,0,.45)" : "none"};
             }
           }
         `}</style>

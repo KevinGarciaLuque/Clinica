@@ -1,10 +1,46 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
 
+/* ── Paleta ────────────────────────────────────────────────── */
+const C = {
+  bg:       "#0d1b2e",
+  surface:  "#112240",
+  card:     "#162a45",
+  border:   "rgba(255,255,255,0.07)",
+  accent:   "#2196f3",
+  accentD:  "#1976d2",
+  success:  "#10b981",
+  warning:  "#f59e0b",
+  text:     "#e2e8f0",
+  muted:    "#94a3b8",
+  inputBg:  "#0d1b2e",
+};
+
 const EMPTY_C = {
   nombre: "", slug: "", email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
 };
 const EMPTY_A = { admin_nombres: "", admin_apellidos: "", admin_email: "", admin_password: "" };
+
+/* ── Subcomponente: campo de formulario ─────────────────────── */
+function Field({ label, hint, children }) {
+  return (
+    <div>
+      <label style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase",
+                       letterSpacing: ".05em", marginBottom: 6, display: "block" }}>
+        {label} {hint && <span style={{ color: C.muted, fontWeight: 400, textTransform: "none",
+                                         letterSpacing: 0, fontSize: 11 }}>{hint}</span>}
+      </label>
+      {children}
+    </div>
+  );
+}
+
+/* ── Estilos globales del <input> ───────────────────────────── */
+const inputSt = {
+  background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 8,
+  color: C.text, padding: "9px 12px", width: "100%", fontSize: 14,
+  outline: "none", transition: "border .2s",
+};
 
 export default function Clinicas() {
   const [clinicas, setClinicas]   = useState([]);
@@ -14,6 +50,7 @@ export default function Clinicas() {
   const [cargando, setCargando]   = useState(false);
   const [error, setError]         = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [hovered, setHovered]     = useState(null);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -57,11 +94,8 @@ export default function Clinicas() {
 
   const toggleActivo = async (c) => {
     try {
-      if (c.activo) {
-        await api.delete(`/clinicas/${c.id}`);
-      } else {
-        await api.put(`/clinicas/${c.id}`, { activo: 1 });
-      }
+      if (c.activo) await api.delete(`/clinicas/${c.id}`);
+      else          await api.put(`/clinicas/${c.id}`, { activo: 1 });
       cargar();
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -72,149 +106,500 @@ export default function Clinicas() {
     `${c.nombre} ${c.slug}`.toLowerCase().includes(busqueda.toLowerCase())
   );
 
+  const total   = clinicas.length;
+  const activas = clinicas.filter((c) => c.activo).length;
+
   return (
-    <div>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <div>
-          <h4 className="mb-0">Gestión de Clínicas</h4>
-          <small className="text-muted">Panel SUPER_ADMIN — todas las clínicas del sistema</small>
+    <div style={{ color: C.text, minHeight: "100vh" }}>
+
+      {/* ── Banner superior ─────────────────────────────────── */}
+      <div style={{
+        background: `linear-gradient(135deg, ${C.surface} 0%, #0f2a50 100%)`,
+        borderRadius: 16, padding: "28px 32px", marginBottom: 24,
+        border: `1px solid ${C.border}`,
+        boxShadow: "0 4px 24px rgba(0,0,0,.3)",
+        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 16,
+      }}>
+        {/* Icono + título */}
+        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+          <div style={{
+            width: 54, height: 54, borderRadius: 14,
+            background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 16px rgba(33,150,243,.4)`,
+          }}>
+            <i className="bi bi-building-fill" style={{ fontSize: 24, color: "#fff" }} />
+          </div>
+          <div>
+            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 22, color: C.text }}>
+              Gestión de Clínicas
+            </h4>
+            <span style={{ color: C.muted, fontSize: 13 }}>
+              Panel SUPER_ADMIN — todas las clínicas del sistema
+            </span>
+          </div>
         </div>
-        <button className="btn btn-primary btn-sm" onClick={abrirNuevo}>+ Nueva clínica</button>
+
+        {/* Stats + botón */}
+        <div style={{ display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+          <div style={{
+            background: "rgba(33,150,243,.12)", border: "1px solid rgba(33,150,243,.2)",
+            borderRadius: 10, padding: "8px 16px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: C.accent, lineHeight: 1 }}>{total}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Total</div>
+          </div>
+          <div style={{
+            background: "rgba(16,185,129,.12)", border: "1px solid rgba(16,185,129,.2)",
+            borderRadius: 10, padding: "8px 16px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: C.success, lineHeight: 1 }}>{activas}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Activas</div>
+          </div>
+          <div style={{
+            background: "rgba(148,163,184,.08)", border: `1px solid ${C.border}`,
+            borderRadius: 10, padding: "8px 16px", textAlign: "center",
+          }}>
+            <div style={{ fontSize: 22, fontWeight: 700, color: C.muted, lineHeight: 1 }}>{total - activas}</div>
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Inactivas</div>
+          </div>
+
+          <button
+            onClick={abrirNuevo}
+            style={{
+              background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+              border: "none", borderRadius: 10, padding: "10px 20px",
+              color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 8,
+              boxShadow: `0 4px 14px rgba(33,150,243,.4)`,
+              transition: "opacity .2s",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = ".85"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+          >
+            <i className="bi bi-plus-lg" />
+            Nueva clínica
+          </button>
+        </div>
       </div>
 
-      {error && <div className="alert alert-danger py-2">{error}</div>}
+      {/* ── Error ────────────────────────────────────────────── */}
+      {error && (
+        <div style={{
+          background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)",
+          borderRadius: 10, padding: "12px 16px", marginBottom: 20, color: "#f87171",
+          display: "flex", alignItems: "center", gap: 10,
+        }}>
+          <i className="bi bi-exclamation-triangle-fill" />
+          {error}
+        </div>
+      )}
 
-      <div className="mb-3">
-        <input className="form-control" placeholder="Buscar clínica..."
-          value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+      {/* ── Buscador ─────────────────────────────────────────── */}
+      <div style={{ position: "relative", marginBottom: 24, maxWidth: 420 }}>
+        <i className="bi bi-search" style={{
+          position: "absolute", left: 14, top: "50%", transform: "translateY(-50%)",
+          color: C.muted, fontSize: 15, pointerEvents: "none",
+        }} />
+        <input
+          style={{ ...inputSt, paddingLeft: 40, borderRadius: 10 }}
+          placeholder="Buscar clínica por nombre o slug..."
+          value={busqueda}
+          onChange={(e) => setBusqueda(e.target.value)}
+          onFocus={(e) => e.target.style.borderColor = C.accent}
+          onBlur={(e)  => e.target.style.borderColor = C.border}
+        />
       </div>
 
+      {/* ── Grid de clínicas ─────────────────────────────────── */}
       {cargando ? (
-        <div className="text-center py-5"><div className="spinner-border" /></div>
+        <div style={{ textAlign: "center", padding: "60px 0" }}>
+          <div style={{
+            width: 44, height: 44, border: `3px solid ${C.border}`,
+            borderTopColor: C.accent, borderRadius: "50%",
+            animation: "spin .8s linear infinite", margin: "0 auto 16px",
+          }} />
+          <span style={{ color: C.muted, fontSize: 14 }}>Cargando clínicas...</span>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
       ) : (
-        <div className="row g-3">
-          {filtradas.map((c) => (
-            <div key={c.id} className="col-md-6 col-lg-4">
-              <div className={`card h-100 ${c.activo ? "" : "opacity-50"}`}>
-                <div className="card-body">
-                  <div className="d-flex justify-content-between align-items-start mb-2">
-                    <h6 className="card-title mb-0">{c.nombre}</h6>
-                    <span className={`badge ${c.activo ? "bg-success" : "bg-secondary"}`}>
-                      {c.activo ? "Activa" : "Inactiva"}
-                    </span>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
+          {filtradas.map((c) => {
+            const initials = c.nombre.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+            const isHov = hovered === c.id;
+            return (
+              <div
+                key={c.id}
+                onMouseEnter={() => setHovered(c.id)}
+                onMouseLeave={() => setHovered(null)}
+                style={{
+                  background: C.card,
+                  border: `1px solid ${isHov ? "rgba(33,150,243,.35)" : C.border}`,
+                  borderRadius: 16,
+                  overflow: "hidden",
+                  opacity: c.activo ? 1 : 0.55,
+                  transition: "border .2s, transform .2s, box-shadow .2s",
+                  transform: isHov ? "translateY(-3px)" : "none",
+                  boxShadow: isHov ? "0 8px 32px rgba(0,0,0,.35)" : "0 2px 12px rgba(0,0,0,.2)",
+                }}
+              >
+                {/* Cabecera de tarjeta */}
+                <div style={{
+                  background: `linear-gradient(135deg, #0f2a50 0%, #1a3a5c 100%)`,
+                  padding: "18px 20px",
+                  display: "flex", alignItems: "center", gap: 14,
+                  borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <div style={{
+                    width: 46, height: 46, borderRadius: 12,
+                    background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontWeight: 700, fontSize: 16, color: "#fff",
+                    flexShrink: 0, boxShadow: `0 3px 10px rgba(33,150,243,.3)`,
+                  }}>
+                    {initials}
                   </div>
-                  <p className="text-muted small mb-1">
-                    <span className="badge bg-light text-dark border me-1">slug: {c.slug}</span>
-                  </p>
-                  {c.email    && <p className="small mb-1">✉ {c.email}</p>}
-                  {c.telefono && <p className="small mb-1">📞 {c.telefono}</p>}
-                  {c.ciudad   && <p className="small mb-1">📍 {c.ciudad}</p>}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: C.text,
+                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                      {c.nombre}
+                    </div>
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 5,
+                      background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                      borderRadius: 6, padding: "2px 8px", marginTop: 4,
+                    }}>
+                      <i className="bi bi-link-45deg" style={{ fontSize: 12, color: C.muted }} />
+                      <span style={{ fontSize: 12, color: C.muted, fontFamily: "monospace" }}>{c.slug}</span>
+                    </div>
+                  </div>
+                  <span style={{
+                    padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                    background: c.activo ? "rgba(16,185,129,.15)" : "rgba(148,163,184,.1)",
+                    color:      c.activo ? C.success : C.muted,
+                    border:     `1px solid ${c.activo ? "rgba(16,185,129,.3)" : C.border}`,
+                    whiteSpace: "nowrap",
+                  }}>
+                    <i className={`bi bi-${c.activo ? "check-circle" : "x-circle"}-fill me-1`} />
+                    {c.activo ? "Activa" : "Inactiva"}
+                  </span>
                 </div>
-                <div className="card-footer d-flex gap-2">
-                  <button className="btn btn-outline-primary btn-sm flex-fill"
-                    onClick={() => abrirEditar(c)}>Editar</button>
-                  <button className={`btn btn-sm flex-fill ${c.activo ? "btn-outline-warning" : "btn-outline-success"}`}
-                    onClick={() => toggleActivo(c)}>
+
+                {/* Cuerpo */}
+                <div style={{ padding: "16px 20px", display: "flex", flexDirection: "column", gap: 8 }}>
+                  {c.email && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <i className="bi bi-envelope" style={{ color: C.accent, fontSize: 13, width: 16 }} />
+                      <span style={{ fontSize: 13, color: C.muted }}>{c.email}</span>
+                    </div>
+                  )}
+                  {c.telefono && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <i className="bi bi-telephone" style={{ color: C.accent, fontSize: 13, width: 16 }} />
+                      <span style={{ fontSize: 13, color: C.muted }}>{c.telefono}</span>
+                    </div>
+                  )}
+                  {c.ciudad && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <i className="bi bi-geo-alt" style={{ color: C.accent, fontSize: 13, width: 16 }} />
+                      <span style={{ fontSize: 13, color: C.muted }}>{c.ciudad}{c.pais ? `, ${c.pais}` : ""}</span>
+                    </div>
+                  )}
+                  {c.ruc && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <i className="bi bi-file-text" style={{ color: C.accent, fontSize: 13, width: 16 }} />
+                      <span style={{ fontSize: 13, color: C.muted }}>RUC: {c.ruc}</span>
+                    </div>
+                  )}
+                  {!c.email && !c.telefono && !c.ciudad && (
+                    <span style={{ fontSize: 13, color: C.muted, fontStyle: "italic" }}>Sin datos de contacto</span>
+                  )}
+                </div>
+
+                {/* Footer de tarjeta */}
+                <div style={{
+                  padding: "12px 20px", borderTop: `1px solid ${C.border}`,
+                  display: "flex", gap: 10,
+                }}>
+                  <button
+                    onClick={() => abrirEditar(c)}
+                    style={{
+                      flex: 1, background: "rgba(33,150,243,.1)", border: "1px solid rgba(33,150,243,.25)",
+                      borderRadius: 8, padding: "8px 0", color: C.accent,
+                      fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(33,150,243,.2)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(33,150,243,.1)"}
+                  >
+                    <i className="bi bi-pencil-square" />
+                    Editar
+                  </button>
+                  <button
+                    onClick={() => toggleActivo(c)}
+                    style={{
+                      flex: 1,
+                      background: c.activo ? "rgba(245,158,11,.08)" : "rgba(16,185,129,.08)",
+                      border: `1px solid ${c.activo ? "rgba(245,158,11,.25)" : "rgba(16,185,129,.25)"}`,
+                      borderRadius: 8, padding: "8px 0",
+                      color: c.activo ? C.warning : C.success,
+                      fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = ".75"}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                  >
+                    <i className={`bi bi-${c.activo ? "pause-circle" : "play-circle"}`} />
                     {c.activo ? "Desactivar" : "Activar"}
                   </button>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
+
+          {/* Estado vacío */}
           {!filtradas.length && (
-            <div className="col-12 text-center text-muted py-5">No hay clínicas registradas</div>
+            <div style={{
+              gridColumn: "1/-1", textAlign: "center", padding: "64px 0",
+            }}>
+              <div style={{
+                width: 72, height: 72, borderRadius: 20, margin: "0 auto 20px",
+                background: "rgba(33,150,243,.08)", border: `1px solid rgba(33,150,243,.15)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-building" style={{ fontSize: 30, color: C.muted }} />
+              </div>
+              <p style={{ color: C.muted, fontSize: 15, margin: 0 }}>
+                {busqueda ? "No se encontraron clínicas con ese criterio" : "No hay clínicas registradas"}
+              </p>
+              {!busqueda && (
+                <button onClick={abrirNuevo} style={{
+                  marginTop: 16, background: C.accent, border: "none", borderRadius: 8,
+                  padding: "9px 20px", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 14,
+                }}>
+                  + Registrar la primera clínica
+                </button>
+              )}
+            </div>
           )}
         </div>
       )}
 
+      {/* ── Modal ─────────────────────────────────────────────── */}
       {showModal && (
-        <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }}>
-          <div className="modal-dialog modal-lg">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">{editId ? "Editar clínica" : "Nueva clínica"}</h5>
-                <button className="btn-close" onClick={() => setShowModal(false)} />
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1050,
+          background: "rgba(0,0,0,.65)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 18, width: "100%", maxWidth: 680,
+            maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+          }}>
+            {/* Header modal */}
+            <div style={{
+              padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 14,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className={`bi bi-${editId ? "pencil-square" : "building-add"}`}
+                   style={{ color: "#fff", fontSize: 17 }} />
               </div>
-              <form onSubmit={guardar}>
-                <div className="modal-body">
-                  {error && <div className="alert alert-danger py-2">{error}</div>}
-                  <h6 className="text-muted mb-3">Datos de la clínica</h6>
-                  <div className="row g-3">
-                    <div className="col-md-6">
-                      <label className="form-label">Nombre *</label>
-                      <input className="form-control" value={form.nombre}
-                        onChange={(e) => setForm({ ...form, nombre: e.target.value })} required />
+              <div style={{ flex: 1 }}>
+                <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 17 }}>
+                  {editId ? "Editar clínica" : "Nueva clínica"}
+                </h5>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  {editId ? "Modifica los datos de la clínica" : "Complete los datos para registrar una nueva clínica"}
+                </span>
+              </div>
+              <button
+                onClick={() => setShowModal(false)}
+                style={{
+                  background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                  borderRadius: 8, width: 34, height: 34,
+                  color: C.muted, cursor: "pointer", fontSize: 16,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+
+            <form onSubmit={guardar}>
+              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 24 }}>
+
+                {error && (
+                  <div style={{
+                    background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)",
+                    borderRadius: 10, padding: "12px 16px", color: "#f87171",
+                    display: "flex", alignItems: "center", gap: 10, fontSize: 14,
+                  }}>
+                    <i className="bi bi-exclamation-triangle-fill" /> {error}
+                  </div>
+                )}
+
+                {/* Sección datos clínica */}
+                <div>
+                  <div style={{
+                    display: "flex", alignItems: "center", gap: 10, marginBottom: 18,
+                  }}>
+                    <div style={{
+                      width: 28, height: 28, borderRadius: 8,
+                      background: "rgba(33,150,243,.15)", border: "1px solid rgba(33,150,243,.25)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      <i className="bi bi-building" style={{ fontSize: 12, color: C.accent }} />
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label">
-                        Slug * <small className="text-muted">(clinica1 → clinica1.tudominio.com)</small>
-                      </label>
-                      <input className="form-control" value={form.slug} placeholder="clinica-ejemplo"
+                    <span style={{ fontWeight: 600, fontSize: 13, color: C.text }}>Datos de la clínica</span>
+                    <div style={{ flex: 1, height: 1, background: C.border }} />
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <Field label="Nombre" hint="*">
+                      <input style={inputSt} value={form.nombre}
+                        onChange={(e) => setForm({ ...form, nombre: e.target.value })}
+                        onFocus={(e) => e.target.style.borderColor = C.accent}
+                        onBlur={(e)  => e.target.style.borderColor = C.border}
+                        required />
+                    </Field>
+                    <Field label="Slug" hint="* (ej: clinica-norte)">
+                      <input style={{ ...inputSt, fontFamily: "monospace" }} value={form.slug}
+                        placeholder="clinica-ejemplo"
                         onChange={(e) => setForm({ ...form, slug: e.target.value.toLowerCase().replace(/\s/g,"-") })}
+                        onFocus={(e) => e.target.style.borderColor = C.accent}
+                        onBlur={(e)  => e.target.style.borderColor = C.border}
                         pattern="[a-z0-9\-]+" required />
+                    </Field>
+                    <Field label="Email">
+                      <input style={inputSt} type="email" value={form.email}
+                        onChange={(e) => setForm({ ...form, email: e.target.value })}
+                        onFocus={(e) => e.target.style.borderColor = C.accent}
+                        onBlur={(e)  => e.target.style.borderColor = C.border} />
+                    </Field>
+                    <Field label="Teléfono">
+                      <input style={inputSt} value={form.telefono}
+                        onChange={(e) => setForm({ ...form, telefono: e.target.value })}
+                        onFocus={(e) => e.target.style.borderColor = C.accent}
+                        onBlur={(e)  => e.target.style.borderColor = C.border} />
+                    </Field>
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="Dirección">
+                        <input style={inputSt} value={form.direccion}
+                          onChange={(e) => setForm({ ...form, direccion: e.target.value })}
+                          onFocus={(e) => e.target.style.borderColor = C.accent}
+                          onBlur={(e)  => e.target.style.borderColor = C.border} />
+                      </Field>
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Email</label>
-                      <input className="form-control" type="email" value={form.email}
-                        onChange={(e) => setForm({ ...form, email: e.target.value })} />
+                    <Field label="Ciudad">
+                      <input style={inputSt} value={form.ciudad}
+                        onChange={(e) => setForm({ ...form, ciudad: e.target.value })}
+                        onFocus={(e) => e.target.style.borderColor = C.accent}
+                        onBlur={(e)  => e.target.style.borderColor = C.border} />
+                    </Field>
+                    <Field label="RUC / NIT">
+                      <input style={inputSt} value={form.ruc}
+                        onChange={(e) => setForm({ ...form, ruc: e.target.value })}
+                        onFocus={(e) => e.target.style.borderColor = C.accent}
+                        onBlur={(e)  => e.target.style.borderColor = C.border} />
+                    </Field>
+                  </div>
+                </div>
+
+                {/* Sección admin inicial */}
+                {!editId && (
+                  <div>
+                    <div style={{
+                      display: "flex", alignItems: "center", gap: 10, marginBottom: 18,
+                    }}>
+                      <div style={{
+                        width: 28, height: 28, borderRadius: 8,
+                        background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.2)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <i className="bi bi-person-badge" style={{ fontSize: 12, color: C.success }} />
+                      </div>
+                      <span style={{ fontWeight: 600, fontSize: 13, color: C.text }}>
+                        Administrador inicial
+                      </span>
+                      <span style={{
+                        fontSize: 11, color: C.muted, background: "rgba(148,163,184,.08)",
+                        border: `1px solid ${C.border}`, borderRadius: 6, padding: "2px 8px",
+                      }}>opcional</span>
+                      <div style={{ flex: 1, height: 1, background: C.border }} />
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Teléfono</label>
-                      <input className="form-control" value={form.telefono}
-                        onChange={(e) => setForm({ ...form, telefono: e.target.value })} />
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label">Dirección</label>
-                      <input className="form-control" value={form.direccion}
-                        onChange={(e) => setForm({ ...form, direccion: e.target.value })} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">Ciudad</label>
-                      <input className="form-control" value={form.ciudad}
-                        onChange={(e) => setForm({ ...form, ciudad: e.target.value })} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label">RUC / NIT</label>
-                      <input className="form-control" value={form.ruc}
-                        onChange={(e) => setForm({ ...form, ruc: e.target.value })} />
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                      <Field label="Nombres">
+                        <input style={inputSt} value={form.admin_nombres}
+                          onChange={(e) => setForm({ ...form, admin_nombres: e.target.value })}
+                          onFocus={(e) => e.target.style.borderColor = C.accent}
+                          onBlur={(e)  => e.target.style.borderColor = C.border} />
+                      </Field>
+                      <Field label="Apellidos">
+                        <input style={inputSt} value={form.admin_apellidos}
+                          onChange={(e) => setForm({ ...form, admin_apellidos: e.target.value })}
+                          onFocus={(e) => e.target.style.borderColor = C.accent}
+                          onBlur={(e)  => e.target.style.borderColor = C.border} />
+                      </Field>
+                      <Field label="Email del admin">
+                        <input style={inputSt} type="email" value={form.admin_email}
+                          onChange={(e) => setForm({ ...form, admin_email: e.target.value })}
+                          onFocus={(e) => e.target.style.borderColor = C.accent}
+                          onBlur={(e)  => e.target.style.borderColor = C.border} />
+                      </Field>
+                      <Field label="Contraseña temporal">
+                        <input style={inputSt} type="password" value={form.admin_password}
+                          onChange={(e) => setForm({ ...form, admin_password: e.target.value })}
+                          onFocus={(e) => e.target.style.borderColor = C.accent}
+                          onBlur={(e)  => e.target.style.borderColor = C.border} />
+                      </Field>
                     </div>
                   </div>
+                )}
+              </div>
 
-                  {!editId && (
-                    <>
-                      <hr />
-                      <h6 className="text-muted mb-3">Administrador inicial (opcional)</h6>
-                      <div className="row g-3">
-                        <div className="col-md-6">
-                          <label className="form-label">Nombres del admin</label>
-                          <input className="form-control" value={form.admin_nombres}
-                            onChange={(e) => setForm({ ...form, admin_nombres: e.target.value })} />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label">Apellidos</label>
-                          <input className="form-control" value={form.admin_apellidos}
-                            onChange={(e) => setForm({ ...form, admin_apellidos: e.target.value })} />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label">Email del admin</label>
-                          <input className="form-control" type="email" value={form.admin_email}
-                            onChange={(e) => setForm({ ...form, admin_email: e.target.value })} />
-                        </div>
-                        <div className="col-md-6">
-                          <label className="form-label">Contraseña temporal</label>
-                          <input className="form-control" type="password" value={form.admin_password}
-                            onChange={(e) => setForm({ ...form, admin_password: e.target.value })} />
-                        </div>
-                      </div>
-                    </>
-                  )}
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary">Guardar</button>
-                </div>
-              </form>
-            </div>
+              {/* Footer modal */}
+              <div style={{
+                padding: "18px 28px", borderTop: `1px solid ${C.border}`,
+                display: "flex", justifyContent: "flex-end", gap: 12,
+              }}>
+                <button
+                  type="button"
+                  onClick={() => setShowModal(false)}
+                  style={{
+                    background: "transparent", border: `1px solid ${C.border}`,
+                    borderRadius: 9, padding: "10px 22px",
+                    color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                    transition: "border .2s, color .2s",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.borderColor=C.accent; e.currentTarget.style.color=C.accent; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.muted; }}
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                    border: "none", borderRadius: 9, padding: "10px 28px",
+                    color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 8,
+                    boxShadow: `0 4px 14px rgba(33,150,243,.35)`,
+                    transition: "opacity .2s",
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.opacity = ".85"}
+                  onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                >
+                  <i className={`bi bi-${editId ? "check-lg" : "plus-lg"}`} />
+                  {editId ? "Guardar cambios" : "Crear clínica"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}
