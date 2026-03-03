@@ -276,7 +276,7 @@ function SalaEspera({ sala, onEstadoChange }) {
 function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
   const [form, setForm] = useState({
     paciente_id: "", medico_id: "", inicio: "", fin: "",
-    tipo_consulta: "CONSULTA", motivo: "", canal: "RECEPCION",
+    tipo_consulta: "PRIMERA_VEZ", motivo: "", canal: "RECEPCION",
   });
   const [pacBusq,  setPacBusq]  = useState("");
   const [pacList,  setPacList]  = useState([]);
@@ -333,7 +333,12 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
     if (!form.inicio)      { setErr("Selecciona un horario");  return; }
     setSaving(true); setErr("");
     try {
-      await api.post("/citas", form);
+      const payload = {
+        ...form,
+        inicio: dayjs(form.inicio).format("YYYY-MM-DD HH:mm:ss"),
+        fin:    dayjs(form.fin).format("YYYY-MM-DD HH:mm:ss"),
+      };
+      await api.post("/citas", payload);
       onCreated();
     } catch (ex) {
       setErr(ex.response?.data?.msg || "Error al guardar");
@@ -411,7 +416,7 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
                 <label className="form-label fw-semibold">Tipo</label>
                 <select className="form-select" value={form.tipo_consulta}
                   onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
-                  {["CONSULTA","CONTROL","URGENCIA","CIRUGIA","PROCEDIMIENTO","TELEMEDICINA"].map(t => (
+                  {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
                     <option key={t}>{t}</option>
                   ))}
                 </select>

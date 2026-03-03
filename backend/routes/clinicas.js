@@ -25,7 +25,7 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
     // SUPER_ADMIN tiene acceso a todos los módulos base
     if (req.user.super) {
       const [rows] = await pool.query(
-        "SELECT clave, nombre, icono, ruta FROM modulos_sistema WHERE disponible=1 ORDER BY id"
+        "SELECT clave, nombre, icono, ruta FROM modulos_sistema WHERE disponible=1 ORDER BY orden"
       );
       return res.json({ ok: true, data: rows });
     }
@@ -37,13 +37,13 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
       INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id
       INNER JOIN clinicas c ON c.tipo_id = tcm.tipo_id
       WHERE c.id = ? AND ms.disponible = 1
-      ORDER BY ms.id
+      ORDER BY ms.orden
     `, [req.user.clinica_id]);
 
     // Si la clínica no tiene tipo asignado, devolver módulos base
     if (!rows.length) {
       const [base] = await pool.query(
-        "SELECT clave, nombre, icono, ruta FROM modulos_sistema WHERE clave IN (?,?,?,?,?,?) AND disponible=1 ORDER BY id",
+        "SELECT clave, nombre, icono, ruta FROM modulos_sistema WHERE clave IN (?,?,?,?,?,?) AND disponible=1 ORDER BY orden",
         ["dashboard","pacientes","citas","historia_clinica","chat_ia","estudios"]
       );
       return res.json({ ok: true, data: base });
@@ -201,11 +201,20 @@ router.put("/:id/config", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   }
 });
 
-// DELETE /api/clinicas/:id  → solo SUPER_ADMIN (desactivar, no borrar)
+// DELETE /api/clinicas/:id  → solo SUPER_ADMIN (eliminar permanente o desactivar)
 router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    const { permanente } = req.query;
+    
+    if (permanente === "true") {
+      // Eliminación permanente (CASCADE eliminará usuarios, pacientes, citas, etc.)
+      await pool.query("DELETE FROM clinicas WHERE id=?", [req.params.id]);
+      return res.json({ ok: true, msg: "Clínica eliminada permanentemente" });
+    }
+    
+    // Solo desactivar
     await pool.query("UPDATE clinicas SET activo=0 WHERE id=?", [req.params.id]);
-    res.json({ ok: true });
+    res.json({ ok: true, msg: "Clínica desactivada" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

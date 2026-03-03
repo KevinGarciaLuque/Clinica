@@ -66,6 +66,16 @@ router.post("/login", async (req, res) => {
 
     const esSuper = user.tipo === "SUPER_ADMIN";
 
+    // Obtener nombre de la clínica si tiene clinica_id
+    let clinicaNombre = null;
+    if (user.clinica_id) {
+      const [clinicaRows] = await pool.query(
+        "SELECT nombre FROM clinicas WHERE id=? LIMIT 1",
+        [user.clinica_id]
+      );
+      if (clinicaRows.length) clinicaNombre = clinicaRows[0].nombre;
+    }
+
     const token = jwt.sign(
       {
         uid: user.id,
@@ -83,6 +93,7 @@ router.post("/login", async (req, res) => {
       usuario: {
         id: user.id,
         clinica_id: user.clinica_id || null,
+        clinica_nombre: clinicaNombre,
         nombres: user.nombres,
         apellidos: user.apellidos,
         email: user.email,

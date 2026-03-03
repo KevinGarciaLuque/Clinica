@@ -98,6 +98,8 @@ app.use("/api/medicamentos",   require("./routes/medicamentos"));
 app.use("/api/registro",       require("./routes/registro"));
 // Base de datos (export / import) — SUPER_ADMIN only
 app.use("/api/database",       require("./routes/database"));
+// Galería Estética (Antes/Después)
+app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
 
 // ===== Manejo de errores =====
 app.use((err, req, res, next) => {

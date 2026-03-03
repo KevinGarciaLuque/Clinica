@@ -1,0 +1,344 @@
+# 📋 FLUJO DE TRABAJO - CLÍNICA DE ESTÉTICA
+
+## 🎯 Descripción General
+Este documento describe el flujo completo de atención estética desde la primera consulta hasta el seguimiento post-procedimiento.
+
+---
+
+## 👨‍⚕️ FLUJO DEL MÉDICO ESTÉTICO
+
+### 1️⃣ PRIMERA CONSULTA
+
+#### Registro del Paciente
+- **Recepción** registra al paciente con datos personales completos
+- Se asigna una cita con el médico especialista en estética
+- El sistema genera un expediente digital del paciente
+
+#### Consulta Inicial
+1. El médico accede al **Perfil del Paciente**
+2. Completa la **Ficha Estética** que incluye:
+   - Motivo de consulta
+   - Antecedentes médicos relevantes
+   - Alergias
+   - Tratamientos previos
+   - Expectativas del paciente
+
+3. Realiza **Evaluación Fotográfica Inicial**:
+   - Accede al módulo **Galería Estética**
+   - Crea una nueva sesión: "Evaluación Inicial"
+   - Toma 6 fotografías en poses estandarizadas:
+     - ✓ Frontal
+     - ✓ 45° Izquierda
+     - ✓ 45° Derecha
+     - ✓ Perfil Izquierdo
+     - ✓ Perfil Derecho
+     - ✓ Vista Superior (Cenital)
+
+4. Elabora el **Diagnóstico y Plan de Tratamiento**
+
+---
+
+### 2️⃣ PRESUPUESTO Y CONSENTIMIENTO
+
+#### Generación de Presupuesto
+1. El médico crea un **Presupuesto** detallado:
+   - Procedimiento(s) recomendado(s)
+   - Costo detallado
+   - Número de sesiones
+   - Productos a utilizar
+   - Tiempo de recuperación estimado
+
+2. Se explica al paciente:
+   - Beneficios esperados
+   - Riesgos potenciales
+   - Alternativas disponibles
+
+#### Consentimiento Informado
+1. El médico genera el **Consentimiento Informado**:
+   - Descripción del procedimiento
+   - Riesgos específicos
+   - Cuidados pre y post procedimiento
+   - Firma digital del paciente y médico
+
+2. El paciente debe leer y firmar antes de proceder
+
+---
+
+### 3️⃣ PROGRAMACIÓN DEL PROCEDIMIENTO
+
+#### Agenda de Citas
+1. Se programa la cita para el procedimiento
+2. Tipo de cita: **PROCEDIMIENTO ESTÉTICO**
+3. El sistema bloquea el tiempo necesario según el tipo de procedimiento
+4. Se asigna:
+   - Sala de procedimientos
+   - Personal de apoyo (enfermera)
+   - Material necesario
+
+#### Indicaciones Pre-Procedimiento
+- El médico registra indicaciones específicas
+- Se envía recordatorio automático al paciente 24h antes
+- Confirmación de asistencia
+
+---
+
+### 4️⃣ DÍA DEL PROCEDIMIENTO
+
+#### Preparación
+1. **Recepción** confirma la llegada del paciente
+2. Verificación del consentimiento informado
+3. **Enfermera** prepara al paciente:
+   - Limpieza de la zona
+   - Fotografías pre-procedimiento inmediatas
+   - Aplicación de anestesia local (si aplica)
+
+#### Ejecución del Procedimiento
+1. El médico realiza el procedimiento
+2. Puede documentar con fotos durante el proceso
+3. Registra en tiempo real:
+   - Productos utilizados (lotes y cantidades)
+   - Técnica aplicada
+   - Observaciones importantes
+   - Complicaciones (si las hay)
+
+#### Fotografías Post-Procedimiento Inmediatas
+1. Al finalizar, se accede a **Galería Estética**
+2. Se crea una nueva sesión: "Botox - 03/03/2026"
+3. Se toman las 6 fotografías POST en las mismas poses:
+   - ✓ Frontal
+   - ✓ 45° Izquierda
+   - ✓ 45° Derecha
+   - ✓ Perfil Izquierdo
+   - ✓ Perfil Derecho
+   - ✓ Vista Superior
+
+4. El sistema permite **comparación lado a lado** con las fotos previas
+
+---
+
+### 5️⃣ INDICACIONES POST-PROCEDIMIENTO
+
+#### Registro de Cuidados
+1. El médico completa el **Seguimiento Post-Operatorio**:
+   - Cuidados inmediatos (primeras 24-48h)
+   - Medicamentos prescritos
+   - Actividades a evitar
+   - Signos de alarma
+   - Fecha de próximo control
+
+2. Se genera un documento imprimible para el paciente
+
+#### Prescripción de Medicamentos
+- Analgésicos
+- Antibióticos (si aplica)
+- Anti-inflamatorios
+- Productos de cuidado tópico
+
+---
+
+### 6️⃣ CONTROLES POST-PROCEDIMIENTO
+
+#### Primera Revisión (24-48 horas)
+1. Se agenda cita de control
+2. El médico evalúa:
+   - Evolución normal vs complicaciones
+   - Inflamación esperada
+   - Dolor
+   - Signos de infección
+
+3. Toma fotografías de seguimiento:
+   - Nueva sesión: "Control 48h - Botox"
+   - Las 6 poses estándar
+   - Comparación con fotos anteriores
+
+#### Controles Subsecuentes
+- **7 días**: Evaluación de resultados iniciales
+- **15 días**: Evaluación de resultados intermedios
+- **30 días**: Evaluación de resultados finales
+
+En cada control:
+1. Nueva sesión fotográfica con las 6 poses
+2. Comparación con todas las sesiones previas
+3. Registro de satisfacción del paciente
+4. Ajustes si son necesarios
+
+---
+
+### 7️⃣ EVALUACIÓN FINAL
+
+#### Resultados
+1. El médico accede a la **Galería Estética**
+2. Selecciona al paciente y el procedimiento
+3. Puede visualizar:
+   - **ANTES**: Fotos de evaluación inicial
+   - **DESPUÉS**: Fotos de control final (30 días)
+   - Comparación lado a lado de las 6 poses
+
+4. Registra:
+   - Satisfacción del paciente (1-5 estrellas)
+   - Cumplimiento de expectativas
+   - Necesidad de retoques
+   - Recomendaciones futuras
+
+#### Documentación Completa
+El expediente digital contiene:
+- ✓ Ficha estética inicial
+- ✓ Evaluación fotográfica completa (ANTES/DESPUÉS)
+- ✓ Todas las sesiones de seguimiento
+- ✓ Presupuesto
+- ✓ Consentimiento informado firmado
+- ✓ Registros de procedimiento
+- ✓ Prescripciones
+- ✓ Notas de seguimiento
+
+---
+
+## 🔄 CASOS ESPECIALES
+
+### Procedimientos Múltiples Sesiones
+- Cada sesión tiene su propia galería fotográfica
+- Se puede comparar evolución entre sesiones
+- Ejemplo: Tratamiento de manchas con 4 sesiones de láser
+
+### Retoque o Corrección
+- Se crea una nueva sesión: "Retoque - [Fecha]"
+- Nuevas fotos pre y post retoque
+- Se mantiene historial completo
+
+### Procedimientos Combinados
+- Ejemplo: Botox + Relleno de ácido hialurónico
+- Se documentan ambos en la misma sesión
+- Se especifican zonas tratadas
+
+---
+
+## 📊 VENTAJAS DEL SISTEMA
+
+### Para el Médico
+✅ **Organización**: Todo en un solo lugar  
+✅ **Comparación Visual**: Antes/después inmediato  
+✅ **Trazabilidad**: Historial fotográfico completo  
+✅ **Legal**: Documentación de consentimientos  
+✅ **Seguimiento**: Control de evolución de pacientes  
+
+### Para el Paciente
+✅ **Transparencia**: Ve su evolución claramente  
+✅ **Confianza**: Documentación profesional  
+✅ **Recordatorios**: No olvida controles  
+✅ **Resultado tangible**: Comparación objetiva  
+
+---
+
+## 🎨 POSES FOTOGRÁFICAS ESTÁNDAR
+
+### ¿Por qué 6 poses?
+
+#### 1. **Frontal**
+- Vista principal
+- Simetría facial
+- Análisis de proporciones
+
+#### 2. **45° Izquierda**
+- Evaluación de volúmenes
+- Contornos faciales
+- Zona de pómulos y mandíbula
+
+#### 3. **45° Derecha**
+- Comparación de simetría
+- Volúmenes del lado derecho
+
+#### 4. **Perfil Izquierdo**
+- Proyección nasal
+- Línea de mandíbula
+- Perfil completo
+
+#### 5. **Perfil Derecho**
+- Comparación bilateral
+- Detección de asimetrías
+
+#### 6. **Vista Superior (Cenital)**
+- Especialmente útil para:
+  - Procedimientos capilares
+  - Rellenos de frente
+  - Tratamientos de cuero cabelludo
+
+---
+
+## 📱 FLUJO DIGITAL
+
+```
+┌─────────────────┐
+│   RECEPCIÓN     │
+│  Nuevo Paciente │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  MÉDICO         │
+│  Consulta       │
+│  + Ficha        │
+│  + Fotos ANTES  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  PRESUPUESTO    │
+│  + Consentim.   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  PROCEDIMIENTO  │
+│  + Fotos DESPUES│
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  CONTROLES      │
+│  Multiple fotos │
+│  Comparaciones  │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  RESULTADO      │
+│  Final ANTES/   │
+│  DESPUÉS        │
+└─────────────────┘
+```
+
+---
+
+## 🔐 ASPECTOS LEGALES
+
+### Consentimiento Informado
+- ✓ Obligatorio antes de cada procedimiento
+- ✓ Debe incluir riesgos específicos
+- ✓ Firma digital con timestamp
+- ✓ No se puede proceder sin él
+
+### Protección de Datos
+- Fotos almacenadas de forma segura
+- Solo personal autorizado accede
+- Cumplimiento de normativa de privacidad
+- Opción de anonimizar para uso académico (con permiso)
+
+### Documentación Médico-Legal
+- Registro completo de procedimientos
+- Productos utilizados (trazabilidad)
+- Evolución documentada
+- Protección ante reclamaciones
+
+---
+
+## 📞 CONTACTO Y SOPORTE
+
+Para dudas sobre el flujo de trabajo:
+- **Soporte Técnico**: [Contacto del sistema]
+- **Capacitación**: Disponible para nuevo personal
+
+---
+
+**Última actualización**: Marzo 2026  
+**Versión**: 1.0  
+**Sistema**: Clínica Management System - Módulo Estética

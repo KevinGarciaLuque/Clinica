@@ -10,6 +10,7 @@ import ChatIA          from "./pages/ChatIA";
 import Consulta        from "./pages/Consulta";
 import HistoriaClinica from "./pages/HistoriaClinica";
 import PerfilPaciente  from "./pages/PerfilPaciente";
+import Estudios        from "./pages/Estudios";
 // Páginas públicas (sin auth)
 import RegistroPaciente from "./pages/RegistroPaciente";
 import VerificarEmail   from "./pages/VerificarEmail";
@@ -65,6 +66,7 @@ export default function App() {
         <Route path="/consulta"               element={<Consulta />} />
         <Route path="/historia/:paciente_id"  element={<HistoriaClinica />} />
         <Route path="/historia"               element={<HistoriaClinica />} />
+        <Route path="/estudios"               element={<Estudios />} />
 
         {/* Rutas de administración (ADMIN + SUPER_ADMIN) */}
         <Route path="/admin/usuarios" element={

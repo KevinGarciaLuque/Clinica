@@ -134,13 +134,13 @@ export default function ConsentimientosEsteticos() {
                       letterSpacing: ".08em", marginBottom: 12 }}>Plantillas de procedimientos</h6>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {PLANTILLAS.map(p => (
-            <div key={p.id} style={{
+            <div key={p.id} style={{color: C.muted,
               background: `${C.accent}10`, border: `1px solid ${C.accent}30`,
               borderRadius: 10, padding: "8px 14px",
               display: "flex", alignItems: "center", gap: 8,
             }}>
               <i className="bi bi-file-earmark-text" style={{ color: C.accent, fontSize: 14 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{p.procedimiento}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: "#113152" }}>{p.procedimiento}</span>
             </div>
           ))}
         </div>

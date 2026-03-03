@@ -52,6 +52,11 @@ export default function Clinicas() {
   const [error, setError]         = useState("");
   const [showModal, setShowModal] = useState(false);
   const [hovered, setHovered]     = useState(null);
+  
+  // Modal de confirmación de eliminación
+  const [modalEliminar, setModalEliminar] = useState(false);
+  const [clinicaEliminar, setClinicaEliminar] = useState(null);
+  const [textoConfirmacion, setTextoConfirmacion] = useState("");
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -103,6 +108,28 @@ export default function Clinicas() {
     try {
       if (c.activo) await api.delete(`/clinicas/${c.id}`);
       else          await api.put(`/clinicas/${c.id}`, { activo: 1 });
+      cargar();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const eliminarClinica = async (c) => {
+    setClinicaEliminar(c);
+    setTextoConfirmacion("");
+    setModalEliminar(true);
+  };
+
+  const confirmarEliminacion = async () => {
+    if (textoConfirmacion !== "ELIMINAR") {
+      setError('❌ Debes escribir exactamente "ELIMINAR" para confirmar');
+      return;
+    }
+    try {
+      await api.delete(`/clinicas/${clinicaEliminar.id}?permanente=true`);
+      setModalEliminar(false);
+      setClinicaEliminar(null);
+      setTextoConfirmacion("");
       cargar();
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
@@ -272,6 +299,17 @@ export default function Clinicas() {
                       {c.nombre}
                     </div>
                     <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
+                      {/* ID de la clínica */}
+                      <div style={{
+                        display: "inline-flex", alignItems: "center", gap: 5,
+                        background: "rgba(16,185,129,.08)", border: "1px solid rgba(16,185,129,.2)",
+                        borderRadius: 6, padding: "2px 8px",
+                      }}>
+                        <i className="bi bi-hash" style={{ fontSize: 11, color: C.success }} />
+                        <span style={{ fontSize: 11, color: C.success, fontFamily: "monospace", fontWeight: 700 }}>
+                          {c.id}
+                        </span>
+                      </div>
                       <div style={{
                         display: "inline-flex", alignItems: "center", gap: 5,
                         background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
@@ -371,6 +409,28 @@ export default function Clinicas() {
                   >
                     <i className={`bi bi-${c.activo ? "pause-circle" : "play-circle"}`} />
                     {c.activo ? "Desactivar" : "Activar"}
+                  </button>
+                  <button
+                    onClick={() => eliminarClinica(c)}
+                    title="Eliminar permanentemente"
+                    style={{
+                      background: "rgba(239,68,68,.08)", 
+                      border: "1px solid rgba(239,68,68,.25)",
+                      borderRadius: 8, padding: "8px 12px",
+                      color: "#ef4444",
+                      fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = "rgba(239,68,68,.15)";
+                      e.currentTarget.style.transform = "scale(1.05)";
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = "rgba(239,68,68,.08)";
+                      e.currentTarget.style.transform = "scale(1)";
+                    }}
+                  >
+                    <i className="bi bi-trash-fill" />
                   </button>
                 </div>
               </div>
@@ -662,6 +722,174 @@ export default function Clinicas() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de confirmación de eliminación ────────────── */}
+      {modalEliminar && clinicaEliminar && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1060,
+          background: "rgba(0,0,0,.75)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `2px solid rgba(239,68,68,.4)`,
+            borderRadius: 18, width: "100%", maxWidth: 520,
+            boxShadow: "0 24px 80px rgba(239,68,68,.3)",
+          }}>
+            {/* Header modal */}
+            <div style={{
+              padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 14,
+            }}>
+              <div style={{
+                width: 46, height: 46, borderRadius: 12,
+                background: "rgba(239,68,68,.15)",
+                border: "2px solid rgba(239,68,68,.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-exclamation-triangle-fill" style={{ color: "#ef4444", fontSize: 22 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h5 style={{ margin: 0, fontWeight: 700, color: "#ef4444", fontSize: 17 }}>
+                  ¡Eliminar clínica permanentemente!
+                </h5>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  Esta acción es irreversible
+                </span>
+              </div>
+              <button
+                onClick={() => {
+                  setModalEliminar(false);
+                  setClinicaEliminar(null);
+                  setTextoConfirmacion("");
+                  setError("");
+                }}
+                style={{
+                  background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                  borderRadius: 8, width: 34, height: 34,
+                  color: C.muted, cursor: "pointer", fontSize: 16,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+
+            {/* Body modal */}
+            <div style={{ padding: "24px 28px" }}>
+              {error && (
+                <div style={{
+                  background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)",
+                  borderRadius: 10, padding: "12px 16px", marginBottom: 20, color: "#f87171",
+                  display: "flex", alignItems: "center", gap: 10, fontSize: 14,
+                }}>
+                  <i className="bi bi-exclamation-triangle-fill" /> {error}
+                </div>
+              )}
+
+              <div style={{
+                background: "rgba(239,68,68,.08)", border: "1px solid rgba(239,68,68,.2)",
+                borderRadius: 12, padding: "16px 20px", marginBottom: 20,
+              }}>
+                <div style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+                  ¿Estás seguro de eliminar la clínica?
+                </div>
+                <div style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  background: "rgba(33,150,243,.15)", border: "1px solid rgba(33,150,243,.3)",
+                  borderRadius: 8, padding: "6px 12px", marginBottom: 12,
+                }}>
+                  <i className="bi bi-building-fill" style={{ color: C.accent, fontSize: 14 }} />
+                  <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+                    {clinicaEliminar.nombre}
+                  </span>
+                </div>
+                <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.6 }}>
+                  <div style={{ marginBottom: 8 }}>
+                    ⚠️ <strong style={{ color: "#ef4444" }}>Esta acción NO se puede deshacer</strong>
+                  </div>
+                  <div>Se eliminarán permanentemente:</div>
+                  <ul style={{ margin: "8px 0", paddingLeft: 20 }}>
+                    <li>Todos los usuarios de la clínica</li>
+                    <li>Todos los pacientes registrados</li>
+                    <li>Historias clínicas completas</li>
+                    <li>Citas y agendas médicas</li>
+                    <li>Documentos y archivos asociados</li>
+                  </ul>
+                </div>
+              </div>
+
+              <Field label='Escribe "ELIMINAR" para confirmar'>
+                <input
+                  style={{
+                    ...inputSt,
+                    borderColor: textoConfirmacion === "ELIMINAR" ? "#10b981" : C.border,
+                    borderWidth: 2,
+                  }}
+                  placeholder="ELIMINAR"
+                  value={textoConfirmacion}
+                  onChange={(e) => {
+                    setTextoConfirmacion(e.target.value);
+                    setError("");
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = textoConfirmacion === "ELIMINAR" ? "#10b981" : "#ef4444"}
+                  onBlur={(e) => e.target.style.borderColor = textoConfirmacion === "ELIMINAR" ? "#10b981" : C.border}
+                  autoFocus
+                />
+              </Field>
+            </div>
+
+            {/* Footer modal */}
+            <div style={{
+              padding: "18px 28px", borderTop: `1px solid ${C.border}`,
+              display: "flex", justifyContent: "flex-end", gap: 12,
+            }}>
+              <button
+                type="button"
+                onClick={() => {
+                  setModalEliminar(false);
+                  setClinicaEliminar(null);
+                  setTextoConfirmacion("");
+                  setError("");
+                }}
+                style={{
+                  background: "transparent", border: `1px solid ${C.border}`,
+                  borderRadius: 9, padding: "10px 22px",
+                  color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  transition: "border .2s, color .2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor=C.accent; e.currentTarget.style.color=C.accent; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.muted; }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarEliminacion}
+                disabled={textoConfirmacion !== "ELIMINAR"}
+                style={{
+                  background: textoConfirmacion === "ELIMINAR" 
+                    ? "linear-gradient(135deg, #ef4444, #dc2626)" 
+                    : "rgba(148,163,184,.2)",
+                  border: "none", borderRadius: 9, padding: "10px 28px",
+                  color: "#fff", fontSize: 14, fontWeight: 600, 
+                  cursor: textoConfirmacion === "ELIMINAR" ? "pointer" : "not-allowed",
+                  display: "flex", alignItems: "center", gap: 8,
+                  boxShadow: textoConfirmacion === "ELIMINAR" 
+                    ? "0 4px 14px rgba(239,68,68,.4)" 
+                    : "none",
+                  transition: "all .2s",
+                  opacity: textoConfirmacion === "ELIMINAR" ? 1 : 0.5,
+                }}
+                onMouseEnter={(e) => textoConfirmacion === "ELIMINAR" && (e.currentTarget.style.opacity = ".85")}
+                onMouseLeave={(e) => textoConfirmacion === "ELIMINAR" && (e.currentTarget.style.opacity = "1")}
+              >
+                <i className="bi bi-trash-fill" />
+                Eliminar permanentemente
+              </button>
+            </div>
           </div>
         </div>
       )}

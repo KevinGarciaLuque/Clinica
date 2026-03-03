@@ -34,8 +34,22 @@ export default function NavbarApp({ onMenuClick }) {
         </button>
         <span className="navbar-brand mb-0 fw-bold d-flex align-items-center gap-2">
           <i className="bi bi-hospital-fill text-primary fs-5" />
-          <span className="d-none d-sm-inline">Multi-Clínica</span>
+          <span style={{ fontSize: "0.95rem" }}>
+            {user?.clinica_nombre || "Multi-Clínica"}
+          </span>
         </span>
+        {user?.clinica_nombre && (
+          <span 
+            className="d-none d-md-inline badge text-white-50 fw-normal" 
+            style={{ 
+              fontSize: "0.65rem", 
+              background: "rgba(255,255,255,0.1)",
+              letterSpacing: "0.03em"
+            }}
+          >
+            Multi-Clínica
+          </span>
+        )}
       </div>
 
       {/* Right side: user + logout */}

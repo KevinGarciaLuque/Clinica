@@ -1,0 +1,28 @@
+/* Efecto hover en las celdas */
+.calendar-cell {
+  cursor: pointer;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.calendar-cell:hover {
+  background-color: #f0f8ff;
+  box-shadow: 0 0 0 2px #4CAF50;
+}
+
+/* Estado activo/seleccionado */
+.calendar-cell.selected {
+  background-color: #e3f2fd;
+  box-shadow: 0 0 0 3px #2196F3;
+  position: relative;
+}
+
+.calendar-cell.selected::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  border: 2px solid #2196F3;
+  pointer-events: none;
+}
