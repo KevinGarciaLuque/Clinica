@@ -100,6 +100,8 @@ app.use("/api/registro",       require("./routes/registro"));
 app.use("/api/database",       require("./routes/database"));
 // Galería Estética (Antes/Después)
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
+// Setup temporal (ELIMINAR después de ejecutar migraciones)
+app.use("/api/setup",          require("./routes/setup"));
 
 // ===== Manejo de errores =====
 app.use((err, req, res, next) => {
