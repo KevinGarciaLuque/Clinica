@@ -16,25 +16,7 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
 console.log("🔍 CORS_ORIGINS configured:", allowedOrigins);
 
 const corsOptions = {
-  origin: function (origin, cb) {
-    console.log("🌐 Request from origin:", origin);
-
-    // Permite requests sin origin (Postman, curl, apps móviles, server-to-server)
-    if (!origin) return cb(null, true);
-
-    // Permite localhost en desarrollo
-    if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
-      return cb(null, true);
-    }
-
-    // Permite dominios definidos en variables de entorno
-    if (allowedOrigins.includes(origin)) {
-      return cb(null, true);
-    }
-
-    console.log("❌ CORS blocked for origin:", origin);
-    return cb(new Error("CORS bloqueado: " + origin));
-  },
+  origin: true, // TEMPORAL: Permite todos los origins para debug
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
@@ -45,6 +27,8 @@ const corsOptions = {
   ],
   optionsSuccessStatus: 204,
 };
+
+console.log("⚠️ CORS configurado en modo PERMISIVO (temporal)");
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
@@ -152,3 +136,5 @@ const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log("✅ Servidor corriendo en puerto", PORT);
 });
+
+console.log(import.meta.env.VITE_API_URL)
