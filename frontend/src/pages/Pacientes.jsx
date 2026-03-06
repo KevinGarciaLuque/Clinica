@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
+
 const C = {
   bg: "#f8f9fa", surface: "#ffffff", card: "#ffffff",
   border: "rgba(0,0,0,0.1)", accent: "#166ae8",
@@ -20,6 +22,7 @@ const FORM_VACIO = {
   telefono: "", email: "",
   direccion: "", ciudad: "",
   grupo_sanguineo: "",
+  foto_perfil: null,
 };
 
 export default function Pacientes() {
@@ -29,6 +32,10 @@ export default function Pacientes() {
   const [msg,    setMsg]    = useState({ tipo: "", texto: "" });
   const [form,   setForm]   = useState(FORM_VACIO);
   const [showForm, setShowForm] = useState(false);
+  const [editandoId, setEditandoId] = useState(null);
+  const [fotoFile, setFotoFile] = useState(null);
+  const [fotoPreview, setFotoPreview] = useState(null);
+  const [modalFoto, setModalFoto] = useState(null);
 
   const cargar = async () => {
     setMsg({ tipo: "", texto: "" });
@@ -38,18 +45,79 @@ export default function Pacientes() {
 
   useEffect(() => { cargar(); }, []);  // eslint-disable-line
 
-  const crear = async (e) => {
+  const guardarPaciente = async (e) => {
     e.preventDefault();
     setMsg({ tipo: "", texto: "" });
     try {
-      await api.post("/pacientes", form);
+      let pacienteId = editandoId;
+      
+      if (editandoId) {
+        // Editar
+        await api.put(`/pacientes/${editandoId}`, form);
+        setMsg({ tipo: "success", texto: "Paciente actualizado correctamente" });
+      } else {
+        // Crear
+        const res = await api.post("/pacientes", form);
+        pacienteId = res.data.id;
+        setMsg({ tipo: "success", texto: "Paciente creado correctamente" });
+      }
+      
+      // Subir foto si hay una seleccionada
+      if (fotoFile && pacienteId) {
+        const formData = new FormData();
+        formData.append("foto", fotoFile);
+        await api.post(`/pacientes/${pacienteId}/foto`, formData, {
+          headers: { "Content-Type": "multipart/form-data" },
+        });
+      }
+      
       setForm(FORM_VACIO);
+      setFotoFile(null);
+      setFotoPreview(null);
+      setEditandoId(null);
       setShowForm(false);
       await cargar();
-      setMsg({ tipo: "success", texto: "Paciente creado correctamente" });
     } catch (err) {
-      setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error creando paciente" });
+      setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error al guardar paciente" });
     }
+  };
+  
+  const abrirEditar = (p) => {
+    setForm({
+      nombres: p.nombres || "",
+      apellidos: p.apellidos || "",
+      dni: p.dni || "",
+      fecha_nacimiento: p.fecha_nacimiento ? p.fecha_nacimiento.split("T")[0] : "",
+      sexo: p.sexo || "",
+      telefono: p.telefono || "",
+      email: p.email || "",
+      direccion: p.direccion || "",
+      ciudad: p.ciudad || "",
+      grupo_sanguineo: p.grupo_sanguineo || "",
+    });
+    setEditandoId(p.id);
+    setFotoFile(null);
+    if (p.foto_perfil) {
+      setFotoPreview(`${API_BASE}/uploads/${p.foto_perfil}`);
+    } else {
+      setFotoPreview(null);
+    }
+    setShowForm(true);
+  };
+  
+  const handleFotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setFotoFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setFotoPreview(reader.result);
+      reader.readAsDataURL(file);
+    }
+  };
+  
+  const eliminarFotoPreview = () => {
+    setFotoFile(null);
+    setFotoPreview(null);
   };
 
   const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
@@ -90,7 +158,21 @@ export default function Pacientes() {
             <i className="bi bi-box-arrow-up-right" /> Link de registro
           </button>
           <button
-            onClick={() => setShowForm(f => !f)}
+            onClick={() => {
+              if (showForm) {
+                setShowForm(false);
+                setEditandoId(null);
+                setForm(FORM_VACIO);
+                setFotoFile(null);
+                setFotoPreview(null);
+              } else {
+                setShowForm(true);
+                setEditandoId(null);
+                setForm(FORM_VACIO);
+                setFotoFile(null);
+                setFotoPreview(null);
+              }
+            }}
             style={{
               background: showForm ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.95)",
               border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, padding: "10px 20px",
@@ -133,10 +215,12 @@ export default function Pacientes() {
             display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
             paddingBottom: 16, borderBottom: `1px solid ${C.border}`,
           }}>
-            <i className="bi bi-person-plus-fill" style={{ color: C.accent, fontSize: 16 }} />
-            <h6 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: C.text }}>Nuevo paciente</h6>
+            <i className={`bi ${editandoId ? "bi-pencil-square" : "bi-person-plus-fill"}`} style={{ color: C.accent, fontSize: 16 }} />
+            <h6 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: C.text }}>
+              {editandoId ? "Editar paciente" : "Nuevo paciente"}
+            </h6>
           </div>
-          <form onSubmit={crear}>
+          <form onSubmit={guardarPaciente}>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 14 }}>
               <div>
                 <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
@@ -200,9 +284,47 @@ export default function Pacientes() {
                                letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Ciudad</label>
                 <input style={inputSt} name="ciudad" value={form.ciudad} onChange={cambioForm} />
               </div>
+              
+              {/* Foto de perfil */}
+              <div style={{ gridColumn: "span 2" }}>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
+                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Foto de perfil</label>
+                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                  {fotoPreview && (
+                    <div style={{ position: "relative" }}>
+                      <img src={fotoPreview} alt="Preview" style={{
+                        width: 80, height: 80, borderRadius: 12, objectFit: "cover",
+                        border: `2px solid ${C.border}`
+                      }} />
+                      <button type="button" onClick={eliminarFotoPreview}
+                        style={{
+                          position: "absolute", top: -6, right: -6,
+                          background: "#dc3545", border: "none", borderRadius: "50%",
+                          width: 24, height: 24, color: "#fff", cursor: "pointer",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          fontSize: 12,
+                        }}>
+                        <i className="bi bi-x" />
+                      </button>
+                    </div>
+                  )}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleFotoChange}
+                    style={{ ...inputSt, flex: 1 }}
+                  />
+                </div>
+              </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20, gap: 10 }}>
-              <button type="button" onClick={() => setShowForm(false)}
+              <button type="button" onClick={() => {
+                setShowForm(false);
+                setEditandoId(null);
+                setForm(FORM_VACIO);
+                setFotoFile(null);
+                setFotoPreview(null);
+              }}
                 style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9,
                          padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600 }}>
                 Cancelar
@@ -215,7 +337,7 @@ export default function Pacientes() {
                   boxShadow: `0 4px 14px rgba(13,110,253,.4)`,
                   display: "flex", alignItems: "center", gap: 8,
                 }}>
-                <i className="bi bi-floppy" /> Guardar paciente
+                <i className="bi bi-floppy" /> {editandoId ? "Actualizar" : "Guardar"} paciente
               </button>
             </div>
           </form>
@@ -282,13 +404,20 @@ export default function Pacientes() {
                   <tr key={p.id} style={{ borderBottom: `1px solid ${C.border}` }}>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <div style={{
+                        <div
+                          onClick={() => p.foto_perfil && setModalFoto(`${API_BASE}/uploads/${p.foto_perfil}`)}
+                          style={{
                           width: 38, height: 38, borderRadius: "50%",
-                          background: "rgba(13,110,253,0.1)",
+                          background: p.foto_perfil ? "transparent" : "rgba(13,110,253,0.1)",
+                          backgroundImage: p.foto_perfil ? `url(${API_BASE}/uploads/${p.foto_perfil})` : "none",
+                          backgroundSize: "cover",
+                          backgroundPosition: "center",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           color: C.accent, fontWeight: 700, fontSize: 13,
+                          cursor: p.foto_perfil ? "pointer" : "default",
+                          border: p.foto_perfil ? `2px solid ${C.border}` : "none",
                         }}>
-                          {p.nombres?.[0]}{p.apellidos?.[0]}
+                          {!p.foto_perfil && `${p.nombres?.[0]}${p.apellidos?.[0]}`}
                         </div>
                         <div>
                           <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>
@@ -328,6 +457,14 @@ export default function Pacientes() {
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                        <button onClick={() => abrirEditar(p)}
+                          style={{
+                            background: "rgba(255,193,7,0.1)", border: "none", borderRadius: 6,
+                            padding: "6px 12px", color: "#ffc107", fontSize: 12, fontWeight: 600,
+                            cursor: "pointer", display: "flex", alignItems: "center", gap: 4,
+                          }}>
+                          <i className="bi bi-pencil-square" /> Editar
+                        </button>
                         <Link to={`/pacientes/${p.id}/perfil`}
                           style={{
                             background: "rgba(0,0,0,0.05)", border: "none", borderRadius: 6,
@@ -377,6 +514,45 @@ export default function Pacientes() {
           </div>
         </div>
       </div>
+
+      {/* Modal para ver foto ampliada */}
+      {modalFoto && (
+        <div
+          onClick={() => setModalFoto(null)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.85)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 20, cursor: "pointer",
+          }}>
+          <div style={{
+            maxWidth: "90%", maxHeight: "90%",
+            position: "relative",
+          }}>
+            <button
+              onClick={(e) => { e.stopPropagation(); setModalFoto(null); }}
+              style={{
+                position: "absolute", top: -16, right: -16,
+                background: "#fff", border: "none", borderRadius: "50%",
+                width: 40, height: 40, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 16px rgba(0,0,0,0.3)",
+                fontSize: 18,
+              }}>
+              <i className="bi bi-x" />
+            </button>
+            <img
+              src={modalFoto}
+              alt="Foto del paciente"
+              style={{
+                maxWidth: "100%", maxHeight: "85vh",
+                borderRadius: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+              }}
+              onClick={(e) => e.stopPropagation()}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

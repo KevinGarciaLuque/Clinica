@@ -13,7 +13,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 
     const q = (req.query.q || "").trim();
     let sql =
-      "SELECT id, nombres, apellidos, dni, telefono, email, activo, creado_en FROM pacientes WHERE clinica_id=? ";
+      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, foto_perfil, activo, creado_en FROM pacientes WHERE clinica_id=? ";
     const params = [clinicaId];
 
     if (q) {

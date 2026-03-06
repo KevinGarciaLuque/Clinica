@@ -62,7 +62,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
   try {
     if (req.user.super) {
       const [rows] = await pool.query(`
-        SELECT c.id, c.nombre, c.slug, c.logo_url, c.email, c.telefono,
+        SELECT c.id, c.nombre, c.slug, c.tipo_id, c.logo_url, c.email, c.telefono,
                c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
                t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
         FROM clinicas c
@@ -73,7 +73,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
     }
     // No-super: solo puede ver la suya
     const [rows] = await pool.query(`
-      SELECT c.id, c.nombre, c.slug, c.logo_url, c.email, c.telefono,
+      SELECT c.id, c.nombre, c.slug, c.tipo_id, c.logo_url, c.email, c.telefono,
              c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
              t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
       FROM clinicas c
@@ -91,7 +91,7 @@ router.get("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const [rows] = await pool.query(
-      "SELECT id, nombre, slug, logo_url, email, telefono, direccion, ciudad, pais, ruc, datos_fiscales, activo FROM clinicas WHERE id=?",
+      "SELECT id, nombre, slug, tipo_id, logo_url, email, telefono, direccion, ciudad, pais, ruc, datos_fiscales, activo FROM clinicas WHERE id=?",
       [id]
     );
     if (!rows.length) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
@@ -121,11 +121,14 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
     const [exist] = await pool.query("SELECT id FROM clinicas WHERE slug=?", [slug]);
     if (exist.length) return res.status(409).json({ ok: false, msg: "El slug ya existe" });
 
+    // Convertir tipo_id a número o null
+    const tipoIdFinal = tipo_id && tipo_id !== "" ? parseInt(tipo_id, 10) : null;
+
     // Insertar clínica
     const [r] = await pool.query(
       `INSERT INTO clinicas (nombre, slug, tipo_id, email, telefono, direccion, ciudad, pais, ruc)
        VALUES (?,?,?,?,?,?,?,?,?)`,
-      [nombre, slug, tipo_id||null, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
+      [nombre, slug, tipoIdFinal, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
     );
     const clinicaId = r.insertId;
 
@@ -157,6 +160,11 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
       if (exist.length) return res.status(409).json({ ok: false, msg: "El slug ya existe" });
     }
 
+    // Convertir tipo_id a número o null
+    const tipoIdFinal = tipo_id !== undefined 
+      ? (tipo_id && tipo_id !== "" ? parseInt(tipo_id, 10) : null)
+      : -1; // -1 significa "no actualizar"
+
     await pool.query(
       `UPDATE clinicas SET
          nombre=COALESCE(?,nombre), slug=COALESCE(?,slug),
@@ -167,7 +175,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
          logo_url=COALESCE(?,logo_url), activo=COALESCE(?,activo)
        WHERE id=?`,
       [nombre||null, slug||null,
-       tipo_id !== undefined ? tipo_id : -1, tipo_id !== undefined ? tipo_id : -1,
+       tipoIdFinal, tipoIdFinal,
        email||null, telefono||null, direccion||null,
        ciudad||null, pais||null, ruc||null, logo_url||null,
        activo !== undefined ? activo : null, id]
