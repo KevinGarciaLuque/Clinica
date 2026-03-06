@@ -5,7 +5,9 @@
     "type": "commonjs",
     "scripts": {
         "dev": "nodemon server.js",
-        "start": "node server.js"
+        "start": "node server.js",
+        "migrate": "node migrate.js",
+        "postinstall": "echo 'Backend instalado correctamente'"
     },
     "dependencies": {
         "argon2": "^0.41.1",
