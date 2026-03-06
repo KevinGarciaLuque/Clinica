@@ -13,14 +13,18 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
+console.log("🔍 CORS_ORIGINS configured:", allowedOrigins);
+
 app.use(
   cors({
     origin: function (origin, cb) {
+      console.log("🌐 Request from origin:", origin);
       // Permite requests sin origin (Postman / curl)
       if (!origin) return cb(null, true);
       // Permite cualquier localhost (cualquier puerto) en desarrollo
       if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) return cb(null, true);
       if (allowedOrigins.includes(origin)) return cb(null, true);
+      console.log("❌ CORS blocked for origin:", origin);
       return cb(new Error("CORS bloqueado: " + origin));
     },
     credentials: true,
