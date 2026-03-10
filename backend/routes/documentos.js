@@ -18,13 +18,18 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
   try {
     const clinicaId   = req.tenant?.clinica_id;
     const pacienteId  = req.params.pacienteId;
+    
+    console.log(`[GET /pacientes/${pacienteId}/documentos] clinicaId: ${clinicaId}, user: ${req.user?.id}`);
 
     // Verificar que el paciente pertenece a la clínica
     const [[p]] = await pool.query(
       "SELECT id FROM pacientes WHERE id=? AND clinica_id=?",
       [pacienteId, clinicaId]
     );
-    if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    if (!p) {
+      console.log(`[GET /pacientes/${pacienteId}/documentos] Paciente no encontrado o no pertenece a clínica ${clinicaId}`);
+      return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    }
 
     const [docs] = await pool.query(
       `SELECT id, tipo, nombre_original, mime_type, tamano_bytes, subido_por, creado_en
@@ -33,9 +38,11 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
        ORDER BY creado_en DESC`,
       [pacienteId, clinicaId]
     );
-
+    
+    console.log(`[GET /pacientes/${pacienteId}/documentos] Encontrados ${docs.length} documentos`);
     res.json({ ok: true, data: docs });
   } catch (e) {
+    console.error(`[GET /pacientes/${req.params.pacienteId}/documentos] ERROR:`, e);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });

@@ -73,15 +73,23 @@ export default function PerfilPaciente() {
   const cargarTodo = async () => {
     setLoading(true);
     try {
+      console.log(`[PerfilPaciente] Cargando paciente ${id}...`);
       const [rPac, rDocs] = await Promise.all([
         api.get(`/pacientes/${id}`),
         api.get(`/pacientes/${id}/documentos`),
       ]);
+      console.log(`[PerfilPaciente] Paciente cargado:`, rPac.data.data);
       setPaciente(rPac.data.data);
       setForm(rPac.data.data);
       setDocs(rDocs.data.data || []);
-    } catch {
-      setMsg({ tipo: "danger", texto: "Error cargando datos del paciente" });
+    } catch (err) {
+      console.error(`[PerfilPaciente] Error cargando paciente:`, err?.response?.data || err);
+      const errorMsg = err?.response?.data?.msg || err?.response?.statusText || "Error cargando datos del paciente";
+      setMsg({ tipo: "danger", texto: `${errorMsg} (Status: ${err?.response?.status || "desconocido"})` });
+      // Si es 404, no intentar cargar más
+      if (err?.response?.status === 404) {
+        setPaciente(null);
+      }
     } finally {
       setLoading(false);
     }

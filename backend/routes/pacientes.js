@@ -34,13 +34,28 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
+    console.log(`[GET /pacientes/${req.params.id}] clinicaId: ${clinicaId}, user: ${req.user?.id}, tipo: ${req.user?.tipo}`);
+    
     const [[p]] = await pool.query(
       "SELECT * FROM pacientes WHERE id = ? AND clinica_id = ?",
       [req.params.id, clinicaId]
     );
-    if (!p) return res.status(404).json({ ok: false, msg: "No encontrado" });
+    
+    if (!p) {
+      console.log(`[GET /pacientes/${req.params.id}] NO ENCONTRADO - Verificando si existe sin filtro de clínica...`);
+      const [[pSinClinica]] = await pool.query("SELECT id, clinica_id FROM pacientes WHERE id = ?", [req.params.id]);
+      if (pSinClinica) {
+        console.log(`[GET /pacientes/${req.params.id}] El paciente EXISTE pero pertenece a clinica_id=${pSinClinica.clinica_id}, usuario tiene clinica_id=${clinicaId}`);
+      } else {
+        console.log(`[GET /pacientes/${req.params.id}] El paciente NO EXISTE en la base de datos`);
+      }
+      return res.status(404).json({ ok: false, msg: "No encontrado" });
+    }
+    
+    console.log(`[GET /pacientes/${req.params.id}] Paciente encontrado: ${p.nombres} ${p.apellidos}`);
     res.json({ ok: true, data: p });
   } catch (e) {
+    console.error(`[GET /pacientes/${req.params.id}] ERROR:`, e);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });
