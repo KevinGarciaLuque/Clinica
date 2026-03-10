@@ -18,25 +18,34 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
   try {
     const clinicaId   = req.tenant?.clinica_id;
     const pacienteId  = req.params.pacienteId;
+    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
     
-    console.log(`[GET /pacientes/${pacienteId}/documentos] clinicaId: ${clinicaId}, user: ${req.user?.id}`);
+    console.log(`[GET /pacientes/${pacienteId}/documentos] clinicaId: ${clinicaId}, user: ${req.user?.id}, isSuperAdmin: ${isSuperAdmin}`);
 
-    // Verificar que el paciente pertenece a la clínica
-    const [[p]] = await pool.query(
-      "SELECT id FROM pacientes WHERE id=? AND clinica_id=?",
-      [pacienteId, clinicaId]
-    );
+    // Verificar que el paciente existe (SUPER_ADMIN puede ver todos)
+    let queryPaciente, paramsPaciente;
+    if (isSuperAdmin) {
+      queryPaciente = "SELECT id, clinica_id FROM pacientes WHERE id=?";
+      paramsPaciente = [pacienteId];
+    } else {
+      queryPaciente = "SELECT id, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+      paramsPaciente = [pacienteId, clinicaId];
+    }
+    
+    const [[p]] = await pool.query(queryPaciente, paramsPaciente);
     if (!p) {
-      console.log(`[GET /pacientes/${pacienteId}/documentos] Paciente no encontrado o no pertenece a clínica ${clinicaId}`);
+      console.log(`[GET /pacientes/${pacienteId}/documentos] Paciente no encontrado`);
       return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
     }
 
+    // Obtener documentos (usando clinica_id del paciente para SUPER_ADMIN)
+    const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
     const [docs] = await pool.query(
       `SELECT id, tipo, nombre_original, mime_type, tamano_bytes, subido_por, creado_en
        FROM documentos_paciente
        WHERE paciente_id=? AND clinica_id=?
        ORDER BY creado_en DESC`,
-      [pacienteId, clinicaId]
+      [pacienteId, clinicaIdFinal]
     );
     
     console.log(`[GET /pacientes/${pacienteId}/documentos] Encontrados ${docs.length} documentos`);
@@ -69,6 +78,7 @@ router.post(
       const clinicaId   = req.tenant?.clinica_id;
       const pacienteId  = req.params.pacienteId;
       const usuarioId   = req.user?.id || null;
+      const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
       if (!req.file)
         return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
@@ -78,22 +88,29 @@ router.post(
       if (!tiposValidos.includes(tipo))
         return res.status(400).json({ ok: false, msg: "Tipo de documento inválido" });
 
-      // Verificar que el paciente pertenece a la clínica
-      const [[p]] = await pool.query(
-        "SELECT id FROM pacientes WHERE id=? AND clinica_id=?",
-        [pacienteId, clinicaId]
-      );
+      // Verificar que el paciente existe (SUPER_ADMIN puede acceder a todos)
+      let queryPaciente, paramsPaciente;
+      if (isSuperAdmin) {
+        queryPaciente = "SELECT id, clinica_id FROM pacientes WHERE id=?";
+        paramsPaciente = [pacienteId];
+      } else {
+        queryPaciente = "SELECT id, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+        paramsPaciente = [pacienteId, clinicaId];
+      }
+      
+      const [[p]] = await pool.query(queryPaciente, paramsPaciente);
       if (!p) {
         fs.unlinkSync(req.file.path); // Borrar archivo subido si no es válido
         return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
       }
 
+      const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
       const [r] = await pool.query(
         `INSERT INTO documentos_paciente
            (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por)
          VALUES (?,?,?,?,?,?,?,?)`,
         [
-          pacienteId, clinicaId,
+          pacienteId, clinicaIdFinal,
           tipo,
           req.file.originalname,
           req.file.filename,     // sólo el nombre, no la ruta absoluta
@@ -131,11 +148,18 @@ router.delete("/:docId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPE
     const clinicaId  = req.tenant?.clinica_id;
     const pacienteId = req.params.pacienteId;
     const docId      = req.params.docId;
+    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
-    const [[doc]] = await pool.query(
-      "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=? AND clinica_id=?",
-      [docId, pacienteId, clinicaId]
-    );
+    let query, params;
+    if (isSuperAdmin) {
+      query = "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=?";
+      params = [docId, pacienteId];
+    } else {
+      query = "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=? AND clinica_id=?";
+      params = [docId, pacienteId, clinicaId];
+    }
+    
+    const [[doc]] = await pool.query(query, params);
     if (!doc) return res.status(404).json({ ok: false, msg: "Documento no encontrado" });
 
     // Borrar archivo físico

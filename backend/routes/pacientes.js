@@ -9,21 +9,33 @@ const path   = require("path");
 router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
-    if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
+    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
+    
+    // SUPER_ADMIN puede ver todos los pacientes
+    if (!isSuperAdmin && !clinicaId) {
+      return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
+    }
 
     const q = (req.query.q || "").trim();
     let sql =
-      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, foto_perfil, activo, creado_en FROM pacientes WHERE clinica_id=? ";
-    const params = [clinicaId];
+      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, foto_perfil, activo, creado_en, clinica_id FROM pacientes ";
+    const params = [];
+
+    // Filtrar por clínica si no es SUPER_ADMIN
+    if (!isSuperAdmin) {
+      sql += "WHERE clinica_id=? ";
+      params.push(clinicaId);
+    }
 
     if (q) {
-      sql += " AND (nombres LIKE ? OR apellidos LIKE ? OR dni LIKE ? OR telefono LIKE ?) ";
+      sql += (isSuperAdmin ? "WHERE " : "AND ") + "(nombres LIKE ? OR apellidos LIKE ? OR dni LIKE ? OR telefono LIKE ?) ";
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
 
     sql += " ORDER BY id DESC LIMIT 200";
 
     const [rows] = await pool.query(sql, params);
+    console.log(`[GET /pacientes] ${isSuperAdmin ? 'SUPER_ADMIN' : 'Usuario normal'} - Encontrados ${rows.length} pacientes`);
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -34,25 +46,27 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
-    console.log(`[GET /pacientes/${req.params.id}] clinicaId: ${clinicaId}, user: ${req.user?.id}, tipo: ${req.user?.tipo}`);
+    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
+    console.log(`[GET /pacientes/${req.params.id}] clinicaId: ${clinicaId}, user: ${req.user?.id}, tipo: ${req.user?.tipo}, isSuperAdmin: ${isSuperAdmin}`);
     
-    const [[p]] = await pool.query(
-      "SELECT * FROM pacientes WHERE id = ? AND clinica_id = ?",
-      [req.params.id, clinicaId]
-    );
-    
-    if (!p) {
-      console.log(`[GET /pacientes/${req.params.id}] NO ENCONTRADO - Verificando si existe sin filtro de clínica...`);
-      const [[pSinClinica]] = await pool.query("SELECT id, clinica_id FROM pacientes WHERE id = ?", [req.params.id]);
-      if (pSinClinica) {
-        console.log(`[GET /pacientes/${req.params.id}] El paciente EXISTE pero pertenece a clinica_id=${pSinClinica.clinica_id}, usuario tiene clinica_id=${clinicaId}`);
-      } else {
-        console.log(`[GET /pacientes/${req.params.id}] El paciente NO EXISTE en la base de datos`);
-      }
-      return res.status(404).json({ ok: false, msg: "No encontrado" });
+    // SUPER_ADMIN puede ver todos los pacientes, otros solo de su clínica
+    let query, params;
+    if (isSuperAdmin) {
+      query = "SELECT * FROM pacientes WHERE id = ?";
+      params = [req.params.id];
+    } else {
+      query = "SELECT * FROM pacientes WHERE id = ? AND clinica_id = ?";
+      params = [req.params.id, clinicaId];
     }
     
-    console.log(`[GET /pacientes/${req.params.id}] Paciente encontrado: ${p.nombres} ${p.apellidos}`);
+    const [[p]] = await pool.query(query, params);
+    
+    if (!p) {
+      console.log(`[GET /pacientes/${req.params.id}] NO ENCONTRADO`);
+      return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    }
+    
+    console.log(`[GET /pacientes/${req.params.id}] Paciente encontrado: ${p.nombres} ${p.apellidos} (clinica_id: ${p.clinica_id})`);
     res.json({ ok: true, data: p });
   } catch (e) {
     console.error(`[GET /pacientes/${req.params.id}] ERROR:`, e);
@@ -100,6 +114,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
   try {
     const clinicaId = req.tenant?.clinica_id;
     const { id }    = req.params;
+    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
     const {
       nombres, apellidos, dni, telefono, email,
@@ -107,12 +122,21 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
       grupo_sanguineo, notas, activo,
     } = req.body;
 
-    const [[exists]] = await pool.query(
-      "SELECT id FROM pacientes WHERE id=? AND clinica_id=?",
-      [id, clinicaId]
-    );
+    // Verificar que el paciente existe (SUPER_ADMIN puede editar cualquiera)
+    let queryExists, paramsExists;
+    if (isSuperAdmin) {
+      queryExists = "SELECT id, clinica_id FROM pacientes WHERE id=?";
+      paramsExists = [id];
+    } else {
+      queryExists = "SELECT id, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+      paramsExists = [id, clinicaId];
+    }
+    
+    const [[exists]] = await pool.query(queryExists, paramsExists);
     if (!exists) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
+    // Actualizar (usando el clinica_id del paciente para SUPER_ADMIN)
+    const clinicaIdFinal = isSuperAdmin ? exists.clinica_id : clinicaId;
     await pool.query(
       `UPDATE pacientes SET
          nombres=COALESCE(?,nombres), apellidos=COALESCE(?,apellidos),
@@ -129,7 +153,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
         direccion||null, ciudad||null, pais||null,
         grupo_sanguineo||null, notas||null,
         activo ?? null,
-        id, clinicaId,
+        id, clinicaIdFinal,
       ]
     );
 
@@ -150,12 +174,19 @@ router.post(
 
       const clinicaId = req.tenant?.clinica_id;
       const { id }    = req.params;
+      const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
-      // Verificar que el paciente pertenece a la clínica
-      const [[p]] = await pool.query(
-        "SELECT id, foto_perfil FROM pacientes WHERE id=? AND clinica_id=?",
-        [id, clinicaId]
-      );
+      // Verificar que el paciente existe (SUPER_ADMIN puede a cualquiera)
+      let query, params;
+      if (isSuperAdmin) {
+        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=?";
+        params = [id];
+      } else {
+        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+        params = [id, clinicaId];
+      }
+      
+      const [[p]] = await pool.query(query, params);
       if (!p) {
         fs.unlink(req.file.path, () => {});
         return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
@@ -169,9 +200,10 @@ router.post(
 
       // Guardar ruta relativa (pacientes/filename.jpg)
       const relativePath = "pacientes/" + req.file.filename;
+      const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
       await pool.query(
         "UPDATE pacientes SET foto_perfil=? WHERE id=? AND clinica_id=?",
-        [relativePath, id, clinicaId]
+        [relativePath, id, clinicaIdFinal]
       );
 
       res.json({ ok: true, foto_perfil: relativePath });
@@ -190,19 +222,27 @@ router.delete(
     try {
       const clinicaId = req.tenant?.clinica_id;
       const { id }    = req.params;
+      const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
-      const [[p]] = await pool.query(
-        "SELECT id, foto_perfil FROM pacientes WHERE id=? AND clinica_id=?",
-        [id, clinicaId]
-      );
+      let query, params;
+      if (isSuperAdmin) {
+        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=?";
+        params = [id];
+      } else {
+        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+        params = [id, clinicaId];
+      }
+      
+      const [[p]] = await pool.query(query, params);
       if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
       if (p.foto_perfil) {
         const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
         if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
+        const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
         await pool.query(
           "UPDATE pacientes SET foto_perfil=NULL WHERE id=? AND clinica_id=?",
-          [id, clinicaId]
+          [id, clinicaIdFinal]
         );
       }
       res.json({ ok: true });
