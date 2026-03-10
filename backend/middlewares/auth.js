@@ -18,6 +18,8 @@ function auth(...roles) {
     try {
       // 1. Obtener token del header Authorization: Bearer <token>
       const header = req.headers.authorization || "";
+      console.log(`[AUTH] ${req.method} ${req.path} - Authorization header: ${header ? 'present' : 'missing'}`);
+      
       if (!header.startsWith("Bearer ")) {
         return res.status(401).json({ ok: false, msg: "Token requerido" });
       }
@@ -43,6 +45,7 @@ function auth(...roles) {
       }
 
       const user = rows[0];
+      console.log(`[AUTH] Usuario autenticado: id=${user.id}, tipo=${user.tipo}, clinica_id=${user.clinica_id}`);
 
       // 4. Verificar rol si se especificaron restricciones
       if (roles.length > 0 && !roles.includes(user.tipo)) {

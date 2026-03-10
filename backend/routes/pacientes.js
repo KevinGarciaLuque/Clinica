@@ -47,7 +47,10 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
   try {
     const clinicaId = req.tenant?.clinica_id;
     const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
-    console.log(`[GET /pacientes/${req.params.id}] clinicaId: ${clinicaId}, user: ${req.user?.id}, tipo: ${req.user?.tipo}, isSuperAdmin: ${isSuperAdmin}`);
+    const userId = req.user?.id || 'N/A';
+    const userTipo = req.user?.tipo || 'N/A';
+    
+    console.log(`[GET /pacientes/${req.params.id}] clinicaId: ${clinicaId}, user: ${userId}, tipo: ${userTipo}, isSuperAdmin: ${isSuperAdmin}`);
     
     // SUPER_ADMIN puede ver todos los pacientes, otros solo de su clínica
     let query, params;
@@ -66,10 +69,10 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
       return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
     }
     
-    console.log(`[GET /pacientes/${req.params.id}] Paciente encontrado: ${p.nombres} ${p.apellidos} (clinica_id: ${p.clinica_id})`);
+    console.log(`[GET /pacientes/${req.params.id}] Paciente encontrado: ${p.nombres || 'N/A'} ${p.apellidos || 'N/A'} (clinica_id: ${p.clinica_id})`);
     res.json({ ok: true, data: p });
   } catch (e) {
-    console.error(`[GET /pacientes/${req.params.id}] ERROR:`, e);
+    console.error(`[GET /pacientes/${req.params.id}] ERROR:`, e.message, e.stack);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });

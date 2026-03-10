@@ -19,8 +19,9 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     const clinicaId   = req.tenant?.clinica_id;
     const pacienteId  = req.params.pacienteId;
     const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
+    const userId = req.user?.id || 'N/A';
     
-    console.log(`[GET /pacientes/${pacienteId}/documentos] clinicaId: ${clinicaId}, user: ${req.user?.id}, isSuperAdmin: ${isSuperAdmin}`);
+    console.log(`[GET /pacientes/${pacienteId}/documentos] clinicaId: ${clinicaId}, user: ${userId}, isSuperAdmin: ${isSuperAdmin}`);
 
     // Verificar que el paciente existe (SUPER_ADMIN puede ver todos)
     let queryPaciente, paramsPaciente;
@@ -40,6 +41,8 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 
     // Obtener documentos (usando clinica_id del paciente para SUPER_ADMIN)
     const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
+    console.log(`[GET /pacientes/${pacienteId}/documentos] Buscando documentos con clinica_id: ${clinicaIdFinal}`);
+    
     const [docs] = await pool.query(
       `SELECT id, tipo, nombre_original, mime_type, tamano_bytes, subido_por, creado_en
        FROM documentos_paciente
@@ -51,7 +54,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     console.log(`[GET /pacientes/${pacienteId}/documentos] Encontrados ${docs.length} documentos`);
     res.json({ ok: true, data: docs });
   } catch (e) {
-    console.error(`[GET /pacientes/${req.params.pacienteId}/documentos] ERROR:`, e);
+    console.error(`[GET /pacientes/${req.params.pacienteId}/documentos] ERROR:`, e.message, e.stack);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });
