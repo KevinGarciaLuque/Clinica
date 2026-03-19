@@ -74,14 +74,24 @@ export default function PerfilPaciente() {
     setLoading(true);
     try {
       console.log(`[PerfilPaciente] Cargando paciente ${id}...`);
-      const [rPac, rDocs] = await Promise.all([
-        api.get(`/pacientes/${id}`),
-        api.get(`/pacientes/${id}/documentos`),
-      ]);
+      
+      // Cargar paciente primero
+      const rPac = await api.get(`/pacientes/${id}`);
       console.log(`[PerfilPaciente] Paciente cargado:`, rPac.data.data);
       setPaciente(rPac.data.data);
       setForm(rPac.data.data);
-      setDocs(rDocs.data.data || []);
+      
+      // Intentar cargar documentos, pero no fallar si hay error
+      try {
+        const rDocs = await api.get(`/pacientes/${id}/documentos`);
+        setDocs(rDocs.data.data || []);
+        console.log(`[PerfilPaciente] Documentos cargados: ${rDocs.data.data?.length || 0}`);
+      } catch (errDocs) {
+        console.error(`[PerfilPaciente] Error cargando documentos (no crítico):`, errDocs?.response?.data || errDocs);
+        setDocs([]);
+        // Mostrar advertencia pero no bloquear la carga del paciente
+        setMsg({ tipo: "warning", texto: "Perfil cargado, pero hubo un error al cargar documentos" });
+      }
     } catch (err) {
       console.error(`[PerfilPaciente] Error cargando paciente:`, err?.response?.data || err);
       const errorMsg = err?.response?.data?.msg || err?.response?.statusText || "Error cargando datos del paciente";
