@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 
@@ -27,6 +27,7 @@ const FORM_VACIO = {
 
 export default function Pacientes() {
   const { user }  = useAuth();
+  const navigate = useNavigate();
   const [q,      setQ]      = useState("");
   const [lista,  setLista]  = useState([]);
   const [msg,    setMsg]    = useState({ tipo: "", texto: "" });
@@ -36,6 +37,7 @@ export default function Pacientes() {
   const [fotoFile, setFotoFile] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
   const [modalFoto, setModalFoto] = useState(null);
+  const [hoveredRow, setHoveredRow] = useState(null);
 
   const cargar = async () => {
     setMsg({ tipo: "", texto: "" });
@@ -150,11 +152,15 @@ export default function Pacientes() {
           <button
             onClick={() => window.open(`/registro?clinica_id=${user?.clinica_id || ""}`, "_blank")}
             style={{
-              background: "rgba(255,255,255,0.2)",
+              background: "rgba(255,255,255,0.15)",
               border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, padding: "10px 20px",
               color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
               display: "flex", alignItems: "center", gap: 8,
-            }}>
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.25)"}
+            onMouseLeave={(e) => e.target.style.background = "rgba(255,255,255,0.15)"}
+          >
             <i className="bi bi-box-arrow-up-right" /> Link de registro
           </button>
           <button
@@ -174,12 +180,32 @@ export default function Pacientes() {
               }
             }}
             style={{
-              background: showForm ? "rgba(255,255,255,0.2)" : "rgba(255,255,255,0.95)",
-              border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, padding: "10px 20px",
-              color: showForm ? "#fff" : C.accent, fontWeight: 600, fontSize: 14, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 8,
-            }}>
-            <i className={`bi ${showForm ? "bi-x-lg" : "bi-person-plus-fill"}`} />
+              background: showForm ? "rgba(239,68,68,0.9)" : "#fff",
+              border: "none", 
+              borderRadius: 10, 
+              padding: "11px 22px",
+              color: showForm ? "#fff" : C.accent, 
+              fontWeight: 700, 
+              fontSize: 14, 
+              cursor: "pointer",
+              display: "flex", 
+              alignItems: "center", 
+              gap: 8,
+              boxShadow: showForm ? "0 4px 12px rgba(239,68,68,0.3)" : "0 4px 16px rgba(0,0,0,0.15)",
+              transition: "all 0.2s ease",
+            }}
+            onMouseEnter={(e) => {
+              if (!showForm) {
+                e.target.style.transform = "translateY(-2px)";
+                e.target.style.boxShadow = "0 6px 20px rgba(0,0,0,0.2)";
+              }
+            }}
+            onMouseLeave={(e) => {
+              e.target.style.transform = "translateY(0)";
+              e.target.style.boxShadow = showForm ? "0 4px 12px rgba(239,68,68,0.3)" : "0 4px 16px rgba(0,0,0,0.15)";
+            }}
+          >
+            <i className={`bi ${showForm ? "bi-x-lg" : "bi-person-plus-fill"}`} style={{ fontSize: 15 }} />
             {showForm ? "Cancelar" : "Nuevo paciente"}
           </button>
         </div>
@@ -351,21 +377,68 @@ export default function Pacientes() {
         boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
       }}>
         <div style={{ padding: "20px 24px" }}>
-          <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
-            <input
-              style={{ ...inputSt, flex: 1 }}
-              placeholder="Buscar por nombre, DNI, teléfono o email..."
-              value={q}
-              onChange={e => setQ(e.target.value)}
-              onKeyDown={e => e.key === "Enter" && cargar()}
-            />
+          <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center" }}>
+            <div style={{ 
+              position: "relative", 
+              flex: 1,
+              display: "flex",
+              alignItems: "center",
+            }}>
+              <i className="bi bi-search" style={{
+                position: "absolute",
+                left: 12,
+                color: C.muted,
+                fontSize: 16,
+                pointerEvents: "none",
+              }} />
+              <input
+                style={{ 
+                  ...inputSt, 
+                  paddingLeft: 38,
+                  width: "100%",
+                  fontSize: 14,
+                  border: `2px solid ${C.border}`,
+                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                }}
+                placeholder="Buscar paciente por nombre, DNI, teléfono o email..."
+                value={q}
+                onChange={e => setQ(e.target.value)}
+                onKeyDown={e => e.key === "Enter" && cargar()}
+                onFocus={(e) => {
+                  e.target.style.borderColor = C.accent;
+                  e.target.style.boxShadow = `0 0 0 3px rgba(13,110,253,0.1)`;
+                }}
+                onBlur={(e) => {
+                  e.target.style.borderColor = C.border;
+                  e.target.style.boxShadow = "none";
+                }}
+              />
+            </div>
             <button onClick={cargar}
               style={{
-                background: C.accent, border: "none", borderRadius: 8,
-                padding: "8px 16px", color: "#fff", cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 6,
-              }}>
-              <i className="bi bi-search" />
+                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                border: "none", borderRadius: 8,
+                padding: "10px 20px", 
+                color: "#fff", 
+                cursor: "pointer",
+                display: "flex", 
+                alignItems: "center", 
+                gap: 8,
+                fontWeight: 600,
+                fontSize: 14,
+                boxShadow: "0 2px 8px rgba(13,110,253,0.3)",
+                transition: "all 0.2s ease",
+              }}
+              onMouseEnter={(e) => {
+                e.target.style.transform = "translateY(-1px)";
+                e.target.style.boxShadow = "0 4px 12px rgba(13,110,253,0.4)";
+              }}
+              onMouseLeave={(e) => {
+                e.target.style.transform = "translateY(0)";
+                e.target.style.boxShadow = "0 2px 8px rgba(13,110,253,0.3)";
+              }}
+            >
+              <i className="bi bi-search" /> Buscar
             </button>
           </div>
 
@@ -401,11 +474,43 @@ export default function Pacientes() {
               </thead>
               <tbody>
                 {lista.map(p => (
-                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <tr 
+                    key={p.id} 
+                    onClick={() => navigate(`/pacientes/${p.id}/perfil`)}
+                    onMouseEnter={() => setHoveredRow(p.id)}
+                    onMouseLeave={() => setHoveredRow(null)}
+                    style={{ 
+                      borderBottom: `1px solid ${C.border}`,
+                      cursor: "pointer",
+                      background: hoveredRow === p.id ? "rgba(13,110,253,0.03)" : "transparent",
+                      transition: "background 0.2s ease",
+                    }}>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                         <div
-                          onClick={() => p.foto_perfil && setModalFoto(`${API_BASE}/uploads/${p.foto_perfil}`)}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (p.foto_perfil) {
+                              setModalFoto(`${API_BASE}/uploads/${p.foto_perfil}`);
+                            } else {
+                              navigate(`/pacientes/${p.id}/perfil`);
+                            }
+                          }}
+                          onMouseEnter={(e) => {
+                            if (p.foto_perfil) {
+                              e.target.style.transform = "scale(1.1)";
+                              e.target.style.boxShadow = "0 4px 12px rgba(13,110,253,0.3)";
+                            } else {
+                              e.target.style.background = "rgba(13,110,253,0.2)";
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            e.target.style.transform = "scale(1)";
+                            e.target.style.boxShadow = "none";
+                            if (!p.foto_perfil) {
+                              e.target.style.background = "rgba(13,110,253,0.1)";
+                            }
+                          }}
                           style={{
                           width: 38, height: 38, borderRadius: "50%",
                           background: p.foto_perfil ? "transparent" : "rgba(13,110,253,0.1)",
@@ -414,8 +519,9 @@ export default function Pacientes() {
                           backgroundPosition: "center",
                           display: "flex", alignItems: "center", justifyContent: "center",
                           color: C.accent, fontWeight: 700, fontSize: 13,
-                          cursor: p.foto_perfil ? "pointer" : "default",
+                          cursor: "pointer",
                           border: p.foto_perfil ? `2px solid ${C.border}` : "none",
+                          transition: "all 0.2s ease",
                         }}>
                           {!p.foto_perfil && `${p.nombres?.[0]}${p.apellidos?.[0]}`}
                         </div>
@@ -457,7 +563,7 @@ export default function Pacientes() {
                     </td>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                        <button onClick={() => abrirEditar(p)}
+                        <button onClick={(e) => { e.stopPropagation(); abrirEditar(p); }}
                           style={{
                             background: "rgba(255,193,7,0.1)", border: "none", borderRadius: 6,
                             padding: "6px 12px", color: "#ffc107", fontSize: 12, fontWeight: 600,
@@ -465,26 +571,32 @@ export default function Pacientes() {
                           }}>
                           <i className="bi bi-pencil-square" /> Editar
                         </button>
-                        <Link to={`/pacientes/${p.id}/perfil`}
-                          style={{
-                            background: "rgba(0,0,0,0.05)", border: "none", borderRadius: 6,
-                            padding: "6px 12px", color: C.text, fontSize: 12, fontWeight: 600,
-                            textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
-                          }}>
-                          <i className="bi bi-person-badge" /> Perfil
-                        </Link>
-                        <Link to={`/historia/${p.id}`}
+                        <Link 
+                          to={`/pacientes/${p.id}/perfil`}
+                          onClick={(e) => e.stopPropagation()}
                           style={{
                             background: "rgba(13,110,253,0.1)", border: "none", borderRadius: 6,
                             padding: "6px 12px", color: C.accent, fontSize: 12, fontWeight: 600,
                             textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
                           }}>
-                          <i className="bi bi-journal-medical" /> HCE
+                          <i className="bi bi-file-earmark-medical" /> Expediente
                         </Link>
-                        <Link to={`/consulta?paciente_id=${p.id}`}
+                        <Link 
+                          to={`/historia/${p.id}`}
+                          onClick={(e) => e.stopPropagation()}
                           style={{
                             background: "rgba(16,185,129,0.1)", border: "none", borderRadius: 6,
                             padding: "6px 12px", color: "#10b981", fontSize: 12, fontWeight: 600,
+                            textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
+                          }}>
+                          <i className="bi bi-journal-medical" /> HCE
+                        </Link>
+                        <Link 
+                          to={`/consulta?paciente_id=${p.id}`}
+                          onClick={(e) => e.stopPropagation()}
+                          style={{
+                            background: "rgba(103,58,183,0.1)", border: "none", borderRadius: 6,
+                            padding: "6px 12px", color: "#673ab7", fontSize: 12, fontWeight: 600,
                             textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
                           }}>
                           <i className="bi bi-plus-circle" /> Consulta

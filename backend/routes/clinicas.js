@@ -2,6 +2,7 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const argon2 = require("argon2");
+const { uploadClinicas } = require("../middlewares/upload");
 
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/tipos  → catálogo de tipos de clínica
@@ -87,7 +88,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
 });
 
 // GET /api/clinicas/:id
-router.get("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const [rows] = await pool.query(
@@ -149,8 +150,8 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
   }
 });
 
-// PUT /api/clinicas/:id  → SUPER_ADMIN o ADMIN de esa clínica
-router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+// PUT /api/clinicas/:id  → SUPER_ADMIN, ADMIN o MEDICO de esa clínica
+router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { nombre, slug, tipo_id, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo } = req.body;
@@ -187,7 +188,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 });
 
 // PUT /api/clinicas/:id/config  → guardar pares clave-valor de config
-router.put("/:id/config", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+router.put("/:id/config", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { config } = req.body; // { smtp_host: "...", slot_minutos: "30", ... }
@@ -223,6 +224,130 @@ router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
     // Solo desactivar
     await pool.query("UPDATE clinicas SET activo=0 WHERE id=?", [req.params.id]);
     res.json({ ok: true, msg: "Clínica desactivada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  PLANTILLAS DE DOCUMENTOS (recetas, laboratorio, estudios, informes)
+// ══════════════════════════════════════════════════════════════════════════
+
+// GET /api/clinicas/:id/plantillas  → obtener todas las plantillas de la clínica
+router.get("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+  try {
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const [rows] = await pool.query(
+      `SELECT id, tipo, nombre, contenido, activo 
+       FROM plantillas_documentos 
+       WHERE clinica_id=? 
+       ORDER BY tipo, nombre`,
+      [id]
+    );
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// GET /api/clinicas/:id/plantillas/:tipo  → obtener plantilla por tipo
+router.get("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+  try {
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const { tipo } = req.params;
+    const [rows] = await pool.query(
+      `SELECT id, tipo, nombre, contenido, activo 
+       FROM plantillas_documentos 
+       WHERE clinica_id=? AND tipo=? AND activo=1 
+       LIMIT 1`,
+      [id, tipo]
+    );
+    res.json({ ok: true, data: rows[0] || null });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /api/clinicas/:id/plantillas  → crear/actualizar plantilla
+router.post("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+  try {
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const { tipo, nombre, contenido } = req.body;
+
+    if (!tipo || !nombre) {
+      return res.status(400).json({ ok: false, msg: "tipo y nombre son obligatorios" });
+    }
+
+    // Verificar si ya existe plantilla de ese tipo
+    const [exist] = await pool.query(
+      "SELECT id FROM plantillas_documentos WHERE clinica_id=? AND tipo=?",
+      [id, tipo]
+    );
+
+    if (exist.length) {
+      // Actualizar
+      await pool.query(
+        `UPDATE plantillas_documentos 
+         SET nombre=?, contenido=?, activo=1 
+         WHERE clinica_id=? AND tipo=?`,
+        [nombre, contenido || "", id, tipo]
+      );
+      res.json({ ok: true, msg: "Plantilla actualizada" });
+    } else {
+      // Crear nueva
+      await pool.query(
+        `INSERT INTO plantillas_documentos (clinica_id, tipo, nombre, contenido) 
+         VALUES (?,?,?,?)`,
+        [id, tipo, nombre, contenido || ""]
+      );
+      res.json({ ok: true, msg: "Plantilla creada" });
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// DELETE /api/clinicas/:id/plantillas/:tipo  → eliminar plantilla
+router.delete("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+  try {
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const { tipo } = req.params;
+    
+    await pool.query(
+      "DELETE FROM plantillas_documentos WHERE clinica_id=? AND tipo=?",
+      [id, tipo]
+    );
+    res.json({ ok: true, msg: "Plantilla eliminada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  UPLOAD DE LOGO
+// ══════════════════════════════════════════════════════════════════════════
+
+// POST /api/clinicas/:id/upload-logo  → subir logo de la clínica
+router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO"), uploadClinicas.single("logo"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
+    }
+
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const logoUrl = `/uploads/clinicas/${req.file.filename}`;
+
+    // Actualizar logo_url en la base de datos
+    await pool.query(
+      "UPDATE clinicas SET logo_url=? WHERE id=?",
+      [logoUrl, id]
+    );
+
+    res.json({ 
+      ok: true, 
+      logo_url: logoUrl,
+      msg: "Logo subido correctamente" 
+    });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

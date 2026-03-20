@@ -31,6 +31,15 @@ const MESSAGES = {
   noEventsInRange: "Sin citas en este rango.",
 };
 
+const FORMATS = {
+  timeGutterFormat: (date, culture, localizer) => localizer.format(date, "h A", culture),
+  eventTimeRangeFormat: ({ start, end }, culture, localizer) => 
+    `${localizer.format(start, "h:mm A", culture)} – ${localizer.format(end, "h:mm A", culture)}`,
+  agendaTimeRangeFormat: ({ start, end }, culture, localizer) => 
+    `${localizer.format(start, "h:mm A", culture)} – ${localizer.format(end, "h:mm A", culture)}`,
+  dayHeaderFormat: (date, culture, localizer) => localizer.format(date, "dddd D [de] MMM", culture),
+};
+
 function buildEvents(citas) {
   return citas.map(c => ({
     id: c.id,
@@ -43,7 +52,18 @@ function buildEvents(citas) {
 
 function eventPropGetter(event) {
   const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff" };
-  return { style: { backgroundColor: col.bg, color: col.fg, borderRadius: "4px", border: "none", fontSize: "0.78rem" } };
+  return { 
+    style: { 
+      backgroundColor: col.bg, 
+      color: col.fg, 
+      borderRadius: "4px", 
+      border: "none", 
+      fontSize: "0.78rem",
+      cursor: "pointer",
+      transition: "all 0.2s ease"
+    },
+    className: "event-hover" 
+  };
 }
 
 // ─── componente principal ─────────────────────────────────────────────────────
@@ -60,6 +80,7 @@ export default function Citas() {
   const [showDet,   setShowDet]     = useState(false);
   const [selEvent,  setSelEvent]    = useState(null);
   const [sala,      setSala]        = useState([]);
+  const [showConfirmDelete, setShowConfirmDelete] = useState(false);
 
   useEffect(() => {
     api.get("/usuarios/medicos")
@@ -81,12 +102,17 @@ export default function Citas() {
 
   useEffect(() => { loadCitas(); }, [loadCitas]);
 
-  useEffect(() => {
-    if (activeTab !== "sala") return;
+  const loadSalaEspera = useCallback(() => {
     api.get("/dashboard/sala-espera")
       .then(r => setSala(r.data.data || []))
       .catch(() => setSala([]));
-  }, [activeTab]);
+  }, []);
+
+  useEffect(() => {
+    if (activeTab === "sala") {
+      loadSalaEspera();
+    }
+  }, [activeTab, loadSalaEspera]);
 
   const onEventDrop = ({ event, start, end }) => {
     api.put(`/citas/${event.id}`, {
@@ -116,6 +142,8 @@ export default function Citas() {
           e.id === selEvent.id ? { ...e, resource: { ...e.resource, estado } } : e
         ));
         setSelEvent(s => ({ ...s, resource: { ...s.resource, estado } }));
+        // Recargar sala de espera si estamos en esa tab
+        loadSalaEspera();
       })
       .catch(err => alert(err.response?.data?.msg || "Error"));
   };
@@ -123,12 +151,70 @@ export default function Citas() {
   const cancelarCita = () => {
     if (!confirm("¿Cancelar esta cita?")) return;
     api.delete(`/citas/${selEvent.id}`)
-      .then(() => { setEvents(prev => prev.filter(e => e.id !== selEvent.id)); setShowDet(false); })
+      .then(() => { 
+        setEvents(prev => prev.filter(e => e.id !== selEvent.id)); 
+        setShowDet(false);
+        // Recargar sala de espera si estamos en esa tab
+        loadSalaEspera();
+      })
       .catch(err => alert(err.response?.data?.msg || "Error"));
+  };
+
+  const eliminarPermanente = () => {
+    api.delete(`/citas/${selEvent.id}/permanente`)
+      .then(() => { 
+        setEvents(prev => prev.filter(e => e.id !== selEvent.id)); 
+        setShowDet(false);
+        setShowConfirmDelete(false);
+        // Recargar sala de espera si estamos en esa tab
+        loadSalaEspera();
+      })
+      .catch(err => alert(err.response?.data?.msg || "Error al eliminar"));
   };
 
   return (
     <div className="container-fluid py-3">
+      <style>{`
+        .event-hover:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+          opacity: 0.95;
+        }
+        
+        /* Hover en celdas del calendario */
+        .rbc-time-slot:hover {
+          background-color: rgba(13, 110, 253, 0.08) !important;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        
+        .rbc-day-slot:hover .rbc-time-slot {
+          background-color: rgba(13, 110, 253, 0.05) !important;
+        }
+        
+        .rbc-time-slot:hover::before {
+          content: '';
+          position: absolute;
+          top: 0;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border: 1px dashed rgba(13, 110, 253, 0.3);
+          pointer-events: none;
+        }
+        
+        /* Hover en vista de mes */
+        .rbc-month-view .rbc-day-bg:hover {
+          background-color: rgba(13, 110, 253, 0.05) !important;
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        
+        .rbc-month-view .rbc-date-cell:hover {
+          background-color: rgba(13, 110, 253, 0.1) !important;
+          border-radius: 4px;
+        }
+      `}</style>
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h4 className="mb-0 fw-bold">Agenda de Citas</h4>
         <button className="btn btn-primary btn-sm" onClick={() => { setSlotInfo(null); setShowNew(true); }}>
@@ -187,6 +273,7 @@ export default function Citas() {
               onEventResize={onEventResize}
               eventPropGetter={eventPropGetter}
               messages={MESSAGES}
+              formats={FORMATS}
               culture="es"
               step={15}
               timeslots={4}
@@ -198,11 +285,17 @@ export default function Citas() {
       )}
 
       {activeTab === "sala" && (
-        <SalaEspera sala={sala} onEstadoChange={(id, estado) => {
-          api.patch(`/citas/${id}/estado`, { estado })
-            .then(() => setSala(prev => prev.map(c => c.id === id ? { ...c, estado } : c)))
-            .catch(err => alert(err.response?.data?.msg || "Error"));
-        }} />
+        <SalaEspera 
+          sala={sala} 
+          onEstadoChange={(id, estado) => {
+            api.patch(`/citas/${id}/estado`, { estado })
+              .then(() => {
+                // Recargar para actualizar la lista en tiempo real
+                loadSalaEspera();
+              })
+              .catch(err => alert(err.response?.data?.msg || "Error"));
+          }}
+        />
       )}
 
       {showNew && (
@@ -210,7 +303,11 @@ export default function Citas() {
           slotInfo={slotInfo}
           medicos={medicos}
           onClose={() => setShowNew(false)}
-          onCreated={() => { setShowNew(false); loadCitas(); }}
+          onCreated={() => { 
+            setShowNew(false); 
+            loadCitas();
+            loadSalaEspera();
+          }}
         />
       )}
 
@@ -220,6 +317,16 @@ export default function Citas() {
           onClose={() => setShowDet(false)}
           onEstado={cambiarEstado}
           onCancelar={cancelarCita}
+          onMostrarConfirmDelete={() => setShowConfirmDelete(true)}
+        />
+      )}
+
+      {showConfirmDelete && selEvent && (
+        <ModalConfirmDelete
+          onConfirm={eliminarPermanente}
+          onCancel={() => setShowConfirmDelete(false)}
+          pacienteNombre={`${selEvent.resource.paciente_apellidos}, ${selEvent.resource.paciente_nombres}`}
+          fecha={dayjs(selEvent.resource.inicio).format("DD/MM/YYYY h:mm A")}
         />
       )}
     </div>
@@ -233,6 +340,14 @@ function SalaEspera({ sala, onEstadoChange }) {
     <div>
       <h6 className="text-muted mb-3">Citas de hoy — {dayjs().format("dddd D [de] MMMM")}</h6>
       {sala.length === 0 && <p className="text-muted">No hay citas para hoy.</p>}
+      {sala.length > 0 && (
+        <div className="alert alert-info py-2 mb-3">
+          <small>
+            <i className="bi bi-info-circle me-1"></i>
+            Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIÓ
+          </small>
+        </div>
+      )}
       <div className="table-responsive">
         <table className="table table-hover align-middle">
           <thead className="table-light">
@@ -248,7 +363,7 @@ function SalaEspera({ sala, onEstadoChange }) {
                   <small className="text-muted">{c.paciente_tel}</small></td>
                 <td>Dr. {c.medico_apellidos}<br/>
                   <small className="text-muted">{c.especialidad}</small></td>
-                <td className="text-nowrap">{dayjs(c.inicio).format("HH:mm")} – {dayjs(c.fin).format("HH:mm")}</td>
+                <td className="text-nowrap">{dayjs(c.inicio).format("h:mm A")} – {dayjs(c.fin).format("h:mm A")}</td>
                 <td>
                   <span className="badge"
                     style={{ background: ESTADO_COLOR[c.estado]?.bg, color: ESTADO_COLOR[c.estado]?.fg }}>
@@ -284,18 +399,35 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
   const [slots,    setSlots]    = useState([]);
   const [slotSel,  setSlotSel]  = useState("");
   const [fechaSel, setFechaSel] = useState(slotInfo ? dayjs(slotInfo.inicio).format("YYYY-MM-DD") : dayjs().format("YYYY-MM-DD"));
+  const [horaInicio, setHoraInicio] = useState(slotInfo ? dayjs(slotInfo.inicio).format("HH:mm") : "");
+  const [horaFin,    setHoraFin]    = useState(slotInfo ? dayjs(slotInfo.fin).format("HH:mm") : "");
   const [saving,   setSaving]   = useState(false);
   const [err,      setErr]      = useState("");
 
   useEffect(() => {
     if (slotInfo) {
+      const inicio = dayjs(slotInfo.inicio);
+      const fin = dayjs(slotInfo.fin);
+      setHoraInicio(inicio.format("HH:mm"));
+      setHoraFin(fin.format("HH:mm"));
       setForm(f => ({
         ...f,
-        inicio: dayjs(slotInfo.inicio).format("YYYY-MM-DD HH:mm:ss"),
-        fin:    dayjs(slotInfo.fin).format("YYYY-MM-DD HH:mm:ss"),
+        inicio: inicio.format("YYYY-MM-DD HH:mm:ss"),
+        fin:    fin.format("YYYY-MM-DD HH:mm:ss"),
       }));
     }
   }, [slotInfo]);
+
+  // Actualizar form cuando cambian fecha/hora manualmente
+  useEffect(() => {
+    if (fechaSel && horaInicio && horaFin) {
+      setForm(f => ({
+        ...f,
+        inicio: `${fechaSel} ${horaInicio}:00`,
+        fin:    `${fechaSel} ${horaFin}:00`,
+      }));
+    }
+  }, [fechaSel, horaInicio, horaFin]);
 
   useEffect(() => {
     if (pacBusq.length < 2) { setPacList([]); return; }
@@ -322,7 +454,11 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
   };
 
   const selSlot = (s) => {
+    const inicio = dayjs(s.inicio);
+    const fin = dayjs(s.fin);
     setSlotSel(s.inicio);
+    setHoraInicio(inicio.format("HH:mm"));
+    setHoraFin(fin.format("HH:mm"));
     setForm(f => ({ ...f, inicio: s.inicio, fin: s.fin }));
   };
 
@@ -330,13 +466,24 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
     e.preventDefault();
     if (!form.paciente_id) { setErr("Selecciona un paciente"); return; }
     if (!form.medico_id)   { setErr("Selecciona un médico");   return; }
-    if (!form.inicio)      { setErr("Selecciona un horario");  return; }
+    if (!fechaSel)         { setErr("Selecciona una fecha");   return; }
+    if (!horaInicio)       { setErr("Ingresa hora de inicio"); return; }
+    if (!horaFin)          { setErr("Ingresa hora de fin");    return; }
+    
+    // Validar que hora fin sea después de hora inicio
+    const inicio = dayjs(`${fechaSel} ${horaInicio}`);
+    const fin = dayjs(`${fechaSel} ${horaFin}`);
+    if (fin.isBefore(inicio) || fin.isSame(inicio)) {
+      setErr("La hora de fin debe ser posterior a la hora de inicio");
+      return;
+    }
+    
     setSaving(true); setErr("");
     try {
       const payload = {
         ...form,
-        inicio: dayjs(form.inicio).format("YYYY-MM-DD HH:mm:ss"),
-        fin:    dayjs(form.fin).format("YYYY-MM-DD HH:mm:ss"),
+        inicio: inicio.format("YYYY-MM-DD HH:mm:ss"),
+        fin:    fin.format("YYYY-MM-DD HH:mm:ss"),
       };
       await api.post("/citas", payload);
       onCreated();
@@ -396,21 +543,47 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
 
               {slots.length > 0 && (
                 <div className="col-12">
-                  <label className="form-label fw-semibold">Horario disponible</label>
+                  <label className="form-label fw-semibold">Horarios disponibles (click para seleccionar)</label>
                   <div className="d-flex flex-wrap gap-1">
                     {slots.map(s => (
                       <button key={s.inicio} type="button"
                         className={`btn btn-sm ${slotSel === s.inicio ? "btn-primary" : "btn-outline-primary"}`}
                         onClick={() => selSlot(s)}>
-                        {dayjs(s.inicio).format("HH:mm")}
+                        {dayjs(s.inicio).format("h:mm A")}
                       </button>
                     ))}
                   </div>
                 </div>
               )}
               {form.medico_id && fechaSel && slots.length === 0 && (
-                <div className="col-12"><small className="text-muted">Sin horarios disponibles para ese día.</small></div>
+                <div className="col-12"><small className="text-muted">Sin horarios disponibles. Ingresa hora manualmente.</small></div>
               )}
+
+              <div className="col-md-6">
+                <label className="form-label fw-semibold">Hora inicio</label>
+                <input 
+                  type="time" 
+                  className="form-control" 
+                  value={horaInicio}
+                  onChange={e => setHoraInicio(e.target.value)}
+                  placeholder="HH:mm"
+                  required
+                />
+                <small className="text-muted">Ejemplo: 2:30 PM = 14:30</small>
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label fw-semibold">Hora fin</label>
+                <input 
+                  type="time" 
+                  className="form-control" 
+                  value={horaFin}
+                  onChange={e => setHoraFin(e.target.value)}
+                  placeholder="HH:mm"
+                  required
+                />
+                <small className="text-muted">Ejemplo: 3:00 PM = 15:00</small>
+              </div>
 
               <div className="col-md-4">
                 <label className="form-label fw-semibold">Tipo</label>
@@ -451,7 +624,7 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
 }
 
 // ─── Modal Detalle Cita ───────────────────────────────────────────────────────
-function ModalDetalle({ event, onClose, onEstado, onCancelar }) {
+function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete }) {
   const c = event.resource;
   const color = ESTADO_COLOR[c.estado] || { bg: "#6c757d", fg: "#fff" };
   const ACCIONES = {
@@ -479,8 +652,8 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar }) {
               <tbody>
                 <tr><th>Paciente</th><td>{c.paciente_apellidos}, {c.paciente_nombres}</td></tr>
                 <tr><th>Médico</th><td>Dr. {c.medico_apellidos} {c.medico_nombres}</td></tr>
-                <tr><th>Inicio</th><td>{dayjs(c.inicio).format("DD/MM/YYYY HH:mm")}</td></tr>
-                <tr><th>Fin</th><td>{dayjs(c.fin).format("HH:mm")}</td></tr>
+                <tr><th>Inicio</th><td>{dayjs(c.inicio).format("DD/MM/YYYY h:mm A")}</td></tr>
+                <tr><th>Fin</th><td>{dayjs(c.fin).format("h:mm A")}</td></tr>
                 <tr><th>Tipo</th><td>{c.tipo_consulta}</td></tr>
                 <tr><th>Canal</th><td>{c.canal}</td></tr>
                 <tr><th>Motivo</th><td>{c.motivo || "—"}</td></tr>
@@ -506,10 +679,56 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar }) {
             )}
           </div>
           <div className="modal-footer">
+            <div className="me-auto">
+              <button className="btn btn-danger btn-sm" 
+                onClick={onMostrarConfirmDelete}
+                title="Eliminar registro permanentemente de la base de datos">
+                <i className="bi bi-trash3"></i> Eliminar permanentemente
+              </button>
+            </div>
             {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
               <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
             )}
             <button className="btn btn-secondary btn-sm" onClick={onClose}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Confirmación Eliminar ──────────────────────────────────────────────
+function ModalConfirmDelete({ onConfirm, onCancel, pacienteNombre, fecha }) {
+  return (
+    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.7)", zIndex: 1060 }}>
+      <div className="modal-dialog modal-dialog-centered">
+        <div className="modal-content border-danger">
+          <div className="modal-header bg-danger text-white">
+            <h5 className="modal-title">
+              <i className="bi bi-exclamation-triangle-fill me-2"></i>
+              Confirmar Eliminación Permanente
+            </h5>
+            <button className="btn-close btn-close-white" onClick={onCancel} />
+          </div>
+          <div className="modal-body">
+            <div className="alert alert-warning mb-3">
+              <strong>⚠️ ADVERTENCIA:</strong> Esta acción eliminará permanentemente el registro de la base de datos y <strong>no se puede deshacer</strong>.
+            </div>
+            <p className="mb-2"><strong>Paciente:</strong> {pacienteNombre}</p>
+            <p className="mb-3"><strong>Fecha:</strong> {fecha}</p>
+            <p className="text-muted small mb-0">
+              Si solo deseas cancelar la cita sin eliminar el registro, usa el botón "Cancelar cita" en su lugar.
+            </p>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={onCancel}>
+              <i className="bi bi-x-circle me-1"></i>
+              No, volver
+            </button>
+            <button className="btn btn-danger" onClick={onConfirm}>
+              <i className="bi bi-trash3-fill me-1"></i>
+              Sí, eliminar permanentemente
+            </button>
           </div>
         </div>
       </div>

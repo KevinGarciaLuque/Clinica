@@ -214,7 +214,7 @@ CREATE TABLE IF NOT EXISTS historias_clinicas (
   subjetivo       TEXT COMMENT 'Síntomas referidos por el paciente',
   objetivo        JSON COMMENT 'Signos vitales: {pa, fc, fr, temp, peso, talla, spo2}',
   examen_fisico   TEXT,
-  diagnostico_cie VARCHAR(8)   COMMENT 'Código CIE-10 principal',
+  diagnostico_cie VARCHAR(50)  COMMENT 'Código CIE-10 principal',
   diagnosticos_secundarios JSON COMMENT '[{cie, descripcion}]',
   plan            TEXT COMMENT 'Tratamiento, indicaciones, seguimiento',
   plantilla_id    INT UNSIGNED,

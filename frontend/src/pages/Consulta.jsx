@@ -1,913 +1,367 @@
-/**
- * FASE 4 — Consulta SOAP (Historia Clínica Electrónica)
- * URL: /consulta?paciente_id=&cita_id=&historia_id=
- */
-import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useState, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import "dayjs/locale/es";
 import api from "../api/api";
 
-// ─── helpers ──────────────────────────────────────────────────────────────────
-const VITALS_FIELDS = [
-  { key: "pa",    label: "P.A.",   placeholder: "120/80",  unit: "mmHg" },
-  { key: "fc",    label: "F.C.",   placeholder: "72",      unit: "bpm"  },
-  { key: "fr",    label: "F.R.",   placeholder: "16",      unit: "rpm"  },
-  { key: "temp",  label: "Temp.",  placeholder: "36.5",    unit: "°C"   },
-  { key: "peso",  label: "Peso",   placeholder: "70",      unit: "kg"   },
-  { key: "talla", label: "Talla",  placeholder: "170",     unit: "cm"   },
-  { key: "spo2",  label: "SpO₂",  placeholder: "98",      unit: "%"    },
-  { key: "imc",   label: "IMC",   placeholder: "—",       unit: "kg/m²", readOnly: true },
-];
+dayjs.locale("es");
 
-function calcIMC(peso, talla) {
-  const p = parseFloat(peso), t = parseFloat(talla);
-  if (!p || !t) return "";
-  return (p / ((t / 100) ** 2)).toFixed(1);
-}
+// ─── colores por estado ───────────────────────────────────────────────────────
+const ESTADO_COLOR = {
+  PENDIENTE:    { bg: "#ffc107", fg: "#000" },
+  CONFIRMADA:   { bg: "#0d6efd", fg: "#fff" },
+  EN_ESPERA:    { bg: "#6610f2", fg: "#fff" },
+  EN_ATENCION:  { bg: "#198754", fg: "#fff" },
+  COMPLETADA:   { bg: "#6c757d", fg: "#fff" },
+  CANCELADA:    { bg: "#dc3545", fg: "#fff" },
+  NO_ASISTIO:   { bg: "#fd7e14", fg: "#fff" },
+};
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Consulta() {
-  const [params]   = useSearchParams();
-  const navigate   = useNavigate();
-  const pacId      = params.get("paciente_id");
-  const citaId     = params.get("cita_id");
-  const historiaId = params.get("historia_id");
+  const [activeTab, setActiveTab] = useState("citas-hoy");
+  const [citasHoy, setCitasHoy] = useState([]);
+  const [salaEspera, setSalaEspera] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
 
-  const [tab,       setTab]       = useState("soap");
-  const [historia,  setHistoria]  = useState(null);   // loaded historia object
-  const [hid,       setHid]       = useState(historiaId || null); // historia id (created or loaded)
-  const [paciente,  setPaciente]  = useState(null);
-  const [firmada,   setFirmada]   = useState(false);
-  const [saving,    setSaving]    = useState(false);
-  const [alert,     setAlert]     = useState(null);   // { type, msg }
+  // ── cargar citas del día ──────────────────────────────────────────────────────
+  const loadCitasHoy = useCallback(() => {
+    setLoading(true);
+    const hoy = dayjs().format("YYYY-MM-DD");
+    api.get("/citas", { params: { desde: hoy, hasta: hoy } })
+      .then(r => setCitasHoy(r.data.data || []))
+      .catch(() => setCitasHoy([]))
+      .finally(() => setLoading(false));
+  }, []);
 
-  // SOAP fields
-  const [soap, setSoap] = useState({
-    subjetivo: "", objetivo: {}, examen_fisico: "", plan: "",
-    diagnostico_cie: "", diagnostico_desc: "",
-    diagnosticos_secundarios: [],
-  });
-  const [vitals, setVitals] = useState({});
+  // ── cargar sala de espera ─────────────────────────────────────────────────────
+  const loadSalaEspera = useCallback(() => {
+    setLoading(true);
+    api.get("/dashboard/sala-espera")
+      .then(r => setSalaEspera(r.data.data || []))
+      .catch(() => setSalaEspera([]))
+      .finally(() => setLoading(false));
+  }, []);
 
-  // ── carga inicial ────────────────────────────────────────────────────────────
+  // ── efectos ───────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // cargar historia existente
-    if (hid) {
-      api.get(`/historias/${hid}`)
-        .then(r => {
-          const h = r.data.data;
-          setHistoria(h);
-          setFirmada(h.estado === "FIRMADA");
-          setPaciente({ id: h.paciente_id, nombres: h.pac_nombres, apellidos: h.pac_apellidos, fecha_nacimiento: h.fecha_nacimiento });
-          const obj = typeof h.objetivo === "string" ? JSON.parse(h.objetivo || "{}") : (h.objetivo || {});
-          setVitals(obj);
-          setSoap({
-            subjetivo: h.subjetivo || "",
-            objetivo:  obj,
-            examen_fisico: h.examen_fisico || "",
-            plan:       h.plan || "",
-            diagnostico_cie:  h.diagnostico_cie || "",
-            diagnostico_desc: "",
-            diagnosticos_secundarios: typeof h.diagnosticos_secundarios === "string"
-              ? JSON.parse(h.diagnosticos_secundarios || "[]")
-              : (h.diagnosticos_secundarios || []),
-          });
-        })
-        .catch(() => setAlert({ type: "danger", msg: "No se pudo cargar la historia" }));
+    if (activeTab === "citas-hoy") {
+      loadCitasHoy();
+    } else if (activeTab === "sala-espera") {
+      loadSalaEspera();
     }
+  }, [activeTab, loadCitasHoy, loadSalaEspera]);
 
-    // cargar paciente si no viene de historia
-    if (pacId && !hid) {
-      api.get(`/pacientes/${pacId}`)
-        .then(r => { if (r.data.data) setPaciente(r.data.data); })
-        .catch(() => {});
-    }
-  }, [hid, pacId]);
-
-  // ── imc automático ───────────────────────────────────────────────────────────
-  useEffect(() => {
-    setVitals(v => ({ ...v, imc: calcIMC(v.peso, v.talla) }));
-  }, [vitals.peso, vitals.talla]);
-
-  // ── guardar borrador ─────────────────────────────────────────────────────────
-  const handleSave = useCallback(async (sign = false) => {
-    setSaving(true);
-    setAlert(null);
-    try {
-      const payload = {
-        paciente_id: paciente?.id || pacId,
-        cita_id:     citaId || null,
-        subjetivo:   soap.subjetivo,
-        objetivo:    { ...vitals, imc: undefined },
-        examen_fisico: soap.examen_fisico,
-        diagnostico_cie: soap.diagnostico_cie || null,
-        diagnosticos_secundarios: soap.diagnosticos_secundarios,
-        plan:        soap.plan,
-        estado:      sign ? "FIRMADA" : "BORRADOR",
-      };
-
-      if (hid) {
-        await api.put(`/historias/${hid}`, payload);
-        if (sign) {
-          await api.post(`/historias/${hid}/firmar`);
-          setFirmada(true);
-          setAlert({ type: "success", msg: "Historia firmada y cita marcada como COMPLETADA." });
-        } else {
-          setAlert({ type: "success", msg: "Guardado como borrador." });
-        }
-      } else {
-        const r = await api.post("/historias", payload);
-        setHid(r.data.id);
-        if (sign) {
-          await api.post(`/historias/${r.data.id}/firmar`);
-          setFirmada(true);
-          setAlert({ type: "success", msg: "Historia firmada." });
-        } else {
-          setAlert({ type: "success", msg: "Historia creada." });
-        }
-      }
-    } catch (e) {
-      setAlert({ type: "danger", msg: e.response?.data?.msg || "Error al guardar" });
-    } finally {
-      setSaving(false);
-    }
-  }, [soap, vitals, hid, paciente, pacId, citaId]);
-
-  // ── UI ───────────────────────────────────────────────────────────────────────
-  const edad = paciente?.fecha_nacimiento
-    ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") + " años"
-    : "";
+  // ── cambiar estado ────────────────────────────────────────────────────────────
+  const cambiarEstado = (citaId, nuevoEstado) => {
+    api.patch(`/citas/${citaId}/estado`, { estado: nuevoEstado })
+      .then(() => {
+        // Recargar ambas listas
+        if (activeTab === "citas-hoy") loadCitasHoy();
+        else loadSalaEspera();
+      })
+      .catch(err => alert(err.response?.data?.msg || "Error al cambiar estado"));
+  };
 
   return (
     <div className="container-fluid py-3">
+      <style>{`
+        .consulta-table-hover tbody tr:hover {
+          background-color: rgba(13, 110, 253, 0.05);
+          cursor: pointer;
+          transition: background-color 0.2s ease;
+        }
+        .btn-estado {
+          font-size: 0.75rem;
+          padding: 0.25rem 0.5rem;
+          border-radius: 4px;
+          transition: all 0.2s;
+        }
+        .btn-estado:hover {
+          transform: translateY(-1px);
+          box-shadow: 0 2px 4px rgba(0,0,0,0.15);
+        }
+        .btn-consulta-medica {
+          font-weight: 600;
+          box-shadow: 0 2px 4px rgba(33, 150, 243, 0.3);
+          transition: all 0.2s;
+        }
+        .btn-consulta-medica:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 4px 8px rgba(33, 150, 243, 0.4);
+        }
+      `}</style>
+
       {/* Header */}
-      <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
-        <div>
-          <button className="btn btn-link p-0 text-muted me-2" onClick={() => navigate(-1)}>← Volver</button>
-          <h5 className="d-inline mb-0 fw-bold">
-            Consulta Médica
-            {firmada && <span className="badge bg-success ms-2">FIRMADA</span>}
-            {!firmada && hid && <span className="badge bg-warning text-dark ms-2">BORRADOR</span>}
-          </h5>
-        </div>
-        {!firmada && (
-          <div className="d-flex gap-2">
-            <button className="btn btn-outline-secondary btn-sm" onClick={() => handleSave(false)} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar Borrador"}
-            </button>
-            <button className="btn btn-success btn-sm" onClick={() => handleSave(true)} disabled={saving}>
-              ✓ Firmar y Cerrar
-            </button>
-          </div>
-        )}
+      <div className="d-flex align-items-center justify-content-between mb-3">
+        <h4 className="mb-0 fw-bold">
+          <i className="bi bi-clipboard2-pulse-fill text-primary me-2"></i>
+          Agenda de Consulta
+        </h4>
       </div>
-
-      {/* Paciente banner */}
-      {paciente && (
-        <div className="alert alert-light border py-2 mb-3 d-flex align-items-center gap-3">
-          <div className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold"
-            style={{ width: 44, height: 44, flexShrink: 0 }}>
-            {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
-          </div>
-          <div>
-            <div className="fw-semibold">{paciente.apellidos}, {paciente.nombres}</div>
-            <small className="text-muted">{edad}{edad ? " · " : ""}{paciente.fecha_nacimiento ? dayjs(paciente.fecha_nacimiento).format("DD/MM/YYYY") : ""}</small>
-          </div>
-          {paciente && (
-            <a href={`/historia/${paciente.id}`} className="ms-auto btn btn-outline-primary btn-sm">
-              Ver HCE completa
-            </a>
-          )}
-        </div>
-      )}
-
-      {alert && (
-        <div className={`alert alert-${alert.type} py-2 alert-dismissible`}>
-          {alert.msg}
-          <button className="btn-close" onClick={() => setAlert(null)} />
-        </div>
-      )}
 
       {/* Tabs */}
       <ul className="nav nav-tabs mb-3">
-        {[
-          { id: "soap",        label: "📋 SOAP" },
-          { id: "rx",          label: "💊 Prescripción" },
-          { id: "estudios",    label: "🧪 Estudios" },
-          { id: "antecedentes",label: "📁 Antecedentes" },
-        ].map(t => (
-          <li key={t.id} className="nav-item">
-            <button className={`nav-link ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
-              {t.label}
-            </button>
-          </li>
-        ))}
+        <li className="nav-item">
+          <button 
+            className={`nav-link ${activeTab === "citas-hoy" ? "active" : ""}`}
+            onClick={() => setActiveTab("citas-hoy")}
+          >
+            Calendario
+          </button>
+        </li>
+        <li className="nav-item">
+          <button 
+            className={`nav-link ${activeTab === "sala-espera" ? "active" : ""}`}
+            onClick={() => setActiveTab("sala-espera")}
+          >
+            Sala de Espera
+          </button>
+        </li>
       </ul>
 
-      {/* ── SOAP ── */}
-      {tab === "soap" && (
-        <SoapTab
-          soap={soap} setSoap={setSoap}
-          vitals={vitals} setVitals={setVitals}
-          firmada={firmada}
+      {/* Contenido según pestaña */}
+      {loading && (
+        <div className="text-center py-4">
+          <div className="spinner-border text-primary" role="status">
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      )}
+
+      {!loading && activeTab === "citas-hoy" && (
+        <CitasDelDia 
+          citas={citasHoy} 
+          onEstadoChange={cambiarEstado}
+          navigate={navigate}
         />
       )}
 
-      {/* ── Prescripción ── */}
-      {tab === "rx" && (
-        <PrescripcionTab
-          historiaId={hid}
-          pacienteId={paciente?.id || pacId}
-          citaId={citaId}
-          firmada={firmada}
-        />
-      )}
-
-      {/* ── Estudios ── */}
-      {tab === "estudios" && (
-        <EstudiosTab
-          historiaId={hid}
-          pacienteId={paciente?.id || pacId}
-          firmada={firmada}
-        />
-      )}
-
-      {/* ── Antecedentes ── */}
-      {tab === "antecedentes" && (
-        <AntecedentesTab
-          pacienteId={paciente?.id || pacId}
-          firmada={firmada}
+      {!loading && activeTab === "sala-espera" && (
+        <SalaDeEspera 
+          citas={salaEspera} 
+          onEstadoChange={cambiarEstado}
+          navigate={navigate}
         />
       )}
     </div>
   );
 }
 
-// ══════════════════════════════════════════════════════════════════════
-// TAB: SOAP
-// ══════════════════════════════════════════════════════════════════════
-function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
-  const [cie10List, setCie10List] = useState([]);
-  const cie10Ref = useRef(null);
-
-  const set = (field) => (e) =>
-    setSoap(s => ({ ...s, [field]: e.target.value }));
-
-  // búsqueda CIE-10
-  useEffect(() => {
-    const q = soap.diagnostico_cie;
-    if (!q || q.length < 2) { setCie10List([]); return; }
-    const t = setTimeout(() => {
-      api.get("/historias/cie10/buscar", { params: { q } })
-        .then(r => setCie10List(r.data.data || []))
-        .catch(() => setCie10List([]));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [soap.diagnostico_cie]);
-
-  const selCie = (item) => {
-    setSoap(s => ({ ...s, diagnostico_cie: item.codigo, diagnostico_desc: item.descripcion }));
-    setCie10List([]);
-  };
-
-  const addDxSec = () => {
-    setSoap(s => ({
-      ...s,
-      diagnosticos_secundarios: [...s.diagnosticos_secundarios, { cie: "", descripcion: "" }],
-    }));
-  };
-
-  const remDxSec = (i) => {
-    setSoap(s => ({
-      ...s,
-      diagnosticos_secundarios: s.diagnosticos_secundarios.filter((_, idx) => idx !== i),
-    }));
-  };
-
-  return (
-    <div className="row g-3">
-      {/* Signos vitales */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <h6 className="fw-semibold mb-3">Signos Vitales</h6>
-            <div className="row g-2">
-              {VITALS_FIELDS.map(f => (
-                <div key={f.key} className="col-6 col-md-3">
-                  <label className="form-label small mb-1">{f.label} <span className="text-muted">{f.unit}</span></label>
-                  <input
-                    className="form-control form-control-sm"
-                    placeholder={f.placeholder}
-                    value={vitals[f.key] || ""}
-                    readOnly={f.readOnly || firmada}
-                    onChange={f.readOnly ? undefined : e => setVitals(v => ({ ...v, [f.key]: e.target.value }))}
-                  />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Subjetivo */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <label className="form-label fw-semibold">
-              S — Subjetivo <small className="text-muted fw-normal">(Síntomas referidos por el paciente)</small>
-            </label>
-            <textarea className="form-control" rows={3} value={soap.subjetivo}
-              onChange={set("subjetivo")} readOnly={firmada}
-              placeholder="Motivo de consulta, síntomas, evolución…" />
-          </div>
-        </div>
-      </div>
-
-      {/* Examen físico */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <label className="form-label fw-semibold">
-              O — Objetivo <small className="text-muted fw-normal">(Hallazgos al examen físico)</small>
-            </label>
-            <textarea className="form-control" rows={3} value={soap.examen_fisico}
-              onChange={set("examen_fisico")} readOnly={firmada}
-              placeholder="Examen físico, hallazgos relevantes…" />
-          </div>
-        </div>
-      </div>
-
-      {/* Diagnóstico */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <label className="form-label fw-semibold">
-              A — Diagnóstico <small className="text-muted fw-normal">(CIE-10)</small>
-            </label>
-            <div className="position-relative" ref={cie10Ref}>
-              <div className="input-group input-group-sm">
-                <input className="form-control" placeholder="Buscar por código o descripción…"
-                  value={soap.diagnostico_cie} readOnly={firmada}
-                  onChange={set("diagnostico_cie")} />
-                {soap.diagnostico_desc && (
-                  <span className="input-group-text text-success">{soap.diagnostico_desc}</span>
-                )}
-              </div>
-              {cie10List.length > 0 && (
-                <ul className="list-group position-absolute z-3"
-                  style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto" }}>
-                  {cie10List.map(c => (
-                    <li key={c.codigo} className="list-group-item list-group-item-action py-1"
-                      style={{ cursor: "pointer", fontSize: "0.82rem" }}
-                      onClick={() => selCie(c)}>
-                      <strong>{c.codigo}</strong> — {c.descripcion}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            {/* Diagnósticos secundarios */}
-            {soap.diagnosticos_secundarios.map((dx, i) => (
-              <div key={i} className="d-flex gap-2 mt-2">
-                <input className="form-control form-control-sm" placeholder="Código CIE" style={{ maxWidth: 90 }}
-                  value={dx.cie} readOnly={firmada}
-                  onChange={e => setSoap(s => ({ ...s, diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) => j === i ? { ...d, cie: e.target.value } : d) }))} />
-                <input className="form-control form-control-sm" placeholder="Descripción"
-                  value={dx.descripcion} readOnly={firmada}
-                  onChange={e => setSoap(s => ({ ...s, diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) => j === i ? { ...d, descripcion: e.target.value } : d) }))} />
-                {!firmada && (
-                  <button className="btn btn-outline-danger btn-sm" onClick={() => remDxSec(i)}>✕</button>
-                )}
-              </div>
-            ))}
-            {!firmada && (
-              <button className="btn btn-link btn-sm mt-1 p-0" onClick={addDxSec}>+ Diagnóstico secundario</button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Plan */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <label className="form-label fw-semibold">
-              P — Plan <small className="text-muted fw-normal">(Tratamiento, indicaciones, seguimiento)</small>
-            </label>
-            <textarea className="form-control" rows={4} value={soap.plan}
-              onChange={set("plan")} readOnly={firmada}
-              placeholder="Tratamiento indicado, próxima cita, derivaciones…" />
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// TAB: Prescripción
-// ══════════════════════════════════════════════════════════════════════
-function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
-  const [list,      setList]      = useState([]);
-  const [showForm,  setShowForm]  = useState(false);
-  const [items,     setItems]     = useState([newItem()]);
-  const [notas,     setNotas]     = useState("");
-  const [saving,    setSaving]    = useState(false);
-  const [alert,     setAlert]     = useState(null);
-  const [medSearch, setMedSearch] = useState([]);
-
-  // Abre la receta en PDF en nueva pestaña
-  const printRx = async (id) => {
-    try {
-      const res = await api.get(`/prescripciones/${id}/pdf`, { responseType: "blob" });
-      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-      window.open(url, "_blank");
-    } catch {
-      alert("No se pudo generar el PDF");
-    }
-  };
-
-  function newItem() {
-    return { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" };
-  }
-
-  useEffect(() => {
-    if (!historiaId && !pacienteId) return;
-    const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
-    api.get("/prescripciones", { params })
-      .then(r => setList(r.data.data || []))
-      .catch(() => {});
-  }, [historiaId, pacienteId]);
-
-  const searchMed = (q, idx) => {
-    if (q.length < 2) { setMedSearch([]); return; }
-    api.get("/medicamentos", { params: { q } })
-      .then(r => setMedSearch({ idx, list: r.data.data || [] }))
-      .catch(() => {});
-  };
-
-  const selMed = (med, idx) => {
-    setItems(prev => prev.map((it, i) => i === idx
-      ? { ...it, medicamento_id: med.id, medicamento_texto: med.nombre_generico + (med.presentacion ? ` (${med.presentacion})` : "") }
-      : it
-    ));
-    setMedSearch([]);
-  };
-
-  const setItem = (idx, field, val) =>
-    setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
-
-  const handleSubmit = async () => {
-    if (!pacienteId) { setAlert({ type: "danger", msg: "Falta paciente_id" }); return; }
-    setSaving(true);
-    try {
-      await api.post("/prescripciones", {
-        historia_id: historiaId || null,
-        cita_id:     citaId || null,
-        paciente_id: pacienteId,
-        notas,
-        items: items.filter(it => it.medicamento_texto || it.medicamento_id),
-      });
-      const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
-      const r = await api.get("/prescripciones", { params });
-      setList(r.data.data || []);
-      setShowForm(false);
-      setItems([newItem()]);
-      setNotas("");
-      setAlert({ type: "success", msg: "Receta creada" });
-    } catch (e) {
-      setAlert({ type: "danger", msg: e.response?.data?.msg || "Error" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
+// ─── Tab 1: Citas del Día ─────────────────────────────────────────────────────
+function CitasDelDia({ citas, onEstadoChange, navigate }) {
+  const hoy = dayjs();
+  
   return (
     <div>
-      {alert && (
-        <div className={`alert alert-${alert.type} py-2 alert-dismissible mb-3`}>
-          {alert.msg} <button className="btn-close" onClick={() => setAlert(null)} />
+      <h6 className="text-muted mb-3">
+        Citas de hoy — {hoy.format("dddd D [de] MMMM")}
+      </h6>
+      
+      {citas.length === 0 && (
+        <div className="alert alert-info">
+          <i className="bi bi-info-circle me-2"></i>
+          No hay citas programadas para hoy.
         </div>
       )}
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h6 className="mb-0">Recetas de esta consulta</h6>
-        {!firmada && !showForm && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Receta</button>
-        )}
-      </div>
-
-      {/* Lista existente */}
-      {list.length === 0 && !showForm && <p className="text-muted">Sin recetas aún.</p>}
-      {list.map(p => (
-        <div key={p.id} className="card border-0 shadow-sm mb-2">
-          <div className="card-body py-2 d-flex align-items-center justify-content-between">
-            <div>
-              <span className="badge bg-secondary me-2">{p.estado}</span>
-              <strong>{p.total_items} medicamento(s)</strong>
-              <small className="text-muted ms-2">{dayjs(p.creado_en).format("DD/MM/YYYY HH:mm")}</small>
-            </div>
-            <div className="d-flex gap-1">
-              {p.estado === "ACTIVA" && !firmada && (
-                <button className="btn btn-outline-success btn-sm"
-                  onClick={() => api.patch(`/prescripciones/${p.id}/estado`, { estado: "ENTREGADA" })
-                    .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, estado: "ENTREGADA" } : x)))}>
-                  Marcar entregada
-                </button>
-              )}
-              <button className="btn btn-outline-primary btn-sm" title="Ver/Imprimir PDF"
-                onClick={() => printRx(p.id)}>
-                <i className="bi bi-printer me-1"></i>Receta PDF
-              </button>
-            </div>
+      {citas.length > 0 && (
+        <>
+          <div className="alert alert-light border py-2 mb-3">
+            <small className="text-muted">
+              <i className="bi bi-info-circle me-1"></i>
+              Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIÓ
+            </small>
           </div>
-        </div>
-      ))}
 
-      {/* Formulario nueva receta */}
-      {showForm && (
-        <div className="card border-primary shadow-sm mt-3">
-          <div className="card-header fw-semibold">Nueva Receta</div>
-          <div className="card-body">
-            {items.map((item, idx) => (
-              <div key={idx} className="border rounded p-2 mb-2 position-relative">
-                <div className="fw-semibold small mb-2 text-muted">Medicamento {idx + 1}</div>
-                <div className="row g-2">
-                  <div className="col-12 position-relative">
-                    <label className="form-label small mb-1">Medicamento</label>
-                    <input className="form-control form-control-sm" placeholder="Buscar o escribir…"
-                      value={item.medicamento_texto}
-                      onChange={e => { setItem(idx, "medicamento_texto", e.target.value); searchMed(e.target.value, idx); }} />
-                    {medSearch?.idx === idx && medSearch.list?.length > 0 && (
-                      <ul className="list-group position-absolute z-3"
-                        style={{ top: "100%", left: 0, right: 0, maxHeight: 150, overflowY: "auto" }}>
-                        {medSearch.list.map(m => (
-                          <li key={m.id} className="list-group-item list-group-item-action py-1"
-                            style={{ cursor: "pointer", fontSize: "0.8rem" }}
-                            onClick={() => selMed(m, idx)}>
-                            {m.nombre_generico} {m.presentacion && `(${m.presentacion})`}
-                          </li>
+          <div className="table-responsive">
+            <table className="table table-hover align-middle consulta-table-hover">
+              <thead className="table-light">
+                <tr>
+                  <th style={{ width: "50px" }}>#</th>
+                  <th>Paciente</th>
+                  <th>DNI</th>
+                  <th>Teléfono</th>
+                  <th>Email</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {citas.map((cita, index) => (
+                  <tr key={cita.id}>
+                    <td className="text-muted fw-bold">{index + 1}</td>
+                    <td>
+                      <div className="fw-semibold">
+                        {cita.paciente_apellidos}, {cita.paciente_nombres}
+                      </div>
+                      <small className="text-muted">
+                        {dayjs(cita.inicio).format("h:mm A")} – {dayjs(cita.fin).format("h:mm A")}
+                      </small>
+                    </td>
+                    <td className="text-nowrap">{cita.paciente_dni || "—"}</td>
+                    <td className="text-nowrap">{cita.paciente_tel || "—"}</td>
+                    <td>
+                      <small>{cita.paciente_email || "—"}</small>
+                    </td>
+                    <td>
+                      <span 
+                        className="badge" 
+                        style={{ 
+                          backgroundColor: ESTADO_COLOR[cita.estado]?.bg || "#6c757d",
+                          color: ESTADO_COLOR[cita.estado]?.fg || "#fff"
+                        }}
+                      >
+                        {cita.estado}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
+                        <button 
+                          className="btn btn-primary btn-sm btn-consulta-medica"
+                          onClick={() => navigate(`/consulta-medica?paciente_id=${cita.paciente_id}&cita_id=${cita.id}`)}
+                          title="Abrir consulta médica"
+                        >
+                          <i className="bi bi-clipboard2-pulse me-1"></i>
+                          Consulta
+                        </button>
+                        {cita.estado !== "EN_ESPERA" && (
+                          <button 
+                            className="btn btn-outline-primary btn-estado"
+                            onClick={() => onEstadoChange(cita.id, "EN_ESPERA")}
+                            title="Marcar como En Espera"
+                          >
+                            → EN ESPERA
+                          </button>
+                        )}
+                        {cita.estado !== "EN_ATENCION" && (
+                          <button 
+                            className="btn btn-outline-success btn-estado"
+                            onClick={() => onEstadoChange(cita.id, "EN_ATENCION")}
+                            title="Marcar como En Atención"
+                          >
+                            → EN ATENCIÓN
+                          </button>
+                        )}
+                        {cita.estado !== "COMPLETADA" && (
+                          <button 
+                            className="btn btn-outline-secondary btn-estado"
+                            onClick={() => onEstadoChange(cita.id, "COMPLETADA")}
+                            title="Marcar como Completada"
+                          >
+                            → COMPLETADA
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ─── Tab 2: Sala de Espera ────────────────────────────────────────────────────
+function SalaDeEspera({ citas, onEstadoChange, navigate }) {
+  const hoy = dayjs();
+  const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
+  
+  return (
+    <div>
+      <h6 className="text-muted mb-3">
+        Citas de hoy — {hoy.format("dddd D [de] MMMM")}
+      </h6>
+
+      {citas.length === 0 && (
+        <div className="alert alert-warning">
+          <i className="bi bi-exclamation-triangle me-2"></i>
+          No hay pacientes en sala de espera.
+        </div>
+      )}
+
+      {citas.length > 0 && (
+        <>
+          <div className="alert alert-info py-2 mb-3">
+            <small>
+              <i className="bi bi-info-circle me-1"></i>
+              Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIÓ
+            </small>
+          </div>
+
+          <div className="table-responsive">
+            <table className="table table-hover align-middle consulta-table-hover">
+              <thead className="table-light">
+                <tr>
+                  <th style={{ width: "50px" }}>#</th>
+                  <th>Paciente</th>
+                  <th>DNI</th>
+                  <th>Teléfono</th>
+                  <th>Email</th>
+                  <th>Estado</th>
+                  <th>Acciones</th>
+                </tr>
+              </thead>
+              <tbody>
+                {citas.map((cita, index) => (
+                  <tr key={cita.id}>
+                    <td className="text-muted fw-bold">{index + 1}</td>
+                    <td>
+                      <div className="fw-semibold">
+                        {cita.paciente_apellidos}, {cita.paciente_nombres}
+                      </div>
+                      <small className="text-muted">
+                        {dayjs(cita.inicio).format("h:mm A")} – {dayjs(cita.fin).format("h:mm A")}
+                      </small>
+                    </td>
+                    <td className="text-nowrap">{cita.paciente_dni || "—"}</td>
+                    <td className="text-nowrap">{cita.paciente_tel || "—"}</td>
+                    <td>
+                      <small>{cita.paciente_email || "—"}</small>
+                    </td>
+                    <td>
+                      <span 
+                        className="badge"
+                        style={{ 
+                          backgroundColor: ESTADO_COLOR[cita.estado]?.bg || "#6c757d",
+                          color: ESTADO_COLOR[cita.estado]?.fg || "#fff"
+                        }}
+                      >
+                        {cita.estado}
+                      </span>
+                    </td>
+                    <td>
+                      <div className="d-flex gap-1 flex-wrap">
+                        <button 
+                          className="btn btn-primary btn-sm btn-consulta-medica"
+                          onClick={() => navigate(`/consulta-medica?paciente_id=${cita.paciente_id}&cita_id=${cita.id}`)}
+                          title="Abrir consulta médica"
+                        >
+                          <i className="bi bi-clipboard2-pulse me-1"></i>
+                          Consulta
+                        </button>
+                        {FLUJO.filter(estado => estado !== cita.estado).map(estado => (
+                          <button 
+                            key={estado}
+                            className="btn btn-outline-secondary btn-estado"
+                            onClick={() => onEstadoChange(cita.id, estado)}
+                          >
+                            → {estado.replace("_", " ")}
+                          </button>
                         ))}
-                      </ul>
-                    )}
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small mb-1">Dosis</label>
-                    <input className="form-control form-control-sm" placeholder="500mg c/8h"
-                      value={item.dosis} onChange={e => setItem(idx, "dosis", e.target.value)} />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small mb-1">Duración</label>
-                    <input className="form-control form-control-sm" placeholder="7 días"
-                      value={item.duracion} onChange={e => setItem(idx, "duracion", e.target.value)} />
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small mb-1">Cantidad</label>
-                    <input className="form-control form-control-sm" placeholder="21 tabletas"
-                      value={item.cantidad} onChange={e => setItem(idx, "cantidad", e.target.value)} />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label small mb-1">Instrucciones</label>
-                    <input className="form-control form-control-sm" placeholder="Tomar con alimentos…"
-                      value={item.instrucciones} onChange={e => setItem(idx, "instrucciones", e.target.value)} />
-                  </div>
-                </div>
-                {items.length > 1 && (
-                  <button className="btn btn-outline-danger btn-sm position-absolute top-0 end-0 m-1"
-                    onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>✕</button>
-                )}
-              </div>
-            ))}
-
-            <button className="btn btn-outline-primary btn-sm me-2"
-              onClick={() => setItems(prev => [...prev, newItem()])}>
-              + Agregar medicamento
-            </button>
-
-            <div className="mt-3">
-              <label className="form-label small">Notas adicionales</label>
-              <textarea className="form-control form-control-sm" rows={2}
-                value={notas} onChange={e => setNotas(e.target.value)} />
-            </div>
-
-            <div className="d-flex gap-2 mt-3">
-              <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={saving}>
-                {saving ? "Guardando…" : "Crear Receta"}
-              </button>
-              <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
-            </div>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-        </div>
+        </>
       )}
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// TAB: Estudios
-// ══════════════════════════════════════════════════════════════════════
-const ESTADO_BADGE = {
-  SOLICITADO:  "warning",
-  EN_PROCESO:  "info",
-  COMPLETADO:  "success",
-  CANCELADO:   "secondary",
-};
-
-function EstudiosTab({ historiaId, pacienteId, firmada }) {
-  const [list,     setList]     = useState([]);
-  const [showForm, setShowForm] = useState(false);
-  const [form,     setForm]     = useState({ tipo: "LABORATORIO", descripcion: "", urgente: false });
-  const [saving,   setSaving]   = useState(false);
-  const [alert,    setAlert]    = useState(null);
-
-  useEffect(() => {
-    if (!historiaId && !pacienteId) return;
-    const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
-    api.get("/estudios", { params })
-      .then(r => setList(r.data.data || []))
-      .catch(() => {});
-  }, [historiaId, pacienteId]);
-
-  const handleSubmit = async () => {
-    if (!form.descripcion) { setAlert({ type: "danger", msg: "Ingresa la descripción" }); return; }
-    setSaving(true);
-    try {
-      await api.post("/estudios", {
-        paciente_id: pacienteId,
-        historia_id: historiaId || null,
-        tipo:        form.tipo,
-        descripcion: form.descripcion,
-        urgente:     form.urgente ? 1 : 0,
-      });
-      const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
-      const r = await api.get("/estudios", { params });
-      setList(r.data.data || []);
-      setShowForm(false);
-      setForm({ tipo: "LABORATORIO", descripcion: "", urgente: false });
-      setAlert({ type: "success", msg: "Solicitud creada" });
-    } catch (e) {
-      setAlert({ type: "danger", msg: e.response?.data?.msg || "Error" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div>
-      {alert && (
-        <div className={`alert alert-${alert.type} py-2 alert-dismissible mb-3`}>
-          {alert.msg} <button className="btn-close" onClick={() => setAlert(null)} />
-        </div>
-      )}
-
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h6 className="mb-0">Solicitudes de Estudios</h6>
-        {!firmada && !showForm && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Solicitud</button>
-        )}
-      </div>
-
-      {list.length === 0 && !showForm && <p className="text-muted">Sin solicitudes.</p>}
-      {list.map(s => (
-        <div key={s.id} className="card border-0 shadow-sm mb-2">
-          <div className="card-body py-2">
-            <div className="d-flex justify-content-between">
-              <div>
-                <span className={`badge bg-${ESTADO_BADGE[s.estado]} me-2`}>{s.estado}</span>
-                <span className="badge bg-light text-dark border me-2">{s.tipo}</span>
-                {s.urgente === 1 && <span className="badge bg-danger">URGENTE</span>}
-              </div>
-              <small className="text-muted">{dayjs(s.creado_en).format("DD/MM/YYYY")}</small>
-            </div>
-            <p className="mb-0 mt-1 small">{s.descripcion}</p>
-            {s.estado === "SOLICITADO" && !firmada && (
-              <button className="btn btn-outline-secondary btn-sm mt-1"
-                onClick={() => api.patch(`/estudios/${s.id}/estado`, { estado: "EN_PROCESO" })
-                  .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, estado: "EN_PROCESO" } : x)))}>
-                → En Proceso
-              </button>
-            )}
-          </div>
-        </div>
-      ))}
-
-      {showForm && (
-        <div className="card border-primary shadow-sm mt-3">
-          <div className="card-header fw-semibold">Nueva Solicitud</div>
-          <div className="card-body row g-2">
-            <div className="col-md-4">
-              <label className="form-label small">Tipo</label>
-              <select className="form-select form-select-sm"
-                value={form.tipo} onChange={e => setForm(f => ({ ...f, tipo: e.target.value }))}>
-                {["LABORATORIO","IMAGENOLOGIA","OTRO"].map(t => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="col-md-8">
-              <label className="form-label small">Descripción de estudios</label>
-              <textarea className="form-control form-control-sm" rows={2}
-                placeholder="Hemograma completo, glucosa, creatinina…"
-                value={form.descripcion} onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
-            </div>
-            <div className="col-12">
-              <div className="form-check">
-                <input className="form-check-input" type="checkbox" id="urgente-check"
-                  checked={form.urgente} onChange={e => setForm(f => ({ ...f, urgente: e.target.checked }))} />
-                <label className="form-check-label small" htmlFor="urgente-check">Urgente</label>
-              </div>
-            </div>
-            <div className="col-12 d-flex gap-2">
-              <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={saving}>
-                {saving ? "Guardando…" : "Crear Solicitud"}
-              </button>
-              <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ══════════════════════════════════════════════════════════════════════
-// TAB: Antecedentes & Alergias
-// ══════════════════════════════════════════════════════════════════════
-const TIPOS_ANTECEDENTE = ["patologico","quirurgico","familiar","ginecobstetrico","habitos","otros"];
-const SEVERIDAD_COLOR   = { LEVE: "success", MODERADA: "warning", SEVERA: "danger", MORTAL: "dark" };
-
-function AntecedentesTab({ pacienteId, firmada }) {
-  const [antecedentes, setAntecedentes] = useState([]);
-  const [alergias,     setAlergias]     = useState([]);
-  const [showAnt,      setShowAnt]      = useState(false);
-  const [showAler,     setShowAler]     = useState(false);
-  const [formAnt,      setFormAnt]      = useState({ tipo: "patologico", descripcion: "" });
-  const [formAler,     setFormAler]     = useState({ agente: "", tipo: "MEDICAMENTO", severidad: "MODERADA", reaccion: "" });
-  const [saving,       setSaving]       = useState(false);
-  const [alert,        setAlert]        = useState(null);
-
-  useEffect(() => {
-    if (!pacienteId) return;
-    Promise.all([
-      api.get(`/historias/paciente/${pacienteId}/antecedentes`),
-      api.get(`/historias/paciente/${pacienteId}/alergias`),
-    ]).then(([a, al]) => {
-      setAntecedentes(a.data.data || []);
-      setAlergias(al.data.data || []);
-    }).catch(() => {});
-  }, [pacienteId]);
-
-  const saveAntecedente = async () => {
-    if (!formAnt.descripcion) return;
-    setSaving(true);
-    try {
-      await api.post(`/historias/paciente/${pacienteId}/antecedentes`, formAnt);
-      const r = await api.get(`/historias/paciente/${pacienteId}/antecedentes`);
-      setAntecedentes(r.data.data || []);
-      setShowAnt(false);
-      setFormAnt({ tipo: "patologico", descripcion: "" });
-    } catch (e) {
-      setAlert({ type: "danger", msg: e.response?.data?.msg || "Error" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const saveAlergia = async () => {
-    if (!formAler.agente) return;
-    setSaving(true);
-    try {
-      await api.post(`/historias/paciente/${pacienteId}/alergias`, formAler);
-      const r = await api.get(`/historias/paciente/${pacienteId}/alergias`);
-      setAlergias(r.data.data || []);
-      setShowAler(false);
-      setFormAler({ agente: "", tipo: "MEDICAMENTO", severidad: "MODERADA", reaccion: "" });
-    } catch (e) {
-      setAlert({ type: "danger", msg: e.response?.data?.msg || "Error" });
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  // agrupar antecedentes por tipo
-  const byTipo = TIPOS_ANTECEDENTE.reduce((acc, t) => {
-    acc[t] = antecedentes.filter(a => a.tipo === t);
-    return acc;
-  }, {});
-
-  return (
-    <div className="row g-3">
-      {alert && (
-        <div className="col-12">
-          <div className={`alert alert-${alert.type} py-2`}>{alert.msg}</div>
-        </div>
-      )}
-
-      {/* Alergias */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h6 className="mb-0">Alergias Conocidas</h6>
-              {!firmada && (
-                <button className="btn btn-outline-danger btn-sm" onClick={() => setShowAler(!showAler)}>
-                  + Alergia
-                </button>
-              )}
-            </div>
-
-            {alergias.length === 0 && <p className="text-muted small mb-0">Sin alergias registradas.</p>}
-            <div className="d-flex flex-wrap gap-2">
-              {alergias.map(a => (
-                <span key={a.id} className={`badge bg-${SEVERIDAD_COLOR[a.severidad] || "secondary"}`}>
-                  ⚠ {a.agente} ({a.tipo}) — {a.severidad}
-                </span>
-              ))}
-            </div>
-
-            {showAler && (
-              <div className="row g-2 mt-2 border-top pt-2">
-                <div className="col-md-4">
-                  <input className="form-control form-control-sm" placeholder="Agente (ej: Penicilina)"
-                    value={formAler.agente} onChange={e => setFormAler(f => ({ ...f, agente: e.target.value }))} />
-                </div>
-                <div className="col-md-3">
-                  <select className="form-select form-select-sm"
-                    value={formAler.tipo} onChange={e => setFormAler(f => ({ ...f, tipo: e.target.value }))}>
-                    {["MEDICAMENTO","ALIMENTO","AMBIENTAL","OTRO"].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="col-md-3">
-                  <select className="form-select form-select-sm"
-                    value={formAler.severidad} onChange={e => setFormAler(f => ({ ...f, severidad: e.target.value }))}>
-                    {["LEVE","MODERADA","SEVERA","MORTAL"].map(t => <option key={t}>{t}</option>)}
-                  </select>
-                </div>
-                <div className="col-md-2">
-                  <button className="btn btn-danger btn-sm w-100" onClick={saveAlergia} disabled={saving}>
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Antecedentes */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <div className="d-flex justify-content-between align-items-center mb-3">
-              <h6 className="mb-0">Antecedentes</h6>
-              {!firmada && (
-                <button className="btn btn-outline-primary btn-sm" onClick={() => setShowAnt(!showAnt)}>
-                  + Antecedente
-                </button>
-              )}
-            </div>
-
-            {TIPOS_ANTECEDENTE.map(tipo => (
-              byTipo[tipo]?.length > 0 && (
-                <div key={tipo} className="mb-3">
-                  <div className="text-muted small fw-semibold text-uppercase mb-1">{tipo.replace("_", " ")}</div>
-                  {byTipo[tipo].map(a => (
-                    <div key={a.id} className="d-flex align-items-start gap-2 mb-1">
-                      <span className="text-muted">•</span>
-                      <span className="small">{a.descripcion}</span>
-                    </div>
-                  ))}
-                </div>
-              )
-            ))}
-
-            {antecedentes.length === 0 && !showAnt && (
-              <p className="text-muted small">Sin antecedentes registrados.</p>
-            )}
-
-            {showAnt && (
-              <div className="row g-2 border-top pt-2">
-                <div className="col-md-4">
-                  <select className="form-select form-select-sm"
-                    value={formAnt.tipo} onChange={e => setFormAnt(f => ({ ...f, tipo: e.target.value }))}>
-                    {TIPOS_ANTECEDENTE.map(t => (
-                      <option key={t} value={t}>{t.replace("_", " ")}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-md-6">
-                  <input className="form-control form-control-sm" placeholder="Descripción"
-                    value={formAnt.descripcion} onChange={e => setFormAnt(f => ({ ...f, descripcion: e.target.value }))} />
-                </div>
-                <div className="col-md-2">
-                  <button className="btn btn-primary btn-sm w-100" onClick={saveAntecedente} disabled={saving}>
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
     </div>
   );
 }

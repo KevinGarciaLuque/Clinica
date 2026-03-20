@@ -7,8 +7,20 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
 
+const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE = { BORRADOR: "warning text-dark", FIRMADA: "success" };
 const SEV_COLOR    = { LEVE: "success", MODERADA: "warning", SEVERA: "danger", MORTAL: "dark" };
+
+const C = {
+  bg: "#f8f9fa", surface: "#ffffff", card: "#ffffff",
+  border: "rgba(0,0,0,0.1)", accent: "#166ae8",
+  accentD: "#1f6bbd", text: "#1a1a1a", muted: "#6c757d", inputBg: "#ffffff",
+};
+
+const inputSt = {
+  background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 8,
+  color: C.text, padding: "8px 12px", width: "100%", fontSize: 14, outline: "none",
+};
 
 export default function HistoriaClinica() {
   const { paciente_id } = useParams();
@@ -24,6 +36,8 @@ export default function HistoriaClinica() {
   const [selPacId,     setSelPacId]     = useState(paciente_id || null);
   const [expandId,     setExpandId]     = useState(null);    // expanded historia
   const [detalle,      setDetalle]      = useState({});      // historia_id → full detail
+  const [hoveredRow,   setHoveredRow]   = useState(null);    // hover effect en tabla
+  const [modalFoto,    setModalFoto]    = useState(null);    // modal foto grande
 
   // ── cargar datos cuando se selecciona paciente ────────────────────────────
   useEffect(() => {
@@ -48,7 +62,13 @@ export default function HistoriaClinica() {
 
   // ── búsqueda de paciente ──────────────────────────────────────────────────
   useEffect(() => {
-    if (search.length < 2) { setSearchList([]); return; }
+    if (search.length < 2) { 
+      // Cargar todos los pacientes cuando no hay búsqueda
+      api.get("/pacientes")
+        .then(r => setSearchList(r.data.data || []))
+        .catch(() => {});
+      return; 
+    }
     const t = setTimeout(() => {
       api.get("/pacientes", { params: { q: search } })
         .then(r => setSearchList(r.data.data || []))
@@ -56,6 +76,15 @@ export default function HistoriaClinica() {
     }, 300);
     return () => clearTimeout(t);
   }, [search]);
+
+  // Cargar lista inicial
+  useEffect(() => {
+    if (!selPacId) {
+      api.get("/pacientes")
+        .then(r => setSearchList(r.data.data || []))
+        .catch(() => {});
+    }
+  }, [selPacId]);
 
   // ── expandir entrada → cargar detalle ────────────────────────────────────
   const toggleExpand = async (id) => {
@@ -104,22 +133,182 @@ export default function HistoriaClinica() {
       </div>
 
       {/* Búsqueda de paciente (si no viene de URL) */}
-      {!paciente_id && (
-        <div className="position-relative mb-4" style={{ maxWidth: 400 }}>
-          <input className="form-control" placeholder="Buscar paciente por nombre o DNI…"
-            value={search} onChange={e => { setSearch(e.target.value); setSelPacId(null); setPaciente(null); }} />
-          {searchList.length > 0 && (
-            <ul className="list-group position-absolute z-3"
-              style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto" }}>
-              {searchList.map(p => (
-                <li key={p.id} className="list-group-item list-group-item-action py-1"
-                  style={{ cursor: "pointer" }}
-                  onClick={() => { setSelPacId(p.id); setSearch(`${p.apellidos}, ${p.nombres}`); setSearchList([]); }}>
-                  {p.apellidos}, {p.nombres} — DNI {p.dni}
-                </li>
-              ))}
-            </ul>
-          )}
+      {!paciente_id && !selPacId && (
+        <div style={{
+          background: C.card, border: `1px solid ${C.border}`,
+          borderRadius: 14, overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          marginBottom: 24,
+        }}>
+          <div style={{ padding: "20px 24px" }}>
+            <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center" }}>
+              <div style={{ 
+                position: "relative", 
+                flex: 1,
+                display: "flex",
+                alignItems: "center",
+              }}>
+                <i className="bi bi-search" style={{
+                  position: "absolute",
+                  left: 12,
+                  color: C.muted,
+                  fontSize: 16,
+                  pointerEvents: "none",
+                }} />
+                <input
+                  style={{ 
+                    ...inputSt, 
+                    paddingLeft: 38,
+                    width: "100%",
+                    fontSize: 14,
+                    border: `2px solid ${C.border}`,
+                    transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+                  }}
+                  placeholder="Buscar paciente por nombre, DNI, teléfono o email..."
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  onFocus={(e) => {
+                    e.target.style.borderColor = C.accent;
+                    e.target.style.boxShadow = `0 0 0 3px rgba(13,110,253,0.1)`;
+                  }}
+                  onBlur={(e) => {
+                    e.target.style.borderColor = C.border;
+                    e.target.style.boxShadow = "none";
+                  }}
+                />
+              </div>
+            </div>
+
+            {searchList.length > 0 && (
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr style={{ background: `linear-gradient(135deg, #214a87 0%, #176DC8 100%)`, border: `1px solid ${C.border}` }}>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
+                                  color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                        Paciente
+                      </th>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
+                                  color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                        DNI
+                      </th>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
+                                  color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                        Teléfono
+                      </th>
+                      <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
+                                  color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                        Email
+                      </th>
+                      <th style={{ padding: "12px 16px", textAlign: "center", fontSize: 12, fontWeight: 700,
+                                  color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
+                        Estado
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {searchList.map(p => (
+                      <tr 
+                        key={p.id} 
+                        onClick={() => { 
+                          setSelPacId(p.id); 
+                          setSearch(`${p.apellidos}, ${p.nombres}`); 
+                        }}
+                        onMouseEnter={() => setHoveredRow(p.id)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        style={{ 
+                          borderBottom: `1px solid ${C.border}`,
+                          cursor: "pointer",
+                          background: hoveredRow === p.id ? "rgba(13,110,253,0.03)" : "transparent",
+                          transition: "background 0.2s ease",
+                        }}>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (p.foto_perfil) {
+                                  setModalFoto(`${API_BASE}/uploads/${p.foto_perfil}`);
+                                }
+                              }}
+                              onMouseEnter={(e) => {
+                                if (p.foto_perfil) {
+                                  e.target.style.transform = "scale(1.1)";
+                                  e.target.style.boxShadow = "0 4px 12px rgba(13,110,253,0.3)";
+                                } else {
+                                  e.target.style.background = "rgba(13,110,253,0.2)";
+                                }
+                              }}
+                              onMouseLeave={(e) => {
+                                e.target.style.transform = "scale(1)";
+                                e.target.style.boxShadow = "none";
+                                if (!p.foto_perfil) {
+                                  e.target.style.background = "rgba(13,110,253,0.1)";
+                                }
+                              }}
+                              style={{
+                              width: 38, height: 38, borderRadius: "50%",
+                              background: p.foto_perfil ? "transparent" : "rgba(13,110,253,0.1)",
+                              backgroundImage: p.foto_perfil ? `url(${API_BASE}/uploads/${p.foto_perfil})` : "none",
+                              backgroundSize: "cover",
+                              backgroundPosition: "center",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: C.accent, fontWeight: 700, fontSize: 13,
+                              cursor: p.foto_perfil ? "pointer" : "default",
+                              border: p.foto_perfil ? `2px solid ${C.border}` : "none",
+                              transition: "all 0.2s ease",
+                            }}>
+                              {!p.foto_perfil && `${p.nombres?.[0]}${p.apellidos?.[0]}`}
+                            </div>
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>
+                                {p.nombres} {p.apellidos}
+                              </div>
+                              {p.fecha_nacimiento && (
+                                <div style={{ fontSize: 12, color: C.muted }}>
+                                  {new Date(p.fecha_nacimiento).toLocaleDateString("es-PE")}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
+                          {p.dni || "—"}
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
+                          {p.telefono || "—"}
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
+                          {p.email || "—"}
+                        </td>
+                        <td style={{ padding: "12px 16px", textAlign: "center" }}>
+                          {p.activo ? (
+                            <span style={{
+                              background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.3)",
+                              borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 600,
+                              color: "#10b981", textTransform: "uppercase",
+                            }}>Activo</span>
+                          ) : (
+                            <span style={{
+                              background: "rgba(0,0,0,0.05)", border: `1px solid ${C.border}`,
+                              borderRadius: 6, padding: "4px 10px", fontSize: 11, fontWeight: 600,
+                              color: C.muted, textTransform: "uppercase",
+                            }}>Inactivo</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {searchList.length === 0 && search.length >= 2 && (
+              <div className="text-center py-4 text-muted">
+                No se encontraron pacientes con "{search}"
+              </div>
+            )}
+          </div>
         </div>
       )}
 
@@ -139,6 +328,36 @@ export default function HistoriaClinica() {
 
       {paciente && (
         <>
+          {/* Botón volver a lista */}
+          {!paciente_id && (
+            <button
+              onClick={() => {
+                setSelPacId(null);
+                setPaciente(null);
+                setHistorias([]);
+                setAlergias([]);
+                setAntecedentes([]);
+                setSearch("");
+              }}
+              style={{
+                background: "rgba(13,110,253,0.1)",
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                padding: "8px 16px",
+                color: C.accent,
+                fontWeight: 600,
+                fontSize: 14,
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                marginBottom: 16,
+              }}
+            >
+              <i className="bi bi-arrow-left" /> Volver a lista de pacientes
+            </button>
+          )}
+
           {/* Tarjeta del paciente */}
           <div className="card border-0 shadow-sm mb-4">
             <div className="card-body">
@@ -337,6 +556,37 @@ export default function HistoriaClinica() {
             })}
           </div>
         </>
+      )}
+
+      {/* Modal foto grande */}
+      {modalFoto && (
+        <div
+          onClick={() => setModalFoto(null)}
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.8)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 9999,
+            cursor: "pointer",
+          }}
+        >
+          <img
+            src={modalFoto}
+            alt="Foto del paciente"
+            style={{
+              maxWidth: "90%",
+              maxHeight: "90%",
+              borderRadius: 12,
+              boxShadow: "0 8px 32px rgba(0,0,0,0.3)",
+            }}
+          />
+        </div>
       )}
     </div>
   );

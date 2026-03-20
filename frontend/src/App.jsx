@@ -8,6 +8,7 @@ import Pacientes       from "./pages/Pacientes";
 import Citas           from "./pages/Citas";
 import ChatIA          from "./pages/ChatIA";
 import Consulta        from "./pages/Consulta";
+import ConsultaMedica  from "./pages/ConsultaMedica";
 import HistoriaClinica from "./pages/HistoriaClinica";
 import PerfilPaciente  from "./pages/PerfilPaciente";
 import Estudios        from "./pages/Estudios";
@@ -64,6 +65,7 @@ export default function App() {
         <Route path="/citas"                  element={<Citas />} />
         <Route path="/chat-ia"                element={<ChatIA />} />
         <Route path="/consulta"               element={<Consulta />} />
+        <Route path="/consulta-medica"        element={<ConsultaMedica />} />
         <Route path="/historia/:paciente_id"  element={<HistoriaClinica />} />
         <Route path="/historia"               element={<HistoriaClinica />} />
         <Route path="/estudios"               element={<Estudios />} />
@@ -85,7 +87,7 @@ export default function App() {
           </RolRoute>
         } />
         <Route path="/admin/config" element={
-          <RolRoute roles={["ADMIN","SUPER_ADMIN"]}>
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <ConfigClinica />
           </RolRoute>
         } />

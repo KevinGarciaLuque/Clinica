@@ -302,23 +302,26 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     let rowY = tableTop + 20;
     items.forEach((item, i) => {
       const bg = i % 2 === 0 ? "#ffffff" : "#f7f9ff";
-      doc.rect(50, rowY, pageW, 22).fill(bg);
-      doc.fillColor("#111").fontSize(8).font("Helvetica");
+      
+      // Calcular altura necesaria según el contenido
       const med = item.medicamento_nombre + (item.presentacion ? ` (${item.presentacion})` : "");
-      doc.text(med,                    cols.med,  rowY + 5, { width: colW.med,   ellipsis: true });
+      const inst = item.instrucciones || "—";
+      
+      doc.fontSize(8).font("Helvetica");
+      const medHeight = doc.heightOfString(med, { width: colW.med });
+      const instHeight = doc.heightOfString(inst, { width: colW.inst });
+      const rowHeight = Math.max(18, medHeight + 10, instHeight + 10);
+      
+      doc.rect(50, rowY, pageW, rowHeight).fill(bg);
+      doc.fillColor("#111").fontSize(8).font("Helvetica");
+      
+      doc.text(med,                     cols.med,  rowY + 5, { width: colW.med });
       doc.text(item.dosis       || "—", cols.dosis,rowY + 5, { width: colW.dosis });
       doc.text(item.duracion    || "—", cols.dur,  rowY + 5, { width: colW.dur  });
       doc.text(item.cantidad    || "—", cols.cant, rowY + 5, { width: colW.cant });
-      doc.text(item.instrucciones || "—", cols.inst, rowY + 5, { width: colW.inst, ellipsis: true });
-      rowY += 22;
-
-      // Si la fila tiene instrucciones largas o nombre largo, agrega 2da línea
-      if (item.instrucciones && item.instrucciones.length > 45) {
-        doc.rect(50, rowY, pageW, 14).fill(bg);
-        doc.fillColor(GRAY).fontSize(7.5).font("Helvetica-Oblique")
-           .text(item.instrucciones, cols.inst, rowY + 2, { width: colW.inst * 2 });
-        rowY += 14;
-      }
+      doc.text(inst,                    cols.inst, rowY + 5, { width: colW.inst });
+      
+      rowY += rowHeight;
     });
 
     doc.rect(50, tableTop, pageW, rowY - tableTop).stroke(BLUE);

@@ -66,7 +66,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     const { desde, hasta, medico_id, paciente_id, estado } = req.query;
     let sql = `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
                       c.paciente_id, c.medico_id,
-                      p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos, p.telefono AS paciente_tel, p.dni AS paciente_dni,
+                      p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos, p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
                       u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
                       e.nombre AS especialidad
                FROM citas c
@@ -191,6 +191,23 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
        tipo_consulta || "CONTROL", motivo || null, canal || "RECEPCION", servicio_id || null]
     );
     res.json({ ok: true, id: r.insertId });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+// DELETE /api/citas/:id/permanente  → eliminar registro completo
+// ⚠️ DEBE IR ANTES de /:id para que Express lo capture correctamente
+// ──────────────────────────────────────────────
+router.delete("/:id/permanente", auth("ADMIN","MEDICO","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    await pool.query(
+      "DELETE FROM citas WHERE id=? AND clinica_id=?",
+      [req.params.id, clinicaId]
+    );
+    res.json({ ok: true, msg: "Cita eliminada permanentemente" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

@@ -89,6 +89,12 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
       return res.status(400).json({ ok: false, msg: "nombres y apellidos son obligatorios" });
     }
 
+    // Formatear fecha si viene en formato ISO
+    let fechaFormateada = fecha_nacimiento;
+    if (fecha_nacimiento && fecha_nacimiento.includes('T')) {
+      fechaFormateada = fecha_nacimiento.split('T')[0];
+    }
+
     const [r] = await pool.query(
       `INSERT INTO pacientes
          (clinica_id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, sexo,
@@ -97,7 +103,7 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
       [
         clinicaId, nombres, apellidos,
         dni || null, telefono || null, email || null,
-        fecha_nacimiento || null, sexo || null,
+        fechaFormateada || null, sexo || null,
         direccion || null,
         req.body.ciudad || null,
         req.body.pais   || null,
@@ -124,6 +130,12 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
       fecha_nacimiento, sexo, direccion, ciudad, pais,
       grupo_sanguineo, notas, activo,
     } = req.body;
+
+    // Formatear fecha si viene en formato ISO
+    let fechaFormateada = fecha_nacimiento;
+    if (fecha_nacimiento && fecha_nacimiento.includes('T')) {
+      fechaFormateada = fecha_nacimiento.split('T')[0];
+    }
 
     // Verificar que el paciente existe (SUPER_ADMIN puede editar cualquiera)
     let queryExists, paramsExists;
@@ -152,7 +164,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
       [
         nombres||null, apellidos||null,
         dni||null, telefono||null, email||null,
-        fecha_nacimiento||null, sexo||null,
+        fechaFormateada||null, sexo||null,
         direccion||null, ciudad||null, pais||null,
         grupo_sanguineo||null, notas||null,
         activo ?? null,

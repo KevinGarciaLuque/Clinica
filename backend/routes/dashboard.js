@@ -72,12 +72,19 @@ router.get("/stats", auth(), async (req, res) => {
 router.get("/sala-espera", auth(), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
-    const hoy = new Date().toISOString().slice(0, 10);
+    // Usar fecha local de México/América para evitar problemas de zona horaria
+    const hoy = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+
+    console.log('🔍 SALA ESPERA DEBUG:', {
+      clinica_id: clinicaId,
+      fecha_hoy: hoy,
+      usuario: req.user.email
+    });
 
     const [rows] = await pool.query(
       `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
               p.id AS paciente_id, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
-              p.telefono AS paciente_tel, p.dni AS paciente_dni,
+              p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
               u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
               e.nombre AS especialidad
        FROM citas c
@@ -89,8 +96,12 @@ router.get("/sala-espera", auth(), async (req, res) => {
        ORDER BY c.inicio ASC`,
       [clinicaId, hoy]
     );
+
+    console.log(`✅ Sala Espera: encontradas ${rows.length} citas`, rows.map(r => ({ id: r.id, paciente: r.paciente_apellidos, estado: r.estado })));
+
     res.json({ ok: true, data: rows });
   } catch (e) {
+    console.error('❌ Error en sala-espera:', e.message);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });

@@ -10,9 +10,10 @@ function ensureDir(dir) {
 }
 
 ensureDir(path.join(BASE_DIR, "pacientes"));
+ensureDir(path.join(BASE_DIR, "clinicas"));
 
-// ── Storage engine ───────────────────────────────────────
-const storage = multer.diskStorage({
+// ── Storage engine para pacientes ───────────────────────────────────────
+const storagePacientes = multer.diskStorage({
   destination(req, file, cb) {
     const dest = path.join(BASE_DIR, "pacientes");
     ensureDir(dest);
@@ -25,10 +26,28 @@ const storage = multer.diskStorage({
   },
 });
 
+// ── Storage engine para logos de clínica ───────────────────────────────
+const storageClinicas = multer.diskStorage({
+  destination(req, file, cb) {
+    const dest = path.join(BASE_DIR, "clinicas");
+    ensureDir(dest);
+    cb(null, dest);
+  },
+  filename(req, file, cb) {
+    const ext  = path.extname(file.originalname).toLowerCase();
+    const rand = Math.random().toString(36).slice(2, 10);
+    cb(null, `logo-${Date.now()}-${rand}${ext}`);
+  },
+});
+
 // ── Tipos permitidos ─────────────────────────────────────
 const ALLOWED_MIME = [
   "image/jpeg", "image/png", "image/webp", "image/gif",
   "application/pdf",
+];
+
+const ALLOWED_IMAGE_MIME = [
+  "image/jpeg", "image/png", "image/webp", "image/gif",
 ];
 
 const fileFilter = (req, file, cb) => {
@@ -36,10 +55,23 @@ const fileFilter = (req, file, cb) => {
   cb(Object.assign(new Error("Tipo de archivo no permitido. Usa JPG, PNG, WEBP o PDF."), { code: "WRONG_TYPE" }));
 };
 
-const upload = multer({
-  storage,
+const imageFilter = (req, file, cb) => {
+  if (ALLOWED_IMAGE_MIME.includes(file.mimetype)) return cb(null, true);
+  cb(Object.assign(new Error("Tipo de archivo no permitido. Usa JPG, PNG, WEBP o GIF."), { code: "WRONG_TYPE" }));
+};
+
+const uploadPacientes = multer({
+  storage: storagePacientes,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB máximo
   fileFilter,
 });
 
-module.exports = upload;
+const uploadClinicas = multer({
+  storage: storageClinicas,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB máximo para logos
+  fileFilter: imageFilter,
+});
+
+module.exports = uploadPacientes;
+module.exports.uploadPacientes = uploadPacientes;
+module.exports.uploadClinicas = uploadClinicas;

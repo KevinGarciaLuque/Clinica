@@ -32,6 +32,10 @@ const adminItems = [
   { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
 ];
 
+const medicoItems = [
+  { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
+];
+
 const superItems = [
   { to: "/superadmin/clinicas",  label: "Clínicas",         icon: "bi-building-fill" },
   { to: "/superadmin/database",  label: "Base de Datos",    icon: "bi-database-fill-gear" },
@@ -52,6 +56,7 @@ function getMenuSections(tipo, modulos) {
 
   if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: adminItems };
   if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: adminItems };
+  if (tipo === "MEDICO")      return { super: [],          main: mainItems, admin: medicoItems };
   return                              { super: [],          main: mainItems, admin: [] };
 }
 

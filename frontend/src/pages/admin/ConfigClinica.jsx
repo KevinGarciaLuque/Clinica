@@ -8,6 +8,7 @@ export default function ConfigClinica() {
   const [clinica, setClinica] = useState(null);
   const [form, setForm]       = useState({});
   const [config, setConfig]   = useState({});
+  const [plantillas, setPlantillas] = useState({});
   const [tab, setTab]         = useState("general");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -21,6 +22,7 @@ export default function ConfigClinica() {
         return;
       }
       try {
+        // Datos de la clínica
         const res = await api.get(`/clinicas/${clinicaId}`);
         const data = res.data.data;
         setClinica(data);
@@ -34,10 +36,20 @@ export default function ConfigClinica() {
           ruc:       data.ruc || "",
           logo_url:  data.logo_url || "",
         });
+        
         // Convertir array [{clave,valor}] a objeto
         const cfgObj = {};
         (data.config || []).forEach((c) => { cfgObj[c.clave] = c.valor; });
         setConfig(cfgObj);
+
+        // Cargar plantillas
+        const resPlantillas = await api.get(`/clinicas/${clinicaId}/plantillas`);
+        const plantillasObj = {};
+        (resPlantillas.data.data || []).forEach((p) => { 
+          plantillasObj[p.tipo] = { nombre: p.nombre, contenido: p.contenido }; 
+        });
+        setPlantillas(plantillasObj);
+
       } catch (e) {
         setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
       } finally {
@@ -71,11 +83,71 @@ export default function ConfigClinica() {
     }
   };
 
+  const guardarPlantilla = async (tipo, nombre) => {
+    setGuardando(true); setMsg({ tipo: "", texto: "" });
+    try {
+      await api.post(`/clinicas/${clinicaId}/plantillas`, {
+        tipo,
+        nombre,
+        contenido: plantillas[tipo]?.contenido || ""
+      });
+      setMsg({ tipo: "success", texto: `Plantilla de ${nombre} guardada correctamente` });
+    } catch (e) {
+      setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  const subirLogo = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setGuardando(true); setMsg({ tipo: "", texto: "" });
+    try {
+      const formData = new FormData();
+      formData.append("logo", file);
+
+      const res = await api.post(`/clinicas/${clinicaId}/upload-logo`, formData, {
+        headers: { "Content-Type": "multipart/form-data" }
+      });
+
+      const baseURL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+      const logoUrl = `${baseURL}${res.data.logo_url}`;
+      
+      setForm({ ...form, logo_url: logoUrl });
+      setMsg({ tipo: "success", texto: "Logo subido correctamente" });
+    } catch (e) {
+      setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // Pestañas según el rol del usuario
+  const allTabs = [
+    { key: "general", label: "Datos generales", icon: "bi-building", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
+    { key: "comunicacion", label: "Email / SMTP", icon: "bi-envelope", roles: ["SUPER_ADMIN", "ADMIN"] },
+    { key: "agenda", label: "Agenda", icon: "bi-calendar3", roles: ["SUPER_ADMIN", "ADMIN"] },
+    { key: "receta", label: "Formato Receta", icon: "bi-file-earmark-medical", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
+    { key: "laboratorio", label: "Formato Laboratorio", icon: "bi-capsule", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
+    { key: "estudios", label: "Formato Estudios", icon: "bi-clipboard2-pulse", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
+    { key: "membrete", label: "Membrete y Firma", icon: "bi-pen", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
+  ];
+
+  const tabsVisibles = allTabs.filter(t => !t.roles || t.roles.includes(user?.tipo));
+
   if (cargando) return <div className="text-center py-5"><div className="spinner-border" /></div>;
 
   return (
     <div>
-      <h4 className="mb-4">Configuración de la Clínica</h4>
+      <div className="d-flex align-items-center gap-3 mb-4">
+        <i className="bi bi-gear-fill" style={{ fontSize: "1.8rem", color: "#2196f3" }} />
+        <div>
+          <h4 className="mb-0">Configuración de la Clínica</h4>
+          <small className="text-muted">{clinica?.nombre}</small>
+        </div>
+      </div>
 
       {msg.texto && (
         <div className={`alert alert-${msg.tipo} py-2 alert-dismissible`} role="alert">
@@ -86,14 +158,22 @@ export default function ConfigClinica() {
 
       {/* Tabs */}
       <ul className="nav nav-tabs mb-4">
-        {[["general", "Datos generales"], ["comunicacion", "Email / SMTP"], ["agenda", "Agenda"]].map(([k, l]) => (
-          <li key={k} className="nav-item">
-            <button className={`nav-link ${tab === k ? "active" : ""}`} onClick={() => setTab(k)}>{l}</button>
+        {tabsVisibles.map(({ key, label, icon }) => (
+          <li key={key} className="nav-item">
+            <button 
+              className={`nav-link ${tab === key ? "active" : ""}`} 
+              onClick={() => setTab(key)}
+            >
+              <i className={`bi ${icon} me-2`} />
+              {label}
+            </button>
           </li>
         ))}
       </ul>
 
-      {/* ── Tab: Datos generales ── */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Datos generales */}
+      {/* ══════════════════════════════════════════════════════════════ */}
       {tab === "general" && (
         <form onSubmit={guardarGeneral}>
           <div className="row g-3">
@@ -138,13 +218,36 @@ export default function ConfigClinica() {
               </select>
             </div>
             <div className="col-12">
-              <label className="form-label">URL del logo</label>
-              <input className="form-control" placeholder="https://..." value={form.logo_url}
-                onChange={(e) => setForm({ ...form, logo_url: e.target.value })} />
+              <label className="form-label">Logo de la clínica</label>
+              <div className="d-flex gap-2 align-items-start">
+                <div className="flex-grow-1">
+                  <input 
+                    className="form-control" 
+                    placeholder="https://... o sube un archivo" 
+                    value={form.logo_url}
+                    onChange={(e) => setForm({ ...form, logo_url: e.target.value })} 
+                  />
+                </div>
+                <label className="btn btn-outline-primary mb-0" style={{ cursor: "pointer" }}>
+                  <i className="bi bi-upload me-2" />
+                  Subir
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    style={{ display: "none" }}
+                    onChange={subirLogo}
+                    disabled={guardando}
+                  />
+                </label>
+              </div>
               {form.logo_url && (
-                <div className="mt-2">
-                  <img src={form.logo_url} alt="Logo" style={{ maxHeight: 60 }}
-                    onError={(e) => e.target.style.display = "none"} />
+                <div className="mt-2 p-2 border rounded bg-light">
+                  <img 
+                    src={form.logo_url} 
+                    alt="Logo" 
+                    style={{ maxHeight: 60 }}
+                    onError={(e) => e.target.style.display = "none"} 
+                  />
                 </div>
               )}
             </div>
@@ -157,12 +260,15 @@ export default function ConfigClinica() {
         </form>
       )}
 
-      {/* ── Tab: Email / SMTP ── */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Email / SMTP */}
+      {/* ══════════════════════════════════════════════════════════════ */}
       {tab === "comunicacion" && (
         <form onSubmit={guardarConfig}>
           <div className="row g-3">
             <div className="col-12">
               <div className="alert alert-info py-2 small">
+                <i className="bi bi-info-circle me-2" />
                 Configura el servidor SMTP para enviar recordatorios de citas y verificaciones de email.
               </div>
             </div>
@@ -190,7 +296,9 @@ export default function ConfigClinica() {
         </form>
       )}
 
-      {/* ── Tab: Agenda ── */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Agenda */}
+      {/* ══════════════════════════════════════════════════════════════ */}
       {tab === "agenda" && (
         <form onSubmit={guardarConfig}>
           <div className="row g-3">
@@ -227,6 +335,245 @@ export default function ConfigClinica() {
             <div className="col-12">
               <button type="submit" className="btn btn-primary" disabled={guardando}>
                 {guardando ? "Guardando..." : "Guardar configuración"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Formato Receta */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {tab === "receta" && (
+        <div>
+          <div className="alert alert-info py-2 small mb-3">
+            <i className="bi bi-info-circle me-2" />
+            Personaliza el formato de las recetas médicas. Puedes usar HTML y variables como 
+            <code className="ms-1">{'{{paciente}}, {{medico}}, {{fecha}}'}</code>
+          </div>
+          <div className="row g-3">
+            <div className="col-12">
+              <label className="form-label">Contenido de la plantilla</label>
+              <textarea 
+                className="form-control font-monospace" 
+                rows={12}
+                placeholder={`<div style="font-family: Arial; padding: 20px;">
+  <h2>{{clinica}}</h2>
+  <p><strong>Dr(a).</strong> {{medico}}</p>
+  <hr/>
+  <p><strong>Paciente:</strong> {{paciente}}</p>
+  <p><strong>Fecha:</strong> {{fecha}}</p>
+  <h3>Prescripción</h3>
+  {{medicamentos}}
+</div>`}
+                value={plantillas.receta?.contenido || ""}
+                onChange={(e) => setPlantillas({ 
+                  ...plantillas, 
+                  receta: { ...plantillas.receta, contenido: e.target.value } 
+                })}
+              />
+            </div>
+            <div className="col-12">
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                disabled={guardando}
+                onClick={() => guardarPlantilla("receta", "Formato Receta")}
+              >
+                {guardando ? "Guardando..." : "Guardar plantilla de receta"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Formato Laboratorio */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {tab === "laboratorio" && (
+        <div>
+          <div className="alert alert-info py-2 small mb-3">
+            <i className="bi bi-info-circle me-2" />
+            Personaliza el formato de las órdenes de laboratorio (hemograma, perfil lipídico, etc.)
+          </div>
+          <div className="row g-3">
+            <div className="col-12">
+              <label className="form-label">Contenido de la plantilla</label>
+              <textarea 
+                className="form-control font-monospace" 
+                rows={12}
+                placeholder={`<div style="font-family: Arial; padding: 20px;">
+  <h2>{{clinica}} - Orden de Laboratorio</h2>
+  <p><strong>Médico:</strong> {{medico}}</p>
+  <p><strong>Paciente:</strong> {{paciente}}</p>
+  <p><strong>Fecha:</strong> {{fecha}}</p>
+  <hr/>
+  <h3>Exámenes Solicitados:</h3>
+  {{examenes}}
+</div>`}
+                value={plantillas.laboratorio?.contenido || ""}
+                onChange={(e) => setPlantillas({ 
+                  ...plantillas, 
+                  laboratorio: { ...plantillas.laboratorio, contenido: e.target.value } 
+                })}
+              />
+            </div>
+            <div className="col-12">
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                disabled={guardando}
+                onClick={() => guardarPlantilla("laboratorio", "Formato Laboratorio")}
+              >
+                {guardando ? "Guardando..." : "Guardar plantilla de laboratorio"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Formato Estudios */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {tab === "estudios" && (
+        <div>
+          <div className="alert alert-info py-2 small mb-3">
+            <i className="bi bi-info-circle me-2" />
+            Personaliza el formato de órdenes de estudios (rayos X, resonancias, ecografías, etc.)
+          </div>
+          <div className="row g-3">
+            <div className="col-12">
+              <label className="form-label">Contenido de la plantilla</label>
+              <textarea 
+                className="form-control font-monospace" 
+                rows={12}
+                placeholder={`<div style="font-family: Arial; padding: 20px;">
+  <h2>{{clinica}} - Orden de Estudio</h2>
+  <p><strong>Médico:</strong> {{medico}}</p>
+  <p><strong>Paciente:</strong> {{paciente}}</p>
+  <p><strong>Fecha:</strong> {{fecha}}</p>
+  <hr/>
+  <h3>Estudios Solicitados:</h3>
+  {{estudios}}
+  <h3>Motivo:</h3>
+  {{motivo}}
+</div>`}
+                value={plantillas.estudios?.contenido || ""}
+                onChange={(e) => setPlantillas({ 
+                  ...plantillas, 
+                  estudios: { ...plantillas.estudios, contenido: e.target.value } 
+                })}
+              />
+            </div>
+            <div className="col-12">
+              <button 
+                type="button" 
+                className="btn btn-primary" 
+                disabled={guardando}
+                onClick={() => guardarPlantilla("estudios", "Formato Estudios")}
+              >
+                {guardando ? "Guardando..." : "Guardar plantilla de estudios"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {/* Tab: Membrete y Firma */}
+      {/* ══════════════════════════════════════════════════════════════ */}
+      {tab === "membrete" && (
+        <form onSubmit={guardarConfig}>
+          <div className="row g-3">
+            <div className="col-12">
+              <div className="alert alert-info py-2 small">
+                <i className="bi bi-info-circle me-2" />
+                Configura el membrete que aparecerá en todos los documentos y tu firma digital
+              </div>
+            </div>
+            
+            <div className="col-12">
+              <h5 className="mb-3">Membrete de Documentos</h5>
+            </div>
+
+            <div className="col-md-6">
+              <label className="form-label">Texto del membrete</label>
+              <textarea 
+                className="form-control" 
+                rows={3}
+                placeholder="Clínica Médica XYZ - Santiago de Chile"
+                value={config["membrete_texto"] || ""}
+                onChange={(e) => setConfig({ ...config, membrete_texto: e.target.value })}
+              />
+            </div>
+
+            <div className="col-md-6">
+              <label className="form-label">Color del membrete</label>
+              <input 
+                type="color" 
+                className="form-control form-control-color" 
+                value={config["membrete_color"] || "#2196f3"}
+                onChange={(e) => setConfig({ ...config, membrete_color: e.target.value })}
+              />
+            </div>
+
+            <div className="col-12">
+              <label className="form-label">Pie de página (footer)</label>
+              <input 
+                className="form-control" 
+                placeholder="Tel: +123456789 | Email: info@clinica.com"
+                value={config["footer_texto"] || ""}
+                onChange={(e) => setConfig({ ...config, footer_texto: e.target.value })}
+              />
+            </div>
+
+            <div className="col-12 mt-4">
+              <h5 className="mb-3">Firma Digital del Médico</h5>
+            </div>
+
+            <div className="col-12">
+              <label className="form-label">URL de la firma (imagen)</label>
+              <input 
+                className="form-control" 
+                placeholder="https://..." 
+                value={config["firma_url"] || ""}
+                onChange={(e) => setConfig({ ...config, firma_url: e.target.value })}
+              />
+              {config["firma_url"] && (
+                <div className="mt-2 p-3 border rounded bg-light">
+                  <img 
+                    src={config["firma_url"]} 
+                    alt="Firma" 
+                    style={{ maxHeight: 80, border: "1px solid #ddd" }}
+                    onError={(e) => e.target.style.display = "none"}
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="col-md-6">
+              <label className="form-label">Número de colegiatura</label>
+              <input 
+                className="form-control" 
+                placeholder="Ej: 12345"
+                value={config["numero_colegiatura"] || ""}
+                onChange={(e) => setConfig({ ...config, numero_colegiatura: e.target.value })}
+              />
+            </div>
+
+            <div className="col-md-6">
+              <label className="form-label">Especialidad</label>
+              <input 
+                className="form-control" 
+                placeholder="Ej: Medicina General"
+                value={config["especialidad_texto"] || ""}
+                onChange={(e) => setConfig({ ...config, especialidad_texto: e.target.value })}
+              />
+            </div>
+
+            <div className="col-12">
+              <button type="submit" className="btn btn-primary" disabled={guardando}>
+                {guardando ? "Guardando..." : "Guardar configuración de membrete y firma"}
               </button>
             </div>
           </div>
