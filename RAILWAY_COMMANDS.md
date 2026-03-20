@@ -10,6 +10,19 @@ npm install -g @railway/cli
 railway --version
 ```
 
+## 🆕 MIGRACIÓN 010 - MÓDULO DE CONSULTA
+
+```bash
+# Ejecutar migración 010 en Railway
+railway run node backend/migrations/run-010.js
+
+# O conectarse y ejecutar manualmente:
+railway connect
+# Luego en la terminal conectada:
+cd backend
+node migrations/run-010.js
+```
+
 ## Comandos básicos
 
 ```bash
