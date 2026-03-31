@@ -13,8 +13,6 @@ const allowedOrigins = (process.env.CORS_ORIGINS || "")
   .map((o) => o.trim())
   .filter(Boolean);
 
-console.log("🔍 CORS_ORIGINS configured:", allowedOrigins);
-
 const corsOptions = {
   origin: true, // TEMPORAL: Permite todos los origins para debug
   credentials: true,
@@ -28,8 +26,6 @@ const corsOptions = {
   optionsSuccessStatus: 204,
 };
 
-console.log("⚠️ CORS configurado en modo PERMISIVO (temporal)");
-
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
 
@@ -40,7 +36,9 @@ app.use(
   })
 );
 
-app.use(morgan("dev"));
+app.use(morgan("dev", {
+  skip: (req, res) => res.statusCode < 400,
+}));
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
@@ -104,6 +102,7 @@ app.use("/api/medicamentos", require("./routes/medicamentos"));
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
+app.use("/api/recordatorios", require("./routes/recordatorios"));
 app.use("/api/setup", require("./routes/setup"));
 
 // ===== 404 =====

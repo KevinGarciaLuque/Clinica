@@ -33,6 +33,9 @@ import ConsentimientosEsteticos from "./pages/estetica/ConsentimientosEsteticos"
 import SeguimientoPostOp       from "./pages/estetica/SeguimientoPostOp";
 import FichaEstetica           from "./pages/estetica/FichaEstetica";
 
+// Módulos adicionales
+import Recordatorios from "./pages/Recordatorios";
+
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
   const raw = localStorage.getItem("user");
@@ -89,6 +92,13 @@ export default function App() {
         <Route path="/admin/config" element={
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <ConfigClinica />
+          </RolRoute>
+        } />
+
+        {/* Módulo de recordatorios */}
+        <Route path="/recordatorios" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN"]}>
+            <Recordatorios />
           </RolRoute>
         } />
 

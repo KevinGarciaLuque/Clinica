@@ -19,16 +19,33 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
-// GET sesiones de un paciente
+// GET sesiones: todas o de un paciente específico
 router.get("/sesiones", async (req, res) => {
   try {
     const { paciente_id } = req.query;
-    if (!paciente_id) return res.status(400).json({ message: "paciente_id requerido" });
-    const [rows] = await db.query(
-      "SELECT * FROM galeria_sesiones WHERE paciente_id = ? ORDER BY fecha DESC, id DESC",
-      [paciente_id]
-    );
-    res.json({ data: rows });
+    
+    if (paciente_id) {
+      // Sesiones de un paciente específico
+      const [rows] = await db.query(
+        "SELECT * FROM galeria_sesiones WHERE paciente_id = ? ORDER BY fecha DESC, id DESC",
+        [paciente_id]
+      );
+      res.json({ data: rows });
+    } else {
+      // Todas las sesiones con datos del paciente
+      const [rows] = await db.query(`
+        SELECT 
+          gs.*,
+          p.nombres as paciente_nombres,
+          p.apellidos as paciente_apellidos,
+          p.dni as paciente_dni,
+          p.fecha_nacimiento as paciente_fecha_nacimiento
+        FROM galeria_sesiones gs
+        INNER JOIN pacientes p ON gs.paciente_id = p.id
+        ORDER BY gs.fecha DESC, gs.id DESC
+      `);
+      res.json({ data: rows });
+    }
   } catch (e) {
     res.status(500).json({ message: e.message });
   }
@@ -44,6 +61,41 @@ router.post("/sesiones", async (req, res) => {
     );
     const [rows] = await db.query("SELECT * FROM galeria_sesiones WHERE id = ?", [r.insertId]);
     res.json({ data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// PUT editar sesión
+router.put("/sesiones/:id", async (req, res) => {
+  try {
+    const { nombre, fecha } = req.body;
+    await db.query(
+      "UPDATE galeria_sesiones SET nombre = ?, fecha = ? WHERE id = ?",
+      [nombre, fecha, req.params.id]
+    );
+    const [rows] = await db.query("SELECT * FROM galeria_sesiones WHERE id = ?", [req.params.id]);
+    res.json({ data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ message: e.message });
+  }
+});
+
+// DELETE eliminar sesión (y sus fotos)
+router.delete("/sesiones/:id", async (req, res) => {
+  try {
+    // Obtener todas las fotos de la sesión para borrar archivos
+    const [fotos] = await db.query("SELECT archivo_nombre FROM galeria_fotos WHERE sesion_id = ?", [req.params.id]);
+    // Borrar archivos del sistema
+    fotos.forEach(f => {
+      const filePath = path.join(__dirname, "../uploads/galeria-estetica", f.archivo_nombre);
+      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+    });
+    // Borrar fotos de la BD
+    await db.query("DELETE FROM galeria_fotos WHERE sesion_id = ?", [req.params.id]);
+    // Borrar sesión
+    await db.query("DELETE FROM galeria_sesiones WHERE id = ?", [req.params.id]);
+    res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ message: e.message });
   }

@@ -29,6 +29,7 @@ const adminItems = [
   { to: "/admin/usuarios",  label: "Usuarios",         icon: "bi-person-badge-fill" },
   { to: "/admin/horarios",  label: "Horarios médicos",  icon: "bi-clock-fill" },
   { to: "/admin/servicios", label: "Servicios",         icon: "bi-tag-fill" },
+  { to: "/recordatorios",   label: "Recordatorios",     icon: "bi-bell-fill" },
   { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
 ];
 

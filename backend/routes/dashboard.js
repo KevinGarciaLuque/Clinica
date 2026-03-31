@@ -75,12 +75,6 @@ router.get("/sala-espera", auth(), async (req, res) => {
     // Usar fecha local de México/América para evitar problemas de zona horaria
     const hoy = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
 
-    console.log('🔍 SALA ESPERA DEBUG:', {
-      clinica_id: clinicaId,
-      fecha_hoy: hoy,
-      usuario: req.user.email
-    });
-
     const [rows] = await pool.query(
       `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
               p.id AS paciente_id, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
@@ -96,8 +90,6 @@ router.get("/sala-espera", auth(), async (req, res) => {
        ORDER BY c.inicio ASC`,
       [clinicaId, hoy]
     );
-
-    console.log(`✅ Sala Espera: encontradas ${rows.length} citas`, rows.map(r => ({ id: r.id, paciente: r.paciente_apellidos, estado: r.estado })));
 
     res.json({ ok: true, data: rows });
   } catch (e) {

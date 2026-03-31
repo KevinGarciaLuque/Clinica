@@ -35,7 +35,6 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     sql += " ORDER BY id DESC LIMIT 200";
 
     const [rows] = await pool.query(sql, params);
-    console.log(`[GET /pacientes] ${isSuperAdmin ? 'SUPER_ADMIN' : 'Usuario normal'} - Encontrados ${rows.length} pacientes`);
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -47,10 +46,7 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
   try {
     const clinicaId = req.tenant?.clinica_id;
     const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
-    const userId = req.user?.id || 'N/A';
-    const userTipo = req.user?.tipo || 'N/A';
-    
-    console.log(`[GET /pacientes/${req.params.id}] clinicaId: ${clinicaId}, user: ${userId}, tipo: ${userTipo}, isSuperAdmin: ${isSuperAdmin}`);
+
     
     // SUPER_ADMIN puede ver todos los pacientes, otros solo de su clínica
     let query, params;
@@ -65,11 +61,8 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
     const [[p]] = await pool.query(query, params);
     
     if (!p) {
-      console.log(`[GET /pacientes/${req.params.id}] NO ENCONTRADO`);
       return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
     }
-    
-    console.log(`[GET /pacientes/${req.params.id}] Paciente encontrado: ${p.nombres || 'N/A'} ${p.apellidos || 'N/A'} (clinica_id: ${p.clinica_id})`);
     res.json({ ok: true, data: p });
   } catch (e) {
     console.error(`[GET /pacientes/${req.params.id}] ERROR:`, e.message, e.stack);

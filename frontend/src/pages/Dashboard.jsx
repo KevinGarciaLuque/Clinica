@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { motion } from "framer-motion";
 import api from "../api/api";
@@ -51,7 +51,7 @@ const itemVariants = {
   }
 };
 
-function KpiCard({ label, value, icon, gradient, sub, delay = 0, isMobile }) {
+function KpiCard({ label, value, icon, gradient, sub, delay = 0, isMobile, to, navigate }) {
   return (
     <motion.div 
       className="col-6 col-lg-3"
@@ -62,6 +62,7 @@ function KpiCard({ label, value, icon, gradient, sub, delay = 0, isMobile }) {
       <motion.div 
         className="h-100"
         whileHover={{ y: -5, transition: { duration: 0.2 } }}
+        onClick={() => to && navigate(to)}
         style={{
           background: "linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(255,255,255,0.95) 100%)",
           backdropFilter: "blur(10px)",
@@ -138,6 +139,7 @@ function KpiCard({ label, value, icon, gradient, sub, delay = 0, isMobile }) {
 
 export default function Dashboard() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats]   = useState(null);
   const [sala,  setSala]    = useState([]);
   const [loading, setLoading] = useState(true);
@@ -277,6 +279,8 @@ export default function Dashboard() {
                 gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)"
                 delay={0}
                 isMobile={isMobile}
+                to="/pacientes"
+                navigate={navigate}
               />
               <KpiCard 
                 label="Citas Hoy" 
@@ -285,6 +289,8 @@ export default function Dashboard() {
                 gradient="linear-gradient(135deg, #f093fb 0%, #f5576c 100%)"
                 delay={0.1}
                 isMobile={isMobile}
+                to="/citas"
+                navigate={navigate}
               />
               <KpiCard 
                 label="Esta Semana" 
@@ -293,6 +299,8 @@ export default function Dashboard() {
                 gradient="linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)"
                 delay={0.2}
                 isMobile={isMobile}
+                to="/citas"
+                navigate={navigate}
               />
               <KpiCard 
                 label="Confirmadas Hoy"
@@ -301,6 +309,8 @@ export default function Dashboard() {
                 gradient="linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)"
                 delay={0.3}
                 isMobile={isMobile}
+                to="/citas"
+                navigate={navigate}
               />
             </div>
 
