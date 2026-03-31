@@ -952,16 +952,24 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
     };
   }, [indiceActual]);
 
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", h);
+    return () => window.removeEventListener("resize", h);
+  }, []);
+
   if (cargando) return <Spin />;
 
   const contAntes   = POSES.filter(p => fotos[`antes_${p.id}`]).length;
   const contDespues = POSES.filter(p => fotos[`despues_${p.id}`]).length;
+  const poseActual  = POSES[indiceActual];
 
   return (
     <div>
       {/* Header sesión */}
       <div style={{
-        background: C.card, borderRadius: 12, padding: "14px 18px",
+        background: C.card, borderRadius: 12, padding: isMobile ? "12px 14px" : "14px 18px",
         marginBottom: 22, border: `1px solid ${C.border}`,
         display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
       }}>
@@ -978,7 +986,7 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
           <i className="bi bi-arrow-left" />
           Volver
         </button>
-        <div>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontWeight: 700, color: C.text, fontSize: 16 }}>
             <i className="bi bi-scissors me-2" style={{ color: C.accent }} />
             {sesion.nombre}
@@ -988,233 +996,432 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
             {new Date(sesion.fecha).toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}
           </div>
         </div>
-        <div style={{ marginLeft: "auto", display: "flex", gap: 8, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Badge color="#3b82f6" text={`${contAntes}/6 antes`} />
           <Badge color={C.success} text={`${contDespues}/6 después`} />
         </div>
       </div>
 
-      {/* Carruseles Antes/Después */}
-      <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-
-        {/* Controles de navegación centrales */}
-        <div style={{
-          display: "flex", justifyContent: "center", alignItems: "center", gap: 16,
-          padding: "12px 0",
-        }}>
-          <button
-            onClick={() => navegarPose(-1)}
-            style={{
-              width: 46, height: 46, borderRadius: 12,
-              background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-              border: "none", color: "#fff", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(233,30,140,.3)",
-              transition: "transform .2s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
-            onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-          >
-            <i className="bi bi-chevron-left" style={{ fontSize: 20, fontWeight: 700 }} />
-          </button>
-          
+      {/* ─── LAYOUT PC: Navegación arriba, ANTES | DESPUÉS lado a lado ─── */}
+      {!isMobile && (
+        <>
+          {/* Controles de navegación */}
           <div style={{
-            background: C.card, border: `1px solid ${C.border}`,
-            borderRadius: 10, padding: "8px 20px",
-            minWidth: 200, textAlign: "center",
+            display: "flex", justifyContent: "center", alignItems: "center", gap: 16,
+            padding: "8px 0 16px",
           }}>
-            <div style={{ fontSize: 13, color: C.muted, marginBottom: 4 }}>Pose actual</div>
-            <div style={{ fontWeight: 700, color: C.text, fontSize: 15, marginBottom: 6 }}>
-              <i className={`bi ${POSES[indiceActual].icon} me-2`} style={{ color: C.accent }} />
-              {POSES[indiceActual].label}
+            <button
+              onClick={() => navegarPose(-1)}
+              style={{
+                width: 42, height: 42, borderRadius: 12,
+                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                border: "none", color: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(233,30,140,.3)",
+                transition: "transform .2s", flexShrink: 0,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+            >
+              <i className="bi bi-chevron-left" style={{ fontSize: 18, fontWeight: 700 }} />
+            </button>
+
+            <div style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: "8px 20px",
+              minWidth: 220, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 11, color: C.muted, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Pose {indiceActual + 1} de {POSES.length}
+              </div>
+              <div style={{ fontWeight: 700, color: C.text, fontSize: 16, marginBottom: 6 }}>
+                <i className={`bi ${poseActual.icon} me-2`} style={{ color: C.accent }} />
+                {poseActual.label}
+              </div>
+              <div style={{ display: "flex", gap: 5, justifyContent: "center" }}>
+                {POSES.map((_, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      width: idx === indiceActual ? 18 : 6, height: 6, borderRadius: 3,
+                      background: idx === indiceActual ? C.accent : `${C.muted}33`,
+                      transition: "all .3s", cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      setIndiceActual(idx);
+                      if (carruselAntesRef.current) {
+                        const ancho = carruselAntesRef.current.offsetWidth;
+                        carruselAntesRef.current.scrollTo({ left: ancho * idx, behavior: "smooth" });
+                      }
+                      if (carruselDespuesRef.current) {
+                        const ancho = carruselDespuesRef.current.offsetWidth;
+                        carruselDespuesRef.current.scrollTo({ left: ancho * idx, behavior: "smooth" });
+                      }
+                    }}
+                  />
+                ))}
+              </div>
             </div>
-            {/* Indicadores de puntos */}
-            <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-              {POSES.map((_, idx) => (
-                <div
-                  key={idx}
-                  style={{
-                    width: idx === indiceActual ? 20 : 6,
-                    height: 6,
-                    borderRadius: 3,
-                    background: idx === indiceActual ? C.accent : `${C.muted}33`,
-                    transition: "all .3s",
-                    cursor: "pointer",
-                  }}
-                  onClick={() => {
-                    setIndiceActual(idx);
-                    if (carruselAntesRef.current) {
-                      const ancho = carruselAntesRef.current.offsetWidth;
-                      carruselAntesRef.current.scrollTo({ left: ancho * idx, behavior: "smooth" });
-                    }
-                    if (carruselDespuesRef.current) {
-                      const ancho = carruselDespuesRef.current.offsetWidth;
-                      carruselDespuesRef.current.scrollTo({ left: ancho * idx, behavior: "smooth" });
-                    }
-                  }}
-                />
+
+            <button
+              onClick={() => navegarPose(1)}
+              style={{
+                width: 42, height: 42, borderRadius: 12,
+                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                border: "none", color: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(233,30,140,.3)",
+                transition: "transform .2s", flexShrink: 0,
+              }}
+              onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
+              onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
+            >
+              <i className="bi bi-chevron-right" style={{ fontSize: 18, fontWeight: 700 }} />
+            </button>
+          </div>
+
+          {/* ANTES | DESPUÉS lado a lado */}
+          <div style={{ display: "flex", gap: 12 }}>
+            {/* ANTES - Izquierda */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                background: "rgba(59,130,246,.1)", border: "1px solid rgba(59,130,246,.3)",
+                borderRadius: 10, padding: "8px 14px", marginBottom: 10,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 14 }}>
+                  <i className="bi bi-clock-history me-2" />ANTES
+                </span>
+                <span style={{ fontSize: 11, color: "#60a5fa", opacity: 0.7 }}>
+                  {contAntes}/6 fotos
+                </span>
+              </div>
+              <div
+                ref={carruselAntesRef}
+                style={{
+                  display: "flex", gap: 0, overflowX: "auto", overflowY: "hidden",
+                  scrollBehavior: "smooth", scrollSnapType: "x mandatory",
+                  msOverflowStyle: "none", scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                }}
+                className="hide-scrollbar"
+              >
+                {POSES.map(pose => (
+                  <div key={pose.id} style={{
+                    minWidth: "100%", width: "100%", flexShrink: 0,
+                    scrollSnapAlign: "start", scrollSnapStop: "always",
+                  }}>
+                    <TarjetaPose
+                      pose={pose}
+                      foto={fotos[`antes_${pose.id}`]}
+                      subiendo={subiendo[`antes_${pose.id}`]}
+                      color="#3b82f6"
+                      compact
+                      onSubir={archivo => subirFoto("antes", pose.id, archivo)}
+                      onEliminar={() => eliminarFoto("antes", pose.id)}
+                      onVerModal={() => setModalImg(fotos[`antes_${pose.id}`])}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Separador visual */}
+            <div style={{
+              width: 2, background: `linear-gradient(to bottom, transparent, ${C.accent}44, ${C.accent}, ${C.accent}44, transparent)`,
+              borderRadius: 2, alignSelf: "stretch", flexShrink: 0,
+            }} />
+
+            {/* DESPUÉS - Derecha */}
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{
+                background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)",
+                borderRadius: 10, padding: "8px 14px", marginBottom: 10,
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+              }}>
+                <span style={{ color: "#34d399", fontWeight: 700, fontSize: 14 }}>
+                  <i className="bi bi-stars me-2" />DESPUÉS
+                </span>
+                <span style={{ fontSize: 11, color: "#34d399", opacity: 0.7 }}>
+                  {contDespues}/6 fotos
+                </span>
+              </div>
+              <div
+                ref={carruselDespuesRef}
+                style={{
+                  display: "flex", gap: 0, overflowX: "auto", overflowY: "hidden",
+                  scrollBehavior: "smooth", scrollSnapType: "x mandatory",
+                  msOverflowStyle: "none", scrollbarWidth: "none",
+                  WebkitOverflowScrolling: "touch",
+                }}
+                className="hide-scrollbar"
+              >
+                {POSES.map(pose => (
+                  <div key={pose.id} style={{
+                    minWidth: "100%", width: "100%", flexShrink: 0,
+                    scrollSnapAlign: "start", scrollSnapStop: "always",
+                  }}>
+                    <TarjetaPose
+                      pose={pose}
+                      foto={fotos[`despues_${pose.id}`]}
+                      subiendo={subiendo[`despues_${pose.id}`]}
+                      color={C.success}
+                      compact
+                      onSubir={archivo => subirFoto("despues", pose.id, archivo)}
+                      onEliminar={() => eliminarFoto("despues", pose.id)}
+                      onVerModal={() => setModalImg(fotos[`despues_${pose.id}`])}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </>
+      )}
+
+      {/* ─── LAYOUT MÓVIL: DESPUÉS arriba, navegación en medio, ANTES abajo ─── */}
+      {isMobile && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* DESPUÉS - Arriba */}
+          <div>
+            <div style={{
+              background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)",
+              borderRadius: 10, padding: "7px 12px", marginBottom: 8,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span style={{ color: "#34d399", fontWeight: 700, fontSize: 13 }}>
+                <i className="bi bi-stars me-2" />DESPUÉS
+              </span>
+              <span style={{ fontSize: 11, color: "#34d399", opacity: 0.7 }}>
+                {contDespues}/6
+              </span>
+            </div>
+            <div
+              ref={carruselDespuesRef}
+              style={{
+                display: "flex", gap: 0, overflowX: "auto", overflowY: "hidden",
+                scrollBehavior: "smooth", scrollSnapType: "x mandatory",
+                msOverflowStyle: "none", scrollbarWidth: "none",
+                WebkitOverflowScrolling: "touch",
+              }}
+              className="hide-scrollbar"
+            >
+              {POSES.map(pose => (
+                <div key={pose.id} style={{
+                  minWidth: "100%", width: "100%", flexShrink: 0,
+                  scrollSnapAlign: "start", scrollSnapStop: "always",
+                }}>
+                  <TarjetaPose
+                    pose={pose}
+                    foto={fotos[`despues_${pose.id}`]}
+                    subiendo={subiendo[`despues_${pose.id}`]}
+                    color={C.success}
+                    onSubir={archivo => subirFoto("despues", pose.id, archivo)}
+                    onEliminar={() => eliminarFoto("despues", pose.id)}
+                    onVerModal={() => setModalImg(fotos[`despues_${pose.id}`])}
+                  />
+                </div>
               ))}
             </div>
           </div>
 
-          <button
-            onClick={() => navegarPose(1)}
-            style={{
-              width: 46, height: 46, borderRadius: 12,
-              background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-              border: "none", color: "#fff", cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              boxShadow: "0 4px 12px rgba(233,30,140,.3)",
-              transition: "transform .2s",
-            }}
-            onMouseEnter={e => e.currentTarget.style.transform = "scale(1.05)"}
-            onMouseLeave={e => e.currentTarget.style.transform = "scale(1)"}
-          >
-            <i className="bi bi-chevron-right" style={{ fontSize: 20, fontWeight: 700 }} />
-          </button>
-        </div>
-
-        {/* DESPUÉS - Carrusel superior */}
-        <div>
+          {/* Controles de navegación - En medio */}
           <div style={{
-            background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)",
-            borderRadius: 12, padding: "10px 16px", marginBottom: 12,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
+            display: "flex", justifyContent: "center", alignItems: "center", gap: 10,
+            padding: "4px 0",
           }}>
-            <span style={{ color: "#34d399", fontWeight: 700, fontSize: 15 }}>
-              <i className="bi bi-stars me-2" />DESPUÉS
-            </span>
-            <span style={{ fontSize: 12, color: "#34d399", opacity: 0.7 }}>
-              {indiceActual + 1} / {POSES.length}
-            </span>
-          </div>
-          <div
-            ref={carruselDespuesRef}
-            style={{
-              display: "flex", gap: 0, overflowX: "auto", overflowY: "hidden",
-              scrollBehavior: "smooth", scrollSnapType: "x mandatory",
-              msOverflowStyle: "none", scrollbarWidth: "none",
-              WebkitOverflowScrolling: "touch",
-            }}
-            className="hide-scrollbar"
-          >
-            {POSES.map(pose => (
-              <div key={pose.id} style={{ 
-                minWidth: "100%", width: "100%", flexShrink: 0,
-                scrollSnapAlign: "start", scrollSnapStop: "always",
-              }}>
-                <TarjetaPose
-                  pose={pose}
-                  foto={fotos[`despues_${pose.id}`]}
-                  subiendo={subiendo[`despues_${pose.id}`]}
-                  color={C.success}
-                  onSubir={archivo => subirFoto("despues", pose.id, archivo)}
-                  onEliminar={() => eliminarFoto("despues", pose.id)}
-                  onVerModal={() => setModalImg(fotos[`despues_${pose.id}`])}
-                />
+            <button
+              onClick={() => navegarPose(-1)}
+              style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                border: "none", color: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(233,30,140,.3)", flexShrink: 0,
+              }}
+            >
+              <i className="bi bi-chevron-left" style={{ fontSize: 18, fontWeight: 700 }} />
+            </button>
+
+            <div style={{
+              background: C.card, border: `1px solid ${C.border}`,
+              borderRadius: 10, padding: "6px 14px", flex: 1, maxWidth: 200, textAlign: "center",
+            }}>
+              <div style={{ fontSize: 10, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                Pose {indiceActual + 1}/{POSES.length}
               </div>
-            ))}
+              <div style={{ fontWeight: 700, color: C.text, fontSize: 14, margin: "2px 0 4px" }}>
+                <i className={`bi ${poseActual.icon} me-1`} style={{ color: C.accent }} />
+                {poseActual.label}
+              </div>
+              <div style={{ display: "flex", gap: 4, justifyContent: "center" }}>
+                {POSES.map((_, idx) => (
+                  <div
+                    key={idx}
+                    style={{
+                      width: idx === indiceActual ? 16 : 5, height: 5, borderRadius: 3,
+                      background: idx === indiceActual ? C.accent : `${C.muted}33`,
+                      transition: "all .3s", cursor: "pointer",
+                    }}
+                    onClick={() => {
+                      setIndiceActual(idx);
+                      if (carruselAntesRef.current) {
+                        const ancho = carruselAntesRef.current.offsetWidth;
+                        carruselAntesRef.current.scrollTo({ left: ancho * idx, behavior: "smooth" });
+                      }
+                      if (carruselDespuesRef.current) {
+                        const ancho = carruselDespuesRef.current.offsetWidth;
+                        carruselDespuesRef.current.scrollTo({ left: ancho * idx, behavior: "smooth" });
+                      }
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={() => navegarPose(1)}
+              style={{
+                width: 40, height: 40, borderRadius: 12,
+                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                border: "none", color: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "0 4px 12px rgba(233,30,140,.3)", flexShrink: 0,
+              }}
+            >
+              <i className="bi bi-chevron-right" style={{ fontSize: 18, fontWeight: 700 }} />
+            </button>
+          </div>
+
+          {/* ANTES - Abajo */}
+          <div>
+            <div style={{
+              background: "rgba(59,130,246,.1)", border: "1px solid rgba(59,130,246,.3)",
+              borderRadius: 10, padding: "7px 12px", marginBottom: 8,
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 13 }}>
+                <i className="bi bi-clock-history me-2" />ANTES
+              </span>
+              <span style={{ fontSize: 11, color: "#60a5fa", opacity: 0.7 }}>
+                {contAntes}/6
+              </span>
+            </div>
+            <div
+              ref={carruselAntesRef}
+              style={{
+                display: "flex", gap: 0, overflowX: "auto", overflowY: "hidden",
+                scrollBehavior: "smooth", scrollSnapType: "x mandatory",
+                msOverflowStyle: "none", scrollbarWidth: "none",
+                WebkitOverflowScrolling: "touch",
+              }}
+              className="hide-scrollbar"
+            >
+              {POSES.map(pose => (
+                <div key={pose.id} style={{
+                  minWidth: "100%", width: "100%", flexShrink: 0,
+                  scrollSnapAlign: "start", scrollSnapStop: "always",
+                }}>
+                  <TarjetaPose
+                    pose={pose}
+                    foto={fotos[`antes_${pose.id}`]}
+                    subiendo={subiendo[`antes_${pose.id}`]}
+                    color="#3b82f6"
+                    onSubir={archivo => subirFoto("antes", pose.id, archivo)}
+                    onEliminar={() => eliminarFoto("antes", pose.id)}
+                    onVerModal={() => setModalImg(fotos[`antes_${pose.id}`])}
+                  />
+                </div>
+              ))}
+            </div>
           </div>
         </div>
+      )}
 
-        {/* ANTES - Carrusel inferior */}
-        <div>
-          <div style={{
-            background: "rgba(59,130,246,.1)", border: "1px solid rgba(59,130,246,.3)",
-            borderRadius: 12, padding: "10px 16px", marginBottom: 12,
-            display: "flex", alignItems: "center", justifyContent: "space-between",
-          }}>
-            <span style={{ color: "#60a5fa", fontWeight: 700, fontSize: 15 }}>
-              <i className="bi bi-clock-history me-2" />ANTES
-            </span>
-            <span style={{ fontSize: 12, color: "#60a5fa", opacity: 0.7 }}>
-              {indiceActual + 1} / {POSES.length}
-            </span>
-          </div>
-          <div
-            ref={carruselAntesRef}
-            style={{
-              display: "flex", gap: 0, overflowX: "auto", overflowY: "hidden",
-              scrollBehavior: "smooth", scrollSnapType: "x mandatory",
-              msOverflowStyle: "none", scrollbarWidth: "none",
-              WebkitOverflowScrolling: "touch",
-            }}
-            className="hide-scrollbar"
-          >
-            {POSES.map(pose => (
-              <div key={pose.id} style={{ 
-                minWidth: "100%", width: "100%", flexShrink: 0,
-                scrollSnapAlign: "start", scrollSnapStop: "always",
-              }}>
-                <TarjetaPose
-                  pose={pose}
-                  foto={fotos[`antes_${pose.id}`]}
-                  subiendo={subiendo[`antes_${pose.id}`]}
-                  color="#3b82f6"
-                  onSubir={archivo => subirFoto("antes", pose.id, archivo)}
-                  onEliminar={() => eliminarFoto("antes", pose.id)}
-                  onVerModal={() => setModalImg(fotos[`antes_${pose.id}`])}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
+      {/* CSS para ocultar scrollbar */}
+      <style>{`
+        .hide-scrollbar::-webkit-scrollbar { display: none; }
+        .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
 
-        {/* CSS para ocultar scrollbar */}
-        <style>{`
-          .hide-scrollbar::-webkit-scrollbar {
-            display: none;
-          }
-          .hide-scrollbar {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-          }
-        `}</style>
-      </div>
-
-      {/* Modal lightbox */}
+      {/* Modal lightbox comparativo */}
       {modalImg && (
         <div
           onClick={() => setModalImg(null)}
           style={{
             position: "fixed", inset: 0, zIndex: 2000,
-            background: "rgba(0,0,0,.9)", backdropFilter: "blur(8px)",
+            background: "rgba(0,0,0,.92)", backdropFilter: "blur(10px)",
             display: "flex", alignItems: "center", justifyContent: "center",
             padding: 20,
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            background: C.surface, borderRadius: 16, maxWidth: 680,
+            background: C.surface, borderRadius: 16,
+            maxWidth: fotos[`antes_${modalImg.pose}`] && fotos[`despues_${modalImg.pose}`] && !isMobile ? 1100 : 680,
             width: "100%", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,.7)",
           }}>
-            <img
-              src={modalImg.archivo_url}
-              alt=""
-              style={{ width: "100%", maxHeight: "70vh", objectFit: "contain", display: "block" }}
-            />
-            <div style={{ padding: "14px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-              <div>
-                <span style={{
-                  background: modalImg.momento === "antes" ? "rgba(59,130,246,.2)" : "rgba(16,185,129,.2)",
-                  color: modalImg.momento === "antes" ? "#60a5fa" : "#34d399",
-                  border: `1px solid ${modalImg.momento === "antes" ? "rgba(59,130,246,.4)" : "rgba(16,185,129,.4)"}`,
-                  borderRadius: 6, padding: "3px 10px", fontSize: 12, fontWeight: 700,
-                  textTransform: "uppercase", marginRight: 8,
-                }}>
-                  {modalImg.momento}
-                </span>
-                <span style={{ color: C.muted, fontSize: 13 }}>
+            {/* Si hay ambas fotos y es PC, mostrar comparación lado a lado */}
+            {fotos[`antes_${modalImg.pose}`] && fotos[`despues_${modalImg.pose}`] && !isMobile ? (
+              <div style={{ display: "flex" }}>
+                <div style={{ flex: 1, position: "relative", borderRight: `1px solid ${C.border}` }}>
+                  <img
+                    src={fotos[`antes_${modalImg.pose}`].archivo_url}
+                    alt="Antes"
+                    style={{ width: "100%", height: "65vh", objectFit: "contain", display: "block", background: "#000" }}
+                  />
+                  <div style={{
+                    position: "absolute", top: 12, left: 12,
+                    background: "rgba(59,130,246,.85)", borderRadius: 6,
+                    padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "#fff",
+                  }}>ANTES</div>
+                </div>
+                <div style={{ flex: 1, position: "relative" }}>
+                  <img
+                    src={fotos[`despues_${modalImg.pose}`].archivo_url}
+                    alt="Después"
+                    style={{ width: "100%", height: "65vh", objectFit: "contain", display: "block", background: "#000" }}
+                  />
+                  <div style={{
+                    position: "absolute", top: 12, left: 12,
+                    background: "rgba(16,185,129,.85)", borderRadius: 6,
+                    padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "#fff",
+                  }}>DESPUÉS</div>
+                </div>
+              </div>
+            ) : (
+              <div style={{ position: "relative" }}>
+                <img
+                  src={modalImg.archivo_url}
+                  alt=""
+                  style={{ width: "100%", maxHeight: "70vh", objectFit: "contain", display: "block", background: "#000" }}
+                />
+                <div style={{
+                  position: "absolute", top: 12, left: 12,
+                  background: modalImg.momento === "antes" ? "rgba(59,130,246,.85)" : "rgba(16,185,129,.85)",
+                  borderRadius: 6, padding: "4px 12px", fontSize: 12, fontWeight: 700, color: "#fff",
+                  textTransform: "uppercase",
+                }}>{modalImg.momento}</div>
+              </div>
+            )}
+            <div style={{ padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <i className={`bi ${POSES.find(p => p.id === modalImg.pose)?.icon}`} style={{ color: C.accent, fontSize: 16 }} />
+                <span style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>
                   {POSES.find(p => p.id === modalImg.pose)?.label}
                 </span>
+                {fotos[`antes_${modalImg.pose}`] && fotos[`despues_${modalImg.pose}`] && !isMobile && (
+                  <span style={{ color: C.muted, fontSize: 12, marginLeft: 4 }}>— Comparación</span>
+                )}
               </div>
               <button
                 onClick={() => setModalImg(null)}
                 style={{
-                  background: "rgba(255,255,255,.07)", border: "none", borderRadius: 8,
-                  padding: "7px 14px", color: C.text, cursor: "pointer",
+                  background: "rgba(255,255,255,.07)", border: `1px solid ${C.border}`, borderRadius: 8,
+                  padding: "7px 14px", color: C.text, cursor: "pointer", fontSize: 13,
+                  display: "flex", alignItems: "center", gap: 6,
                 }}
               >
-                <i className="bi bi-x-lg" />
+                <i className="bi bi-x-lg" /> Cerrar
               </button>
             </div>
           </div>
@@ -1225,8 +1432,9 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
 }
 
 /* ─── Tarjeta de una pose ─── */
-function TarjetaPose({ pose, foto, subiendo, color, onSubir, onEliminar, onVerModal }) {
+function TarjetaPose({ pose, foto, subiendo, color, onSubir, onEliminar, onVerModal, compact }) {
   const inputRef = useRef();
+  const imgHeight = compact ? "min(50vh, 380px)" : "min(60vh, 500px)";
 
   const handleArchivo = e => {
     const f = e.target.files[0];
@@ -1260,7 +1468,7 @@ function TarjetaPose({ pose, foto, subiendo, color, onSubir, onEliminar, onVerMo
               alt={pose.label}
               onClick={onVerModal}
               style={{
-                width: "100%", height: "min(60vh, 500px)", objectFit: "contain",
+                width: "100%", height: imgHeight, objectFit: "contain",
                 display: "block", cursor: "zoom-in",
               }}
             />
@@ -1310,7 +1518,7 @@ function TarjetaPose({ pose, foto, subiendo, color, onSubir, onEliminar, onVerMo
           }}
         >
           <div style={{
-            height: "min(60vh, 500px)", display: "flex", flexDirection: "column",
+            height: imgHeight, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center", gap: 10,
             background: `${color}08`,
           }}>
