@@ -451,6 +451,12 @@ function CatalogoDiagnosticos() {
                 </ul>
               )}
             </div>
+            <div className="col-12">
+              <label className="form-label small fw-semibold">Descripción CIE *</label>
+              <input className="form-control form-control-sm" placeholder="Se auto-llena al seleccionar código CIE, o escríbela manualmente"
+                value={form.descripcion_cie}
+                onChange={e => setForm(f => ({ ...f, descripcion_cie: e.target.value }))} />
+            </div>
 
             {/* Diagnósticos secundarios */}
             <div className="col-12">
