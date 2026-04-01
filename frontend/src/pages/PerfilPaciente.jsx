@@ -3,11 +3,13 @@
  * 1. Datos Generales
  * 2. Historial Clínico  
  * 3. Exámenes / Documentos
- * 4. Eliminar Paciente
+ * 4. Curvas de Crecimiento OMS
+ * 5. Eliminar Paciente
  */
 import { useEffect, useState, useRef } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/api";
+import CurvaCrecimiento from "../components/CurvaCrecimiento";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -23,6 +25,7 @@ const TIPOS_DOC = [
 export default function PerfilPaciente() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const fileRef = useRef();
   const fotoInputRef = useRef();
 
@@ -35,7 +38,7 @@ export default function PerfilPaciente() {
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
   
   // Pestaña activa
-  const [tab, setTab] = useState("datos");
+  const [tab, setTab] = useState(searchParams.get("tab") || "datos");
   
   // Edición datos generales
   const [editandoDatos, setEditandoDatos] = useState(false);
@@ -331,6 +334,14 @@ export default function PerfilPaciente() {
             {documentos.length > 0 && (
               <span className="badge bg-info ms-2">{documentos.length}</span>
             )}
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${tab === "crecimiento" ? "active" : ""}`}
+            onClick={() => setTab("crecimiento")}
+          >
+            <i className="bi bi-graph-up-arrow me-2" />Curvas de Crecimiento
           </button>
         </li>
         <li className="nav-item">
@@ -729,7 +740,27 @@ export default function PerfilPaciente() {
       )}
 
       {/* ─────────────────────────────────────────────────────── */}
-      {/* TAB 4: ELIMINAR PACIENTE (Doble confirmación) */}
+      {/* TAB 4: CURVAS DE CRECIMIENTO OMS */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "crecimiento" && (
+        <div className="card shadow-sm">
+          <div className="card-header" style={{ background: "linear-gradient(135deg, #214a87 0%, #176DC8 100%)" }}>
+            <h5 className="mb-0 text-white">
+              <i className="bi bi-graph-up-arrow me-2" />Curvas de Crecimiento — Estándares OMS
+            </h5>
+          </div>
+          <div className="card-body p-4">
+            <CurvaCrecimiento
+              pacienteId={id}
+              sexo={paciente.sexo}
+              fechaNacimiento={paciente.fecha_nacimiento}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB 5: ELIMINAR PACIENTE (Doble confirmación) */}
       {/* ─────────────────────────────────────────────────────── */}
       {tab === "eliminar" && (
         <div className="card shadow-sm border-danger">

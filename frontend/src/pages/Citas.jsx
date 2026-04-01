@@ -72,6 +72,8 @@ export default function Citas() {
   const [events,    setEvents]      = useState([]);
   const [medicos,   setMedicos]     = useState([]);
   const [filterMed, setFilterMed]   = useState("");
+  const [filterMedText, setFilterMedText] = useState("");
+  const [showMedList, setShowMedList] = useState(false);
   const [view,      setView]        = useState(Views.WEEK);
   const [date,      setDate]        = useState(new Date());
   const [loading,   setLoading]     = useState(false);
@@ -236,13 +238,42 @@ export default function Citas() {
       {activeTab === "calendario" && (
         <>
           <div className="d-flex gap-2 mb-3 flex-wrap align-items-center">
-            <select className="form-select form-select-sm" style={{ maxWidth: 240 }}
-              value={filterMed} onChange={e => setFilterMed(e.target.value)}>
-              <option value="">— Todos los médicos —</option>
-              {medicos.map(m => (
-                <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
-              ))}
-            </select>
+            <div className="position-relative" style={{ maxWidth: 300 }}>
+              <div className="input-group input-group-sm">
+                <span className="input-group-text bg-white border-end-0"><i className="bi bi-search text-muted"></i></span>
+                <input
+                  className="form-control form-control-sm border-start-0"
+                  placeholder="Buscar médico por nombre…"
+                  value={filterMedText}
+                  onChange={e => { setFilterMedText(e.target.value); setShowMedList(true); if (!e.target.value) { setFilterMed(""); } }}
+                  onFocus={() => setShowMedList(true)}
+                />
+                {filterMed && (
+                  <button className="btn btn-outline-secondary btn-sm border-start-0" type="button"
+                    onClick={() => { setFilterMed(""); setFilterMedText(""); }}>
+                    <i className="bi bi-x"></i>
+                  </button>
+                )}
+              </div>
+              {showMedList && filterMedText.length > 0 && (() => {
+                const filtered = medicos.filter(m => {
+                  const txt = filterMedText.toLowerCase();
+                  return m.nombres?.toLowerCase().includes(txt) || m.apellidos?.toLowerCase().includes(txt) || m.especialidad?.toLowerCase().includes(txt);
+                });
+                return filtered.length > 0 ? (
+                  <ul className="list-group position-absolute z-3 shadow" style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto" }}>
+                    {filtered.map(m => (
+                      <li key={m.id} className={`list-group-item list-group-item-action py-1 ${filterMed === String(m.id) ? "active" : ""}`}
+                        style={{ cursor: "pointer", fontSize: "0.82rem" }}
+                        onClick={() => { setFilterMed(String(m.id)); setFilterMedText(`Dr. ${m.nombres} ${m.apellidos}`); setShowMedList(false); }}>
+                        <strong>Dr. {m.nombres} {m.apellidos}</strong>
+                        {m.especialidad && <span className="text-muted ms-1">— {m.especialidad}</span>}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null;
+              })()}
+            </div>
             <div className="d-flex gap-1 flex-wrap ms-auto">
               {ESTADOS.map(est => (
                 <span key={est} className="badge"

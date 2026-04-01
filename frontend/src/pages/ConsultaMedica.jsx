@@ -250,6 +250,39 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
   const [cie10List, setCie10List] = useState([]);
   const cie10Ref = useRef(null);
 
+  // ── Catálogo de diagnósticos ──
+  const [catDxQuery, setCatDxQuery] = useState("");
+  const [catDxList, setCatDxList]   = useState([]);
+  const [showCatDx, setShowCatDx]   = useState(false);
+
+  useEffect(() => {
+    if (!catDxQuery || catDxQuery.length < 2) { setCatDxList([]); return; }
+    const t = setTimeout(() => {
+      api.get("/catalogos-diagnostico", { params: { q: catDxQuery } })
+        .then(r => { setCatDxList(r.data.data || []); setShowCatDx(true); })
+        .catch(() => setCatDxList([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [catDxQuery]);
+
+  const selCatDx = (cat) => {
+    let secArr = [];
+    try {
+      secArr = typeof cat.diagnosticos_secundarios === "string"
+        ? JSON.parse(cat.diagnosticos_secundarios || "[]")
+        : (cat.diagnosticos_secundarios || []);
+    } catch { secArr = []; }
+    setSoap(s => ({
+      ...s,
+      diagnostico_cie: cat.codigo_cie,
+      diagnostico_desc: cat.descripcion_cie,
+      diagnosticos_secundarios: secArr,
+    }));
+    setCatDxQuery("");
+    setCatDxList([]);
+    setShowCatDx(false);
+  };
+
   const set = (field) => (e) =>
     setSoap(s => ({ ...s, [field]: e.target.value }));
 
@@ -310,8 +343,8 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       </div>
 
       {/* Subjetivo */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
+      <div className="col-md-6">
+        <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
             <label className="form-label fw-semibold">
               S — Subjetivo <small className="text-muted fw-normal">(Síntomas referidos por el paciente)</small>
@@ -324,8 +357,8 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       </div>
 
       {/* Examen físico */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
+      <div className="col-md-6">
+        <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
             <label className="form-label fw-semibold">
               O — Objetivo <small className="text-muted fw-normal">(Hallazgos al examen físico)</small>
@@ -338,12 +371,41 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       </div>
 
       {/* Diagnóstico */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
+      <div className="col-md-6">
+        <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
             <label className="form-label fw-semibold">
               A — Diagnóstico <small className="text-muted fw-normal">(CIE-10)</small>
             </label>
+
+            {/* Selector de catálogo de diagnósticos */}
+            {!firmada && (
+              <div className="position-relative mb-2">
+                <div className="input-group input-group-sm">
+                  <span className="input-group-text bg-info bg-opacity-10 text-info border-0">
+                    <i className="bi bi-journal-bookmark-fill"></i>
+                  </span>
+                  <input className="form-control" placeholder="Buscar en catálogo de diagnósticos…"
+                    value={catDxQuery}
+                    onChange={e => setCatDxQuery(e.target.value)}
+                    onFocus={() => catDxList.length > 0 && setShowCatDx(true)} />
+                </div>
+                {showCatDx && catDxList.length > 0 && (
+                  <ul className="list-group position-absolute z-3 shadow"
+                    style={{ top: "100%", left: 0, right: 0, maxHeight: 180, overflowY: "auto" }}>
+                    {catDxList.map(c => (
+                      <li key={c.id} className="list-group-item list-group-item-action py-1"
+                        style={{ cursor: "pointer", fontSize: "0.82rem" }}
+                        onClick={() => selCatDx(c)}>
+                        <i className="bi bi-lightning-fill text-warning me-1"></i>
+                        <strong>{c.nombre}</strong> — <span className="text-muted">{c.codigo_cie}</span> {c.descripcion_cie}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            )}
+
             <div className="position-relative" ref={cie10Ref}>
               <div className="input-group input-group-sm">
                 <input className="form-control" placeholder="Buscar por código o descripción…"
@@ -389,8 +451,8 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       </div>
 
       {/* Plan */}
-      <div className="col-12">
-        <div className="card border-0 shadow-sm">
+      <div className="col-md-6">
+        <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
             <label className="form-label fw-semibold">
               P — Plan <small className="text-muted fw-normal">(Tratamiento, indicaciones, seguimiento)</small>
@@ -449,7 +511,15 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
 
   const selMed = (med, idx) => {
     setItems(prev => prev.map((it, i) => i === idx
-      ? { ...it, medicamento_id: med.id, medicamento_texto: med.nombre_generico + (med.presentacion ? ` (${med.presentacion})` : "") }
+      ? {
+          ...it,
+          medicamento_id: med.id,
+          medicamento_texto: med.nombre_generico + (med.presentacion ? ` (${med.presentacion})` : ""),
+          dosis: med.dosis_default || it.dosis,
+          duracion: med.duracion_default || it.duracion,
+          cantidad: med.cantidad_default || it.cantidad,
+          instrucciones: med.instrucciones_default || it.instrucciones,
+        }
       : it
     ));
     setMedSearch([]);
@@ -532,13 +602,20 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
           <div className="card-body">
             {items.map((item, idx) => (
               <div key={idx} className="border rounded p-2 mb-2 position-relative">
-                <div className="fw-semibold small mb-2 text-muted">Medicamento {idx + 1}</div>
+                <div className="fw-semibold small mb-2 text-muted d-flex justify-content-between align-items-center">
+                  <span>Medicamento {idx + 1}</span>
+                  {item.medicamento_id && (
+                    <span className="badge bg-success bg-opacity-10 text-success" style={{ fontSize: "0.7rem" }}>
+                      <i className="bi bi-lightning-fill me-1"></i>Auto-llenado desde catálogo
+                    </span>
+                  )}
+                </div>
                 <div className="row g-2">
                   <div className="col-12 position-relative">
                     <label className="form-label small mb-1">Medicamento</label>
                     <input className="form-control form-control-sm" placeholder="Buscar o escribir…"
                       value={item.medicamento_texto}
-                      onChange={e => { setItem(idx, "medicamento_texto", e.target.value); searchMed(e.target.value, idx); }} />
+                      onChange={e => { setItem(idx, "medicamento_texto", e.target.value); setItem(idx, "medicamento_id", null); searchMed(e.target.value, idx); }} />
                     {medSearch?.idx === idx && medSearch.list?.length > 0 && (
                       <ul className="list-group position-absolute z-3"
                         style={{ top: "100%", left: 0, right: 0, maxHeight: 150, overflowY: "auto" }}>
@@ -547,27 +624,32 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
                             style={{ cursor: "pointer", fontSize: "0.8rem" }}
                             onClick={() => selMed(m, idx)}>
                             {m.nombre_generico} {m.presentacion && `(${m.presentacion})`}
+                            {(m.dosis_default || m.duracion_default) && (
+                              <span className="text-success ms-2" style={{ fontSize: "0.7rem" }}>
+                                <i className="bi bi-lightning-fill"></i> con defaults
+                              </span>
+                            )}
                           </li>
                         ))}
                       </ul>
                     )}
                   </div>
-                  <div className="col-md-4">
+                  <div className="col-md-3">
                     <label className="form-label small mb-1">Dosis</label>
                     <input className="form-control form-control-sm" placeholder="500mg c/8h"
                       value={item.dosis} onChange={e => setItem(idx, "dosis", e.target.value)} />
                   </div>
-                  <div className="col-md-4">
+                  <div className="col-md-3">
                     <label className="form-label small mb-1">Duración</label>
                     <input className="form-control form-control-sm" placeholder="7 días"
                       value={item.duracion} onChange={e => setItem(idx, "duracion", e.target.value)} />
                   </div>
-                  <div className="col-md-4">
+                  <div className="col-md-3">
                     <label className="form-label small mb-1">Cantidad</label>
                     <input className="form-control form-control-sm" placeholder="21 tabletas"
                       value={item.cantidad} onChange={e => setItem(idx, "cantidad", e.target.value)} />
                   </div>
-                  <div className="col-12">
+                  <div className="col-md-3">
                     <label className="form-label small mb-1">Instrucciones</label>
                     <input className="form-control form-control-sm" placeholder="Tomar con alimentos…"
                       value={item.instrucciones} onChange={e => setItem(idx, "instrucciones", e.target.value)} />
@@ -620,6 +702,34 @@ function EstudiosTab({ historiaId, pacienteId, firmada }) {
   const [form,     setForm]     = useState({ tipo: "LABORATORIO", descripcion: "", urgente: false });
   const [saving,   setSaving]   = useState(false);
   const [alertEstudios, setAlertEstudios] = useState(null);
+
+  // ── Catálogo de estudios ──
+  const [catEstQuery, setCatEstQuery] = useState("");
+  const [catEstList, setCatEstList]   = useState([]);
+  const [showCatEst, setShowCatEst]   = useState(false);
+
+  useEffect(() => {
+    if (!catEstQuery || catEstQuery.length < 2) { setCatEstList([]); return; }
+    const t = setTimeout(() => {
+      api.get("/catalogos-estudios", { params: { q: catEstQuery } })
+        .then(r => { setCatEstList(r.data.data || []); setShowCatEst(true); })
+        .catch(() => setCatEstList([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [catEstQuery]);
+
+  const selCatEst = (cat) => {
+    setForm(f => ({
+      ...f,
+      tipo: cat.categoria || "LABORATORIO",
+      descripcion: f.descripcion
+        ? f.descripcion + ", " + cat.nombre + (cat.descripcion ? ` (${cat.descripcion})` : "")
+        : cat.nombre + (cat.descripcion ? ` (${cat.descripcion})` : ""),
+    }));
+    setCatEstQuery("");
+    setCatEstList([]);
+    setShowCatEst(false);
+  };
 
   useEffect(() => {
     if (!historiaId && !pacienteId) return;
@@ -696,6 +806,33 @@ function EstudiosTab({ historiaId, pacienteId, firmada }) {
         <div className="card border-primary shadow-sm mt-3">
           <div className="card-header fw-semibold">Nueva Solicitud</div>
           <div className="card-body row g-2">
+            {/* Buscador de catálogo de estudios */}
+            <div className="col-12 position-relative">
+              <label className="form-label small">
+                <i className="bi bi-journal-bookmark-fill text-info me-1"></i>Buscar en catálogo de estudios
+              </label>
+              <input className="form-control form-control-sm" placeholder="Buscar estudio del catálogo…"
+                value={catEstQuery}
+                onChange={e => setCatEstQuery(e.target.value)}
+                onFocus={() => catEstList.length > 0 && setShowCatEst(true)} />
+              {showCatEst && catEstList.length > 0 && (
+                <ul className="list-group position-absolute z-3 shadow"
+                  style={{ top: "100%", left: 0, right: 0, maxHeight: 180, overflowY: "auto" }}>
+                  {catEstList.map(c => (
+                    <li key={c.id} className="list-group-item list-group-item-action py-1"
+                      style={{ cursor: "pointer", fontSize: "0.82rem" }}
+                      onClick={() => selCatEst(c)}>
+                      <i className="bi bi-lightning-fill text-warning me-1"></i>
+                      <strong>{c.nombre}</strong>
+                      <span className={`badge ms-2 ${c.categoria === "LABORATORIO" ? "bg-primary" : c.categoria === "IMAGENOLOGIA" ? "bg-info text-dark" : "bg-secondary"}`} style={{ fontSize: "0.68rem" }}>
+                        {c.categoria}
+                      </span>
+                      {c.descripcion && <span className="text-muted ms-1">— {c.descripcion}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
             <div className="col-md-4">
               <label className="form-label small">Tipo</label>
               <select className="form-select form-select-sm"

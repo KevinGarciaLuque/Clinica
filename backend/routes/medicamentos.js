@@ -54,15 +54,18 @@ router.post("/", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
     const {
       nombre_generico, nombre_comercial,
       presentacion, via_administracion, contraindicaciones,
+      dosis_default, duracion_default, cantidad_default, instrucciones_default,
     } = req.body;
 
     if (!nombre_generico) return res.status(400).json({ ok: false, msg: "nombre_generico requerido" });
 
     const [r] = await pool.query(
       `INSERT INTO medicamentos
-         (nombre_generico, nombre_comercial, presentacion, via_administracion, contraindicaciones)
-       VALUES (?,?,?,?,?)`,
-      [nombre_generico, nombre_comercial || null, presentacion || null, via_administracion || null, contraindicaciones || null]
+         (nombre_generico, nombre_comercial, presentacion, via_administracion, contraindicaciones,
+          dosis_default, duracion_default, cantidad_default, instrucciones_default)
+       VALUES (?,?,?,?,?,?,?,?,?)`,
+      [nombre_generico, nombre_comercial || null, presentacion || null, via_administracion || null, contraindicaciones || null,
+       dosis_default || null, duracion_default || null, cantidad_default || null, instrucciones_default || null]
     );
     res.json({ ok: true, id: r.insertId });
   } catch (e) {
@@ -73,19 +76,22 @@ router.post("/", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
 /**
  * PUT /api/medicamentos/:id
  */
-router.put("/:id", auth("ADMIN","SUPER_ADMIN"), async (req, res) => {
+router.put("/:id", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
   try {
     const {
       nombre_generico, nombre_comercial,
       presentacion, via_administracion, contraindicaciones,
+      dosis_default, duracion_default, cantidad_default, instrucciones_default,
     } = req.body;
 
     await pool.query(
       `UPDATE medicamentos
        SET nombre_generico=?, nombre_comercial=?,
-           presentacion=?, via_administracion=?, contraindicaciones=?
+           presentacion=?, via_administracion=?, contraindicaciones=?,
+           dosis_default=?, duracion_default=?, cantidad_default=?, instrucciones_default=?
        WHERE id=?`,
-      [nombre_generico, nombre_comercial || null, presentacion || null, via_administracion || null, contraindicaciones || null, req.params.id]
+      [nombre_generico, nombre_comercial || null, presentacion || null, via_administracion || null, contraindicaciones || null,
+       dosis_default || null, duracion_default || null, cantidad_default || null, instrucciones_default || null, req.params.id]
     );
     res.json({ ok: true });
   } catch (e) {
@@ -96,7 +102,7 @@ router.put("/:id", auth("ADMIN","SUPER_ADMIN"), async (req, res) => {
 /**
  * DELETE /api/medicamentos/:id  — toggle activo
  */
-router.delete("/:id", auth("ADMIN","SUPER_ADMIN"), async (req, res) => {
+router.delete("/:id", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
   try {
     await pool.query(
       "UPDATE medicamentos SET activo = NOT activo WHERE id = ?",

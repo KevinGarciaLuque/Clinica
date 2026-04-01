@@ -99,10 +99,13 @@ app.use("/api/historias", require("./routes/historias"));
 app.use("/api/prescripciones", require("./routes/prescripciones"));
 app.use("/api/estudios", require("./routes/estudios"));
 app.use("/api/medicamentos", require("./routes/medicamentos"));
+app.use("/api/catalogos-diagnostico", require("./routes/catalogosDiagnostico"));
+app.use("/api/catalogos-estudios", require("./routes/catalogosEstudios"));
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
 app.use("/api/recordatorios", require("./routes/recordatorios"));
+app.use("/api/crecimiento", require("./routes/crecimiento"));
 app.use("/api/setup", require("./routes/setup"));
 
 // ===== 404 =====

@@ -35,6 +35,7 @@ import FichaEstetica           from "./pages/estetica/FichaEstetica";
 
 // Módulos adicionales
 import Recordatorios from "./pages/Recordatorios";
+import Catalogos from "./pages/Catalogos";
 
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
@@ -72,6 +73,7 @@ export default function App() {
         <Route path="/historia/:paciente_id"  element={<HistoriaClinica />} />
         <Route path="/historia"               element={<HistoriaClinica />} />
         <Route path="/estudios"               element={<Estudios />} />
+        <Route path="/catalogos"              element={<Catalogos />} />
 
         {/* Rutas de administración (ADMIN + SUPER_ADMIN) */}
         <Route path="/admin/usuarios" element={

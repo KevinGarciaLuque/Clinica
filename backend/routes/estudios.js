@@ -20,8 +20,8 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 
     let sql = `
       SELECT s.*,
-             p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
-             u.nombres AS med_nombres, u.apellidos AS med_apellidos
+             p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
+             u.nombres AS medico_nombres, u.apellidos AS medico_apellidos
       FROM estudios_solicitudes s
       JOIN pacientes p ON p.id = s.paciente_id
       JOIN usuarios  u ON u.id = s.medico_id
@@ -51,8 +51,8 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 
     const [[sol]] = await pool.query(
       `SELECT s.*,
-              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
-              u.nombres AS med_nombres, u.apellidos AS med_apellidos
+              p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
+              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos
        FROM estudios_solicitudes s
        JOIN pacientes p ON p.id = s.paciente_id
        JOIN usuarios  u ON u.id = s.medico_id
