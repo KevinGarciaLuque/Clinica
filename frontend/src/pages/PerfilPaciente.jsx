@@ -28,6 +28,7 @@ export default function PerfilPaciente() {
   const [searchParams] = useSearchParams();
   const fileRef = useRef();
   const fotoInputRef = useRef();
+  const fotoCameraRef = useRef();
 
   // Estados principales
   const [paciente, setPaciente] = useState(null);
@@ -398,18 +399,35 @@ export default function PerfilPaciente() {
                           type="file"
                           ref={fotoInputRef}
                           accept="image/*"
+                          onChange={handleFotoChange}
+                          style={{ display: "none" }}
+                        />
+                        <input
+                          type="file"
+                          ref={fotoCameraRef}
+                          accept="image/*"
                           capture="environment"
                           onChange={handleFotoChange}
                           style={{ display: "none" }}
                         />
-                        <button
-                          type="button"
-                          className="btn btn-outline-primary btn-sm"
-                          onClick={() => fotoInputRef.current?.click()}
-                        >
-                          <i className="bi bi-camera me-1" />
-                          {fotoPreview ? "Cambiar foto" : "Subir foto"}
-                        </button>
+                        <div className="d-flex gap-2 flex-wrap">
+                          <button
+                            type="button"
+                            className="btn btn-outline-primary btn-sm"
+                            onClick={() => fotoCameraRef.current?.click()}
+                          >
+                            <i className="bi bi-camera me-1" />
+                            Tomar foto
+                          </button>
+                          <button
+                            type="button"
+                            className="btn btn-outline-secondary btn-sm"
+                            onClick={() => fotoInputRef.current?.click()}
+                          >
+                            <i className="bi bi-image me-1" />
+                            {fotoPreview ? "Cambiar foto" : "Subir desde galería"}
+                          </button>
+                        </div>
                         <small className="d-block text-muted mt-1">
                           Puedes tomar una foto desde el celular o subir un archivo
                         </small>
@@ -641,8 +659,8 @@ export default function PerfilPaciente() {
                     type="file"
                     className="form-control"
                     accept="image/*,.pdf"
-                    capture="environment"
-                    onChange={(e) => setArchivo(e.target.files[0])}
+                    onChange={(e) => setArchivo(e.target.files[0])
+                    }
                   />
                   <small className="text-muted">
                     Puedes tomar una foto desde el celular o subir PDF/imágenes

@@ -18,6 +18,8 @@ export default function Usuarios() {
   const [error, setError]             = useState("");
   const [showModal, setShowModal]     = useState(false);
   const [resetPass, setResetPass]     = useState({ id: null, pass: "" });
+  const [deleteConfirm, setDeleteConfirm] = useState({ id: null, nombre: "", texto: "" });
+  const [showResetPass, setShowResetPass] = useState(false);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -98,6 +100,21 @@ export default function Usuarios() {
     }
   };
 
+  const eliminarUsuario = async () => {
+    if (deleteConfirm.texto !== "ELIMINAR") {
+      setError('Debes escribir exactamente "ELIMINAR" para confirmar');
+      return;
+    }
+    try {
+      await api.delete(`/usuarios/${deleteConfirm.id}`);
+      setDeleteConfirm({ id: null, nombre: "", texto: "" });
+      setError("");
+      cargar();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
   const filtrados = usuarios.filter((u) =>
     `${u.nombres} ${u.apellidos} ${u.email}`.toLowerCase().includes(busqueda.toLowerCase())
   );
@@ -156,9 +173,13 @@ export default function Usuarios() {
                       onClick={() => toggleActivo(u)}>
                       {u.activo ? "Desactivar" : "Activar"}
                     </button>
-                    <button className="btn btn-outline-secondary btn-sm"
-                      onClick={() => setResetPass({ id: u.id, pass: "" })}>
+                    <button className="btn btn-outline-secondary btn-sm me-1"
+                      onClick={() => { setResetPass({ id: u.id, pass: "" }); setShowResetPass(false); }}>
                       Contraseña
+                    </button>
+                    <button className="btn btn-outline-danger btn-sm"
+                      onClick={() => setDeleteConfirm({ id: u.id, nombre: `${u.nombres} ${u.apellidos}`, texto: "" })}>
+                      Eliminar
                     </button>
                   </td>
                 </tr>
@@ -273,9 +294,15 @@ export default function Usuarios() {
               <div className="modal-body">
                 {error && <div className="alert alert-danger py-2">{error}</div>}
                 <label className="form-label">Nueva contraseña (mín. 8 caracteres)</label>
-                <input className="form-control" type="password"
-                  value={resetPass.pass}
-                  onChange={(e) => setResetPass({ ...resetPass, pass: e.target.value })} />
+                <div className="input-group">
+                  <input className="form-control" type={showResetPass ? "text" : "password"}
+                    value={resetPass.pass}
+                    onChange={(e) => setResetPass({ ...resetPass, pass: e.target.value })} />
+                  <button type="button" className="btn btn-outline-secondary"
+                    onClick={() => setShowResetPass(!showResetPass)}>
+                    <i className={`bi ${showResetPass ? "bi-eye-slash" : "bi-eye"}`} />
+                  </button>
+                </div>
               </div>
               <div className="modal-footer">
                 <button className="btn btn-secondary" onClick={() => setResetPass({ id: null, pass: "" })}>
@@ -284,6 +311,51 @@ export default function Usuarios() {
                 <button className="btn btn-warning" onClick={guardarResetPass}
                   disabled={resetPass.pass.length < 8}>
                   Cambiar contraseña
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal eliminar con doble confirmación ── */}
+      {deleteConfirm.id && (
+        <div className="modal d-block" style={{ background: "rgba(0,0,0,.6)" }}>
+          <div className="modal-dialog">
+            <div className="modal-content border-danger">
+              <div className="modal-header bg-danger text-white">
+                <h5 className="modal-title">
+                  <i className="bi bi-exclamation-triangle-fill me-2" />
+                  Eliminar usuario permanentemente
+                </h5>
+                <button className="btn-close btn-close-white"
+                  onClick={() => { setDeleteConfirm({ id: null, nombre: "", texto: "" }); setError(""); }} />
+              </div>
+              <div className="modal-body">
+                {error && <div className="alert alert-danger py-2">{error}</div>}
+                <div className="alert alert-warning">
+                  <strong>⚠️ Esta acción NO se puede deshacer.</strong>
+                  <p className="mb-0 mt-2">Se eliminará permanentemente al usuario:</p>
+                  <p className="fw-bold mb-0 mt-1">{deleteConfirm.nombre}</p>
+                </div>
+                <label className="form-label fw-semibold">
+                  Escribe <code>ELIMINAR</code> para confirmar:
+                </label>
+                <input className="form-control"
+                  placeholder="ELIMINAR"
+                  value={deleteConfirm.texto}
+                  onChange={(e) => { setDeleteConfirm({ ...deleteConfirm, texto: e.target.value }); setError(""); }}
+                  autoFocus />
+              </div>
+              <div className="modal-footer">
+                <button className="btn btn-secondary"
+                  onClick={() => { setDeleteConfirm({ id: null, nombre: "", texto: "" }); setError(""); }}>
+                  Cancelar
+                </button>
+                <button className="btn btn-danger" onClick={eliminarUsuario}
+                  disabled={deleteConfirm.texto !== "ELIMINAR"}>
+                  <i className="bi bi-trash-fill me-1" />
+                  Eliminar permanentemente
                 </button>
               </div>
             </div>
