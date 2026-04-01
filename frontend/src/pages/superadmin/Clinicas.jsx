@@ -17,7 +17,7 @@ const C = {
 };
 
 const EMPTY_C = {
-  nombre: "", slug: "", tipo_id: "", email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
+  nombre: "", slug: "", tipo_id: "", es_pediatrica: false, email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
 };
 const EMPTY_A = { admin_nombres: "", admin_apellidos: "", admin_email: "", admin_password: "" };
 
@@ -58,6 +58,10 @@ export default function Clinicas() {
   const [clinicaEliminar, setClinicaEliminar] = useState(null);
   const [textoConfirmacion, setTextoConfirmacion] = useState("");
 
+  // Modal de configuración de módulos
+  const [showModulosModal, setShowModulosModal] = useState(false);
+  const [allModulos, setAllModulos] = useState([]);
+
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
@@ -83,6 +87,7 @@ export default function Clinicas() {
   const abrirEditar = (c) => {
     setForm({ nombre: c.nombre, slug: c.slug,
               tipo_id: c.tipo_id != null ? String(c.tipo_id) : "",
+              es_pediatrica: !!c.es_pediatrica,
               email: c.email||"", telefono: c.telefono||"",
               direccion: c.direccion||"", ciudad: c.ciudad||"",
               pais: c.pais||"PE", ruc: c.ruc||"",
@@ -131,6 +136,28 @@ export default function Clinicas() {
       setClinicaEliminar(null);
       setTextoConfirmacion("");
       cargar();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  /* ── Módulos por categoría ── */
+  const abrirModulosConfig = async () => {
+    try {
+      const r = await api.get("/clinicas/modulos/configuracion");
+      setAllModulos(r.data.data);
+      setShowModulosModal(true);
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const toggleModuloFlag = async (modId, campo, valor) => {
+    try {
+      await api.put(`/clinicas/modulos/${modId}/configuracion`, { [campo]: valor });
+      setAllModulos((prev) =>
+        prev.map((m) => (m.id === modId ? { ...m, [campo]: valor ? 1 : 0 } : m))
+      );
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     }
@@ -197,6 +224,22 @@ export default function Clinicas() {
             <div style={{ fontSize: 22, fontWeight: 700, color: C.muted, lineHeight: 1 }}>{total - activas}</div>
             <div style={{ fontSize: 11, color: C.muted, marginTop: 2 }}>Inactivas</div>
           </div>
+
+          <button
+            onClick={abrirModulosConfig}
+            style={{
+              background: "rgba(16,185,129,.12)", border: "1px solid rgba(16,185,129,.25)",
+              borderRadius: 10, padding: "10px 20px",
+              color: C.success, fontWeight: 600, fontSize: 14, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 8,
+              transition: "opacity .2s",
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = ".85"}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+          >
+            <i className="bi bi-puzzle-fill" />
+            Módulos
+          </button>
 
           <button
             onClick={abrirNuevo}
@@ -329,6 +372,16 @@ export default function Clinicas() {
                           <span style={{ fontSize: 11, color: c.tipo_color, fontWeight: 600 }}>{c.tipo_nombre}</span>
                         </div>
                       )}
+                      {c.es_pediatrica ? (
+                        <div style={{
+                          display: "inline-flex", alignItems: "center", gap: 5,
+                          background: "rgba(156,39,176,.12)", border: "1px solid rgba(156,39,176,.3)",
+                          borderRadius: 6, padding: "2px 8px",
+                        }}>
+                          <i className="bi bi-balloon-heart-fill" style={{ fontSize: 11, color: "#9C27B0" }} />
+                          <span style={{ fontSize: 11, color: "#9C27B0", fontWeight: 600 }}>Pediátrica</span>
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                   <span style={{
@@ -596,6 +649,60 @@ export default function Clinicas() {
                           })}
                         </div>
                       </Field>
+                    </div>
+
+                    {/* ── Switch Normal / Pediátrica ── */}
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 16,
+                        background: form.es_pediatrica ? "rgba(156,39,176,.1)" : "rgba(33,150,243,.06)",
+                        border: `1px solid ${form.es_pediatrica ? "rgba(156,39,176,.3)" : C.border}`,
+                        borderRadius: 12, padding: "14px 20px",
+                        transition: "all .25s",
+                      }}>
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                          background: form.es_pediatrica
+                            ? "linear-gradient(135deg, #9C27B0, #7B1FA2)"
+                            : `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          transition: "background .25s",
+                        }}>
+                          <i className={`bi ${form.es_pediatrica ? "bi-balloon-heart-fill" : "bi-building-fill"}`}
+                             style={{ fontSize: 18, color: "#fff" }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>
+                            {form.es_pediatrica ? "Clínica Pediátrica" : "Clínica Normal (Adultos)"}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                            {form.es_pediatrica
+                              ? "Módulos pediátricos habilitados (curvas de crecimiento, etc.)"
+                              : "Módulos estándar para atención de adultos"}
+                          </div>
+                        </div>
+                        {/* Switch toggle */}
+                        <div
+                          onClick={() => setForm({ ...form, es_pediatrica: !form.es_pediatrica })}
+                          style={{
+                            width: 52, height: 28, borderRadius: 14, cursor: "pointer",
+                            background: form.es_pediatrica
+                              ? "linear-gradient(135deg, #9C27B0, #7B1FA2)"
+                              : "rgba(148,163,184,.3)",
+                            position: "relative", transition: "background .25s",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div style={{
+                            width: 22, height: 22, borderRadius: "50%",
+                            background: "#fff", position: "absolute",
+                            top: 3,
+                            left: form.es_pediatrica ? 27 : 3,
+                            transition: "left .25s",
+                            boxShadow: "0 2px 6px rgba(0,0,0,.25)",
+                          }} />
+                        </div>
+                      </div>
                     </div>
 
                     <Field label="Email">
@@ -888,6 +995,174 @@ export default function Clinicas() {
               >
                 <i className="bi bi-trash-fill" />
                 Eliminar permanentemente
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Configuración de Módulos por Categoría ───── */}
+      {showModulosModal && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1050,
+          background: "rgba(0,0,0,.65)", backdropFilter: "blur(4px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 18, width: "100%", maxWidth: 720,
+            maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 14,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "linear-gradient(135deg, #10b981, #059669)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-puzzle-fill" style={{ color: "#fff", fontSize: 17 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 17 }}>
+                  Módulos por Categoría
+                </h5>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  Configura qué módulos aparecen en clínicas normales y/o pediátricas
+                </span>
+              </div>
+              <button
+                onClick={() => setShowModulosModal(false)}
+                style={{
+                  background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                  borderRadius: 8, width: 34, height: 34,
+                  color: C.muted, cursor: "pointer", fontSize: 16,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+
+            {/* Body: tabla de módulos */}
+            <div style={{ padding: "20px 28px" }}>
+              {/* Leyenda */}
+              <div style={{
+                display: "flex", gap: 16, marginBottom: 18, flexWrap: "wrap",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                  <div style={{ width: 14, height: 14, borderRadius: 4, background: C.accent }} />
+                  <span style={{ color: C.muted }}>Normal (Adultos)</span>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13 }}>
+                  <div style={{ width: 14, height: 14, borderRadius: 4, background: "#9C27B0" }} />
+                  <span style={{ color: C.muted }}>Pediátrica</span>
+                </div>
+              </div>
+
+              <div style={{
+                borderRadius: 12, overflow: "hidden",
+                border: `1px solid ${C.border}`,
+              }}>
+                {/* Header de tabla */}
+                <div style={{
+                  display: "grid", gridTemplateColumns: "1fr 100px 100px",
+                  background: "rgba(255,255,255,.03)", padding: "10px 16px",
+                  borderBottom: `1px solid ${C.border}`,
+                }}>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    Módulo
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: C.accent, textTransform: "uppercase", letterSpacing: ".05em", textAlign: "center" }}>
+                    Normal
+                  </span>
+                  <span style={{ fontSize: 11, fontWeight: 700, color: "#9C27B0", textTransform: "uppercase", letterSpacing: ".05em", textAlign: "center" }}>
+                    Pediátrica
+                  </span>
+                </div>
+
+                {/* Filas */}
+                {allModulos.map((m, idx) => (
+                  <div key={m.id} style={{
+                    display: "grid", gridTemplateColumns: "1fr 100px 100px",
+                    padding: "10px 16px", alignItems: "center",
+                    background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,.02)",
+                    borderBottom: idx < allModulos.length - 1 ? `1px solid ${C.border}` : "none",
+                  }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                      <i className={`bi ${m.icono}`} style={{ fontSize: 15, color: C.accent, width: 20, textAlign: "center" }} />
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{m.nombre}</div>
+                        <div style={{ fontSize: 11, color: C.muted, fontFamily: "monospace" }}>{m.clave}</div>
+                      </div>
+                    </div>
+
+                    {/* Toggle Normal */}
+                    <div style={{ display: "flex", justifyContent: "center" }}>
+                      <div
+                        onClick={() => toggleModuloFlag(m.id, "para_normal", !m.para_normal)}
+                        style={{
+                          width: 42, height: 24, borderRadius: 12, cursor: "pointer",
+                          background: m.para_normal
+                            ? `linear-gradient(135deg, ${C.accent}, ${C.accentD})`
+                            : "rgba(148,163,184,.25)",
+                          position: "relative", transition: "background .2s",
+                        }}
+                      >
+                        <div style={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          background: "#fff", position: "absolute",
+                          top: 3, left: m.para_normal ? 21 : 3,
+                          transition: "left .2s",
+                          boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+                        }} />
+                      </div>
+                    </div>
+
+                    {/* Toggle Pediátrica */}
+                    <div style={{ display: "flex", justifyContent: "center" }}>
+                      <div
+                        onClick={() => toggleModuloFlag(m.id, "para_pediatrica", !m.para_pediatrica)}
+                        style={{
+                          width: 42, height: 24, borderRadius: 12, cursor: "pointer",
+                          background: m.para_pediatrica
+                            ? "linear-gradient(135deg, #9C27B0, #7B1FA2)"
+                            : "rgba(148,163,184,.25)",
+                          position: "relative", transition: "background .2s",
+                        }}
+                      >
+                        <div style={{
+                          width: 18, height: 18, borderRadius: "50%",
+                          background: "#fff", position: "absolute",
+                          top: 3, left: m.para_pediatrica ? 21 : 3,
+                          transition: "left .2s",
+                          boxShadow: "0 1px 4px rgba(0,0,0,.3)",
+                        }} />
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: "16px 28px", borderTop: `1px solid ${C.border}`,
+              display: "flex", justifyContent: "flex-end",
+            }}>
+              <button
+                onClick={() => setShowModulosModal(false)}
+                style={{
+                  background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                  border: "none", borderRadius: 9, padding: "10px 24px",
+                  color: "#fff", fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  boxShadow: `0 4px 14px rgba(33,150,243,.35)`,
+                }}
+              >
+                Listo
               </button>
             </div>
           </div>
