@@ -50,8 +50,8 @@ router.post("/", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     const { nombre, codigo_cie, descripcion_cie, diagnosticos_secundarios } = req.body;
 
-    if (!nombre || !codigo_cie || !descripcion_cie) {
-      return res.status(400).json({ ok: false, msg: "nombre, codigo_cie y descripcion_cie son requeridos" });
+    if (!nombre || !codigo_cie) {
+      return res.status(400).json({ ok: false, msg: "nombre y codigo_cie son requeridos" });
     }
 
     const [r] = await pool.query(

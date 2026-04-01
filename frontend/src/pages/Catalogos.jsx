@@ -366,8 +366,8 @@ function CatalogoDiagnosticos() {
   };
 
   const guardar = async () => {
-    if (!form.nombre || !form.codigo_cie || !form.descripcion_cie) {
-      setAlert({ t: "danger", m: "Nombre, código CIE y descripción son obligatorios" });
+    if (!form.nombre || !form.codigo_cie) {
+      setAlert({ t: "danger", m: "Nombre y código CIE son obligatorios" });
       return;
     }
     setSaving(true);
