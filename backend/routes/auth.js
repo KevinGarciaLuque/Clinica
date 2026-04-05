@@ -66,14 +66,28 @@ router.post("/login", async (req, res) => {
 
     const esSuper = user.tipo === "SUPER_ADMIN";
 
-    // Obtener nombre de la clínica si tiene clinica_id
+    // Obtener nombre e info de licencia de la clínica
     let clinicaNombre = null;
+    let licencia_info = null;
     if (user.clinica_id) {
       const [clinicaRows] = await pool.query(
-        "SELECT nombre FROM clinicas WHERE id=? LIMIT 1",
+        "SELECT nombre, plan_tipo, licencia_inicio, licencia_fin FROM clinicas WHERE id=? LIMIT 1",
         [user.clinica_id]
       );
-      if (clinicaRows.length) clinicaNombre = clinicaRows[0].nombre;
+      if (clinicaRows.length) {
+        clinicaNombre = clinicaRows[0].nombre;
+        const { plan_tipo, licencia_inicio, licencia_fin } = clinicaRows[0];
+        const fin  = licencia_fin ? new Date(licencia_fin) : null;
+        const ahora = new Date();
+        const dias  = fin ? Math.ceil((fin - ahora) / 86400000) : null;
+        licencia_info = {
+          plan_tipo:       plan_tipo || "trial",
+          licencia_inicio: licencia_inicio || null,
+          licencia_fin:    licencia_fin    || null,
+          dias_restantes:  dias,
+          vencida:         fin ? fin < ahora : false,
+        };
+      }
     }
 
     const token = jwt.sign(
@@ -90,6 +104,7 @@ router.post("/login", async (req, res) => {
     res.json({
       ok: true,
       token,
+      licencia_info,
       usuario: {
         id: user.id,
         clinica_id: user.clinica_id || null,

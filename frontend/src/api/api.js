@@ -41,7 +41,10 @@ api.interceptors.response.use(
       localStorage.removeItem("user");
       window.location.href = "/login";
     }
-
+    if (error.response?.status === 402 && error.response?.data?.licencia_vencida) {
+      // Notificar al resto de la app que la licencia venció
+      window.dispatchEvent(new CustomEvent("licenciaVencida", { detail: error.response.data }));
+    }
     return Promise.reject(error);
   }
 );

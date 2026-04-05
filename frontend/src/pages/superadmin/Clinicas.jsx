@@ -62,6 +62,12 @@ export default function Clinicas() {
   const [showModulosModal, setShowModulosModal] = useState(false);
   const [allModulos, setAllModulos] = useState([]);
 
+  // Modal de gestión de licencia
+  const [showLicenciaModal, setShowLicenciaModal] = useState(false);
+  const [clinicaLicencia, setClinicaLicencia]     = useState(null);
+  const [licenciaForm, setLicenciaForm]           = useState({ plan_tipo: "anual", inicio_manual: "", notas: "" });
+  const [licenciaGuardando, setLicenciaGuardando] = useState(false);
+
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
@@ -166,6 +172,41 @@ export default function Clinicas() {
   const filtradas = clinicas.filter((c) =>
     `${c.nombre} ${c.slug}`.toLowerCase().includes(busqueda.toLowerCase())
   );
+
+  /* ── Helpers de licencia ── */
+  const getLicenciaStatus = (c) => {
+    if (!c.licencia_fin) return { label: "Sin licencia", color: C.muted, bg: "rgba(148,163,184,.08)", icon: "bi-slash-circle", tipo: "ninguna" };
+    const fin   = new Date(c.licencia_fin);
+    const ahora = new Date();
+    const dias  = Math.ceil((fin - ahora) / 86400000);
+    if (dias <= 0)  return { label: "Vencida",         color: "#ef4444", bg: "rgba(239,68,68,.1)",   icon: "bi-x-circle-fill",           tipo: "vencida",    dias: 0 };
+    if (dias <= 7)  return { label: `${dias}d crítico`, color: "#ef4444", bg: "rgba(239,68,68,.08)",  icon: "bi-exclamation-circle-fill",  tipo: "critica",    dias };
+    if (dias <= 30) return { label: `${dias}d rest.`,   color: "#f59e0b", bg: "rgba(245,158,11,.08)", icon: "bi-exclamation-triangle-fill",tipo: "por_vencer", dias };
+    return              { label: `${dias}d`,            color: "#10b981", bg: "rgba(16,185,129,.08)", icon: "bi-check-circle-fill",        tipo: "activa",     dias };
+  };
+
+  const PLAN_LABEL = { trial: "Prueba", semestral: "Semestral", anual: "Anual" };
+
+  const abrirLicencia = (c) => {
+    setClinicaLicencia(c);
+    setLicenciaForm({ plan_tipo: c.plan_tipo || "anual", inicio_manual: "", notas: "" });
+    setShowLicenciaModal(true);
+    setError("");
+  };
+
+  const guardarLicencia = async () => {
+    setLicenciaGuardando(true);
+    setError("");
+    try {
+      await api.post(`/clinicas/${clinicaLicencia.id}/licencia`, licenciaForm);
+      setShowLicenciaModal(false);
+      cargar();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    } finally {
+      setLicenciaGuardando(false);
+    }
+  };
 
   const total   = clinicas.length;
   const activas = clinicas.filter((c) => c.activo).length;
@@ -384,16 +425,32 @@ export default function Clinicas() {
                       ) : null}
                     </div>
                   </div>
-                  <span style={{
-                    padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
-                    background: c.activo ? "rgba(16,185,129,.15)" : "rgba(148,163,184,.1)",
-                    color:      c.activo ? C.success : C.muted,
-                    border:     `1px solid ${c.activo ? "rgba(16,185,129,.3)" : C.border}`,
-                    whiteSpace: "nowrap",
-                  }}>
-                    <i className={`bi bi-${c.activo ? "check-circle" : "x-circle"}-fill me-1`} />
-                    {c.activo ? "Activa" : "Inactiva"}
-                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                    {/* Badge estado */}
+                    <span style={{
+                      padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
+                      background: c.activo ? "rgba(16,185,129,.15)" : "rgba(148,163,184,.1)",
+                      color:      c.activo ? C.success : C.muted,
+                      border:     `1px solid ${c.activo ? "rgba(16,185,129,.3)" : C.border}`,
+                      whiteSpace: "nowrap",
+                    }}>
+                      <i className={`bi bi-${c.activo ? "check-circle" : "x-circle"}-fill me-1`} />
+                      {c.activo ? "Activa" : "Inactiva"}
+                    </span>
+                    {/* Badge licencia */}
+                    {(() => { const ls = getLicenciaStatus(c); return (
+                      <span style={{
+                        padding: "3px 8px", borderRadius: 20, fontSize: 10, fontWeight: 700,
+                        background: ls.bg,
+                        color: ls.color,
+                        border: `1px solid ${ls.color}40`,
+                        whiteSpace: "nowrap", letterSpacing: ".02em",
+                      }}>
+                        <i className={`bi ${ls.icon} me-1`} />
+                        {PLAN_LABEL[c.plan_tipo] || "Trial"} · {ls.label}
+                      </span>
+                    ); })()}
+                  </div>
                 </div>
 
                 {/* Cuerpo */}
@@ -432,6 +489,22 @@ export default function Clinicas() {
                   padding: "12px 20px", borderTop: `1px solid ${C.border}`,
                   display: "flex", gap: 10,
                 }}>
+                  <button
+                    onClick={() => abrirLicencia(c)}
+                    title="Gestionar licencia"
+                    style={{
+                      background: (() => { const ls = getLicenciaStatus(c); return ls.bg; })(),
+                      border: (() => { const ls = getLicenciaStatus(c); return `1px solid ${ls.color}40`; })(),
+                      borderRadius: 8, padding: "8px 10px",
+                      color: (() => { const ls = getLicenciaStatus(c); return ls.color; })(),
+                      fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.opacity = ".75"}
+                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                  >
+                    <i className="bi bi-key-fill" />
+                  </button>
                   <button
                     onClick={() => abrirEditar(c)}
                     style={{
@@ -1163,6 +1236,200 @@ export default function Clinicas() {
                 }}
               >
                 Listo
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal de Gestión de Licencia ────────────────────── */}
+      {showLicenciaModal && clinicaLicencia && (
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 1070,
+          background: "rgba(0,0,0,.7)", backdropFilter: "blur(5px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 18, width: "100%", maxWidth: 520,
+            boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+          }}>
+            {/* Header */}
+            <div style={{
+              padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 14,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-key-fill" style={{ color: "#fff", fontSize: 17 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 17 }}>
+                  Gestionar Licencia
+                </h5>
+                <span style={{ fontSize: 12, color: C.muted }}>
+                  {clinicaLicencia.nombre}
+                </span>
+              </div>
+              <button
+                onClick={() => { setShowLicenciaModal(false); setError(""); }}
+                style={{
+                  background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                  borderRadius: 8, width: 34, height: 34,
+                  color: C.muted, cursor: "pointer", fontSize: 16,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+
+            {/* Body */}
+            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
+              {error && (
+                <div style={{
+                  background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)",
+                  borderRadius: 10, padding: "12px 16px", color: "#f87171",
+                  display: "flex", alignItems: "center", gap: 10, fontSize: 14,
+                }}>
+                  <i className="bi bi-exclamation-triangle-fill" /> {error}
+                </div>
+              )}
+
+              {/* Estado actual */}
+              {(() => {
+                const ls = getLicenciaStatus(clinicaLicencia);
+                const fin = clinicaLicencia.licencia_fin
+                  ? new Date(clinicaLicencia.licencia_fin).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" })
+                  : "—";
+                return (
+                  <div style={{
+                    background: `${ls.bg}`, border: `1px solid ${ls.color}30`,
+                    borderRadius: 12, padding: "14px 18px",
+                    display: "flex", alignItems: "center", gap: 14,
+                  }}>
+                    <i className={`bi ${ls.icon}`} style={{ color: ls.color, fontSize: 22 }} />
+                    <div>
+                      <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Estado actual</div>
+                      <div style={{ fontSize: 14, fontWeight: 700, color: ls.color }}>
+                        {PLAN_LABEL[clinicaLicencia.plan_tipo] || "Trial"} — {ls.tipo === "vencida" ? "Vencida" : ls.tipo === "activa" ? `${ls.dias} días restantes` : ls.label}
+                      </div>
+                      <div style={{ fontSize: 12, color: C.muted }}>
+                        Vence: <strong style={{ color: C.text }}>{fin}</strong>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {/* Selector de plan */}
+              <div>
+                <label style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10, display: "block" }}>
+                  Seleccionar nuevo plan
+                </label>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                  {[
+                    { key: "trial",     label: "Prueba",    sub: "14 días",   icon: "bi-clock-history",   color: "#f59e0b" },
+                    { key: "semestral", label: "Semestral", sub: "6 meses",   icon: "bi-calendar2-check", color: C.accent },
+                    { key: "anual",     label: "Anual",     sub: "12 meses",  icon: "bi-award-fill",      color: "#10b981", rec: true },
+                  ].map(p => {
+                    const sel = licenciaForm.plan_tipo === p.key;
+                    return (
+                      <button
+                        key={p.key}
+                        type="button"
+                        onClick={() => setLicenciaForm({ ...licenciaForm, plan_tipo: p.key })}
+                        style={{
+                          background: sel ? `${p.color}20` : "rgba(255,255,255,.03)",
+                          border: `2px solid ${sel ? p.color : C.border}`,
+                          borderRadius: 12, padding: "14px 10px", cursor: "pointer",
+                          textAlign: "center", transition: "all .18s", position: "relative",
+                        }}
+                      >
+                        {p.rec && (
+                          <div style={{
+                            position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)",
+                            background: p.color, color: "#fff", fontSize: 9, fontWeight: 700,
+                            borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap",
+                          }}>
+                            RECOMENDADO
+                          </div>
+                        )}
+                        <i className={`bi ${p.icon}`} style={{ color: p.color, fontSize: 24, display: "block", marginBottom: 6 }} />
+                        <div style={{ fontSize: 13, fontWeight: 700, color: sel ? p.color : C.text }}>{p.label}</div>
+                        <div style={{ fontSize: 11, color: C.muted }}>{p.sub}</div>
+                        {sel && <i className="bi bi-check-circle-fill" style={{ color: p.color, fontSize: 14, position: "absolute", top: 8, right: 8 }} />}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Fecha de inicio (opcional) */}
+              <Field label="Inicio del plan" hint="(vacío = hoy)">
+                <input
+                  type="date"
+                  style={inputSt}
+                  value={licenciaForm.inicio_manual}
+                  onChange={(e) => setLicenciaForm({ ...licenciaForm, inicio_manual: e.target.value })}
+                  onFocus={(e) => e.target.style.borderColor = C.accent}
+                  onBlur={(e)  => e.target.style.borderColor = C.border}
+                />
+              </Field>
+
+              {/* Notas */}
+              <Field label="Notas internas" hint="(opcional)">
+                <textarea
+                  style={{ ...inputSt, resize: "vertical", minHeight: 64 }}
+                  placeholder="Ej: Pago recibido por transferencia…"
+                  value={licenciaForm.notas}
+                  onChange={(e) => setLicenciaForm({ ...licenciaForm, notas: e.target.value })}
+                  onFocus={(e) => e.target.style.borderColor = C.accent}
+                  onBlur={(e)  => e.target.style.borderColor = C.border}
+                />
+              </Field>
+            </div>
+
+            {/* Footer */}
+            <div style={{
+              padding: "18px 28px", borderTop: `1px solid ${C.border}`,
+              display: "flex", justifyContent: "flex-end", gap: 12,
+            }}>
+              <button
+                type="button"
+                onClick={() => { setShowLicenciaModal(false); setError(""); }}
+                style={{
+                  background: "transparent", border: `1px solid ${C.border}`,
+                  borderRadius: 9, padding: "10px 22px",
+                  color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                  transition: "border .2s, color .2s",
+                }}
+                onMouseEnter={(e) => { e.currentTarget.style.borderColor=C.accent; e.currentTarget.style.color=C.accent; }}
+                onMouseLeave={(e) => { e.currentTarget.style.borderColor=C.border; e.currentTarget.style.color=C.muted; }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={guardarLicencia}
+                disabled={licenciaGuardando}
+                style={{
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  border: "none", borderRadius: 9, padding: "10px 28px",
+                  color: "#fff", fontSize: 14, fontWeight: 600, cursor: licenciaGuardando ? "wait" : "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                  boxShadow: "0 4px 14px rgba(245,158,11,.35)",
+                  transition: "opacity .2s",
+                  opacity: licenciaGuardando ? 0.7 : 1,
+                }}
+                onMouseEnter={(e) => !licenciaGuardando && (e.currentTarget.style.opacity = ".85")}
+                onMouseLeave={(e) => !licenciaGuardando && (e.currentTarget.style.opacity = "1")}
+              >
+                <i className={`bi bi-${licenciaGuardando ? "hourglass-split" : "check-lg"}`} />
+                {licenciaGuardando ? "Guardando..." : "Activar plan"}
               </button>
             </div>
           </div>

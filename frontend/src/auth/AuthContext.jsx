@@ -15,6 +15,12 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : [];
   });
 
+  // Info de licencia de la clínica
+  const [licenciaInfo, setLicenciaInfo] = useState(() => {
+    const raw = localStorage.getItem("licencia_info");
+    return raw ? JSON.parse(raw) : null;
+  });
+
   const isAuth = !!user;
 
   /** Carga (o recarga) los módulos del usuario autenticado */
@@ -40,11 +46,15 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post("/auth/login", { email, password });
-    const { token, usuario } = res.data;
+    const { token, usuario, licencia_info } = res.data;
 
     localStorage.setItem("token", token);
     localStorage.setItem("user", JSON.stringify(usuario));
+    if (licencia_info) {
+      localStorage.setItem("licencia_info", JSON.stringify(licencia_info));
+    }
     setUser(usuario);
+    setLicenciaInfo(licencia_info || null);
 
     // Cargar módulos inmediatamente tras login
     await cargarModulos();
@@ -56,12 +66,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
     localStorage.removeItem("modulos");
+    localStorage.removeItem("licencia_info");
     setUser(null);
     setModulos([]);
+    setLicenciaInfo(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, login, logout, cargarModulos }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, logout, cargarModulos }}>
       {children}
     </AuthContext.Provider>
   );

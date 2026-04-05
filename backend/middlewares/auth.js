@@ -73,7 +73,25 @@ function auth(...roles) {
         }
       }
 
-      // 6. Adjuntar usuario al request para uso en rutas
+      // 6. Verificar licencia para usuarios de clínica (no SUPER_ADMIN)
+      if (user.tipo !== "SUPER_ADMIN" && user.clinica_id) {
+        const [licRows] = await pool.query(
+          "SELECT licencia_fin FROM clinicas WHERE id=? LIMIT 1",
+          [user.clinica_id]
+        );
+        if (licRows.length && licRows[0].licencia_fin) {
+          const fin = new Date(licRows[0].licencia_fin);
+          if (fin < new Date()) {
+            return res.status(402).json({
+              ok: false,
+              msg: "Tu licencia ha vencido. Contacta al administrador del sistema para renovar tu plan.",
+              licencia_vencida: true,
+            });
+          }
+        }
+      }
+
+      // 7. Adjuntar usuario al request para uso en rutas
       req.user = {
         id: user.id,
         clinica_id: user.clinica_id,

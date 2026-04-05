@@ -106,6 +106,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
       const [rows] = await pool.query(`
         SELECT c.id, c.nombre, c.slug, c.tipo_id, c.es_pediatrica, c.logo_url, c.email, c.telefono,
                c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
+               c.plan_tipo, c.licencia_inicio, c.licencia_fin,
                t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
         FROM clinicas c
         LEFT JOIN tipos_clinica t ON t.id = c.tipo_id
@@ -117,6 +118,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
     const [rows] = await pool.query(`
       SELECT c.id, c.nombre, c.slug, c.tipo_id, c.es_pediatrica, c.logo_url, c.email, c.telefono,
              c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
+             c.plan_tipo, c.licencia_inicio, c.licencia_fin,
              t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
       FROM clinicas c
       LEFT JOIN tipos_clinica t ON t.id = c.tipo_id
@@ -166,10 +168,10 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
     // Convertir tipo_id a número o null
     const tipoIdFinal = tipo_id && tipo_id !== "" ? parseInt(tipo_id, 10) : null;
 
-    // Insertar clínica
+    // Insertar clínica con trial automático de 14 días
     const [r] = await pool.query(
-      `INSERT INTO clinicas (nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      `INSERT INTO clinicas (nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, plan_tipo, licencia_inicio, licencia_fin)
+       VALUES (?,?,?,?,?,?,?,?,?,?, 'trial', NOW(), DATE_ADD(NOW(), INTERVAL 14 DAY))`,
       [nombre, slug, tipoIdFinal, es_pediatrica ? 1 : 0, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
     );
     const clinicaId = r.insertId;
@@ -267,6 +269,95 @@ router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
     // Solo desactivar
     await pool.query("UPDATE clinicas SET activo=0 WHERE id=?", [req.params.id]);
     res.json({ ok: true, msg: "Clínica desactivada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════════════════════
+//  LICENCIAS
+// ══════════════════════════════════════════════════════════════════════════
+
+// GET /api/clinicas/:id/licencia  → info de licencia de una clínica
+router.get("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT plan_tipo, licencia_inicio, licencia_fin FROM clinicas WHERE id=? LIMIT 1`,
+      [req.params.id]
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    const { plan_tipo, licencia_inicio, licencia_fin } = rows[0];
+    const fin   = licencia_fin ? new Date(licencia_fin) : null;
+    const ahora = new Date();
+    const dias  = fin ? Math.ceil((fin - ahora) / 86400000) : null;
+
+    // Historial
+    const [historial] = await pool.query(
+      `SELECT lh.plan_tipo, lh.inicio, lh.fin, lh.notas, lh.creado_en,
+              u.nombres, u.apellidos
+       FROM licencias_historial lh
+       LEFT JOIN usuarios u ON u.id = lh.superadmin_id
+       WHERE lh.clinica_id=?
+       ORDER BY lh.creado_en DESC
+       LIMIT 10`,
+      [req.params.id]
+    );
+
+    res.json({
+      ok: true,
+      data: {
+        plan_tipo:       plan_tipo || "trial",
+        licencia_inicio: licencia_inicio || null,
+        licencia_fin:    licencia_fin    || null,
+        dias_restantes:  dias,
+        vencida:         fin ? fin < ahora : false,
+        historial,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /api/clinicas/:id/licencia  → asignar o renovar licencia (SUPER_ADMIN)
+router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const { plan_tipo, inicio_manual, notas } = req.body;
+
+    if (!["trial","semestral","anual"].includes(plan_tipo)) {
+      return res.status(400).json({ ok: false, msg: "plan_tipo inválido. Use: trial, semestral, anual" });
+    }
+
+    // Calcular fechas
+    const inicio = inicio_manual ? new Date(inicio_manual) : new Date();
+    const fin    = new Date(inicio);
+    if      (plan_tipo === "trial")     fin.setDate(fin.getDate() + 14);
+    else if (plan_tipo === "semestral") fin.setMonth(fin.getMonth() + 6);
+    else if (plan_tipo === "anual")     fin.setFullYear(fin.getFullYear() + 1);
+
+    // Actualizar clínica
+    await pool.query(
+      `UPDATE clinicas SET plan_tipo=?, licencia_inicio=?, licencia_fin=?, activo=1 WHERE id=?`,
+      [plan_tipo, inicio, fin, req.params.id]
+    );
+
+    // Registrar en historial
+    await pool.query(
+      `INSERT INTO licencias_historial (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas)
+       VALUES (?,?,?,?,?,?)`,
+      [req.params.id, plan_tipo, inicio, fin, req.user.id, notas || null]
+    );
+
+    res.json({
+      ok: true,
+      data: {
+        plan_tipo,
+        licencia_inicio: inicio,
+        licencia_fin:    fin,
+        dias_restantes:  Math.ceil((fin - new Date()) / 86400000),
+      },
+    });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

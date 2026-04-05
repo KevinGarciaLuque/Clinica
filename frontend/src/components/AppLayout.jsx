@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Outlet } from "react-router-dom";
 import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
+import LicenciaVencidaModal from "./LicenciaVencidaModal";
 
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -11,6 +12,9 @@ export default function AppLayout() {
 
   return (
     <div style={{ height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
+
+      {/* Modal bloqueante de licencia vencida */}
+      <LicenciaVencidaModal />
 
       {/* ── Navbar fija arriba ── */}
       <NavbarApp onMenuClick={() => setMobileOpen(o => !o)} />
