@@ -283,6 +283,20 @@ router.post("/paciente/:paciente_id/antecedentes", auth("MEDICO","ENFERMERA","AD
   }
 });
 
+router.put("/antecedente/:id", auth("MEDICO","ENFERMERA","ADMIN","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    const { descripcion } = req.body;
+    await pool.query(
+      "UPDATE antecedentes_paciente SET descripcion=? WHERE id=? AND clinica_id=?",
+      [descripcion, req.params.id, cid]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 router.delete("/antecedente/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);

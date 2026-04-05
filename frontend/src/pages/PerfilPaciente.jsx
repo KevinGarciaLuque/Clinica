@@ -10,6 +10,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import api from "../api/api";
 import CurvaCrecimiento from "../components/CurvaCrecimiento";
+import AntecedentesClinico from "../components/AntecedentesClinico";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -58,6 +59,9 @@ export default function PerfilPaciente() {
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
   const [textoConfirmacion, setTextoConfirmacion] = useState("");
   const [eliminando, setEliminando] = useState(false);
+
+  // Sub-pestaña dentro de Datos Generales
+  const [subTabDatos, setSubTabDatos] = useState("paciente");
 
   // ══════════════════════════════════════════════════════════
   // CARGA INICIAL
@@ -366,7 +370,7 @@ export default function PerfilPaciente() {
         <div className="card shadow-sm">
           <div className="card-header bg-white d-flex justify-content-between align-items-center">
             <h5 className="mb-0">
-              <i className="bi bi-person-badge me-2 text-primary" />Datos del Paciente
+              <i className="bi bi-person-badge me-2 text-primary" />Expediente del Paciente
             </h5>
             <button
               className={`btn btn-sm ${editandoDatos ? "btn-outline-secondary" : "btn-outline-primary"}`}
@@ -379,184 +383,470 @@ export default function PerfilPaciente() {
               {editandoDatos ? "Cancelar" : "Editar"}
             </button>
           </div>
+
+          {/* Sub-pestañas */}
+          <div className="border-bottom bg-light">
+            <div className="d-flex" style={{ overflowX: "auto" }}>
+              {[
+                { key: "paciente",    label: "Datos Personales",     icon: "bi-person-fill" },
+                { key: "responsable", label: "Responsable / Tutor",  icon: "bi-people-fill" },
+                { key: "seguro",      label: "Seguro Médico",        icon: "bi-shield-plus" },
+                { key: "emergencia",  label: "Contacto Emergencia",  icon: "bi-telephone-forward" },
+                { key: "notas",       label: "Notas",                icon: "bi-sticky" },
+              ].map(st => (
+                <button
+                  key={st.key}
+                  className="btn rounded-0 px-3 py-2 border-0"
+                  onClick={() => setSubTabDatos(st.key)}
+                  style={{
+                    fontWeight: subTabDatos === st.key ? 600 : 400,
+                    color: subTabDatos === st.key ? "#214a87" : "#6c757d",
+                    borderBottom: subTabDatos === st.key ? "3px solid #214a87" : "3px solid transparent",
+                    fontSize: "0.85rem",
+                    whiteSpace: "nowrap",
+                    background: "transparent",
+                  }}
+                >
+                  <i className={`bi ${st.icon} me-1`} />{st.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="card-body p-4">
             {editandoDatos ? (
               <form onSubmit={guardarDatos}>
-                <div className="row g-3">
-                  {/* Foto de perfil */}
-                  <div className="col-12">
-                    <label className="form-label fw-semibold">Foto de perfil</label>
-                    <div className="d-flex align-items-center gap-3">
-                      {(fotoPreview || paciente.foto_perfil) && (
-                        <img
-                          src={fotoPreview || `${API_BASE}/uploads/${paciente.foto_perfil}`}
-                          alt="Preview"
-                          style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 12 }}
-                        />
-                      )}
-                      <div>
-                        <input
-                          type="file"
-                          ref={fotoInputRef}
-                          accept="image/*"
-                          onChange={handleFotoChange}
-                          style={{ display: "none" }}
-                        />
-                        <input
-                          type="file"
-                          ref={fotoCameraRef}
-                          accept="image/*"
-                          capture="environment"
-                          onChange={handleFotoChange}
-                          style={{ display: "none" }}
-                        />
-                        <div className="d-flex gap-2 flex-wrap">
-                          <button
-                            type="button"
-                            className="btn btn-outline-primary btn-sm"
-                            onClick={() => fotoCameraRef.current?.click()}
-                          >
-                            <i className="bi bi-camera me-1" />
-                            Tomar foto
-                          </button>
-                          <button
-                            type="button"
-                            className="btn btn-outline-secondary btn-sm"
-                            onClick={() => fotoInputRef.current?.click()}
-                          >
-                            <i className="bi bi-image me-1" />
-                            {fotoPreview ? "Cambiar foto" : "Subir desde galería"}
-                          </button>
+
+                {/* ── Sub-tab: Datos Personales ── */}
+                {subTabDatos === "paciente" && (
+                  <div className="row g-3">
+                    {/* Foto de perfil */}
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Foto de perfil</label>
+                      <div className="d-flex align-items-center gap-3">
+                        {(fotoPreview || paciente.foto_perfil) && (
+                          <img
+                            src={fotoPreview || `${API_BASE}/uploads/${paciente.foto_perfil}`}
+                            alt="Preview"
+                            style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 12 }}
+                          />
+                        )}
+                        <div>
+                          <input type="file" ref={fotoInputRef} accept="image/*" onChange={handleFotoChange} style={{ display: "none" }} />
+                          <input type="file" ref={fotoCameraRef} accept="image/*" capture="environment" onChange={handleFotoChange} style={{ display: "none" }} />
+                          <div className="d-flex gap-2 flex-wrap">
+                            <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => fotoCameraRef.current?.click()}>
+                              <i className="bi bi-camera me-1" />Tomar foto
+                            </button>
+                            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => fotoInputRef.current?.click()}>
+                              <i className="bi bi-image me-1" />{fotoPreview ? "Cambiar foto" : "Subir desde galería"}
+                            </button>
+                          </div>
+                          <small className="d-block text-muted mt-1">Puedes tomar una foto desde el celular o subir un archivo</small>
                         </div>
-                        <small className="d-block text-muted mt-1">
-                          Puedes tomar una foto desde el celular o subir un archivo
-                        </small>
+                      </div>
+                    </div>
+
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Nombres *</label>
+                      <input className="form-control" name="nombres" value={form.nombres || ""} onChange={cambioForm} required />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Apellidos *</label>
+                      <input className="form-control" name="apellidos" value={form.apellidos || ""} onChange={cambioForm} required />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">DNI / Identidad</label>
+                      <input className="form-control" name="dni" value={form.dni || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Fecha de nacimiento</label>
+                      <input className="form-control" type="date" name="fecha_nacimiento" value={form.fecha_nacimiento ? form.fecha_nacimiento.split("T")[0] : ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Sexo</label>
+                      <select className="form-select" name="sexo" value={form.sexo || ""} onChange={cambioForm}>
+                        <option value="">Seleccionar</option>
+                        <option value="M">Masculino</option>
+                        <option value="F">Femenino</option>
+                        <option value="OTRO">Otro</option>
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Grupo sanguíneo</label>
+                      <select className="form-select" name="grupo_sanguineo" value={form.grupo_sanguineo || ""} onChange={cambioForm}>
+                        <option value="">Seleccionar</option>
+                        {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g}>{g}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Estado Civil</label>
+                      <select className="form-select" name="estado_civil" value={form.estado_civil || ""} onChange={cambioForm}>
+                        <option value="">Seleccionar</option>
+                        {["Soltero(a)","Casado(a)","Unión Libre","Divorciado(a)","Viudo(a)"].map(e => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Ocupación</label>
+                      <input className="form-control" name="ocupacion" value={form.ocupacion || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Escolaridad</label>
+                      <select className="form-select" name="escolaridad" value={form.escolaridad || ""} onChange={cambioForm}>
+                        <option value="">Seleccionar</option>
+                        {["Ninguna","Primaria","Secundaria","Preparatoria","Técnico","Universidad","Posgrado"].map(e => <option key={e} value={e}>{e}</option>)}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Religión</label>
+                      <input className="form-control" name="religion" value={form.religion || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Nacionalidad</label>
+                      <input className="form-control" name="nacionalidad" value={form.nacionalidad || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Lugar de nacimiento</label>
+                      <input className="form-control" name="lugar_nacimiento" value={form.lugar_nacimiento || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Teléfono</label>
+                      <input className="form-control" name="telefono" value={form.telefono || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Email</label>
+                      <input className="form-control" type="email" name="email" value={form.email || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Dirección</label>
+                      <input className="form-control" name="direccion" value={form.direccion || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">Ciudad</label>
+                      <input className="form-control" name="ciudad" value={form.ciudad || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-6">
+                      <label className="form-label fw-semibold">País</label>
+                      <input className="form-control" name="pais" value={form.pais || ""} onChange={cambioForm} />
+                    </div>
+                  </div>
+                )}
+
+                {/* ── Sub-tab: Responsable / Tutor ── */}
+                {subTabDatos === "responsable" && (
+                  <div>
+                    <div className="alert alert-info py-2 mb-3">
+                      <i className="bi bi-info-circle me-2" />
+                      <small>Datos del padre, madre, tutor o representante legal del paciente (obligatorio para menores de edad).</small>
+                    </div>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Nombre completo del responsable</label>
+                        <input className="form-control" name="responsable_nombre" value={form.responsable_nombre || ""} onChange={cambioForm} placeholder="Nombre y apellidos" />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Parentesco</label>
+                        <select className="form-select" name="responsable_parentesco" value={form.responsable_parentesco || ""} onChange={cambioForm}>
+                          <option value="">Seleccionar</option>
+                          {["Madre","Padre","Abuelo(a)","Tío(a)","Hermano(a)","Tutor Legal","Cónyuge","Otro"].map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">DNI del responsable</label>
+                        <input className="form-control" name="responsable_dni" value={form.responsable_dni || ""} onChange={cambioForm} />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Teléfono</label>
+                        <input className="form-control" name="responsable_telefono" value={form.responsable_telefono || ""} onChange={cambioForm} />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Email</label>
+                        <input className="form-control" type="email" name="responsable_email" value={form.responsable_email || ""} onChange={cambioForm} />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Dirección</label>
+                        <input className="form-control" name="responsable_direccion" value={form.responsable_direccion || ""} onChange={cambioForm} />
                       </div>
                     </div>
                   </div>
+                )}
 
-                  {/* Campos del formulario */}
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Nombres *</label>
-                    <input className="form-control" name="nombres" value={form.nombres || ""} onChange={cambioForm} required />
+                {/* ── Sub-tab: Seguro Médico ── */}
+                {subTabDatos === "seguro" && (
+                  <div>
+                    <div className="alert alert-info py-2 mb-3">
+                      <i className="bi bi-info-circle me-2" />
+                      <small>Información del seguro médico o aseguradora del paciente.</small>
+                    </div>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Aseguradora</label>
+                        <input className="form-control" name="aseguradora" value={form.aseguradora || ""} onChange={cambioForm} placeholder="Nombre de la aseguradora" />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Número de póliza</label>
+                        <input className="form-control" name="numero_poliza" value={form.numero_poliza || ""} onChange={cambioForm} />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Tipo de seguro</label>
+                        <select className="form-select" name="tipo_seguro" value={form.tipo_seguro || ""} onChange={cambioForm}>
+                          <option value="">Seleccionar</option>
+                          {["Público","Privado","Mixto","IHSS","Otro"].map(t => <option key={t} value={t}>{t}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Vigencia del seguro</label>
+                        <input className="form-control" type="date" name="vigencia_seguro" value={form.vigencia_seguro ? form.vigencia_seguro.split("T")[0] : ""} onChange={cambioForm} />
+                      </div>
+                    </div>
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Apellidos *</label>
-                    <input className="form-control" name="apellidos" value={form.apellidos || ""} onChange={cambioForm} required />
+                )}
+
+                {/* ── Sub-tab: Contacto de Emergencia ── */}
+                {subTabDatos === "emergencia" && (
+                  <div>
+                    <div className="alert alert-warning py-2 mb-3">
+                      <i className="bi bi-exclamation-triangle me-2" />
+                      <small>Persona a contactar en caso de emergencia (diferente al responsable si es necesario).</small>
+                    </div>
+                    <div className="row g-3">
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Nombre completo</label>
+                        <input className="form-control" name="contacto_emergencia_nombre" value={form.contacto_emergencia_nombre || ""} onChange={cambioForm} placeholder="Nombre de contacto de emergencia" />
+                      </div>
+                      <div className="col-md-6">
+                        <label className="form-label fw-semibold">Teléfono de emergencia</label>
+                        <input className="form-control" name="contacto_emergencia_telefono" value={form.contacto_emergencia_telefono || ""} onChange={cambioForm} placeholder="Número de teléfono" />
+                      </div>
+                    </div>
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">DNI</label>
-                    <input className="form-control" name="dni" value={form.dni || ""} onChange={cambioForm} />
+                )}
+
+                {/* ── Sub-tab: Notas ── */}
+                {subTabDatos === "notas" && (
+                  <div>
+                    <label className="form-label fw-semibold">Notas / Observaciones generales</label>
+                    <textarea className="form-control" name="notas" rows={5} value={form.notas || ""} onChange={cambioForm} placeholder="Notas internas sobre el paciente..." style={{ resize: "vertical" }} />
                   </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Fecha de nacimiento</label>
-                    <input 
-                      className="form-control" 
-                      type="date" 
-                      name="fecha_nacimiento" 
-                      value={form.fecha_nacimiento ? form.fecha_nacimiento.split("T")[0] : ""} 
-                      onChange={cambioForm} 
-                    />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Sexo</label>
-                    <select className="form-select" name="sexo" value={form.sexo || ""} onChange={cambioForm}>
-                      <option value="">Seleccionar</option>
-                      <option value="M">Masculino</option>
-                      <option value="F">Femenino</option>
-                      <option value="OTRO">Otro</option>
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Grupo sanguíneo</label>
-                    <select className="form-select" name="grupo_sanguineo" value={form.grupo_sanguineo || ""} onChange={cambioForm}>
-                      <option value="">Seleccionar</option>
-                      {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g}>{g}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Teléfono</label>
-                    <input className="form-control" name="telefono" value={form.telefono || ""} onChange={cambioForm} />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Email</label>
-                    <input className="form-control" type="email" name="email" value={form.email || ""} onChange={cambioForm} />
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label fw-semibold">Dirección</label>
-                    <input className="form-control" name="direccion" value={form.direccion || ""} onChange={cambioForm} />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">Ciudad</label>
-                    <input className="form-control" name="ciudad" value={form.ciudad || ""} onChange={cambioForm} />
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label fw-semibold">País</label>
-                    <input className="form-control" name="pais" value={form.pais || ""} onChange={cambioForm} />
-                  </div>
-                  
-                  {/* Botón guardar */}
-                  <div className="col-12">
-                    <button type="submit" className="btn btn-primary" disabled={guardando}>
-                      {guardando ? (
-                        <><span className="spinner-border spinner-border-sm me-2" />Guardando...</>
-                      ) : (
-                        <><i className="bi bi-check-lg me-1" />Guardar cambios</>
-                      )}
-                    </button>
-                  </div>
+                )}
+
+                {/* Botón guardar (siempre visible) */}
+                <div className="mt-4 pt-3 border-top">
+                  <button type="submit" className="btn btn-primary" disabled={guardando}>
+                    {guardando ? (
+                      <><span className="spinner-border spinner-border-sm me-2" />Guardando...</>
+                    ) : (
+                      <><i className="bi bi-check-lg me-1" />Guardar cambios</>
+                    )}
+                  </button>
                 </div>
               </form>
             ) : (
-              <div className="row g-3">
-                <div className="col-md-6">
-                  <label className="text-muted small">Nombres</label>
-                  <p className="fw-semibold mb-0">{paciente.nombres}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Apellidos</label>
-                  <p className="fw-semibold mb-0">{paciente.apellidos}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">DNI</label>
-                  <p className="fw-semibold mb-0">{paciente.dni || "—"}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Fecha de nacimiento</label>
-                  <p className="fw-semibold mb-0">
-                    {paciente.fecha_nacimiento ? new Date(paciente.fecha_nacimiento).toLocaleDateString() : "—"}
-                  </p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Sexo</label>
-                  <p className="fw-semibold mb-0">
-                    {paciente.sexo === "M" ? "Masculino" : paciente.sexo === "F" ? "Femenino" : paciente.sexo || "—"}
-                  </p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Grupo sanguíneo</label>
-                  <p className="fw-semibold mb-0">{paciente.grupo_sanguineo || "—"}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Teléfono</label>
-                  <p className="fw-semibold mb-0">{paciente.telefono || "—"}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Email</label>
-                  <p className="fw-semibold mb-0">{paciente.email || "—"}</p>
-                </div>
-                <div className="col-12">
-                  <label className="text-muted small">Dirección</label>
-                  <p className="fw-semibold mb-0">{paciente.direccion || "—"}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">Ciudad</label>
-                  <p className="fw-semibold mb-0">{paciente.ciudad || "—"}</p>
-                </div>
-                <div className="col-md-6">
-                  <label className="text-muted small">País</label>
-                  <p className="fw-semibold mb-0">{paciente.pais || "—"}</p>
-                </div>
+              /* ── MODO LECTURA ── */
+              <div>
+                {/* Sub-tab: Datos Personales - lectura */}
+                {subTabDatos === "paciente" && (
+                  <div className="row g-3">
+                    <div className="col-md-4">
+                      <label className="text-muted small">Nombres</label>
+                      <p className="fw-semibold mb-0">{paciente.nombres}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Apellidos</label>
+                      <p className="fw-semibold mb-0">{paciente.apellidos}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">DNI / Identidad</label>
+                      <p className="fw-semibold mb-0">{paciente.dni || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Fecha de nacimiento</label>
+                      <p className="fw-semibold mb-0">
+                        {paciente.fecha_nacimiento ? new Date(paciente.fecha_nacimiento).toLocaleDateString() : "—"}
+                      </p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Sexo</label>
+                      <p className="fw-semibold mb-0">
+                        {paciente.sexo === "M" ? "Masculino" : paciente.sexo === "F" ? "Femenino" : paciente.sexo || "—"}
+                      </p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Grupo sanguíneo</label>
+                      <p className="fw-semibold mb-0">{paciente.grupo_sanguineo || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Estado Civil</label>
+                      <p className="fw-semibold mb-0">{paciente.estado_civil || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Ocupación</label>
+                      <p className="fw-semibold mb-0">{paciente.ocupacion || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Escolaridad</label>
+                      <p className="fw-semibold mb-0">{paciente.escolaridad || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Religión</label>
+                      <p className="fw-semibold mb-0">{paciente.religion || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Nacionalidad</label>
+                      <p className="fw-semibold mb-0">{paciente.nacionalidad || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Lugar de nacimiento</label>
+                      <p className="fw-semibold mb-0">{paciente.lugar_nacimiento || "—"}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="text-muted small">Teléfono</label>
+                      <p className="fw-semibold mb-0">{paciente.telefono || "—"}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="text-muted small">Email</label>
+                      <p className="fw-semibold mb-0">{paciente.email || "—"}</p>
+                    </div>
+                    <div className="col-12">
+                      <label className="text-muted small">Dirección</label>
+                      <p className="fw-semibold mb-0">{paciente.direccion || "—"}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="text-muted small">Ciudad</label>
+                      <p className="fw-semibold mb-0">{paciente.ciudad || "—"}</p>
+                    </div>
+                    <div className="col-md-6">
+                      <label className="text-muted small">País</label>
+                      <p className="fw-semibold mb-0">{paciente.pais || "—"}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Sub-tab: Responsable - lectura */}
+                {subTabDatos === "responsable" && (
+                  <div>
+                    {!paciente.responsable_nombre ? (
+                      <div className="text-center py-4 text-muted">
+                        <i className="bi bi-people" style={{ fontSize: "2.5rem" }} />
+                        <p className="mt-2 mb-0">No se ha registrado un responsable</p>
+                        <button className="btn btn-outline-primary btn-sm mt-2" onClick={() => { setEditandoDatos(true); setForm(paciente); }}>
+                          <i className="bi bi-plus-lg me-1" />Agregar responsable
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="text-muted small">Nombre del responsable</label>
+                          <p className="fw-semibold mb-0">{paciente.responsable_nombre}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Parentesco</label>
+                          <p className="fw-semibold mb-0">{paciente.responsable_parentesco || "—"}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">DNI del responsable</label>
+                          <p className="fw-semibold mb-0">{paciente.responsable_dni || "—"}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Teléfono</label>
+                          <p className="fw-semibold mb-0">{paciente.responsable_telefono || "—"}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Email</label>
+                          <p className="fw-semibold mb-0">{paciente.responsable_email || "—"}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Dirección</label>
+                          <p className="fw-semibold mb-0">{paciente.responsable_direccion || "—"}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-tab: Seguro - lectura */}
+                {subTabDatos === "seguro" && (
+                  <div>
+                    {!paciente.aseguradora ? (
+                      <div className="text-center py-4 text-muted">
+                        <i className="bi bi-shield-plus" style={{ fontSize: "2.5rem" }} />
+                        <p className="mt-2 mb-0">No se ha registrado seguro médico</p>
+                        <button className="btn btn-outline-primary btn-sm mt-2" onClick={() => { setEditandoDatos(true); setForm(paciente); }}>
+                          <i className="bi bi-plus-lg me-1" />Agregar seguro
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="text-muted small">Aseguradora</label>
+                          <p className="fw-semibold mb-0">{paciente.aseguradora}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Número de póliza</label>
+                          <p className="fw-semibold mb-0">{paciente.numero_poliza || "—"}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Tipo de seguro</label>
+                          <p className="fw-semibold mb-0">{paciente.tipo_seguro || "—"}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Vigencia</label>
+                          <p className="fw-semibold mb-0">
+                            {paciente.vigencia_seguro ? new Date(paciente.vigencia_seguro).toLocaleDateString() : "—"}
+                          </p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-tab: Emergencia - lectura */}
+                {subTabDatos === "emergencia" && (
+                  <div>
+                    {!paciente.contacto_emergencia_nombre ? (
+                      <div className="text-center py-4 text-muted">
+                        <i className="bi bi-telephone-forward" style={{ fontSize: "2.5rem" }} />
+                        <p className="mt-2 mb-0">No se ha registrado contacto de emergencia</p>
+                        <button className="btn btn-outline-primary btn-sm mt-2" onClick={() => { setEditandoDatos(true); setForm(paciente); }}>
+                          <i className="bi bi-plus-lg me-1" />Agregar contacto
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="row g-3">
+                        <div className="col-md-6">
+                          <label className="text-muted small">Nombre</label>
+                          <p className="fw-semibold mb-0">{paciente.contacto_emergencia_nombre}</p>
+                        </div>
+                        <div className="col-md-6">
+                          <label className="text-muted small">Teléfono de emergencia</label>
+                          <p className="fw-semibold mb-0">{paciente.contacto_emergencia_telefono || "—"}</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Sub-tab: Notas - lectura */}
+                {subTabDatos === "notas" && (
+                  <div>
+                    {!paciente.notas ? (
+                      <div className="text-center py-4 text-muted">
+                        <i className="bi bi-sticky" style={{ fontSize: "2.5rem" }} />
+                        <p className="mt-2 mb-0">No hay notas registradas</p>
+                        <button className="btn btn-outline-primary btn-sm mt-2" onClick={() => { setEditandoDatos(true); setForm(paciente); }}>
+                          <i className="bi bi-plus-lg me-1" />Agregar nota
+                        </button>
+                      </div>
+                    ) : (
+                      <div>
+                        <label className="text-muted small">Notas / Observaciones</label>
+                        <div className="bg-light rounded p-3 mt-1" style={{ whiteSpace: "pre-wrap" }}>
+                          {paciente.notas}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -567,60 +857,68 @@ export default function PerfilPaciente() {
       {/* TAB 2: HISTORIAL CLÍNICO */}
       {/* ─────────────────────────────────────────────────────── */}
       {tab === "historial" && (
-        <div className="card shadow-sm">
-          <div className="card-header bg-white d-flex justify-content-between align-items-center">
-            <h5 className="mb-0">
-              <i className="bi bi-journal-medical me-2 text-success" />Historial Clínico
-            </h5>
-            <Link to={`/consulta?paciente_id=${id}`} className="btn btn-sm btn-success">
-              <i className="bi bi-plus-lg me-1" />Nueva Consulta
-            </Link>
+        <div>
+          {/* Sección: Antecedentes del Paciente */}
+          <div className="mb-4">
+            <AntecedentesClinico pacienteId={id} sexo={paciente.sexo} />
           </div>
-          <div className="card-body">
-            {historias.length === 0 ? (
-              <div className="text-center py-5">
-                <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
-                <p className="text-muted mt-3">No hay consultas registradas</p>
-                <Link to={`/consulta?paciente_id=${id}`} className="btn btn-primary">
-                  <i className="bi bi-plus-circle me-1" />Crear primera consulta
-                </Link>
-              </div>
-            ) : (
-              <div className="list-group list-group-flush">
-                {historias.map((h) => (
-                  <div key={h.id} className="list-group-item">
-                    <div className="d-flex justify-content-between align-items-start">
-                      <div>
-                        <h6 className="mb-1">
-                          <i className="bi bi-calendar-check me-2 text-success" />
-                          {new Date(h.creado_en).toLocaleDateString('es-ES', { 
-                            year: 'numeric', month: 'long', day: 'numeric' 
-                          })} - {new Date(h.creado_en).toLocaleTimeString('es-ES', { 
-                            hour: '2-digit', minute: '2-digit' 
-                          })}
-                        </h6>
-                        <p className="mb-1 text-muted small">
-                          <strong>Médico:</strong> Dr(a). {h.med_nombres} {h.med_apellidos}
-                        </p>
-                        {h.diagnostico_cie && (
-                          <p className="mb-1">
-                            <span className="badge bg-info">{h.diagnostico_cie}</span>
+
+          {/* Sección: Consultas */}
+          <div className="card shadow-sm">
+            <div className="card-header bg-white d-flex justify-content-between align-items-center">
+              <h5 className="mb-0">
+                <i className="bi bi-journal-medical me-2 text-success" />Consultas
+              </h5>
+              <Link to={`/consulta?paciente_id=${id}`} className="btn btn-sm btn-success">
+                <i className="bi bi-plus-lg me-1" />Nueva Consulta
+              </Link>
+            </div>
+            <div className="card-body">
+              {historias.length === 0 ? (
+                <div className="text-center py-5">
+                  <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
+                  <p className="text-muted mt-3">No hay consultas registradas</p>
+                  <Link to={`/consulta?paciente_id=${id}`} className="btn btn-primary">
+                    <i className="bi bi-plus-circle me-1" />Crear primera consulta
+                  </Link>
+                </div>
+              ) : (
+                <div className="list-group list-group-flush">
+                  {historias.map((h) => (
+                    <div key={h.id} className="list-group-item">
+                      <div className="d-flex justify-content-between align-items-start">
+                        <div>
+                          <h6 className="mb-1">
+                            <i className="bi bi-calendar-check me-2 text-success" />
+                            {new Date(h.creado_en).toLocaleDateString('es-ES', { 
+                              year: 'numeric', month: 'long', day: 'numeric' 
+                            })} - {new Date(h.creado_en).toLocaleTimeString('es-ES', { 
+                              hour: '2-digit', minute: '2-digit' 
+                            })}
+                          </h6>
+                          <p className="mb-1 text-muted small">
+                            <strong>Médico:</strong> Dr(a). {h.med_nombres} {h.med_apellidos}
                           </p>
-                        )}
-                        {h.subjetivo && (
-                          <p className="mb-0 text-muted" style={{ fontSize: '0.9rem' }}>
-                            {h.subjetivo.substring(0, 100)}...
-                          </p>
-                        )}
+                          {h.diagnostico_cie && (
+                            <p className="mb-1">
+                              <span className="badge bg-info">{h.diagnostico_cie}</span>
+                            </p>
+                          )}
+                          {h.subjetivo && (
+                            <p className="mb-0 text-muted" style={{ fontSize: '0.9rem' }}>
+                              {h.subjetivo.substring(0, 100)}...
+                            </p>
+                          )}
+                        </div>
+                        <Link to={`/consulta?historia_id=${h.id}`} className="btn btn-sm btn-outline-primary">
+                          <i className="bi bi-eye me-1" />Ver
+                        </Link>
                       </div>
-                      <Link to={`/consulta?historia_id=${h.id}`} className="btn btn-sm btn-outline-primary">
-                        <i className="bi bi-eye me-1" />Ver
-                      </Link>
                     </div>
-                  </div>
-                ))}
-              </div>
-            )}
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}

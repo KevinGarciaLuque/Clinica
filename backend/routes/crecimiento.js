@@ -276,19 +276,81 @@ const WHO_PC_EDAD_F = [
   { mes: 60, L: 1, M: 48.9377, S: 0.03184 },
 ];
 
+// Peso para talla (kg) — Niños (M) — Longitud 45–110 cm (WHO 2006)
+const WHO_PESO_TALLA_M = [
+  { talla: 45, L: -0.3521, M: 2.441, S: 0.09182 },
+  { talla: 48, L: -0.3521, M: 2.948, S: 0.09007 },
+  { talla: 50, L: -0.3521, M: 3.3278, S: 0.0889 },
+  { talla: 52, L: -0.3521, M: 3.762, S: 0.08771 },
+  { talla: 55, L: -0.3521, M: 4.5467, S: 0.08592 },
+  { talla: 58, L: -0.3521, M: 5.418, S: 0.0843 },
+  { talla: 60, L: -0.3521, M: 5.9907, S: 0.08342 },
+  { talla: 62, L: -0.3521, M: 6.5251, S: 0.08279 },
+  { talla: 65, L: -0.3521, M: 7.2666, S: 0.08223 },
+  { talla: 68, L: -0.3521, M: 7.9674, S: 0.08214 },
+  { talla: 70, L: -0.3521, M: 8.4227, S: 0.08229 },
+  { talla: 72, L: -0.3521, M: 8.8697, S: 0.08254 },
+  { talla: 75, L: -0.3521, M: 9.5032, S: 0.08295 },
+  { talla: 78, L: -0.3521, M: 10.0827, S: 0.08318 },
+  { talla: 80, L: -0.3521, M: 10.4475, S: 0.08308 },
+  { talla: 82, L: -0.3521, M: 10.8321, S: 0.08273 },
+  { talla: 85, L: -0.3521, M: 11.5007, S: 0.08181 },
+  { talla: 88, L: -0.3521, M: 12.2382, S: 0.08082 },
+  { talla: 90, L: -0.3521, M: 12.7209, S: 0.08041 },
+  { talla: 92, L: -0.3521, M: 13.191, S: 0.08025 },
+  { talla: 95, L: -0.3521, M: 13.8928, S: 0.08047 },
+  { talla: 98, L: -0.3521, M: 14.6316, S: 0.08122 },
+  { talla: 100, L: -0.3521, M: 15.1637, S: 0.08198 },
+  { talla: 102, L: -0.3521, M: 15.7276, S: 0.08292 },
+  { talla: 105, L: -0.3521, M: 16.6268, S: 0.08453 },
+  { talla: 108, L: -0.3521, M: 17.5885, S: 0.08629 },
+  { talla: 110, L: -0.3521, M: 18.2689, S: 0.08755 },
+];
+
+// Peso para talla (kg) — Niñas (F) — Longitud 45–110 cm (WHO 2006)
+const WHO_PESO_TALLA_F = [
+  { talla: 45, L: -0.3833, M: 2.4607, S: 0.09029 },
+  { talla: 48, L: -0.3833, M: 2.9741, S: 0.09052 },
+  { talla: 50, L: -0.3833, M: 3.3518, S: 0.09068 },
+  { talla: 52, L: -0.3833, M: 3.7911, S: 0.09085 },
+  { talla: 55, L: -0.3833, M: 4.5498, S: 0.0911 },
+  { talla: 58, L: -0.3833, M: 5.3507, S: 0.0913 },
+  { talla: 60, L: -0.3833, M: 5.8742, S: 0.09136 },
+  { talla: 62, L: -0.3833, M: 6.3738, S: 0.09135 },
+  { talla: 65, L: -0.3833, M: 7.0812, S: 0.09119 },
+  { talla: 68, L: -0.3833, M: 7.7448, S: 0.0909 },
+  { talla: 70, L: -0.3833, M: 8.163, S: 0.09068 },
+  { talla: 72, L: -0.3833, M: 8.5679, S: 0.09043 },
+  { talla: 75, L: -0.3833, M: 9.149, S: 0.09005 },
+  { talla: 78, L: -0.3833, M: 9.7015, S: 0.08965 },
+  { talla: 80, L: -0.3833, M: 10.0891, S: 0.0894 },
+  { talla: 82, L: -0.3833, M: 10.514, S: 0.08918 },
+  { talla: 85, L: -0.3833, M: 11.2198, S: 0.08898 },
+  { talla: 88, L: -0.3833, M: 11.972, S: 0.08896 },
+  { talla: 90, L: -0.3833, M: 12.4723, S: 0.08906 },
+  { talla: 92, L: -0.3833, M: 12.9681, S: 0.08923 },
+  { talla: 95, L: -0.3833, M: 13.7146, S: 0.08963 },
+  { talla: 98, L: -0.3833, M: 14.4848, S: 0.09021 },
+  { talla: 100, L: -0.3833, M: 15.0267, S: 0.09069 },
+  { talla: 102, L: -0.3833, M: 15.6046, S: 0.09125 },
+  { talla: 105, L: -0.3833, M: 16.547, S: 0.09219 },
+  { talla: 108, L: -0.3833, M: 17.5839, S: 0.09326 },
+  { talla: 110, L: -0.3833, M: 18.3324, S: 0.09401 },
+];
+
 // ═══════════════════════════════════════════════════════════
 // FUNCIONES DE CÁLCULO Z-SCORE (Método LMS de la OMS)
 // ═══════════════════════════════════════════════════════════
 
-function interpolarLMS(tabla, edadMeses) {
-  if (edadMeses <= tabla[0].mes) return tabla[0];
-  if (edadMeses >= tabla[tabla.length - 1].mes) return tabla[tabla.length - 1];
+function interpolarLMS(tabla, valor, key = "mes") {
+  if (valor <= tabla[0][key]) return tabla[0];
+  if (valor >= tabla[tabla.length - 1][key]) return tabla[tabla.length - 1];
 
   let i = 0;
-  while (i < tabla.length - 1 && tabla[i + 1].mes < edadMeses) i++;
+  while (i < tabla.length - 1 && tabla[i + 1][key] < valor) i++;
 
   const a = tabla[i], b = tabla[i + 1];
-  const t = (edadMeses - a.mes) / (b.mes - a.mes);
+  const t = (valor - a[key]) / (b[key] - a[key]);
 
   return {
     L: a.L + t * (b.L - a.L),
@@ -323,6 +385,7 @@ function obtenerTabla(indicador, sexo) {
     "talla-edad": { M: WHO_TALLA_EDAD_M, F: WHO_TALLA_EDAD_F },
     "imc-edad":   { M: WHO_IMC_EDAD_M, F: WHO_IMC_EDAD_F },
     "pc-edad":    { M: WHO_PC_EDAD_M, F: WHO_PC_EDAD_F },
+    "peso-talla": { M: WHO_PESO_TALLA_M, F: WHO_PESO_TALLA_F },
   };
   return tablas[indicador]?.[sexo] || null;
 }
@@ -362,6 +425,14 @@ function calcularTodosZscores(edadMeses, sexo, peso, talla, imc, pc) {
     result.percentil_pc_edad = zscoreToPercentil(result.zscore_pc_edad);
   }
 
+  // Peso para talla
+  const tPT = obtenerTabla("peso-talla", sexo);
+  if (tPT && peso && talla) {
+    const lms = interpolarLMS(tPT, talla, "talla");
+    result.zscore_peso_talla = calcZscore(peso, lms);
+    result.percentil_peso_talla = zscoreToPercentil(result.zscore_peso_talla);
+  }
+
   return result;
 }
 
@@ -370,6 +441,7 @@ function generarCurvasReferencia(indicador, sexo) {
   const tabla = obtenerTabla(indicador, sexo);
   if (!tabla) return null;
 
+  const xKey = indicador === "peso-talla" ? "talla" : "mes";
   const zlines = [-3, -2, -1, 0, 1, 2, 3];
   const curves = {};
 
@@ -382,7 +454,7 @@ function generarCurvasReferencia(indicador, sexo) {
       } else {
         val = M * Math.pow(1 + L * S * z, 1 / L);
       }
-      return { mes: row.mes, valor: Math.round(val * 100) / 100 };
+      return { [xKey]: row[xKey], valor: Math.round(val * 100) / 100 };
     });
   });
 
@@ -395,6 +467,29 @@ function generarCurvasReferencia(indicador, sexo) {
 // ═══════════════════════════════════════════════════════════
 
 const ROLES = ["ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA", "SUPER_ADMIN"];
+
+// GET /api/crecimiento/referencia/:indicador/:sexo — Curvas de referencia OMS
+// ⚠️ DEBE ir ANTES de /:pacienteId para que Express no lo capture como pacienteId
+router.get("/referencia/:indicador/:sexo", auth(...ROLES), (req, res) => {
+  const { indicador, sexo } = req.params;
+  const sexoUpper = (sexo || "").toUpperCase();
+
+  if (!["M", "F"].includes(sexoUpper)) {
+    return res.status(400).json({ ok: false, msg: "Sexo debe ser M o F" });
+  }
+
+  const indicadoresValidos = ["peso-edad", "talla-edad", "imc-edad", "pc-edad", "peso-talla"];
+  if (!indicadoresValidos.includes(indicador)) {
+    return res.status(400).json({ ok: false, msg: "Indicador inválido" });
+  }
+
+  const curves = generarCurvasReferencia(indicador, sexoUpper);
+  if (!curves) {
+    return res.status(404).json({ ok: false, msg: "Datos no disponibles" });
+  }
+
+  res.json({ ok: true, data: curves });
+});
 
 // GET /api/crecimiento/:pacienteId — Obtener todas las mediciones
 router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
@@ -418,28 +513,6 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     console.error("Error GET mediciones:", err);
     res.status(500).json({ ok: false, msg: "Error al obtener mediciones" });
   }
-});
-
-// GET /api/crecimiento/referencia/:indicador/:sexo — Curvas de referencia OMS
-router.get("/referencia/:indicador/:sexo", auth(...ROLES), (req, res) => {
-  const { indicador, sexo } = req.params;
-  const sexoUpper = (sexo || "").toUpperCase();
-
-  if (!["M", "F"].includes(sexoUpper)) {
-    return res.status(400).json({ ok: false, msg: "Sexo debe ser M o F" });
-  }
-
-  const indicadoresValidos = ["peso-edad", "talla-edad", "imc-edad", "pc-edad"];
-  if (!indicadoresValidos.includes(indicador)) {
-    return res.status(400).json({ ok: false, msg: "Indicador inválido" });
-  }
-
-  const curves = generarCurvasReferencia(indicador, sexoUpper);
-  if (!curves) {
-    return res.status(404).json({ ok: false, msg: "Datos no disponibles" });
-  }
-
-  res.json({ ok: true, data: curves });
 });
 
 // POST /api/crecimiento/:pacienteId — Crear nueva medición
@@ -490,12 +563,12 @@ router.post("/:pacienteId", auth("ADMIN", "MEDICO", "SUPER_ADMIN"), async (req, 
         peso, talla, pc, imc,
         scores.zscore_peso_edad ?? null,
         scores.zscore_talla_edad ?? null,
-        null, // peso-talla se calcula aparte si se necesita
+        scores.zscore_peso_talla ?? null,
         scores.zscore_imc_edad ?? null,
         scores.zscore_pc_edad ?? null,
         scores.percentil_peso_edad ?? null,
         scores.percentil_talla_edad ?? null,
-        null,
+        scores.percentil_peso_talla ?? null,
         scores.percentil_imc_edad ?? null,
         scores.percentil_pc_edad ?? null,
         notas || null,

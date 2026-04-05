@@ -122,12 +122,26 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
       nombres, apellidos, dni, telefono, email,
       fecha_nacimiento, sexo, direccion, ciudad, pais,
       grupo_sanguineo, notas, activo,
+      // Responsable / tutor
+      responsable_nombre, responsable_parentesco, responsable_telefono,
+      responsable_email, responsable_dni, responsable_direccion,
+      // Aseguradora
+      aseguradora, numero_poliza, tipo_seguro, vigencia_seguro,
+      // Datos complementarios
+      estado_civil, ocupacion, escolaridad, religion,
+      lugar_nacimiento, nacionalidad,
+      // Contacto emergencia (ya existía en schema)
+      contacto_emergencia_nombre, contacto_emergencia_telefono,
     } = req.body;
 
     // Formatear fecha si viene en formato ISO
     let fechaFormateada = fecha_nacimiento;
     if (fecha_nacimiento && fecha_nacimiento.includes('T')) {
       fechaFormateada = fecha_nacimiento.split('T')[0];
+    }
+    let vigenciaFormateada = vigencia_seguro;
+    if (vigencia_seguro && vigencia_seguro.includes('T')) {
+      vigenciaFormateada = vigencia_seguro.split('T')[0];
     }
 
     // Verificar que el paciente existe (SUPER_ADMIN puede editar cualquiera)
@@ -145,27 +159,46 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 
     // Actualizar (usando el clinica_id del paciente para SUPER_ADMIN)
     const clinicaIdFinal = isSuperAdmin ? exists.clinica_id : clinicaId;
+
+    // Helper: convierte "" a null para campos opcionales, pero permite "0"
+    const v = (val) => (val === undefined ? undefined : (val === "" ? null : val));
+
     await pool.query(
       `UPDATE pacientes SET
-         nombres=COALESCE(?,nombres), apellidos=COALESCE(?,apellidos),
-         dni=COALESCE(?,dni), telefono=COALESCE(?,telefono), email=COALESCE(?,email),
-         fecha_nacimiento=COALESCE(?,fecha_nacimiento), sexo=COALESCE(?,sexo),
-         direccion=COALESCE(?,direccion), ciudad=COALESCE(?,ciudad), pais=COALESCE(?,pais),
-         grupo_sanguineo=COALESCE(?,grupo_sanguineo), notas=COALESCE(?,notas),
-         activo=COALESCE(?,activo)
+         nombres=?,        apellidos=?,
+         dni=?,            telefono=?,     email=?,
+         fecha_nacimiento=?,              sexo=?,
+         direccion=?,      ciudad=?,       pais=?,
+         grupo_sanguineo=?,               notas=?,
+         responsable_nombre=?,            responsable_parentesco=?,
+         responsable_telefono=?,          responsable_email=?,
+         responsable_dni=?,               responsable_direccion=?,
+         aseguradora=?,                   numero_poliza=?,
+         tipo_seguro=?,                   vigencia_seguro=?,
+         estado_civil=?,   ocupacion=?,   escolaridad=?,
+         religion=?,       lugar_nacimiento=?,  nacionalidad=?,
+         contacto_emergencia_nombre=?,    contacto_emergencia_telefono=?
        WHERE id=? AND clinica_id=?`,
       [
         nombres||null, apellidos||null,
-        dni||null, telefono||null, email||null,
-        fechaFormateada||null, sexo||null,
-        direccion||null, ciudad||null, pais||null,
-        grupo_sanguineo||null, notas||null,
-        activo ?? null,
+        v(dni), v(telefono), v(email),
+        fechaFormateada||null, v(sexo),
+        v(direccion), v(ciudad), v(pais),
+        v(grupo_sanguineo), v(notas),
+        v(responsable_nombre), v(responsable_parentesco),
+        v(responsable_telefono), v(responsable_email),
+        v(responsable_dni), v(responsable_direccion),
+        v(aseguradora), v(numero_poliza),
+        v(tipo_seguro), vigenciaFormateada||null,
+        v(estado_civil), v(ocupacion), v(escolaridad),
+        v(religion), v(lugar_nacimiento), v(nacionalidad),
+        v(contacto_emergencia_nombre), v(contacto_emergencia_telefono),
         id, clinicaIdFinal,
       ]
     );
 
-    res.json({ ok: true, msg: "Paciente actualizado" });
+    const [[updated]] = await pool.query("SELECT * FROM pacientes WHERE id=?", [id]);
+    res.json({ ok: true, paciente: updated });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
