@@ -28,7 +28,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","RECEPCIONISTA"), async (req, res) =>
                       u.creado_en
                FROM usuarios u
                LEFT JOIN especialidades e ON e.id = u.especialidad_id
-               WHERE u.clinica_id = ?`;
+               WHERE u.clinica_id = ? AND u.activo = 1`;
     const params = [clinicaId];
 
     if (tipo) { sql += " AND u.tipo = ?"; params.push(tipo); }
@@ -165,28 +165,23 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
       passwordHash = await argon2.hash(password);
     }
 
-    await pool.query(
-      `UPDATE usuarios SET
-         nombres=COALESCE(?,nombres),
-         apellidos=COALESCE(?,apellidos),
-         email=COALESCE(?,email),
-         ${passwordHash ? "password_hash=?," : ""}
-         tipo=COALESCE(?,tipo),
-         especialidad_id=COALESCE(?,especialidad_id),
-         telefono=COALESCE(?,telefono),
-         numero_colegiatura=COALESCE(?,numero_colegiatura),
-         firma_url=COALESCE(?,firma_url),
-         activo=COALESCE(?,activo)
-       WHERE id=?`,
-      [
-        nombres||null, apellidos||null, email||null,
-        ...(passwordHash ? [passwordHash] : []),
-        tipo||null, especialidad_id||null, telefono||null,
-        numero_colegiatura||null, firma_url||null,
-        activo !== undefined ? activo : null,
-        req.params.id
-      ]
-    );
+    // Construir campos dinámicamente para permitir limpiar valores (ej. especialidad_id → null)
+    const fields = [];
+    const values = [];
+    if (nombres      !== undefined) { fields.push("nombres=?");            values.push(nombres || null); }
+    if (apellidos    !== undefined) { fields.push("apellidos=?");          values.push(apellidos || null); }
+    if (email        !== undefined) { fields.push("email=?");              values.push(email || null); }
+    if (passwordHash !== undefined) { fields.push("password_hash=?");      values.push(passwordHash); }
+    if (tipo         !== undefined) { fields.push("tipo=?");               values.push(tipo || null); }
+    if (especialidad_id !== undefined) { fields.push("especialidad_id=?"); values.push(especialidad_id || null); }
+    if (telefono     !== undefined) { fields.push("telefono=?");           values.push(telefono || null); }
+    if (numero_colegiatura !== undefined) { fields.push("numero_colegiatura=?"); values.push(numero_colegiatura || null); }
+    if (firma_url    !== undefined) { fields.push("firma_url=?");          values.push(firma_url || null); }
+    if (activo       !== undefined) { fields.push("activo=?");             values.push(activo); }
+
+    if (!fields.length) return res.json({ ok: true });
+    values.push(req.params.id);
+    await pool.query(`UPDATE usuarios SET ${fields.join(", ")} WHERE id=?`, values);
 
     res.json({ ok: true });
   } catch (e) {
@@ -194,15 +189,23 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   }
 });
 
-// DELETE /api/usuarios/:id  → desactivar (no borrar)
+// DELETE /api/usuarios/:id  → eliminar permanentemente (FK en CASCADE)
 router.delete("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? null : req.user.clinica_id;
-    const sql = clinicaId
-      ? "UPDATE usuarios SET activo=0 WHERE id=? AND clinica_id=?"
-      : "UPDATE usuarios SET activo=0 WHERE id=?";
-    const params = clinicaId ? [req.params.id, clinicaId] : [req.params.id];
-    await pool.query(sql, params);
+
+    // Verificar que el usuario pertenece a la clínica del que elimina
+    const [rows] = await pool.query("SELECT id, clinica_id, tipo FROM usuarios WHERE id=? LIMIT 1", [req.params.id]);
+    if (!rows.length) return res.status(404).json({ ok: false, msg: "Usuario no encontrado" });
+    if (clinicaId && rows[0].clinica_id !== clinicaId) {
+      return res.status(403).json({ ok: false, msg: "No tienes acceso a este usuario" });
+    }
+    // Evitar que se elimine a sí mismo
+    if (rows[0].id === req.user.id) {
+      return res.status(400).json({ ok: false, msg: "No puedes eliminarte a ti mismo" });
+    }
+
+    await pool.query("DELETE FROM usuarios WHERE id=?", [req.params.id]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
