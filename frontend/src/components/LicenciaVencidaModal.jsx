@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from "react";
 import { useAuth } from "../auth/AuthContext";
+import api from "../api/api";
 
 const C = {
   bg:      "#0d1b2e",
@@ -15,19 +16,29 @@ const C = {
   accent:  "#2196f3",
   warning: "#f59e0b",
   danger:  "#ef4444",
+  success: "#10b981",
 };
 
 const PLANES_LABEL = {
-  trial:     { label: "Prueba",   color: "#f59e0b", icon: "bi-clock-history" },
+  trial:     { label: "Prueba",    color: "#f59e0b", icon: "bi-clock-history" },
   semestral: { label: "Semestral", color: "#2196f3", icon: "bi-calendar2-check" },
-  anual:     { label: "Anual",    color: "#10b981", icon: "bi-award-fill" },
+  anual:     { label: "Anual",     color: "#10b981", icon: "bi-award-fill" },
 };
+
+const PLANES = [
+  { key: "semestral", label: "Semestral", sub: "6 meses",  icon: "bi-calendar2-check", color: "#2196f3" },
+  { key: "anual",     label: "Anual",     sub: "12 meses", icon: "bi-award-fill",       color: "#10b981", rec: true },
+];
 
 export default function LicenciaVencidaModal() {
   const { user, licenciaInfo, logout } = useAuth();
-  const [visible, setVisible] = useState(false);
+  const [visible, setVisible]           = useState(false);
+  const [planSel, setPlanSel]           = useState("anual");
+  const [mensaje, setMensaje]           = useState("");
+  const [enviando, setEnviando]         = useState(false);
+  const [enviado, setEnviado]           = useState(false);
+  const [errorMsg, setErrorMsg]         = useState("");
 
-  // Mostrar si la licencia está vencida y no es SUPER_ADMIN
   useEffect(() => {
     if (user && !user.super && licenciaInfo?.vencida) {
       setVisible(true);
@@ -36,7 +47,6 @@ export default function LicenciaVencidaModal() {
     }
   }, [user, licenciaInfo]);
 
-  // También escuchar el evento 402 del interceptor de axios
   useEffect(() => {
     const handler = () => setVisible(true);
     window.addEventListener("licenciaVencida", handler);
@@ -45,12 +55,27 @@ export default function LicenciaVencidaModal() {
 
   if (!visible) return null;
 
-  const fin    = licenciaInfo?.licencia_fin ? new Date(licenciaInfo.licencia_fin) : null;
+  const fin = licenciaInfo?.licencia_fin ? new Date(licenciaInfo.licencia_fin) : null;
   const fechaVencimiento = fin
     ? fin.toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })
     : "—";
-
   const planInfo = PLANES_LABEL[licenciaInfo?.plan_tipo] || PLANES_LABEL.trial;
+
+  const handleEnviar = async () => {
+    setEnviando(true);
+    setErrorMsg("");
+    try {
+      await api.post("/clinicas/solicitar-licencia", {
+        plan_solicitado: planSel,
+        mensaje: mensaje.trim() || null,
+      });
+      setEnviado(true);
+    } catch (e) {
+      setErrorMsg(e.response?.data?.msg || "Error al enviar la solicitud");
+    } finally {
+      setEnviando(false);
+    }
+  };
 
   return (
     <div style={{
@@ -60,41 +85,51 @@ export default function LicenciaVencidaModal() {
     }}>
       <div style={{
         background: C.surface,
-        border: "2px solid rgba(239,68,68,.4)",
-        borderRadius: 20, width: "100%", maxWidth: 480,
-        boxShadow: "0 24px 80px rgba(239,68,68,.25)",
-        overflow: "hidden",
+        border: `2px solid ${enviado ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}`,
+        borderRadius: 20, width: "100%", maxWidth: 500,
+        boxShadow: `0 24px 80px ${enviado ? "rgba(16,185,129,.2)" : "rgba(239,68,68,.25)"}`,
+        overflow: "hidden", maxHeight: "95vh", overflowY: "auto",
       }}>
+
         {/* Header */}
         <div style={{
-          background: "linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.08))",
+          background: enviado
+            ? "linear-gradient(135deg, rgba(16,185,129,.15), rgba(16,185,129,.08))"
+            : "linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.08))",
           padding: "28px 32px 24px",
           textAlign: "center",
-          borderBottom: `1px solid rgba(239,68,68,.2)`,
+          borderBottom: `1px solid ${enviado ? "rgba(16,185,129,.2)" : "rgba(239,68,68,.2)"}`,
         }}>
           <div style={{
             width: 72, height: 72, borderRadius: 20, margin: "0 auto 16px",
-            background: "rgba(239,68,68,.15)", border: "2px solid rgba(239,68,68,.4)",
+            background: enviado ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)",
+            border: `2px solid ${enviado ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}`,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <i className="bi bi-lock-fill" style={{ fontSize: 30, color: C.danger }} />
+            <i
+              className={`bi ${enviado ? "bi-check-circle-fill" : "bi-lock-fill"}`}
+              style={{ fontSize: 30, color: enviado ? C.success : C.danger }}
+            />
           </div>
-          <h4 style={{ color: C.danger, margin: 0, fontWeight: 700, fontSize: 20 }}>
-            Licencia Vencida
+          <h4 style={{ color: enviado ? C.success : C.danger, margin: 0, fontWeight: 700, fontSize: 20 }}>
+            {enviado ? "Solicitud Enviada" : "Licencia Vencida"}
           </h4>
           <p style={{ color: C.muted, margin: "8px 0 0", fontSize: 13 }}>
-            El acceso a tu clínica ha sido suspendido
+            {enviado
+              ? "El administrador fue notificado y revisará tu solicitud"
+              : "El acceso a tu clínica ha sido suspendido"}
           </p>
         </div>
 
         {/* Cuerpo */}
         <div style={{ padding: "24px 32px" }}>
-          {/* Info del plan */}
+
+          {/* Info del plan vencido */}
           <div style={{
             background: "rgba(239,68,68,.06)", border: "1px solid rgba(239,68,68,.2)",
             borderRadius: 12, padding: "14px 18px", marginBottom: 20,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
               <i className={`bi ${planInfo.icon}`} style={{ color: planInfo.color, fontSize: 16 }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
                 Plan {planInfo.label}
@@ -102,8 +137,7 @@ export default function LicenciaVencidaModal() {
               <span style={{
                 marginLeft: "auto", fontSize: 11, fontWeight: 700,
                 background: "rgba(239,68,68,.15)", color: C.danger,
-                border: "1px solid rgba(239,68,68,.3)",
-                borderRadius: 6, padding: "2px 8px",
+                border: "1px solid rgba(239,68,68,.3)", borderRadius: 6, padding: "2px 8px",
               }}>
                 VENCIDO
               </span>
@@ -114,71 +148,132 @@ export default function LicenciaVencidaModal() {
             </div>
           </div>
 
-          {/* Mensaje */}
-          <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.7, margin: 0 }}>
-              Tu período de uso ha finalizado. Para continuar usando el sistema,
-              contacta al <strong style={{ color: C.text }}>administrador del sistema</strong> para
-              renovar o actualizar tu licencia.
-            </p>
-          </div>
-
-          {/* Planes disponibles */}
-          <div style={{
-            display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, marginBottom: 24,
-          }}>
-            {[
-              { key: "trial",     label: "Prueba",    sub: "14 días",  icon: "bi-clock-history",  color: "#f59e0b" },
-              { key: "semestral", label: "Semestral", sub: "6 meses",  icon: "bi-calendar2-check", color: "#2196f3" },
-              { key: "anual",     label: "Anual",     sub: "12 meses", icon: "bi-award-fill",      color: "#10b981", rec: true },
-            ].map(p => (
-              <div key={p.key} style={{
-                background: p.rec ? `${p.color}15` : "rgba(255,255,255,.03)",
-                border: `1px solid ${p.rec ? `${p.color}40` : C.border}`,
-                borderRadius: 10, padding: "10px 8px", textAlign: "center",
-                position: "relative",
-              }}>
-                {p.rec && (
-                  <div style={{
-                    position: "absolute", top: -8, left: "50%", transform: "translateX(-50%)",
-                    background: p.color, color: "#fff", fontSize: 9, fontWeight: 700,
-                    borderRadius: 4, padding: "2px 6px", whiteSpace: "nowrap",
-                  }}>
-                    RECOMENDADO
+          {!enviado ? (
+            <>
+              {/* Selector de plan */}
+              <p style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                ¿Qué plan deseas solicitar?
+              </p>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
+                {PLANES.map(p => (
+                  <div
+                    key={p.key}
+                    onClick={() => setPlanSel(p.key)}
+                    style={{
+                      background: planSel === p.key ? `${p.color}20` : "rgba(255,255,255,.03)",
+                      border: `2px solid ${planSel === p.key ? p.color : C.border}`,
+                      borderRadius: 12, padding: "14px 10px", textAlign: "center",
+                      cursor: "pointer", position: "relative",
+                      transition: "border .15s, background .15s",
+                    }}
+                  >
+                    {p.rec && (
+                      <div style={{
+                        position: "absolute", top: -9, left: "50%", transform: "translateX(-50%)",
+                        background: p.color, color: "#fff", fontSize: 9, fontWeight: 700,
+                        borderRadius: 4, padding: "2px 7px", whiteSpace: "nowrap",
+                      }}>
+                        RECOMENDADO
+                      </div>
+                    )}
+                    {planSel === p.key && (
+                      <div style={{
+                        position: "absolute", top: 6, right: 6,
+                        width: 16, height: 16, borderRadius: "50%",
+                        background: p.color,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <i className="bi bi-check" style={{ color: "#fff", fontSize: 10 }} />
+                      </div>
+                    )}
+                    <i className={`bi ${p.icon}`} style={{ color: p.color, fontSize: 22, display: "block", marginBottom: 6 }} />
+                    <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{p.label}</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{p.sub}</div>
                   </div>
-                )}
-                <i className={`bi ${p.icon}`} style={{ color: p.color, fontSize: 18, display: "block", marginBottom: 4 }} />
-                <div style={{ fontSize: 12, fontWeight: 700, color: C.text }}>{p.label}</div>
-                <div style={{ fontSize: 11, color: C.muted }}>{p.sub}</div>
+                ))}
               </div>
-            ))}
-          </div>
+
+              {/* Mensaje opcional */}
+              <p style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 8, textTransform: "uppercase", letterSpacing: ".06em" }}>
+                Mensaje al administrador <span style={{ fontWeight: 400, textTransform: "none" }}>(opcional)</span>
+              </p>
+              <textarea
+                value={mensaje}
+                onChange={e => setMensaje(e.target.value)}
+                maxLength={400}
+                rows={3}
+                placeholder="Ej: Necesito activar el plan lo antes posible, ya pagué..."
+                style={{
+                  width: "100%", background: "rgba(255,255,255,.05)",
+                  border: `1px solid ${C.border}`, borderRadius: 10,
+                  color: C.text, fontSize: 13, padding: "10px 12px",
+                  resize: "none", outline: "none", fontFamily: "inherit",
+                  boxSizing: "border-box",
+                }}
+              />
+              <div style={{ textAlign: "right", fontSize: 11, color: C.muted, marginBottom: 16 }}>
+                {mensaje.length}/400
+              </div>
+
+              {errorMsg && (
+                <div style={{
+                  background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.3)",
+                  borderRadius: 8, padding: "8px 12px", fontSize: 13, color: C.danger, marginBottom: 12,
+                }}>
+                  <i className="bi bi-exclamation-circle me-2" />
+                  {errorMsg}
+                </div>
+              )}
+
+              {/* Botón enviar */}
+              <button
+                onClick={handleEnviar}
+                disabled={enviando}
+                style={{
+                  width: "100%", padding: "12px 0",
+                  background: planSel === "anual"
+                    ? "linear-gradient(135deg, #10b981, #059669)"
+                    : "linear-gradient(135deg, #2196f3, #1565c0)",
+                  border: "none", borderRadius: 12,
+                  color: "#fff", fontSize: 14, fontWeight: 700, cursor: enviando ? "wait" : "pointer",
+                  opacity: enviando ? .7 : 1, marginBottom: 10,
+                }}
+              >
+                {enviando
+                  ? <><span className="spinner-border spinner-border-sm me-2" />Enviando...</>
+                  : <><i className="bi bi-send-fill me-2" />Solicitar plan {PLANES_LABEL[planSel]?.label}</>
+                }
+              </button>
+            </>
+          ) : (
+            /* Estado éxito */
+            <div style={{
+              background: "rgba(16,185,129,.08)", border: "1px solid rgba(16,185,129,.25)",
+              borderRadius: 12, padding: "18px 20px", textAlign: "center", marginBottom: 16,
+            }}>
+              <i className="bi bi-bell-fill" style={{ fontSize: 28, color: C.success, display: "block", marginBottom: 10 }} />
+              <p style={{ color: C.text, fontSize: 14, fontWeight: 600, margin: "0 0 6px" }}>
+                Plan <strong>{PLANES_LABEL[planSel]?.label}</strong> solicitado
+              </p>
+              <p style={{ color: C.muted, fontSize: 13, margin: 0, lineHeight: 1.6 }}>
+                El administrador del sistema recibió tu solicitud y la activará a la brevedad.
+                Cierra sesión e intenta ingresar nuevamente una vez te confirmen.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* Footer */}
-        <div style={{
-          padding: "16px 32px 24px",
-          display: "flex", flexDirection: "column", gap: 10,
-          borderTop: `1px solid ${C.border}`,
-        }}>
-          <div style={{
-            background: "rgba(33,150,243,.08)", border: "1px solid rgba(33,150,243,.2)",
-            borderRadius: 10, padding: "10px 14px",
-            display: "flex", alignItems: "center", gap: 10, fontSize: 13, color: C.muted,
-          }}>
-            <i className="bi bi-info-circle-fill" style={{ color: C.accent, flexShrink: 0 }} />
-            Contacta al administrador del sistema para renovar tu licencia.
-          </div>
+        <div style={{ padding: "0 32px 24px" }}>
           <button
             onClick={logout}
             style={{
-              background: "transparent", border: `1px solid ${C.border}`,
-              borderRadius: 10, padding: "10px 0",
-              color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
-              width: "100%", transition: "border .2s, color .2s",
+              width: "100%", background: "transparent",
+              border: `1px solid ${C.border}`, borderRadius: 10,
+              padding: "10px 0", color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
             }}
-            onMouseEnter={(e) => { e.currentTarget.style.borderColor = C.danger; e.currentTarget.style.color = C.danger; }}
-            onMouseLeave={(e) => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted; }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor = C.danger; e.currentTarget.style.color = C.danger; }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted; }}
           >
             <i className="bi bi-box-arrow-right me-2" />
             Cerrar sesión
@@ -188,3 +283,4 @@ export default function LicenciaVencidaModal() {
     </div>
   );
 }
+

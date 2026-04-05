@@ -1,6 +1,6 @@
 /**
- * run-017.js — Migración: Sistema de Licencias por Clínica
- * node backend/migrations/run-017.js
+ * run-018.js — Migración: Solicitudes de Activación de Licencia
+ * node backend/migrations/run-018.js
  */
 require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const pool = require("../db");
@@ -8,12 +8,11 @@ const fs   = require("fs");
 const path = require("path");
 
 async function run() {
-  console.log("▶ Ejecutando migración 017_licencias...");
-  const sql = fs.readFileSync(path.join(__dirname, "017_licencias.sql"), "utf8");
+  console.log("▶ Ejecutando migración 018_solicitudes_licencia...");
+  const sql = fs.readFileSync(path.join(__dirname, "018_solicitudes_licencia.sql"), "utf8");
   const stmts = sql
     .split(";")
     .map(s =>
-      // Quitar líneas de comentario SQL (--)
       s.split("\n").filter(l => !l.trim().startsWith("--")).join("\n").trim()
     )
     .filter(s => s.length > 0);
@@ -21,11 +20,10 @@ async function run() {
   for (const stmt of stmts) {
     try {
       await pool.query(stmt);
-      console.log("  ✓", stmt.slice(0, 60).replace(/\n/g, " ") + "...");
+      console.log("  ✓", stmt.slice(0, 70).replace(/\n/g, " ") + "...");
     } catch (e) {
-      // Ignorar "column already exists"
-      if (e.code === "ER_DUP_FIELDNAME" || e.code === "ER_TABLE_EXISTS_ERROR") {
-        console.log("  (ya existe, saltando)");
+      if (e.code === "ER_TABLE_EXISTS_ERROR") {
+        console.log("  (tabla ya existe, saltando)");
       } else {
         console.error("  ✗ Error:", e.message);
         throw e;
@@ -33,7 +31,7 @@ async function run() {
     }
   }
 
-  console.log("✅ Migración 017 completada.");
+  console.log("✅ Migración 018 completada.");
   process.exit(0);
 }
 

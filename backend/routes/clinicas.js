@@ -130,6 +130,69 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════
+//  SOLICITUDES DE LICENCIA  (deben ir ANTES de /:id para no ser capturadas)
+// ══════════════════════════════════════════════════════════════════════════
+
+// POST /api/clinicas/solicitar-licencia  → clínica pide activación de plan
+router.post("/solicitar-licencia",
+  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  async (req, res) => {
+  try {
+    const clinica_id = req.user.clinica_id;
+    if (!clinica_id) return res.status(400).json({ ok: false, msg: "Sin clínica asociada" });
+
+    const { plan_solicitado, mensaje } = req.body;
+    if (!["semestral","anual","trial"].includes(plan_solicitado)) {
+      return res.status(400).json({ ok: false, msg: "plan_solicitado inválido" });
+    }
+
+    await pool.query(
+      `UPDATE solicitudes_licencia SET estado='atendida', atendida_en=NOW()
+       WHERE clinica_id=? AND estado='pendiente'`,
+      [clinica_id]
+    );
+    await pool.query(
+      `INSERT INTO solicitudes_licencia (clinica_id, plan_solicitado, mensaje) VALUES (?, ?, ?)`,
+      [clinica_id, plan_solicitado, mensaje || null]
+    );
+    res.json({ ok: true, msg: "Solicitud enviada al administrador" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// GET /api/clinicas/solicitudes-licencia  → SUPER_ADMIN lista solicitudes pendientes
+router.get("/solicitudes-licencia", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const [rows] = await pool.query(`
+      SELECT sl.id, sl.plan_solicitado, sl.mensaje, sl.estado, sl.creado_en,
+             c.id AS clinica_id, c.nombre AS clinica_nombre, c.email AS clinica_email,
+             c.plan_tipo AS plan_actual, c.licencia_fin
+      FROM solicitudes_licencia sl
+      JOIN clinicas c ON c.id = sl.clinica_id
+      WHERE sl.estado = 'pendiente'
+      ORDER BY sl.creado_en DESC
+    `);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// PUT /api/clinicas/solicitudes-licencia/:id/atender
+router.put("/solicitudes-licencia/:id/atender", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE solicitudes_licencia SET estado='atendida', atendida_en=NOW() WHERE id=?`,
+      [req.params.id]
+    );
+    res.json({ ok: true, msg: "Solicitud marcada como atendida" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // GET /api/clinicas/:id
 router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {

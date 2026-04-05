@@ -68,6 +68,42 @@ export default function Clinicas() {
   const [licenciaForm, setLicenciaForm]           = useState({ plan_tipo: "anual", inicio_manual: "", notas: "" });
   const [licenciaGuardando, setLicenciaGuardando] = useState(false);
 
+  // Solicitudes de licencia pendientes
+  const [solicitudes, setSolicitudes]     = useState([]);
+  const [solCargando, setSolCargando]     = useState(false);
+
+  const cargarSolicitudes = useCallback(async () => {
+    setSolCargando(true);
+    try {
+      const r = await api.get("/clinicas/solicitudes-licencia");
+      setSolicitudes(r.data.data || []);
+    } catch {}
+    finally { setSolCargando(false); }
+  }, []);
+
+  const atenderYActivar = async (sol) => {
+    // Marcar solicitud como atendida y abrir modal de licencia de esa clínica
+    try {
+      await api.put(`/clinicas/solicitudes-licencia/${sol.id}/atender`);
+      setSolicitudes(prev => prev.filter(s => s.id !== sol.id));
+    } catch {}
+    // Buscar la clínica en el estado y abrir el modal de licencia
+    const c = clinicas.find(cl => cl.id === sol.clinica_id);
+    if (c) {
+      setClinicaLicencia(c);
+      setLicenciaForm({ plan_tipo: sol.plan_solicitado, inicio_manual: "", notas: `Solicitud #${sol.id} atendida` });
+      setShowLicenciaModal(true);
+    }
+  };
+
+  const desestimar = async (id) => {
+    try {
+      await api.put(`/clinicas/solicitudes-licencia/${id}/atender`);
+      setSolicitudes(prev => prev.filter(s => s.id !== id));
+    } catch {}
+  };
+
+
   const cargar = useCallback(async () => {
     setCargando(true);
     try {
@@ -84,7 +120,7 @@ export default function Clinicas() {
     }
   }, []);
 
-  useEffect(() => { cargar(); }, [cargar]);
+  useEffect(() => { cargar(); cargarSolicitudes(); }, [cargar, cargarSolicitudes]);
 
   const abrirNuevo = () => {
     setForm({ ...EMPTY_C, ...EMPTY_A }); setEditId(null); setError(""); setShowModal(true);
@@ -310,6 +346,118 @@ export default function Clinicas() {
         }}>
           <i className="bi bi-exclamation-triangle-fill" />
           {error}
+        </div>
+      )}
+
+      {/* ── Panel de solicitudes de licencia pendientes ───────── */}
+      {solicitudes.length > 0 && (
+        <div style={{
+          background: "linear-gradient(135deg, rgba(245,158,11,.08), rgba(245,158,11,.04))",
+          border: "1px solid rgba(245,158,11,.3)", borderRadius: 14,
+          marginBottom: 24, overflow: "hidden",
+        }}>
+          {/* Header del panel */}
+          <div style={{
+            padding: "12px 20px", borderBottom: "1px solid rgba(245,158,11,.2)",
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <div style={{
+              width: 30, height: 30, borderRadius: 8,
+              background: "rgba(245,158,11,.2)", border: "1px solid rgba(245,158,11,.4)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <i className="bi bi-bell-fill" style={{ color: "#f59e0b", fontSize: 13 }} />
+            </div>
+            <span style={{ color: "#f59e0b", fontWeight: 700, fontSize: 14 }}>
+              {solicitudes.length} solicitud{solicitudes.length !== 1 ? "es" : ""} de activación de licencia
+            </span>
+            <button
+              onClick={cargarSolicitudes}
+              disabled={solCargando}
+              style={{
+                marginLeft: "auto", background: "transparent", border: "none",
+                color: C.muted, cursor: "pointer", fontSize: 13, padding: "2px 6px",
+              }}
+              title="Actualizar"
+            >
+              <i className={`bi bi-arrow-clockwise ${solCargando ? "spin" : ""}`} />
+            </button>
+          </div>
+
+          {/* Lista de solicitudes */}
+          {solicitudes.map(s => {
+            const PLAN_C = { trial: "#f59e0b", semestral: "#2196f3", anual: "#10b981" };
+            const PLAN_L = { trial: "Prueba", semestral: "Semestral", anual: "Anual" };
+            const col    = PLAN_C[s.plan_solicitado] || C.muted;
+            const fecha  = new Date(s.creado_en).toLocaleDateString("es-PE", {
+              day: "2-digit", month: "short", year: "numeric",
+              hour: "2-digit", minute: "2-digit",
+            });
+            return (
+              <div key={s.id} style={{
+                padding: "14px 20px", display: "flex", alignItems: "flex-start",
+                gap: 14, borderBottom: "1px solid rgba(245,158,11,.1)",
+              }}>
+                {/* Ícono clínica */}
+                <div style={{
+                  width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                  background: `${col}18`, border: `1px solid ${col}40`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <i className="bi bi-building" style={{ color: col, fontSize: 16 }} />
+                </div>
+
+                {/* Info */}
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+                      {s.clinica_nombre}
+                    </span>
+                    <span style={{
+                      background: `${col}20`, color: col, border: `1px solid ${col}40`,
+                      fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 8px",
+                    }}>
+                      Plan {PLAN_L[s.plan_solicitado]}
+                    </span>
+                    <span style={{ fontSize: 11, color: C.muted }}>{fecha}</span>
+                  </div>
+                  {s.mensaje && (
+                    <div style={{
+                      fontSize: 12, color: C.muted, fontStyle: "italic",
+                      background: "rgba(255,255,255,.03)", borderRadius: 6,
+                      padding: "5px 10px", marginBottom: 8, maxWidth: 500,
+                    }}>
+                      <i className="bi bi-chat-quote me-2" />"{s.mensaje}"
+                    </div>
+                  )}
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                    <button
+                      onClick={() => atenderYActivar(s)}
+                      style={{
+                        background: `linear-gradient(135deg, ${col}, ${col}cc)`,
+                        border: "none", borderRadius: 8, padding: "6px 14px",
+                        color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer",
+                      }}
+                    >
+                      <i className="bi bi-key-fill me-1" />
+                      Activar plan {PLAN_L[s.plan_solicitado]}
+                    </button>
+                    <button
+                      onClick={() => desestimar(s.id)}
+                      style={{
+                        background: "rgba(148,163,184,.08)", border: `1px solid ${C.border}`,
+                        borderRadius: 8, padding: "6px 14px",
+                        color: C.muted, fontSize: 12, fontWeight: 600, cursor: "pointer",
+                      }}
+                    >
+                      <i className="bi bi-x me-1" />
+                      Desestimar
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 

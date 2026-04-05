@@ -25,6 +25,7 @@ import ConfigClinica from "./pages/admin/ConfigClinica";
 // Super Admin
 import Clinicas  from "./pages/superadmin/Clinicas";
 import Database  from "./pages/superadmin/Database";
+import Reportes  from "./pages/superadmin/Reportes";
 
 // Módulos de Cirugía Estética
 import GaleriaEstetica         from "./pages/estetica/GaleriaEstetica";
@@ -113,6 +114,11 @@ export default function App() {
         <Route path="/superadmin/database" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <Database />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/reportes" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <Reportes />
           </RolRoute>
         } />
 

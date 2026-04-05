@@ -3,7 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
@@ -106,7 +106,8 @@ app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
 app.use("/api/recordatorios", require("./routes/recordatorios"));
 app.use("/api/crecimiento", require("./routes/crecimiento"));
-app.use("/api/setup", require("./routes/setup"));
+app.use("/api/setup",     require("./routes/setup"));
+app.use("/api/reportes",  require("./routes/reportes"));
 
 // ===== 404 =====
 app.use((req, res) => {

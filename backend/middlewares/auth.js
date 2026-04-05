@@ -74,7 +74,9 @@ function auth(...roles) {
       }
 
       // 6. Verificar licencia para usuarios de clínica (no SUPER_ADMIN)
-      if (user.tipo !== "SUPER_ADMIN" && user.clinica_id) {
+      // Excluir la ruta de solicitar-licencia para que clínicas vencidas puedan enviar solicitud
+      const esSolicitudLicencia = req.path && req.path.includes("solicitar-licencia");
+      if (user.tipo !== "SUPER_ADMIN" && user.clinica_id && !esSolicitudLicencia) {
         const [licRows] = await pool.query(
           "SELECT licencia_fin FROM clinicas WHERE id=? LIMIT 1",
           [user.clinica_id]

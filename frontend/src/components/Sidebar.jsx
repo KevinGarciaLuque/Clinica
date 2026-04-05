@@ -40,8 +40,9 @@ const medicoItems = [
 ];
 
 const superItems = [
-  { to: "/superadmin/clinicas",  label: "Clínicas",         icon: "bi-building-fill" },
-  { to: "/superadmin/database",  label: "Base de Datos",    icon: "bi-database-fill-gear" },
+  { to: "/superadmin/clinicas",  label: "Clínicas",       icon: "bi-building-fill" },
+  { to: "/superadmin/reportes",  label: "Reportes",        icon: "bi-bar-chart-line-fill" },
+  { to: "/superadmin/database",  label: "Base de Datos",  icon: "bi-database-fill-gear" },
 ];
 
 /** Convierte respuesta del API de módulos a items del sidebar */
