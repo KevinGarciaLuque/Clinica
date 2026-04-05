@@ -166,11 +166,11 @@ export default function Reportes() {
   );
 
   return (
-    <div style={{ padding: "28px 24px", color: C.text, minHeight: "100vh" }}>
+    <div className="reportes-wrap" style={{ padding: "28px 24px", color: C.text, minHeight: "100vh" }}>
 
       {/* ── Encabezado ── */}
       <div style={{ marginBottom: 28 }}>
-        <h2 style={{ margin: 0, fontSize: "1.45rem", fontWeight: 700, color: C.text, display: "flex", alignItems: "center", gap: 10 }}>
+        <h2 style={{ margin: 0, fontSize: "1.45rem", fontWeight: 700, color: C.accent, display: "flex", alignItems: "center", gap: 10 }}>
           <i className="bi bi-bar-chart-line-fill" style={{ color: C.accent }} />
           Reportes &amp; Analítica
         </h2>
@@ -193,7 +193,7 @@ export default function Reportes() {
       </div>
 
       {/* ── Dos columnas: Top crecimiento + Barra de ordenado ── */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 28 }}>
+      <div className="reportes-2col">
 
         {/* Top 5 crecimiento este mes */}
         <div style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 12, padding: "18px 20px" }}>
@@ -291,10 +291,10 @@ export default function Reportes() {
         </div>
 
         {/* Tabla */}
-        <div style={{ overflowX: "auto" }}>
+        <div style={{ overflowX: "auto", overflowY: "auto", maxHeight: 440 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.82rem" }}>
-            <thead>
-              <tr style={{ borderBottom: `1px solid ${C.border}`, color: C.muted, textAlign: "left" }}>
+            <thead style={{ position: "sticky", top: 0, zIndex: 2 }}>
+              <tr style={{ borderBottom: `1px solid ${C.border}`, color: C.muted, textAlign: "left", background: C.card }}>
                 <th style={{ padding: "8px 10px", fontWeight: 600 }}>Clínica</th>
                 <th style={{ padding: "8px 10px", fontWeight: 600 }}>Tipo</th>
                 <th style={{ padding: "8px 10px", fontWeight: 600 }}>Ciudad</th>
@@ -431,6 +431,19 @@ export default function Reportes() {
       <style>{`
         @keyframes spin { to { transform: rotate(360deg); } }
         select option { background: #112240; }
+        .reportes-2col {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 16px;
+          margin-bottom: 28px;
+        }
+        @media (max-width: 900px) {
+          .reportes-2col { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 640px) {
+          .reportes-wrap { padding: 16px 12px !important; }
+          .reportes-wrap h2 { font-size: 1.15rem !important; }
+        }
       `}</style>
     </div>
   );
