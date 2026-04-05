@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
+import { useAuth } from "../../auth/AuthContext";
 
 const TIPOS = ["ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA"];
 const EMPTY = {
@@ -9,8 +10,13 @@ const EMPTY = {
 };
 
 export default function Usuarios() {
+  const { user } = useAuth();
+  const esSuperAdmin = user?.tipo === "SUPER_ADMIN";
+
   const [usuarios, setUsuarios]       = useState([]);
   const [especialidades, setEspecialidades] = useState([]);
+  const [clinicas, setClinicas]       = useState([]);
+  const [clinicaSeleccionada, setClinicaSeleccionada] = useState("");
   const [form, setForm]               = useState(EMPTY);
   const [editId, setEditId]           = useState(null);
   const [busqueda, setBusqueda]       = useState("");
@@ -21,11 +27,24 @@ export default function Usuarios() {
   const [deleteConfirm, setDeleteConfirm] = useState({ id: null, nombre: "", texto: "" });
   const [showResetPass, setShowResetPass] = useState(false);
 
+  // Cargar lista de clínicas si es SUPER_ADMIN
+  useEffect(() => {
+    if (!esSuperAdmin) return;
+    api.get("/clinicas").then((r) => {
+      const lista = r.data.data || [];
+      setClinicas(lista);
+      if (lista.length > 0) setClinicaSeleccionada(String(lista[0].id));
+    }).catch(() => {});
+  }, [esSuperAdmin]);
+
   const cargar = useCallback(async () => {
+    const cid = esSuperAdmin ? clinicaSeleccionada : (user?.clinica_id || "");
+    if (!cid) return;
     setCargando(true);
     try {
+      const params = esSuperAdmin ? { clinica_id: cid } : {};
       const [uRes, eRes] = await Promise.all([
-        api.get("/usuarios"),
+        api.get("/usuarios", { params }),
         api.get("/usuarios/especialidades"),
       ]);
       setUsuarios(uRes.data.data);
@@ -35,7 +54,7 @@ export default function Usuarios() {
     } finally {
       setCargando(false);
     }
-  }, []);
+  }, [esSuperAdmin, clinicaSeleccionada, user?.clinica_id]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -66,6 +85,7 @@ export default function Usuarios() {
       const payload = { ...form };
       if (!payload.password) delete payload.password;
       if (!payload.especialidad_id) delete payload.especialidad_id;
+      if (esSuperAdmin && clinicaSeleccionada) payload.clinica_id = Number(clinicaSeleccionada);
 
       if (editId) {
         await api.put(`/usuarios/${editId}`, payload);
@@ -132,6 +152,22 @@ export default function Usuarios() {
           + Nuevo usuario
         </button>
       </div>
+
+      {esSuperAdmin && (
+        <div className="mb-3">
+          <label className="form-label fw-semibold">Clínica</label>
+          <select
+            className="form-select"
+            value={clinicaSeleccionada}
+            onChange={(e) => { setClinicaSeleccionada(e.target.value); setError(""); }}
+          >
+            <option value="">— Selecciona una clínica —</option>
+            {clinicas.map((c) => (
+              <option key={c.id} value={c.id}>{c.nombre}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {error && <div className="alert alert-danger py-2">{error}</div>}
 
