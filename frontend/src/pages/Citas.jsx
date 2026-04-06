@@ -29,6 +29,7 @@ const MESSAGES = {
   month: "Mes", week: "Semana", day: "Día", agenda: "Agenda",
   date: "Fecha", time: "Hora", event: "Cita",
   noEventsInRange: "Sin citas en este rango.",
+  showMore: (total) => `+${total} más`,
 };
 
 const FORMATS = {
@@ -48,6 +49,101 @@ function buildEvents(citas) {
     end:   new Date(c.fin),
     resource: c,
   }));
+}
+
+// ─── Componente personalizado para la vista Agenda ───────────────────────────
+// Muestra el plan + estudios pendientes de la última consulta del paciente
+function AgendaEventoPendientes({ event }) {
+  const [pendientes, setPendientes] = useState(null);
+  const [cargando, setCargando] = useState(true);
+
+  useEffect(() => {
+    let activo = true;
+    api.get(`/citas/${event.id}/pendientes`)
+      .then(r => { if (activo) setPendientes(r.data.data); })
+      .catch(() => {})
+      .finally(() => { if (activo) setCargando(false); });
+    return () => { activo = false; };
+  }, [event.id]);
+
+  const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff" };
+  const hayPendientes = pendientes && (pendientes.plan || pendientes.estudios?.length > 0);
+
+  return (
+    <div style={{ lineHeight: 1.4 }}>
+      <div className="d-flex align-items-center gap-2">
+        <span className="fw-semibold">{event.title}</span>
+        {!cargando && hayPendientes && (
+          <span className="badge" style={{ background: "#e65c00", fontSize: "0.68rem", padding: "2px 6px" }}>
+            <i className="bi bi-exclamation-circle me-1" />
+            {pendientes.estudios.length > 0 && `${pendientes.estudios.length} estudio${pendientes.estudios.length > 1 ? "s" : ""}`}
+            {pendientes.estudios.length > 0 && pendientes.plan && " · "}
+            {pendientes.plan && "plan pendiente"}
+          </span>
+        )}
+      </div>
+
+      {hayPendientes && (
+        <div className="mt-1 rounded" style={{
+          background: "rgba(255,255,255,0.92)",
+          border: "1px solid #f0c040",
+          padding: "5px 8px",
+          fontSize: "0.78rem",
+          color: "#333",
+          maxWidth: 500,
+        }}>
+          {pendientes.diagnostico_desc && (
+            <div className="mb-1" style={{ color: "#555", fontSize: "0.74rem" }}>
+              <i className="bi bi-clipboard2-pulse me-1 text-primary" />
+              <strong>Dx anterior:</strong> {pendientes.diagnostico_desc}
+            </div>
+          )}
+          {pendientes.plan && (
+            <div className="mb-1">
+              <i className="bi bi-journal-text me-1 text-success" />
+              <strong>Plan médico:</strong> {pendientes.plan}
+            </div>
+          )}
+          {pendientes.estudios?.length > 0 && (
+            <div>
+              <i className="bi bi-flask me-1 text-warning" />
+              <strong>Estudios pendientes:</strong>
+              <ul className="mb-0 mt-1 ps-3" style={{ fontSize: "0.75rem" }}>
+                {pendientes.estudios.map(e => (
+                  <li key={e.id}>
+                    {e.urgente === 1 && <span className="text-danger fw-bold me-1">URGENTE</span>}
+                    <span className="badge bg-secondary me-1" style={{ fontSize: "0.68rem" }}>{e.tipo}</span>
+                    {e.descripcion}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {pendientes.ultima_consulta && (
+            <div className="mt-1" style={{ color: "#888", fontSize: "0.72rem" }}>
+              <i className="bi bi-clock-history me-1" />
+              Última consulta: {dayjs(pendientes.ultima_consulta).format("DD/MM/YYYY")}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function dayPropGetter(date) {
+  const today = new Date();
+  const isToday =
+    date.getDate() === today.getDate() &&
+    date.getMonth() === today.getMonth() &&
+    date.getFullYear() === today.getFullYear();
+  if (!isToday) return {};
+  return {
+    style: {
+      boxShadow: "inset 0 0 0 3px #0D1B2E",
+      borderRadius: "4px",
+    },
+  };
 }
 
 function eventPropGetter(event) {
@@ -74,7 +170,7 @@ export default function Citas() {
   const [filterMed, setFilterMed]   = useState("");
   const [filterMedText, setFilterMedText] = useState("");
   const [showMedList, setShowMedList] = useState(false);
-  const [view,      setView]        = useState(Views.WEEK);
+  const [view,      setView]        = useState(Views.MONTH);
   const [date,      setDate]        = useState(new Date());
   const [loading,   setLoading]     = useState(false);
   const [showNew,   setShowNew]     = useState(false);
@@ -83,6 +179,7 @@ export default function Citas() {
   const [selEvent,  setSelEvent]    = useState(null);
   const [sala,      setSala]        = useState([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
+  const [showEdit,         setShowEdit]          = useState(false);
 
   useEffect(() => {
     api.get("/usuarios/medicos")
@@ -117,12 +214,23 @@ export default function Citas() {
   }, [activeTab, loadSalaEspera]);
 
   const onEventDrop = ({ event, start, end }) => {
+    // Actualización optimista: mover el evento en el calendario de inmediato
+    setEvents(prev => prev.map(e =>
+      e.id === event.id
+        ? { ...e, start, end, resource: { ...e.resource, inicio: start.toISOString(), fin: end.toISOString() } }
+        : e
+    ));
     api.put(`/citas/${event.id}`, {
       inicio: dayjs(start).format("YYYY-MM-DD HH:mm:ss"),
       fin:    dayjs(end).format("YYYY-MM-DD HH:mm:ss"),
     })
-    .then(() => setEvents(prev => prev.map(e => e.id === event.id ? { ...e, start, end } : e)))
-    .catch(err => alert(err.response?.data?.msg || "Error al reprogramar"));
+    .catch(err => {
+      // Revertir si falla
+      setEvents(prev => prev.map(e =>
+        e.id === event.id ? { ...e, start: event.start, end: event.end } : e
+      ));
+      alert(err.response?.data?.msg || "Error al reprogramar");
+    });
   };
 
   const onEventResize = ({ event, start, end }) => onEventDrop({ event, start, end });
@@ -216,6 +324,19 @@ export default function Citas() {
           background-color: rgba(13, 110, 253, 0.1) !important;
           border-radius: 4px;
         }
+
+        /* Mostrar 3 eventos por día */
+        .rbc-month-row {
+          min-height: 90px;
+        }
+        .rbc-event {
+          padding: 1px 4px !important;
+          font-size: 0.72rem !important;
+          line-height: 1.3 !important;
+        }
+        .rbc-event-content {
+          font-size: 0.72rem !important;
+        }
       `}</style>
       <div className="d-flex align-items-center justify-content-between mb-3">
         <h4 className="mb-0 fw-bold">Agenda de Citas</h4>
@@ -303,13 +424,21 @@ export default function Citas() {
               onEventDrop={onEventDrop}
               onEventResize={onEventResize}
               eventPropGetter={eventPropGetter}
+              dayPropGetter={dayPropGetter}
+              popup
+              popupOffset={{ x: 30, y: 20 }}
               messages={MESSAGES}
               formats={FORMATS}
               culture="es"
               step={15}
               timeslots={4}
-              defaultView={Views.WEEK}
+              defaultView={Views.MONTH}
               views={[Views.MONTH, Views.WEEK, Views.DAY, Views.AGENDA]}
+              components={{
+                agenda: {
+                  event: AgendaEventoPendientes,
+                },
+              }}
             />
           </div>
         </>
@@ -349,6 +478,16 @@ export default function Citas() {
           onEstado={cambiarEstado}
           onCancelar={cancelarCita}
           onMostrarConfirmDelete={() => setShowConfirmDelete(true)}
+          onEditar={() => { setShowDet(false); setShowEdit(true); }}
+        />
+      )}
+
+      {showEdit && selEvent && (
+        <ModalEditarCita
+          event={selEvent}
+          medicos={medicos}
+          onClose={() => setShowEdit(false)}
+          onSaved={() => { setShowEdit(false); loadCitas(); loadSalaEspera(); }}
         />
       )}
 
@@ -414,6 +553,45 @@ function SalaEspera({ sala, onEstadoChange }) {
           </tbody>
         </table>
       </div>
+    </div>
+  );
+}
+
+// ─── TimePicker 12h ──────────────────────────────────────────────────────────
+// Recibe value en "HH:mm" (24h) y llama onChange con "HH:mm" (24h)
+function TimePicker12h({ value, onChange, label, required }) {
+  // Parsear value (HH:mm 24h) → partes 12h
+  const parse = (v) => {
+    if (!v) return { h: "", m: "00", ampm: "AM" };
+    const [hh, mm] = v.split(":");
+    const h24 = parseInt(hh, 10);
+    const ampm = h24 >= 12 ? "PM" : "AM";
+    const h12 = h24 === 0 ? 12 : h24 > 12 ? h24 - 12 : h24;
+    return { h: String(h12), m: mm || "00", ampm };
+  };
+  const { h, m, ampm } = parse(value);
+
+  const emit = (nh, nm, na) => {
+    if (!nh) return;
+    let h24 = parseInt(nh, 10);
+    if (na === "AM" && h24 === 12) h24 = 0;
+    if (na === "PM" && h24 !== 12) h24 += 12;
+    onChange(`${String(h24).padStart(2, "0")}:${nm}`);
+  };
+
+  const HORAS = ["1","2","3","4","5","6","7","8","9","10","11","12"];
+  const MINS  = ["00","05","10","15","20","25","30","35","40","45","50","55"];
+
+  return (
+    <div>
+      {label && <label className="form-label mb-1" style={{ fontSize: "0.78rem" }}>{label}</label>}
+      <input
+        type="time"
+        className="form-control form-control-sm"
+        value={value || ""}
+        onChange={e => onChange(e.target.value)}
+        required={required}
+      />
     </div>
   );
 }
@@ -526,124 +704,119 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
   };
 
   return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)" }}>
-      <div className="modal-dialog modal-lg modal-dialog-scrollable">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">Nueva Cita</h5>
-            <button className="btn-close" onClick={onClose} />
+    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 1055 }}>
+      <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: 480, margin: "1rem auto" }}>
+        <div className="modal-content" style={{ fontSize: "0.85rem" }}>
+          <div className="modal-header py-2 px-3">
+            <h6 className="modal-title mb-0 fw-bold">
+              <i className="bi bi-calendar-plus me-2 text-primary" />
+              Nueva Cita
+            </h6>
+            <button className="btn-close btn-sm" onClick={onClose} />
           </div>
           <form onSubmit={handleSubmit}>
-            <div className="modal-body row g-3">
-              {err && <div className="col-12"><div className="alert alert-danger py-2">{err}</div></div>}
+            <div className="modal-body px-3 py-2">
+              {err && <div className="alert alert-danger py-1 px-2 mb-2" style={{ fontSize: "0.8rem" }}>{err}</div>}
 
-              <div className="col-12 position-relative">
-                <label className="form-label fw-semibold">Paciente</label>
-                <input className="form-control" placeholder="Buscar por nombre o DNI…"
-                  value={pacBusq}
-                  onChange={e => { setPacBusq(e.target.value); setPacSel(null); setForm(f => ({ ...f, paciente_id: "" })); }} />
-                {pacList.length > 0 && (
-                  <ul className="list-group position-absolute z-3" style={{ maxHeight: 200, overflowY: "auto", width: "calc(100% - 3rem)" }}>
-                    {pacList.map(p => (
-                      <li key={p.id} className="list-group-item list-group-item-action py-1" style={{ cursor: "pointer" }}
-                        onClick={() => selPaciente(p)}>
-                        {p.apellidos}, {p.nombres} — DNI {p.dni}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-                {pacSel && <small className="text-success">✓ {pacSel.nombres} {pacSel.apellidos}</small>}
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label fw-semibold">Médico</label>
-                <select className="form-select" value={form.medico_id}
-                  onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
-                  <option value="">— Selecciona —</option>
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="col-md-6">
-                <label className="form-label fw-semibold">Fecha</label>
-                <input type="date" className="form-control" value={fechaSel}
-                  onChange={e => setFechaSel(e.target.value)} />
-              </div>
-
-              {slots.length > 0 && (
-                <div className="col-12">
-                  <label className="form-label fw-semibold">Horarios disponibles (click para seleccionar)</label>
-                  <div className="d-flex flex-wrap gap-1">
-                    {slots.map(s => (
-                      <button key={s.inicio} type="button"
-                        className={`btn btn-sm ${slotSel === s.inicio ? "btn-primary" : "btn-outline-primary"}`}
-                        onClick={() => selSlot(s)}>
-                        {dayjs(s.inicio).format("h:mm A")}
-                      </button>
-                    ))}
-                  </div>
+              <div className="row g-2">
+                {/* Paciente */}
+                <div className="col-12 position-relative">
+                  <label className="form-label mb-1">Paciente</label>
+                  <input className="form-control form-control-sm" placeholder="Buscar por nombre o DNI…"
+                    value={pacBusq}
+                    onChange={e => { setPacBusq(e.target.value); setPacSel(null); setForm(f => ({ ...f, paciente_id: "" })); }} />
+                  {pacList.length > 0 && (
+                    <ul className="list-group position-absolute z-3 shadow-sm" style={{ top: "100%", left: 0, right: 0, maxHeight: 160, overflowY: "auto", fontSize: "0.8rem" }}>
+                      {pacList.map(p => (
+                        <li key={p.id} className="list-group-item list-group-item-action py-1 px-2" style={{ cursor: "pointer" }}
+                          onClick={() => selPaciente(p)}>
+                          <strong>{p.apellidos}, {p.nombres}</strong>
+                          <span className="text-muted ms-1">DNI {p.dni}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {pacSel && <div className="text-success mt-1" style={{ fontSize: "0.78rem" }}>✓ {pacSel.nombres} {pacSel.apellidos}</div>}
                 </div>
-              )}
-              {form.medico_id && fechaSel && slots.length === 0 && (
-                <div className="col-12"><small className="text-muted">Sin horarios disponibles. Ingresa hora manualmente.</small></div>
-              )}
 
-              <div className="col-md-6">
-                <label className="form-label fw-semibold">Hora inicio</label>
-                <input 
-                  type="time" 
-                  className="form-control" 
-                  value={horaInicio}
-                  onChange={e => setHoraInicio(e.target.value)}
-                  placeholder="HH:mm"
-                  required
-                />
-                <small className="text-muted">Ejemplo: 2:30 PM = 14:30</small>
-              </div>
+                {/* Médico + Fecha */}
+                <div className="col-8">
+                  <label className="form-label mb-1">Médico</label>
+                  <select className="form-select form-select-sm" value={form.medico_id}
+                    onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
+                    <option value="">— Selecciona —</option>
+                    {medicos.map(m => (
+                      <option key={m.id} value={m.id}>
+                        Dr. {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-4">
+                  <label className="form-label mb-1">Fecha</label>
+                  <input type="date" className="form-control form-control-sm" value={fechaSel}
+                    onChange={e => setFechaSel(e.target.value)} />
+                </div>
 
-              <div className="col-md-6">
-                <label className="form-label fw-semibold">Hora fin</label>
-                <input 
-                  type="time" 
-                  className="form-control" 
-                  value={horaFin}
-                  onChange={e => setHoraFin(e.target.value)}
-                  placeholder="HH:mm"
-                  required
-                />
-                <small className="text-muted">Ejemplo: 3:00 PM = 15:00</small>
-              </div>
+                {/* Slots */}
+                {slots.length > 0 && (
+                  <div className="col-12">
+                    <label className="form-label mb-1">Horarios disponibles</label>
+                    <div className="d-flex flex-wrap gap-1">
+                      {slots.map(s => (
+                        <button key={s.inicio} type="button" style={{ fontSize: "0.75rem", padding: "2px 8px" }}
+                          className={`btn btn-sm ${slotSel === s.inicio ? "btn-primary" : "btn-outline-primary"}`}
+                          onClick={() => selSlot(s)}>
+                          {dayjs(s.inicio).format("h:mm A")}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {form.medico_id && fechaSel && slots.length === 0 && (
+                  <div className="col-12">
+                    <small className="text-muted">Sin horarios disponibles. Ingresa hora manualmente.</small>
+                  </div>
+                )}
 
-              <div className="col-md-4">
-                <label className="form-label fw-semibold">Tipo</label>
-                <select className="form-select" value={form.tipo_consulta}
-                  onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
-                  {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
-                    <option key={t}>{t}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-4">
-                <label className="form-label fw-semibold">Canal</label>
-                <select className="form-select" value={form.canal}
-                  onChange={e => setForm(f => ({ ...f, canal: e.target.value }))}>
-                  {["RECEPCION","APP","TELEFONO","WEB"].map(c => (
-                    <option key={c}>{c}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-4">
-                <label className="form-label fw-semibold">Motivo</label>
-                <input className="form-control" value={form.motivo}
-                  onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Opcional" />
+                {/* Horas */}
+                <div className="col-6 col-sm-6">
+                  <TimePicker12h label="Hora inicio" value={horaInicio} onChange={setHoraInicio} required />
+                </div>
+                <div className="col-6 col-sm-6">
+                  <TimePicker12h label="Hora fin" value={horaFin} onChange={setHoraFin} required />
+                </div>
+
+                {/* Tipo + Canal + Motivo */}
+                <div className="col-4">
+                  <label className="form-label mb-1">Tipo</label>
+                  <select className="form-select form-select-sm" value={form.tipo_consulta}
+                    onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
+                    {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
+                      <option key={t}>{t}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-4">
+                  <label className="form-label mb-1">Canal</label>
+                  <select className="form-select form-select-sm" value={form.canal}
+                    onChange={e => setForm(f => ({ ...f, canal: e.target.value }))}>
+                    {["RECEPCION","APP","TELEFONO","WEB"].map(c => (
+                      <option key={c}>{c}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="col-4">
+                  <label className="form-label mb-1">Motivo</label>
+                  <input className="form-control form-control-sm" value={form.motivo}
+                    onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Opcional" />
+                </div>
               </div>
             </div>
 
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
+            <div className="modal-footer py-2 px-3">
+              <button type="button" className="btn btn-sm btn-secondary" onClick={onClose}>Cancelar</button>
+              <button type="submit" className="btn btn-sm btn-primary" disabled={saving}>
                 {saving ? "Guardando…" : "Crear Cita"}
               </button>
             </div>
@@ -655,7 +828,7 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
 }
 
 // ─── Modal Detalle Cita ───────────────────────────────────────────────────────
-function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete }) {
+function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar }) {
   const c = event.resource;
   const color = ESTADO_COLOR[c.estado] || { bg: "#6c757d", fg: "#fff" };
   const ACCIONES = {
@@ -717,11 +890,137 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
                 <i className="bi bi-trash3"></i> Eliminar permanentemente
               </button>
             </div>
+            {c.estado === "PENDIENTE" && (
+              <button className="btn btn-outline-primary btn-sm" onClick={onEditar}>
+                <i className="bi bi-pencil me-1"></i>Editar
+              </button>
+            )}
             {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
               <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
             )}
             <button className="btn btn-secondary btn-sm" onClick={onClose}>Cerrar</button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Modal Editar Cita ────────────────────────────────────────────────────────
+function ModalEditarCita({ event, medicos, onClose, onSaved }) {
+  const c = event.resource;
+  const [form, setForm] = useState({
+    medico_id:     String(c.medico_id),
+    tipo_consulta: c.tipo_consulta,
+    canal:         c.canal,
+    motivo:        c.motivo || "",
+  });
+  const [fechaSel,   setFechaSel]   = useState(dayjs(c.inicio).format("YYYY-MM-DD"));
+  const [horaInicio, setHoraInicio] = useState(dayjs(c.inicio).format("HH:mm"));
+  const [horaFin,    setHoraFin]    = useState(dayjs(c.fin).format("HH:mm"));
+  const [saving,     setSaving]     = useState(false);
+  const [err,        setErr]        = useState("");
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    const inicio = dayjs(`${fechaSel} ${horaInicio}`);
+    const fin    = dayjs(`${fechaSel} ${horaFin}`);
+    if (fin.isBefore(inicio) || fin.isSame(inicio)) {
+      setErr("La hora de fin debe ser posterior a la hora de inicio");
+      return;
+    }
+    setSaving(true); setErr("");
+    try {
+      await api.put(`/citas/${c.id}`, {
+        ...form,
+        inicio: inicio.format("YYYY-MM-DD HH:mm:ss"),
+        fin:    fin.format("YYYY-MM-DD HH:mm:ss"),
+      });
+      onSaved();
+    } catch (ex) {
+      setErr(ex.response?.data?.msg || "Error al guardar");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)" }}>
+      <div className="modal-dialog modal-lg modal-dialog-scrollable">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">
+              <i className="bi bi-pencil-square me-2"></i>Editar Cita
+            </h5>
+            <button className="btn-close" onClick={onClose} />
+          </div>
+          <form onSubmit={handleSubmit}>
+            <div className="modal-body row g-3">
+              {err && <div className="col-12"><div className="alert alert-danger py-2">{err}</div></div>}
+
+              <div className="col-12">
+                <label className="form-label fw-semibold">Paciente</label>
+                <input className="form-control" value={`${c.paciente_apellidos}, ${c.paciente_nombres}`} disabled />
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label fw-semibold">Médico</label>
+                <select className="form-select" value={form.medico_id}
+                  onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
+                  {medicos.map(m => (
+                    <option key={m.id} value={String(m.id)}>
+                      Dr. {m.nombres} {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="col-md-6">
+                <label className="form-label fw-semibold">Fecha</label>
+                <input type="date" className="form-control" value={fechaSel}
+                  onChange={e => setFechaSel(e.target.value)} required />
+              </div>
+
+              <div className="col-md-6">
+                <TimePicker12h label="Hora inicio" value={horaInicio} onChange={setHoraInicio} required />
+              </div>
+              <div className="col-md-6">
+                <TimePicker12h label="Hora fin" value={horaFin} onChange={setHoraFin} required />
+              </div>
+
+              <div className="col-md-4">
+                <label className="form-label fw-semibold">Tipo</label>
+                <select className="form-select" value={form.tipo_consulta}
+                  onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
+                  {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
+                    <option key={t}>{t}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-4">
+                <label className="form-label fw-semibold">Canal</label>
+                <select className="form-select" value={form.canal}
+                  onChange={e => setForm(f => ({ ...f, canal: e.target.value }))}>
+                  {["RECEPCION","APP","TELEFONO","WEB"].map(ch => (
+                    <option key={ch}>{ch}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-4">
+                <label className="form-label fw-semibold">Motivo</label>
+                <input className="form-control" value={form.motivo}
+                  onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
+                  placeholder="Opcional" />
+              </div>
+            </div>
+
+            <div className="modal-footer">
+              <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
+              <button type="submit" className="btn btn-primary" disabled={saving}>
+                {saving ? "Guardando…" : "Guardar cambios"}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
     </div>

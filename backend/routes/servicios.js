@@ -59,7 +59,7 @@ router.get("/:id", auth(), async (req, res) => {
 });
 
 // POST /api/servicios
-router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+router.post("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA"), async (req, res) => {
   try {
     const clinicaId = req.user.super
       ? (req.body.clinica_id || req.tenant?.clinica_id)
@@ -84,7 +84,7 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 });
 
 // PUT /api/servicios/:id
-router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? null : req.user.clinica_id;
     const { nombre, descripcion, categoria, precio, moneda, duracion_min, activo } = req.body;
@@ -116,7 +116,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 });
 
 // DELETE /api/servicios/:id  → desactivar
-router.delete("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+router.delete("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? null : req.user.clinica_id;
     const sql = clinicaId

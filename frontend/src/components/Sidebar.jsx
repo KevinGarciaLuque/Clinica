@@ -30,11 +30,12 @@ const adminItems = [
   { to: "/admin/horarios",  label: "Horarios médicos",  icon: "bi-clock-fill" },
   { to: "/admin/servicios", label: "Servicios",         icon: "bi-tag-fill" },
   { to: "/catalogos",       label: "Catálogos",         icon: "bi-journal-bookmark-fill" },
-  { to: "/recordatorios",   label: "Recordatorios",     icon: "bi-bell-fill" },
   { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
 ];
 
 const medicoItems = [
+  { to: "/admin/horarios",  label: "Horarios médicos",  icon: "bi-clock-fill" },
+  { to: "/admin/servicios", label: "Servicios",         icon: "bi-tag-fill" },
   { to: "/catalogos",       label: "Catálogos",         icon: "bi-journal-bookmark-fill" },
   { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
 ];
@@ -56,7 +57,16 @@ function modulosToItems(modulos) {
 
 function getMenuSections(tipo, modulos) {
   const hasDynamic = modulos && modulos.length > 0;
-  const mainItems  = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
+  let mainItems = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
+
+  // MEDICO y ADMIN siempre deben ver Consulta (puede no estar en caché)
+  if ((tipo === "MEDICO" || tipo === "ADMIN") && !mainItems.some(m => m.to === "/consulta")) {
+    const consulta = { to: "/consulta", label: "Consulta", icon: "bi-clipboard2-pulse-fill" };
+    const citasIdx = mainItems.findIndex(m => m.to === "/citas");
+    mainItems = citasIdx >= 0
+      ? [...mainItems.slice(0, citasIdx + 1), consulta, ...mainItems.slice(citasIdx + 1)]
+      : [...mainItems, consulta];
+  }
 
   if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: adminItems };
   if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: adminItems };

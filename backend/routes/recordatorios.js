@@ -66,25 +66,38 @@ router.post("/config/smtp", auth(), async (req, res) => {
   try {
     const { smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, from_email, from_name, activo } = req.body;
 
-    // Encriptar contraseña
-    const encryptedPass = encrypt(smtp_pass);
-
     const [existing] = await db.query(
       "SELECT id FROM clinica_smtp_config WHERE clinica_id = ?",
       [req.user.clinica_id]
     );
 
     if (existing.length > 0) {
-      // Update
-      await db.query(
-        `UPDATE clinica_smtp_config
-         SET smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?,
-             smtp_secure = ?, from_email = ?, from_name = ?, activo = ?
-         WHERE clinica_id = ?`,
-        [smtp_host, smtp_port, smtp_user, encryptedPass, smtp_secure, from_email, from_name, activo, req.user.clinica_id]
-      );
+      if (smtp_pass) {
+        // Update con nueva contraseña
+        const encryptedPass = encrypt(smtp_pass);
+        await db.query(
+          `UPDATE clinica_smtp_config
+           SET smtp_host = ?, smtp_port = ?, smtp_user = ?, smtp_pass = ?,
+               smtp_secure = ?, from_email = ?, from_name = ?, activo = ?
+           WHERE clinica_id = ?`,
+          [smtp_host, smtp_port, smtp_user, encryptedPass, smtp_secure, from_email, from_name, activo, req.user.clinica_id]
+        );
+      } else {
+        // Update SIN tocar la contraseña guardada
+        await db.query(
+          `UPDATE clinica_smtp_config
+           SET smtp_host = ?, smtp_port = ?, smtp_user = ?,
+               smtp_secure = ?, from_email = ?, from_name = ?, activo = ?
+           WHERE clinica_id = ?`,
+          [smtp_host, smtp_port, smtp_user, smtp_secure, from_email, from_name, activo, req.user.clinica_id]
+        );
+      }
     } else {
+      if (!smtp_pass) {
+        return res.status(400).json({ error: "La contraseña es obligatoria al crear la configuración" });
+      }
       // Insert
+      const encryptedPass = encrypt(smtp_pass);
       await db.query(
         `INSERT INTO clinica_smtp_config
          (clinica_id, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, from_email, from_name, activo)

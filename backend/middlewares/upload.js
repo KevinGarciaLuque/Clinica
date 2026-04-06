@@ -21,8 +21,15 @@ const storagePacientes = multer.diskStorage({
   },
   filename(req, file, cb) {
     const ext  = path.extname(file.originalname).toLowerCase();
-    const rand = Math.random().toString(36).slice(2, 10);
-    cb(null, `${Date.now()}-${rand}${ext}`);
+    const now  = new Date();
+    const yyyy = now.getFullYear();
+    const mm   = String(now.getMonth() + 1).padStart(2, "0");
+    const dd   = String(now.getDate()).padStart(2, "0");
+    const hh   = String(now.getHours()).padStart(2, "0");
+    const min  = String(now.getMinutes()).padStart(2, "0");
+    const ss   = String(now.getSeconds()).padStart(2, "0");
+    const rand = Math.random().toString(36).slice(2, 6);
+    cb(null, `${yyyy}-${mm}-${dd}_${hh}${min}${ss}-${rand}${ext}`);
   },
 });
 
@@ -62,7 +69,7 @@ const imageFilter = (req, file, cb) => {
 
 const uploadPacientes = multer({
   storage: storagePacientes,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB máximo
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB máximo
   fileFilter,
 });
 

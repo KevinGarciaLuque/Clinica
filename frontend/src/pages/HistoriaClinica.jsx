@@ -6,6 +6,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
+import AntecedentesClinico from "../components/AntecedentesClinico";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE = { BORRADOR: "warning text-dark", FIRMADA: "success" };
@@ -29,7 +30,6 @@ export default function HistoriaClinica() {
   const [paciente,     setPaciente]     = useState(null);
   const [historias,    setHistorias]    = useState([]);
   const [alergias,     setAlergias]     = useState([]);
-  const [antecedentes, setAntecedentes] = useState([]);
   const [loading,      setLoading]      = useState(true);
   const [search,       setSearch]       = useState("");       // buscar paciente si no hay id en URL
   const [searchList,   setSearchList]   = useState([]);
@@ -40,6 +40,9 @@ export default function HistoriaClinica() {
   const [modalFoto,    setModalFoto]    = useState(null);    // modal foto grande
   const [showConsultaModal,  setShowConsultaModal]  = useState(false);
   const [consultaPaciente,   setConsultaPaciente]   = useState(null);
+  const [activeTabHist,      setActiveTabHist]      = useState("alergias");
+  const [filtroDesde,        setFiltroDesde]        = useState("");
+  const [filtroHasta,        setFiltroHasta]        = useState("");
 
   // ── cargar datos cuando se selecciona paciente ────────────────────────────
   useEffect(() => {
@@ -50,13 +53,11 @@ export default function HistoriaClinica() {
       api.get(`/pacientes/${selPacId}`),
       api.get(`/historias`, { params: { paciente_id: selPacId } }),
       api.get(`/historias/paciente/${selPacId}/alergias`),
-      api.get(`/historias/paciente/${selPacId}/antecedentes`),
     ])
-    .then(([p, h, al, ant]) => {
+    .then(([p, h, al]) => {
       setPaciente(p.data.data || null);
       setHistorias(h.data.data || []);
       setAlergias(al.data.data || []);
-      setAntecedentes(ant.data.data || []);
     })
     .catch(() => {})
     .finally(() => setLoading(false));
@@ -100,6 +101,156 @@ export default function HistoriaClinica() {
     }
   };
 
+  // ── Imprimir consulta ──────────────────────────────────────────────────────
+  const imprimirConsulta = async (h) => {
+    // Obtener detalle completo si no está en caché
+    let det = detalle[h.id];
+    if (!det) {
+      try {
+        const r = await api.get(`/historias/${h.id}`);
+        det = r.data.data;
+        setDetalle(d => ({ ...d, [h.id]: det }));
+      } catch {
+        alert("No se pudo cargar el detalle de la consulta");
+        return;
+      }
+    }
+
+    const vitals = det.objetivo
+      ? (typeof det.objetivo === "string" ? JSON.parse(det.objetivo) : det.objetivo)
+      : {};
+
+    const vitalesHtml = ["pa","fc","fr","temp","peso","talla","spo2"]
+      .filter(k => vitals[k])
+      .map(k => {
+        const labels = { pa: "P.A.", fc: "F.C.", fr: "F.R.", temp: "Temp.", peso: "Peso", talla: "Talla", spo2: "SpO₂" };
+        const units  = { pa: "mmHg", fc: "bpm", fr: "rpm", temp: "°C", peso: "kg", talla: "cm", spo2: "%" };
+        return `<span class="vital">${labels[k]}: <strong>${vitals[k]}</strong> ${units[k]}</span>`;
+      }).join("");
+
+    const prescHtml = (det.prescripciones || []).map(p => `
+      <div class="section">
+        <div class="section-title">Receta #${p.id} — ${p.estado}</div>
+        <ul>${(p.items || []).filter(Boolean).map(it =>
+          `<li>${it.medicamento_nombre || it.medicamento_texto || ""}${it.dosis ? ` — ${it.dosis}` : ""}${it.duracion ? ` — ${it.duracion}` : ""}</li>`
+        ).join("")}</ul>
+      </div>`).join("");
+
+    const estudiosHtml = (det.estudios || []).length > 0 ? `
+      <div class="section">
+        <div class="section-title">Estudios solicitados</div>
+        <ul>${(det.estudios || []).map(s =>
+          `<li>[${s.tipo}] ${s.descripcion} — ${s.estado}</li>`
+        ).join("")}</ul>
+      </div>` : "";
+
+    const alergiasHtml = alergias.length > 0
+      ? `<div class="alergias">⚠ Alergias: ${alergias.map(a => `${a.agente} (${a.severidad})`).join(" | ")}</div>`
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Consulta — ${det.pac_apellidos}, ${det.pac_nombres} — ${dayjs(det.creado_en).format("DD/MM/YYYY")}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 24px 32px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #166ae8; padding-bottom: 12px; margin-bottom: 16px; }
+    .header-left h1 { font-size: 18px; color: #166ae8; }
+    .header-left p { font-size: 12px; color: #555; margin-top: 2px; }
+    .header-right { text-align: right; font-size: 12px; color: #555; }
+    .paciente { background: #f4f6fb; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    .paciente h2 { font-size: 15px; margin-bottom: 4px; }
+    .paciente .datos { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #555; }
+    .alergias { background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; font-weight: bold; color: #856404; }
+    .vitales { display: flex; flex-wrap: wrap; gap: 10px; background: #eef2ff; border-radius: 4px; padding: 10px 14px; margin-bottom: 14px; }
+    .vital { font-size: 12px; color: #333; }
+    .section { margin-bottom: 14px; }
+    .section-title { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #166ae8; border-bottom: 1px solid #dde3f5; padding-bottom: 3px; margin-bottom: 6px; }
+    .section p, .section pre { font-size: 13px; color: #333; white-space: pre-wrap; line-height: 1.5; }
+    ul { padding-left: 20px; }
+    ul li { margin-bottom: 3px; }
+    .badge-cie { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+    .firma { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ccc; display: flex; justify-content: flex-end; }
+    .firma-box { text-align: center; }
+    .firma-box .linea { width: 200px; border-top: 1px solid #333; margin: 0 auto 4px; }
+    .firma-box p { font-size: 12px; color: #444; }
+    @media print { body { padding: 12px 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>Historia Clínica Electrónica</h1>
+      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}${det.especialidad ? ` — ${det.especialidad}` : ""}</p>
+    </div>
+    <div class="header-right">
+      <p><strong>Fecha:</strong> ${dayjs(det.creado_en).format("DD/MM/YYYY HH:mm")}</p>
+      <p><strong>Estado:</strong> ${det.estado}</p>
+      <p><strong>Consulta #${det.id}</strong></p>
+    </div>
+  </div>
+
+  <div class="paciente">
+    <h2>${det.pac_apellidos}, ${det.pac_nombres}</h2>
+    <div class="datos">
+      ${det.fecha_nacimiento ? `<span>Nacimiento: ${dayjs(det.fecha_nacimiento).format("DD/MM/YYYY")}</span>` : ""}
+      ${det.sexo ? `<span>Sexo: ${det.sexo}</span>` : ""}
+      ${det.pac_tel ? `<span>Tel: ${det.pac_tel}</span>` : ""}
+      ${det.pac_email ? `<span>Email: ${det.pac_email}</span>` : ""}
+    </div>
+  </div>
+
+  ${alergiasHtml}
+
+  ${vitalesHtml ? `<div class="vitales">${vitalesHtml}</div>` : ""}
+
+  ${det.diagnostico_cie ? `
+  <div class="section">
+    <div class="section-title">Diagnóstico</div>
+    <p><span class="badge-cie">CIE: ${det.diagnostico_cie}</span>${det.diagnostico_desc || ""}</p>
+  </div>` : ""}
+
+  ${det.subjetivo ? `
+  <div class="section">
+    <div class="section-title">Motivo / Anamnesis (Subjetivo)</div>
+    <p>${det.subjetivo}</p>
+  </div>` : ""}
+
+  ${det.examen_fisico ? `
+  <div class="section">
+    <div class="section-title">Examen Físico (Objetivo)</div>
+    <pre>${det.examen_fisico}</pre>
+  </div>` : ""}
+
+  ${det.plan ? `
+  <div class="section">
+    <div class="section-title">Plan de tratamiento</div>
+    <pre>${det.plan}</pre>
+  </div>` : ""}
+
+  ${prescHtml}
+  ${estudiosHtml}
+
+  <div class="firma">
+    <div class="firma-box">
+      <div class="linea"></div>
+      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>
+      ${det.especialidad ? `<p>${det.especialidad}</p>` : ""}
+    </div>
+  </div>
+</body>
+</html>`;
+
+    const win = window.open("", "_blank", "width=800,height=900");
+    if (!win) { alert("El navegador bloqueó la ventana emergente. Permite popups para este sitio."); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
+
   // ── PDF de receta ─────────────────────────────────────────────────────────
   const printRx = async (id) => {
     try {
@@ -110,13 +261,6 @@ export default function HistoriaClinica() {
       alert("No se pudo generar el PDF");
     }
   };
-
-  // ── agrupar antecedentes por tipo ─────────────────────────────────────────
-  const antByTipo = antecedentes.reduce((acc, a) => {
-    acc[a.tipo] = acc[a.tipo] || [];
-    acc[a.tipo].push(a);
-    return acc;
-  }, {});
 
   const edad = paciente?.fecha_nacimiento
     ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") + " años"
@@ -384,54 +528,102 @@ export default function HistoriaClinica() {
                 </div>
               </div>
 
-              {/* Alergias */}
-              {alergias.length > 0 && (
-                <div className="mt-3 pt-3 border-top">
-                  <div className="small fw-semibold text-danger mb-1">⚠ Alergias conocidas:</div>
-                  <div className="d-flex flex-wrap gap-1">
-                    {alergias.map(a => (
-                      <span key={a.id} className={`badge bg-${SEV_COLOR[a.severidad] || "secondary"}`}>
-                        {a.agente} — {a.severidad}
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              {/* Antecedentes resumen */}
-              {Object.keys(antByTipo).length > 0 && (
-                <div className="mt-3 pt-3 border-top">
-                  <div className="small fw-semibold text-muted mb-1">Antecedentes:</div>
-                  <div className="row g-2">
-                    {Object.entries(antByTipo).map(([tipo, items]) => (
-                      <div key={tipo} className="col-md-4">
-                        <div className="small text-uppercase text-muted mb-1">{tipo}</div>
-                        {items.map(a => (
-                          <div key={a.id} className="small text-body">• {a.descripcion}</div>
-                        ))}
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              )}
             </div>
           </div>
 
-          {/* Timeline de consultas */}
-          <h6 className="text-muted mb-3">Historial de Consultas ({historias.length})</h6>
+          {/* ── Pestañas ─────────────────────────────────────────────── */}
+          <ul className="nav nav-tabs mb-3">
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTabHist === "alergias" ? "active" : ""}`}
+                onClick={() => setActiveTabHist("alergias")}
+              >
+                <i className="bi bi-heart-pulse me-1"></i>
+                Alergias y Antecedentes
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTabHist === "historial" ? "active" : ""}`}
+                onClick={() => setActiveTabHist("historial")}
+              >
+                <i className="bi bi-clock-history me-1"></i>
+                Historial de Consultas
+                <span className="badge bg-secondary ms-1" style={{ fontSize: "0.7rem" }}>{historias.length}</span>
+              </button>
+            </li>
+          </ul>
 
-          {historias.length === 0 && (
-            <div className="text-center py-4 text-muted">
-              No hay consultas registradas.
-              <br />
-              <Link to={`/consulta?paciente_id=${paciente.id}`} className="btn btn-outline-primary btn-sm mt-2">
-                Abrir primera consulta
-              </Link>
-            </div>
+          {/* ── Tab 1: Alergias y Antecedentes ───────────────────────── */}
+          {activeTabHist === "alergias" && (
+            <AntecedentesClinico
+              pacienteId={selPacId || paciente_id}
+              sexo={paciente?.sexo}
+            />
           )}
 
-          <div className="timeline">
-            {historias.map((h, i) => {
+          {/* ── Tab 2: Historial de Consultas ────────────────────────── */}
+          {activeTabHist === "historial" && (() => {
+            const historiasFiltradas = historias.filter(h => {
+              const fecha = dayjs(h.creado_en);
+              if (filtroDesde && fecha.isBefore(dayjs(filtroDesde), "day")) return false;
+              if (filtroHasta && fecha.isAfter(dayjs(filtroHasta), "day")) return false;
+              return true;
+            });
+            return (
+            <div>
+              {/* Filtro por fecha */}
+              <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
+                <small className="text-muted fw-semibold">Filtrar por fecha:</small>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  style={{ width: 150 }}
+                  value={filtroDesde}
+                  onChange={e => setFiltroDesde(e.target.value)}
+                  placeholder="Desde"
+                />
+                <span className="text-muted small">—</span>
+                <input
+                  type="date"
+                  className="form-control form-control-sm"
+                  style={{ width: 150 }}
+                  value={filtroHasta}
+                  onChange={e => setFiltroHasta(e.target.value)}
+                  placeholder="Hasta"
+                />
+                {(filtroDesde || filtroHasta) && (
+                  <button
+                    className="btn btn-outline-secondary btn-sm"
+                    onClick={() => { setFiltroDesde(""); setFiltroHasta(""); }}
+                  >
+                    <i className="bi bi-x-circle me-1"></i>Limpiar
+                  </button>
+                )}
+                <small className="text-muted ms-auto">
+                  {historiasFiltradas.length} de {historias.length} consulta{historias.length !== 1 ? "s" : ""}
+                </small>
+              </div>
+
+              {historias.length === 0 && (
+                <div className="text-center py-4 text-muted">
+                  No hay consultas registradas.
+                  <br />
+                  <Link to={`/consulta?paciente_id=${paciente.id}`} className="btn btn-outline-primary btn-sm mt-2">
+                    Abrir primera consulta
+                  </Link>
+                </div>
+              )}
+
+              {historias.length > 0 && historiasFiltradas.length === 0 && (
+                <div className="alert alert-warning py-2">
+                  <i className="bi bi-search me-2"></i>
+                  No hay consultas en el rango de fechas seleccionado.
+                </div>
+              )}
+
+          <div className="timeline" style={{ maxHeight: 520, overflowY: "auto", paddingRight: 4 }}>
+              {historiasFiltradas.map((h, i) => {
               const det = detalle[h.id];
               const expanded = expandId === h.id;
               const vitals = h.objetivo
@@ -444,7 +636,7 @@ export default function HistoriaClinica() {
                   <div className="d-flex flex-column align-items-center" style={{ minWidth: 24 }}>
                     <div className={`rounded-circle border border-2 ${h.estado === "FIRMADA" ? "border-success bg-success" : "border-warning bg-warning"}`}
                       style={{ width: 12, height: 12, marginTop: 6, flexShrink: 0 }} />
-                    {i < historias.length - 1 && (
+                    {i < historiasFiltradas.length - 1 && (
                       <div style={{ width: 2, flex: 1, background: "#dee2e6", minHeight: 40 }} />
                     )}
                   </div>
@@ -486,21 +678,28 @@ export default function HistoriaClinica() {
                       )}
 
                       {/* Acciones */}
-                      <div className="d-flex gap-2 mt-2">
+                      <div className="d-flex gap-2 mt-2 flex-wrap">
                         <button className="btn btn-outline-secondary btn-sm"
                           onClick={() => toggleExpand(h.id)}>
                           {expanded ? "Ocultar detalle" : "Ver detalle"}
                         </button>
                         {h.estado === "BORRADOR" && (
-                          <Link to={`/consulta?historia_id=${h.id}`} className="btn btn-outline-primary btn-sm">
+                          <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-outline-primary btn-sm">
                             ✏ Editar
                           </Link>
                         )}
                         {h.estado === "FIRMADA" && (
-                          <Link to={`/consulta?historia_id=${h.id}`} className="btn btn-link btn-sm p-0">
+                          <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-link btn-sm p-0">
                             Ver completa
                           </Link>
                         )}
+                        <button
+                          className="btn btn-outline-secondary btn-sm ms-auto"
+                          title="Imprimir consulta"
+                          onClick={() => imprimirConsulta(h)}
+                        >
+                          <i className="bi bi-printer me-1"></i>Imprimir
+                        </button>
                       </div>
 
                       {/* Detalle expandido */}
@@ -559,6 +758,9 @@ export default function HistoriaClinica() {
               );
             })}
           </div>
+            </div>
+            );
+          })()}
         </>
       )}
 

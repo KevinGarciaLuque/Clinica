@@ -15,10 +15,11 @@
  *   Argumentos: C:\ruta\backend\scripts\enviar-recordatorios.js
  */
 
-require("dotenv").config();
+require("dotenv").config({ path: require("path").join(__dirname, "../.env") });
 const mysql = require("mysql2/promise");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
+const db = require("../db");
 
 // ═══════════════════════════════════════════════════════════════
 // UTILIDADES
@@ -54,19 +55,15 @@ function reemplazarVariables(texto, variables) {
 // ═══════════════════════════════════════════════════════════════
 
 async function enviarRecordatoriosAutomaticos() {
-  const connection = await mysql.createConnection({
-    host: process.env.DB_HOST || "localhost",
-    user: process.env.DB_USER || "root",
-    password: process.env.DB_PASSWORD || "",
-    database: process.env.DB_NAME || "clinica_db",
-  });
+  // Usar el pool compartido de db.js para garantizar misma conexión/timezone
+  const connection = db;
 
   try {
     console.log("🚀 Iniciando envío automático de recordatorios...\n");
 
     // Obtener todas las clínicas con recordatorios activos
     const [clinicas] = await connection.query(`
-      SELECT c.id, c.nombre, crc.*
+      SELECT c.id AS clinica_id, c.nombre, crc.*
       FROM clinicas c
       INNER JOIN clinica_recordatorios_config crc ON c.id = crc.clinica_id
       WHERE c.activo = 1
@@ -87,8 +84,6 @@ async function enviarRecordatoriosAutomaticos() {
   } catch (error) {
     console.error("❌ Error en proceso de recordatorios:", error);
     throw error;
-  } finally {
-    await connection.end();
   }
 }
 
@@ -103,9 +98,14 @@ async function procesarClinica(connection, clinica) {
     if (clinica.email_2h || clinica.sms_2h || clinica.whatsapp_2h) tiempos.push(2);
   }
 
+  console.log(`   Ventanas activas: ${tiempos.join(", ")}h`);
+
   for (const horas of tiempos) {
-    const inicio = new Date(ahora.getTime() + horas * 60 * 60 * 1000);
-    const fin = new Date(inicio.getTime() + 60 * 60 * 1000); // Ventana de 1 hora
+    // Ventana de ±1h centrada en la marca objetivo para mayor resiliencia
+    const inicio = new Date(ahora.getTime() + (horas - 1) * 60 * 60 * 1000);
+    const fin = new Date(ahora.getTime() + (horas + 1) * 60 * 60 * 1000);
+
+    console.log(`   🔍 Verificando ventana ${horas}h (${inicio.toLocaleTimeString()} – ${fin.toLocaleTimeString()})...`);
 
     // Obtener citas en esta ventana de tiempo
     const [citas] = await connection.query(
@@ -119,7 +119,7 @@ async function procesarClinica(connection, clinica) {
        WHERE c.clinica_id = ?
          AND c.inicio BETWEEN ? AND ?
          AND c.estado IN ('PENDIENTE', 'CONFIRMADA')`,
-      [clinica.id, inicio, fin]
+      [clinica.clinica_id, inicio, fin]
     );
 
     if (citas.length > 0) {
@@ -162,7 +162,7 @@ async function procesarClinica(connection, clinica) {
           (horas === 24 && clinica.email_24h) ||
           (horas === 2 && clinica.email_2h))
       ) {
-        await enviarEmail(connection, clinica.id, cita, horas, variables);
+        await enviarEmail(connection, clinica.clinica_id, cita, horas, variables);
       }
 
       // SMS
@@ -170,7 +170,7 @@ async function procesarClinica(connection, clinica) {
         clinica.sms_activo &&
         ((horas === 48 && clinica.sms_48h) || (horas === 24 && clinica.sms_24h) || (horas === 2 && clinica.sms_2h))
       ) {
-        await enviarSMS(connection, clinica.id, cita, horas, variables);
+        await enviarSMS(connection, clinica.clinica_id, cita, horas, variables);
       }
 
       // WHATSAPP
@@ -180,7 +180,7 @@ async function procesarClinica(connection, clinica) {
           (horas === 24 && clinica.whatsapp_24h) ||
           (horas === 2 && clinica.whatsapp_2h))
       ) {
-        await enviarWhatsApp(connection, clinica.id, cita, horas, variables);
+        await enviarWhatsApp(connection, clinica.clinica_id, cita, horas, variables);
       }
     }
   }
@@ -222,7 +222,7 @@ async function enviarEmail(connection, clinicaId, cita, horas, variables) {
     const contenido = reemplazarVariables(plantilla.contenido, variables);
 
     // Enviar email
-    const transporter = nodemailer.createTransporter({
+    const transporter = nodemailer.createTransport({
       host: smtp.smtp_host,
       port: smtp.smtp_port,
       secure: smtp.smtp_secure === 1,
@@ -244,7 +244,7 @@ async function enviarEmail(connection, clinicaId, cita, horas, variables) {
       `INSERT INTO cita_recordatorios 
        (cita_id, tipo, mensaje, destinatario, proveedor, enviado, enviado_en, programado_para)
        VALUES (?, ?, ?, ?, 'SMTP', 1, NOW(), ?)`,
-      [`EMAIL_${horas}H`, contenido, cita.paciente_email, cita.inicio]
+      [cita.id, `EMAIL_${horas}H`, contenido, cita.paciente_email, cita.inicio]
     );
 
     await connection.query(

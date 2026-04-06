@@ -307,6 +307,176 @@ const WHO_PESO_TALLA_M = [
   { talla: 110, L: -0.3521, M: 18.2689, S: 0.08755 },
 ];
 
+// ═══════════════════════════════════════════════════════════
+// WHO GROWTH REFERENCE 2007 — 5 a 19 años (61-228 meses)
+// Fuente: WHO 2007 Growth Reference (de Onis et al., 2007)
+// Indicadores: talla/edad (61-228m), IMC/edad (61-228m), peso/edad (61-120m)
+// PC/edad y Peso/talla NO tienen referencia OMS para 5-19 años.
+// Datos cada 6 meses para optimizar tamaño; la interpolación rellena entre puntos.
+// ═══════════════════════════════════════════════════════════
+
+// Talla para edad (cm) — Niños (M) 5-19 años
+const WHO_TALLA_EDAD_M_519 = [
+  { mes: 60, L: 1, M: 109.7265, S: 0.04156 },
+  { mes: 66, L: 1, M: 112.9110, S: 0.04203 },
+  { mes: 72, L: 1, M: 115.9509, S: 0.04249 },
+  { mes: 78, L: 1, M: 118.8700, S: 0.04295 },
+  { mes: 84, L: 1, M: 121.7338, S: 0.04342 },
+  { mes: 90, L: 1, M: 124.5361, S: 0.04390 },
+  { mes: 96, L: 1, M: 127.2651, S: 0.04438 },
+  { mes: 102, L: 1, M: 129.9300, S: 0.04487 },
+  { mes: 108, L: 1, M: 132.5652, S: 0.04535 },
+  { mes: 114, L: 1, M: 135.1829, S: 0.04582 },
+  { mes: 120, L: 1, M: 137.7795, S: 0.04626 },
+  { mes: 126, L: 1, M: 140.3948, S: 0.04667 },
+  { mes: 132, L: 1, M: 143.1126, S: 0.04703 },
+  { mes: 138, L: 1, M: 145.9891, S: 0.04732 },
+  { mes: 144, L: 1, M: 149.0807, S: 0.04753 },
+  { mes: 150, L: 1, M: 152.4425, S: 0.04763 },
+  { mes: 156, L: 1, M: 156.0426, S: 0.04760 },
+  { mes: 162, L: 1, M: 159.6962, S: 0.04744 },
+  { mes: 168, L: 1, M: 163.1816, S: 0.04714 },
+  { mes: 174, L: 1, M: 166.3050, S: 0.04671 },
+  { mes: 180, L: 1, M: 168.9580, S: 0.04619 },
+  { mes: 186, L: 1, M: 171.1468, S: 0.04559 },
+  { mes: 192, L: 1, M: 172.8967, S: 0.04495 },
+  { mes: 198, L: 1, M: 174.2251, S: 0.04429 },
+  { mes: 204, L: 1, M: 175.1609, S: 0.04364 },
+  { mes: 210, L: 1, M: 175.7672, S: 0.04301 },
+  { mes: 216, L: 1, M: 176.1449, S: 0.04241 },
+  { mes: 222, L: 1, M: 176.3851, S: 0.04185 },
+  { mes: 228, L: 1, M: 176.5432, S: 0.04134 },
+];
+
+// Talla para edad (cm) — Niñas (F) 5-19 años
+const WHO_TALLA_EDAD_F_519 = [
+  { mes: 60, L: 1, M: 109.0725, S: 0.04346 },
+  { mes: 66, L: 1, M: 112.1753, S: 0.04399 },
+  { mes: 72, L: 1, M: 115.1244, S: 0.04447 },
+  { mes: 78, L: 1, M: 117.9769, S: 0.04489 },
+  { mes: 84, L: 1, M: 120.8105, S: 0.04525 },
+  { mes: 90, L: 1, M: 123.6646, S: 0.04556 },
+  { mes: 96, L: 1, M: 126.5558, S: 0.04581 },
+  { mes: 102, L: 1, M: 129.4975, S: 0.04600 },
+  { mes: 108, L: 1, M: 132.4944, S: 0.04612 },
+  { mes: 114, L: 1, M: 135.5410, S: 0.04617 },
+  { mes: 120, L: 1, M: 138.6363, S: 0.04614 },
+  { mes: 126, L: 1, M: 141.7892, S: 0.04603 },
+  { mes: 132, L: 1, M: 144.9929, S: 0.04584 },
+  { mes: 138, L: 1, M: 148.1804, S: 0.04557 },
+  { mes: 144, L: 1, M: 151.2327, S: 0.04523 },
+  { mes: 150, L: 1, M: 154.0041, S: 0.04483 },
+  { mes: 156, L: 1, M: 156.3748, S: 0.04439 },
+  { mes: 162, L: 1, M: 158.2997, S: 0.04392 },
+  { mes: 168, L: 1, M: 159.7890, S: 0.04345 },
+  { mes: 174, L: 1, M: 160.8927, S: 0.04299 },
+  { mes: 180, L: 1, M: 161.6692, S: 0.04255 },
+  { mes: 186, L: 1, M: 162.1880, S: 0.04214 },
+  { mes: 192, L: 1, M: 162.5156, S: 0.04176 },
+  { mes: 198, L: 1, M: 162.7165, S: 0.04141 },
+  { mes: 204, L: 1, M: 162.8545, S: 0.04109 },
+  { mes: 210, L: 1, M: 162.9649, S: 0.04080 },
+  { mes: 216, L: 1, M: 163.0595, S: 0.04053 },
+  { mes: 222, L: 1, M: 163.1279, S: 0.04030 },
+  { mes: 228, L: 1, M: 163.1548, S: 0.04009 },
+];
+
+// IMC para edad — Niños (M) 5-19 años
+const WHO_IMC_EDAD_M_519 = [
+  { mes: 60, L: -0.7151, M: 15.2679, S: 0.08366 },
+  { mes: 66, L: -0.8554, M: 15.2645, S: 0.08516 },
+  { mes: 72, L: -0.9921, M: 15.3062, S: 0.08682 },
+  { mes: 78, L: -1.1230, M: 15.3825, S: 0.08865 },
+  { mes: 84, L: -1.2460, M: 15.4832, S: 0.09068 },
+  { mes: 90, L: -1.3596, M: 15.6023, S: 0.09289 },
+  { mes: 96, L: -1.4629, M: 15.7368, S: 0.09526 },
+  { mes: 102, L: -1.5542, M: 15.8855, S: 0.09778 },
+  { mes: 108, L: -1.6318, M: 16.0490, S: 0.10038 },
+  { mes: 114, L: -1.6944, M: 16.2333, S: 0.10303 },
+  { mes: 120, L: -1.7407, M: 16.4433, S: 0.10566 },
+  { mes: 126, L: -1.7710, M: 16.6786, S: 0.10823 },
+  { mes: 132, L: -1.7862, M: 16.9392, S: 0.11070 },
+  { mes: 138, L: -1.7873, M: 17.2236, S: 0.11304 },
+  { mes: 144, L: -1.7751, M: 17.5334, S: 0.11522 },
+  { mes: 150, L: -1.7511, M: 17.8704, S: 0.11720 },
+  { mes: 156, L: -1.7168, M: 18.2330, S: 0.11898 },
+  { mes: 162, L: -1.6732, M: 18.6148, S: 0.12055 },
+  { mes: 168, L: -1.6211, M: 19.0050, S: 0.12191 },
+  { mes: 174, L: -1.5615, M: 19.3937, S: 0.12310 },
+  { mes: 180, L: -1.4961, M: 19.7744, S: 0.12412 },
+  { mes: 186, L: -1.4263, M: 20.1427, S: 0.12501 },
+  { mes: 192, L: -1.3529, M: 20.4951, S: 0.12579 },
+  { mes: 198, L: -1.2762, M: 20.8287, S: 0.12650 },
+  { mes: 204, L: -1.1962, M: 21.1423, S: 0.12715 },
+  { mes: 210, L: -1.1129, M: 21.4354, S: 0.12777 },
+  { mes: 216, L: -1.0260, M: 21.7077, S: 0.12836 },
+  { mes: 222, L: -0.9356, M: 21.9585, S: 0.12893 },
+  { mes: 228, L: -0.8419, M: 22.1883, S: 0.12948 },
+];
+
+// IMC para edad — Niñas (F) 5-19 años
+const WHO_IMC_EDAD_F_519 = [
+  { mes: 60, L: -0.8702, M: 15.2453, S: 0.09646 },
+  { mes: 66, L: -0.9780, M: 15.2464, S: 0.09920 },
+  { mes: 72, L: -1.0794, M: 15.2697, S: 0.10195 },
+  { mes: 78, L: -1.1728, M: 15.3200, S: 0.10471 },
+  { mes: 84, L: -1.2565, M: 15.4036, S: 0.10746 },
+  { mes: 90, L: -1.3287, M: 15.5240, S: 0.11020 },
+  { mes: 96, L: -1.3880, M: 15.6810, S: 0.11291 },
+  { mes: 102, L: -1.4336, M: 15.8738, S: 0.11557 },
+  { mes: 108, L: -1.4650, M: 16.0964, S: 0.11816 },
+  { mes: 114, L: -1.4823, M: 16.3425, S: 0.12067 },
+  { mes: 120, L: -1.4864, M: 16.6133, S: 0.12307 },
+  { mes: 126, L: -1.4787, M: 16.9136, S: 0.12534 },
+  { mes: 132, L: -1.4606, M: 17.2459, S: 0.12748 },
+  { mes: 138, L: -1.4339, M: 17.6088, S: 0.12946 },
+  { mes: 144, L: -1.4006, M: 17.9966, S: 0.13129 },
+  { mes: 150, L: -1.3621, M: 18.3986, S: 0.13295 },
+  { mes: 156, L: -1.3195, M: 18.8012, S: 0.13445 },
+  { mes: 162, L: -1.2739, M: 19.1931, S: 0.13580 },
+  { mes: 168, L: -1.2266, M: 19.5647, S: 0.13700 },
+  { mes: 174, L: -1.1788, M: 19.9070, S: 0.13808 },
+  { mes: 180, L: -1.1311, M: 20.2125, S: 0.13904 },
+  { mes: 186, L: -1.0838, M: 20.4769, S: 0.13991 },
+  { mes: 192, L: -1.0368, M: 20.7008, S: 0.14070 },
+  { mes: 198, L: -0.9898, M: 20.8863, S: 0.14142 },
+  { mes: 204, L: -0.9423, M: 21.0367, S: 0.14208 },
+  { mes: 210, L: -0.8944, M: 21.1586, S: 0.14271 },
+  { mes: 216, L: -0.8462, M: 21.2603, S: 0.14330 },
+  { mes: 222, L: -0.7980, M: 21.3480, S: 0.14386 },
+  { mes: 228, L: -0.7496, M: 21.4269, S: 0.14441 },
+];
+
+// Peso para edad (kg) — Niños (M) 5-10 años (61-120m) — WHO 2007
+const WHO_PESO_EDAD_M_519 = [
+  { mes: 60, L: -0.1922, M: 18.3328, S: 0.12947 },
+  { mes: 66, L: -0.2548, M: 19.3940, S: 0.13178 },
+  { mes: 72, L: -0.3180, M: 20.5137, S: 0.13372 },
+  { mes: 78, L: -0.3804, M: 21.6810, S: 0.13554 },
+  { mes: 84, L: -0.4402, M: 22.8915, S: 0.13759 },
+  { mes: 90, L: -0.4964, M: 24.1371, S: 0.14016 },
+  { mes: 96, L: -0.5482, M: 25.4163, S: 0.14344 },
+  { mes: 102, L: -0.5946, M: 26.7358, S: 0.14752 },
+  { mes: 108, L: -0.6337, M: 28.1092, S: 0.15233 },
+  { mes: 114, L: -0.6624, M: 29.5736, S: 0.15760 },
+  { mes: 120, L: -0.6764, M: 31.1586, S: 0.16305 },
+];
+
+// Peso para edad (kg) — Niñas (F) 5-10 años (61-120m) — WHO 2007
+const WHO_PESO_EDAD_F_519 = [
+  { mes: 60, L: -0.4650, M: 18.0823, S: 0.14240 },
+  { mes: 66, L: -0.4834, M: 19.1276, S: 0.14569 },
+  { mes: 72, L: -0.5013, M: 20.1639, S: 0.14900 },
+  { mes: 78, L: -0.5185, M: 21.2274, S: 0.15230 },
+  { mes: 84, L: -0.5347, M: 22.3740, S: 0.15556 },
+  { mes: 90, L: -0.5495, M: 23.6369, S: 0.15876 },
+  { mes: 96, L: -0.5627, M: 25.0262, S: 0.16186 },
+  { mes: 102, L: -0.5740, M: 26.5519, S: 0.16483 },
+  { mes: 108, L: -0.5833, M: 28.2040, S: 0.16764 },
+  { mes: 114, L: -0.5905, M: 29.9663, S: 0.17025 },
+  { mes: 120, L: -0.5958, M: 31.8578, S: 0.17262 },
+];
+
 // Peso para talla (kg) — Niñas (F) — Longitud 45–110 cm (WHO 2006)
 const WHO_PESO_TALLA_F = [
   { talla: 45, L: -0.3833, M: 2.4607, S: 0.09029 },
@@ -379,7 +549,16 @@ function zscoreToPercentil(z) {
   return Math.round(cdf * 1000) / 10; // 1 decimal
 }
 
-function obtenerTabla(indicador, sexo) {
+function obtenerTabla(indicador, sexo, rango = "0_5") {
+  if (rango === "5_19") {
+    const tablas519 = {
+      "talla-edad": { M: WHO_TALLA_EDAD_M_519, F: WHO_TALLA_EDAD_F_519 },
+      "imc-edad":   { M: WHO_IMC_EDAD_M_519,   F: WHO_IMC_EDAD_F_519   },
+      "peso-edad":  { M: WHO_PESO_EDAD_M_519,   F: WHO_PESO_EDAD_F_519  },
+      // PC/edad y Peso/talla no tienen referencia OMS para 5-19 años
+    };
+    return tablas519[indicador]?.[sexo] || null;
+  }
   const tablas = {
     "peso-edad":  { M: WHO_PESO_EDAD_M, F: WHO_PESO_EDAD_F },
     "talla-edad": { M: WHO_TALLA_EDAD_M, F: WHO_TALLA_EDAD_F },
@@ -437,8 +616,8 @@ function calcularTodosZscores(edadMeses, sexo, peso, talla, imc, pc) {
 }
 
 // Generar curvas de referencia para un indicador (para la gráfica)
-function generarCurvasReferencia(indicador, sexo) {
-  const tabla = obtenerTabla(indicador, sexo);
+function generarCurvasReferencia(indicador, sexo, rango = "0_5") {
+  const tabla = obtenerTabla(indicador, sexo, rango);
   if (!tabla) return null;
 
   const xKey = indicador === "peso-talla" ? "talla" : "mes";
@@ -469,9 +648,11 @@ function generarCurvasReferencia(indicador, sexo) {
 const ROLES = ["ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA", "SUPER_ADMIN"];
 
 // GET /api/crecimiento/referencia/:indicador/:sexo — Curvas de referencia OMS
+// Query param: ?rango=0_5 (default) | ?rango=5_19
 // ⚠️ DEBE ir ANTES de /:pacienteId para que Express no lo capture como pacienteId
 router.get("/referencia/:indicador/:sexo", auth(...ROLES), (req, res) => {
   const { indicador, sexo } = req.params;
+  const rango = req.query.rango === "5_19" ? "5_19" : "0_5";
   const sexoUpper = (sexo || "").toUpperCase();
 
   if (!["M", "F"].includes(sexoUpper)) {
@@ -483,9 +664,9 @@ router.get("/referencia/:indicador/:sexo", auth(...ROLES), (req, res) => {
     return res.status(400).json({ ok: false, msg: "Indicador inválido" });
   }
 
-  const curves = generarCurvasReferencia(indicador, sexoUpper);
+  const curves = generarCurvasReferencia(indicador, sexoUpper, rango);
   if (!curves) {
-    return res.status(404).json({ ok: false, msg: "Datos no disponibles" });
+    return res.status(404).json({ ok: false, msg: "Datos no disponibles para este indicador/rango" });
   }
 
   res.json({ ok: true, data: curves });

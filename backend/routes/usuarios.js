@@ -58,15 +58,30 @@ router.get("/medicos", auth(), async (req, res) => {
       ? (req.tenant?.clinica_id || req.query.clinica_id)
       : req.user.clinica_id;
 
-    if (!clinicaId) return res.json({ ok: true, data: [] });
-
-    const [rows] = await pool.query(
-      `SELECT u.id, u.nombres, u.apellidos, e.nombre AS especialidad
-       FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
-       WHERE u.clinica_id=? AND u.tipo='MEDICO' AND u.activo=1
-       ORDER BY u.apellidos`,
-      [clinicaId]
-    );
+    let rows;
+    if (!clinicaId && req.user.super) {
+      // SUPER_ADMIN sin clínica específica → traer todos los médicos de todas las clínicas
+      [rows] = await pool.query(
+        `SELECT u.id, u.nombres, u.apellidos, u.clinica_id,
+                c.nombre AS clinica_nombre,
+                e.nombre AS especialidad
+         FROM usuarios u
+         LEFT JOIN especialidades e ON e.id = u.especialidad_id
+         LEFT JOIN clinicas c ON c.id = u.clinica_id
+         WHERE u.tipo='MEDICO' AND u.activo=1
+         ORDER BY c.nombre, u.apellidos`
+      );
+    } else {
+      if (!clinicaId) return res.json({ ok: true, data: [] });
+      [rows] = await pool.query(
+        `SELECT u.id, u.nombres, u.apellidos, u.clinica_id,
+                e.nombre AS especialidad
+         FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
+         WHERE u.clinica_id=? AND u.tipo='MEDICO' AND u.activo=1
+         ORDER BY u.apellidos`,
+        [clinicaId]
+      );
+    }
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

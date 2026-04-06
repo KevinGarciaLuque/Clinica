@@ -39,7 +39,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
     
     const [docs] = await pool.query(
-      `SELECT id, tipo, nombre_original, mime_type, tamano_bytes, subido_por, creado_en
+      `SELECT id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por, creado_en AS subido_en
        FROM documentos_paciente
        WHERE paciente_id=? AND clinica_id=?
        ORDER BY creado_en DESC`,
@@ -63,7 +63,7 @@ router.post(
         return res.status(400).json({
           ok:  false,
           msg: err.code === "LIMIT_FILE_SIZE"
-            ? "El archivo no debe superar 5 MB"
+            ? "El archivo no debe superar 10 MB"
             : err.message,
         });
       }

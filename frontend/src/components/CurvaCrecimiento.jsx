@@ -112,6 +112,236 @@ function formatFechaNac(fechaNac) {
 }
 
 // ═══════════════════════════════════════════════════════════
+// HELPER PURO: construye datos para cualquier indicador
+// ═══════════════════════════════════════════════════════════
+function buildChartData(indKey, meds, curvasRef) {
+  if (!curvasRef) return [];
+  const indInf   = INDICADORES.find(i => i.key === indKey);
+  const isPT     = indKey === "peso-talla";
+  const xKey     = isPT ? "talla" : "mes";
+  const puntosRef = curvasRef["z0"] || [];
+
+  const data = puntosRef.map(p => {
+    const punto = { [xKey]: p[xKey] };
+    [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
+      const curva = curvasRef[`z${z}`];
+      if (curva) {
+        const match = curva.find(c => c[xKey] === p[xKey]);
+        if (match) punto[`z${z}`] = match.valor;
+      }
+    });
+    return punto;
+  });
+
+  meds.forEach(m => {
+    if (isPT) {
+      const peso = m.peso_kg, talla = m.talla_cm;
+      if (!peso || !talla) return;
+      const t   = parseFloat(talla);
+      const idx = data.findIndex(d => d.talla >= t);
+      const newPt = { talla: t, paciente: parseFloat(peso) };
+      [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
+        const curva = curvasRef[`z${z}`];
+        if (!curva) return;
+        const ci = curva.findIndex(c => c.talla >= t);
+        if (ci > 0) {
+          const a = curva[ci - 1], b = curva[ci];
+          const frac = (t - a.talla) / (b.talla - a.talla);
+          newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
+        } else if (ci === 0) { newPt[`z${z}`] = curva[0].valor; }
+      });
+      if (idx === -1) data.push(newPt);
+      else if (Math.abs(data[idx].talla - t) < 0.5) data[idx].paciente = parseFloat(peso);
+      else data.splice(idx, 0, newPt);
+    } else {
+      const valor = m[indInf.campo];
+      if (valor === null || valor === undefined) return;
+      const idx = data.findIndex(d => d.mes >= m.edad_meses);
+      const newPt = { mes: m.edad_meses, paciente: parseFloat(valor) };
+      [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
+        const curva = curvasRef[`z${z}`];
+        if (!curva) return;
+        const ci = curva.findIndex(c => c.mes >= m.edad_meses);
+        if (ci > 0) {
+          const a = curva[ci - 1], b = curva[ci];
+          const frac = (m.edad_meses - a.mes) / (b.mes - a.mes);
+          newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
+        } else if (ci === 0) { newPt[`z${z}`] = curva[0].valor; }
+      });
+      if (idx === -1) data.push(newPt);
+      else if (Math.abs(data[idx].mes - m.edad_meses) < 0.5) data[idx].paciente = parseFloat(valor);
+      else data.splice(idx, 0, newPt);
+    }
+  });
+
+  return data.sort((a, b) => (a[xKey] || 0) - (b[xKey] || 0));
+}
+
+function escHtml(s) {
+  if (s === null || s === undefined) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+function zColorHex(z) {
+  if (z === null || z === undefined) return "#6c757d";
+  const a = Math.abs(z);
+  if (a <= 1) return "#10b981";
+  if (a <= 2) return "#f59e0b";
+  return "#ef4444";
+}
+
+function generateConsolidadoHTML(svgSections, mediciones, sexoPaciente, fechaNacimiento) {
+  const edadTxt = fechaNacimiento ? formatEdadTexto(fechaNacimiento) : "";
+  const nacTxt  = fechaNacimiento ? formatFechaNac(fechaNacimiento)  : "";
+  const hoy     = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
+  const ultima  = mediciones.length > 0 ? mediciones[mediciones.length - 1] : null;
+
+  const resumenRows = [
+    { label: "Peso / Edad",           indKey: "peso-edad",   z: ultima?.zscore_peso_edad,   p: ultima?.percentil_peso_edad,   val: ultima?.peso_kg,               unit: "kg"    },
+    { label: "Talla / Edad",          indKey: "talla-edad",  z: ultima?.zscore_talla_edad,  p: ultima?.percentil_talla_edad,  val: ultima?.talla_cm,              unit: "cm"    },
+    { label: "Peso / Talla",          indKey: "peso-talla",  z: ultima?.zscore_peso_talla,  p: ultima?.percentil_peso_talla,  val: ultima?.peso_kg,               unit: "kg"    },
+    { label: "IMC / Edad",            indKey: "imc-edad",    z: ultima?.zscore_imc_edad,    p: ultima?.percentil_imc_edad,    val: ultima?.imc,                   unit: "kg/m²" },
+    { label: "Per. Cefálico / Edad",  indKey: "pc-edad",     z: ultima?.zscore_pc_edad,     p: ultima?.percentil_pc_edad,     val: ultima?.perimetro_cefalico_cm, unit: "cm"    },
+  ];
+
+  const resumenHtml = ultima
+    ? `<table class="tbl-res">
+        <thead><tr><th>Indicador</th><th>Valor</th><th>Z-Score</th><th>Percentil</th><th>Estado</th></tr></thead>
+        <tbody>
+          ${resumenRows.filter(r => r.val !== null && r.val !== undefined).map(r => {
+            const col = zColorHex(r.z);
+            return `<tr>
+              <td><strong>${r.label}</strong></td>
+              <td>${Number(r.val).toFixed(1)} ${escHtml(r.unit)}</td>
+              <td style="color:${col};font-weight:700">${r.z !== null && r.z !== undefined ? Number(r.z).toFixed(2) : "—"}</td>
+              <td>P${r.p !== null && r.p !== undefined ? Number(r.p).toFixed(0) : "—"}</td>
+              <td><span style="background:${col}20;color:${col};border:1px solid ${col}50;padding:2px 8px;border-radius:5px;font-size:10px;font-weight:700;text-transform:uppercase">${interpretarZscore(r.indKey, r.z)}</span></td>
+            </tr>`;
+          }).join("")}
+        </tbody>
+      </table>`
+    : `<p style="color:#888;font-style:italic">Sin mediciones registradas</p>`;
+
+  const historialRows = [...mediciones].reverse().map(m => {
+    const anios  = Math.floor(m.edad_meses / 12);
+    const mesesR = Math.round(m.edad_meses % 12);
+    const edadStr = `${anios > 0 ? anios + "a " : ""}${mesesR}m`;
+    const fmt = (v, dec = 2) => (v !== null && v !== undefined ? Number(v).toFixed(dec) : "—");
+    return `<tr>
+      <td>${new Date(m.fecha_medicion).toLocaleDateString("es-PE")}</td>
+      <td>${edadStr}</td>
+      <td>${m.peso_kg ?? "—"}</td>
+      <td>${m.talla_cm ?? "—"}</td>
+      <td>${m.imc ? Number(m.imc).toFixed(1) : "—"}</td>
+      <td>${m.perimetro_cefalico_cm ?? "—"}</td>
+      <td style="color:${zColorHex(m.zscore_peso_edad)};font-weight:700">${fmt(m.zscore_peso_edad)}</td>
+      <td style="color:${zColorHex(m.zscore_talla_edad)};font-weight:700">${fmt(m.zscore_talla_edad)}</td>
+      <td style="color:${zColorHex(m.zscore_peso_talla)};font-weight:700">${fmt(m.zscore_peso_talla)}</td>
+      <td style="color:${zColorHex(m.zscore_imc_edad)};font-weight:700">${fmt(m.zscore_imc_edad)}</td>
+      <td style="color:${zColorHex(m.zscore_pc_edad)};font-weight:700">${fmt(m.zscore_pc_edad)}</td>
+      <td style="color:#888;font-style:italic;max-width:120px">${escHtml(m.notas) || "—"}</td>
+    </tr>`;
+  }).join("");
+
+  const chartsHtml = svgSections.map(({ ind, svg }) => `
+    <div class="chart-sec">
+      <div class="chart-hdr">
+        <span class="ind-pill">${escHtml(ind.labelCorto)}</span>
+        ${escHtml(ind.label)} &mdash; ${sexoPaciente === "M" ? "Niños" : "Niñas"}
+      </div>
+      ${svg
+        ? `<div style="padding:8px">${svg}</div>`
+        : `<div style="padding:28px;text-align:center;color:#aaa;font-style:italic">Gráfica no disponible</div>`}
+    </div>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Reporte Consolidado — Curvas de Crecimiento OMS</title>
+  <style>
+    @page { size: A4 landscape; margin: 10mm 12mm; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, Helvetica, sans-serif; font-size: 12px; color: #1a1a1a; background: #fff; }
+    .tip-descarga { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 10px 16px; margin-bottom: 16px; font-size: 12px; color: #1d4ed8; display: flex; align-items: center; gap: 8px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 3px solid #166ae8; padding-bottom: 10px; margin-bottom: 14px; }
+    .header h1 { font-size: 17px; color: #166ae8; margin-bottom: 3px; }
+    .header p { font-size: 11px; color: #555; margin-top: 2px; }
+    .header-right { text-align: right; font-size: 11px; color: #555; }
+    .sec-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: #166ae8; border-left: 3px solid #166ae8; padding: 3px 0 3px 8px; margin-bottom: 8px; margin-top: 14px; }
+    .tbl-res { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+    .tbl-res th { background: linear-gradient(135deg,#214a87,#176DC8); color: #fff; padding: 7px 12px; font-size: 10px; text-transform: uppercase; letter-spacing: .04em; text-align: left; }
+    .tbl-res td { padding: 7px 12px; border-bottom: 1px solid #e9ecef; font-size: 12px; }
+    .tbl-res tr:nth-child(even) td { background: #f8f9fa; }
+    .tbl-hist { width: 100%; border-collapse: collapse; font-size: 10px; }
+    .tbl-hist th { background: linear-gradient(135deg,#214a87,#176DC8); color: #fff; padding: 5px 7px; font-size: 9px; text-transform: uppercase; letter-spacing: .03em; text-align: left; }
+    .tbl-hist td { padding: 5px 7px; border-bottom: 1px solid #e9ecef; }
+    .tbl-hist tr:nth-child(even) td { background: #f8f9fa; }
+    .charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 6px; }
+    .chart-sec { border: 1px solid #e9ecef; border-radius: 8px; overflow: hidden; }
+    .chart-hdr { background: #f4f6fb; padding: 6px 12px; font-size: 12px; font-weight: 700; color: #214a87; border-bottom: 1px solid #e9ecef; display: flex; align-items: center; gap: 8px; }
+    .ind-pill { background: #166ae8; color: #fff; padding: 2px 7px; border-radius: 4px; font-size: 10px; font-weight: 700; }
+    .chart-sec svg { width: 100%; height: auto; max-height: 270px; display: block; }
+    .legend { display: flex; gap: 14px; justify-content: flex-end; margin-bottom: 8px; font-size: 10px; }
+    .legend span { display: flex; align-items: center; gap: 4px; }
+    .leg-l { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
+    .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dee2e6; display: flex; justify-content: space-between; font-size: 9px; color: #aaa; }
+    @media print { .tip-descarga, .no-print { display: none !important; } .chart-sec { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <div class="tip-descarga no-print">
+    💡 <strong>Para guardar como PDF:</strong> Presiona <kbd>Ctrl+P</kbd> (o <kbd>Cmd+P</kbd>) → Destino: <em>Guardar como PDF</em> → Orientación: <em>Horizontal</em> → Guardar
+  </div>
+  <div class="header">
+    <div>
+      <h1>📈 Reporte Consolidado &mdash; Curvas de Crecimiento OMS</h1>
+      <p>${sexoPaciente === "M" ? "Paciente masculino" : "Paciente femenino"} &nbsp;·&nbsp; ${mediciones.length} medición${mediciones.length !== 1 ? "es" : ""} registrada${mediciones.length !== 1 ? "s" : ""}</p>
+    </div>
+    <div class="header-right">
+      <p style="font-weight:700;color:#166ae8">Generado: ${hoy}</p>
+      ${nacTxt ? `<p>F. Nac: ${escHtml(nacTxt)}</p>` : ""}
+      ${edadTxt ? `<p>Edad actual: ${escHtml(edadTxt)}</p>` : ""}
+    </div>
+  </div>
+  ${ultima ? `
+  <div class="sec-title">Resumen &mdash; Última medición (${new Date(ultima.fecha_medicion).toLocaleDateString("es-PE")})</div>
+  ${resumenHtml}` : ""}
+
+  <div class="sec-title">Curvas de Crecimiento &mdash; Estándares OMS</div>
+  <div class="legend">
+    <span><span class="leg-l" style="background:#10b981"></span> Normal (±1 DE)</span>
+    <span><span class="leg-l" style="background:#f59e0b"></span> Riesgo (±2 DE)</span>
+    <span><span class="leg-l" style="background:#ef4444"></span> Alerta (±3 DE)</span>
+    <span><span class="leg-l" style="background:#166ae8"></span> Paciente</span>
+  </div>
+  <div class="charts-grid">${chartsHtml}</div>
+
+  ${mediciones.length > 0 ? `
+  <div class="sec-title" style="margin-top:18px">Historial completo de mediciones</div>
+  <div style="overflow-x:auto">
+    <table class="tbl-hist">
+      <thead><tr>
+        <th>Fecha</th><th>Edad</th><th>Peso(kg)</th><th>Talla(cm)</th><th>IMC</th><th>P.C.(cm)</th>
+        <th>Z P/E</th><th>Z T/E</th><th>Z P/T</th><th>Z IMC</th><th>Z PC</th><th>Notas</th>
+      </tr></thead>
+      <tbody>${historialRows}</tbody>
+    </table>
+  </div>` : ""}
+
+  <div class="footer">
+    <span>Estándares de Crecimiento OMS &mdash; Organización Mundial de la Salud</span>
+    <span>Generado el ${hoy}</span>
+  </div>
+</body>
+</html>`;
+}
+
+// ═══════════════════════════════════════════════════════════
 // COMPONENTE PRINCIPAL
 // ═══════════════════════════════════════════════════════════
 
@@ -125,15 +355,41 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
 
+  // estados para reporte consolidado
+  const [todasCurvas,        setTodasCurvas]        = useState({});
+  const [showMenuImprimir,   setShowMenuImprimir]   = useState(false);
+  const [showMenuDescargar,  setShowMenuDescargar]  = useState(false);
+  const [generandoConsolidado, setGenerandoConsolidado] = useState(false);
+  const hiddenChartsRef = useRef({});
+
+  // rango OMS: "0_5" = Estándares 0-5 años | "5_19" = Referencia 5-19 años
+  const [rango, setRango] = useState("0_5");
+
   useEffect(() => {
     const onResize = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
 
+  // Cerrar dropdowns al hacer clic fuera
+  useEffect(() => {
+    const handler = () => { setShowMenuImprimir(false); setShowMenuDescargar(false); };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
   const sexoPaciente = (sexo || "M").toUpperCase();
   const indInfo = INDICADORES.find(i => i.key === indicador);
   const isPesoTalla = indicador === "peso-talla";
+
+  // Indicadores sin datos OMS para 5-19 años
+  const INDICADORES_SIN_519 = ["pc-edad", "peso-talla"];
+  const handleRangoChange = (nuevoRango) => {
+    if (nuevoRango === "5_19" && INDICADORES_SIN_519.includes(indicador)) {
+      setIndicador("talla-edad");
+    }
+    setRango(nuevoRango);
+  };
   const xKey = isPesoTalla ? "talla" : "mes";
   const chartRef = useRef(null);
 
@@ -157,19 +413,34 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const cargarCurvasRef = useCallback(async () => {
     try {
       setCurvasRef(null);
-      const res = await api.get(`/crecimiento/referencia/${indicador}/${sexoPaciente}`);
+      const params = rango === "5_19" ? "?rango=5_19" : "";
+      const res = await api.get(`/crecimiento/referencia/${indicador}/${sexoPaciente}${params}`);
       setCurvasRef(res.data.data);
     } catch (err) {
       console.error("Error cargando curvas referencia:", err);
       setCurvasRef(null);
     }
-  }, [indicador, sexoPaciente]);
+  }, [indicador, sexoPaciente, rango]);
+
+  // Carga las 5 curvas de referencia para el reporte consolidado
+  const cargarTodasCurvas = useCallback(async () => {
+    const resultados = {};
+    await Promise.all(INDICADORES.map(async (ind) => {
+      try {
+        const res = await api.get(`/crecimiento/referencia/${ind.key}/${sexoPaciente}`);
+        resultados[ind.key] = res.data.data;
+      } catch { /* silencio */ }
+    }));
+    setTodasCurvas(resultados);
+  }, [sexoPaciente]);
 
   useEffect(() => {
     setLoading(true);
     Promise.all([cargarMediciones(), cargarCurvasRef()])
       .finally(() => setLoading(false));
   }, [cargarMediciones, cargarCurvasRef]);
+
+  useEffect(() => { cargarTodasCurvas(); }, [cargarTodasCurvas]);
 
   // ─────────────────────────────────────────────────────────
   // GUARDAR MEDICIÓN
@@ -219,110 +490,7 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   // ─────────────────────────────────────────────────────────
   // PREPARAR DATOS PARA LA GRÁFICA
   // ─────────────────────────────────────────────────────────
-  const chartData = (() => {
-    if (!curvasRef) return [];
-
-    // Tomar los puntos de las curvas de referencia como eje X
-    const puntosRef = curvasRef["z0"] || [];
-    const data = puntosRef.map(p => {
-      const punto = { [xKey]: p[xKey] };
-
-      // Agregar bandas de Z-score
-      [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
-        const curva = curvasRef[`z${z}`];
-        if (curva) {
-          const match = curva.find(c => c[xKey] === p[xKey]);
-          if (match) punto[`z${z}`] = match.valor;
-        }
-      });
-
-      return punto;
-    });
-
-    // Agregar mediciones del paciente
-    mediciones.forEach(m => {
-      if (isPesoTalla) {
-        const peso = m.peso_kg;
-        const talla = m.talla_cm;
-        if (!peso || !talla) return;
-        const t = parseFloat(talla);
-        const idx = data.findIndex(d => d.talla >= t);
-        if (idx === -1) {
-          const newPt = { talla: t, paciente: parseFloat(peso) };
-          // Interpolar z-scores en el punto insertado
-          [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
-            const curva = curvasRef[`z${z}`];
-            if (!curva) return;
-            const ci = curva.findIndex(c => c.talla >= t);
-            if (ci > 0) {
-              const a = curva[ci - 1], b = curva[ci];
-              const frac = (t - a.talla) / (b.talla - a.talla);
-              newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
-            } else if (ci === 0) {
-              newPt[`z${z}`] = curva[0].valor;
-            }
-          });
-          data.push(newPt);
-        } else if (Math.abs(data[idx].talla - t) < 0.5) {
-          data[idx].paciente = parseFloat(peso);
-        } else {
-          const newPt = { talla: t, paciente: parseFloat(peso) };
-          [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
-            const curva = curvasRef[`z${z}`];
-            if (!curva) return;
-            const ci = curva.findIndex(c => c.talla >= t);
-            if (ci > 0) {
-              const a = curva[ci - 1], b = curva[ci];
-              const frac = (t - a.talla) / (b.talla - a.talla);
-              newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
-            } else if (ci === 0) {
-              newPt[`z${z}`] = curva[0].valor;
-            }
-          });
-          data.splice(idx, 0, newPt);
-        }
-      } else {
-        const valor = m[indInfo.campo];
-        if (valor === null || valor === undefined) return;
-        const idx = data.findIndex(d => d.mes >= m.edad_meses);
-        if (idx === -1) {
-          const newPt = { mes: m.edad_meses, paciente: parseFloat(valor) };
-          [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
-            const curva = curvasRef[`z${z}`];
-            if (!curva) return;
-            const ci = curva.findIndex(c => c.mes >= m.edad_meses);
-            if (ci > 0) {
-              const a = curva[ci - 1], b = curva[ci];
-              const frac = (m.edad_meses - a.mes) / (b.mes - a.mes);
-              newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
-            } else if (ci === 0) {
-              newPt[`z${z}`] = curva[0].valor;
-            }
-          });
-          data.push(newPt);
-        } else if (Math.abs(data[idx].mes - m.edad_meses) < 0.5) {
-          data[idx].paciente = parseFloat(valor);
-        } else {
-          const newPt = { mes: m.edad_meses, paciente: parseFloat(valor) };
-          [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
-            const curva = curvasRef[`z${z}`];
-            if (!curva) return;
-            const ci = curva.findIndex(c => c.mes >= m.edad_meses);
-            if (ci > 0) {
-              const a = curva[ci - 1], b = curva[ci];
-              const frac = (m.edad_meses - a.mes) / (b.mes - a.mes);
-              newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
-            } else if (ci === 0) {
-              newPt[`z${z}`] = curva[0].valor;
-            }
-          });
-          data.splice(idx, 0, newPt);
-        }
-      }
-    });
-
-    return data.sort((a, b) => (a[xKey] || 0) - (b[xKey] || 0));
-  })();
+  const chartData = buildChartData(indicador, mediciones, curvasRef);
 
   // ─────────────────────────────────────────────────────────
   // TOOLTIP PERSONALIZADO
@@ -364,15 +532,14 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   };
 
   // ─────────────────────────────────────────────────────────
-  // IMPRIMIR CURVAS
+  // IMPRIMIR / DESCARGAR — curva actual (una sola)
   // ─────────────────────────────────────────────────────────
-  const handlePrint = () => {
+  const abrirVentanaCurvaActual = (autoPrint) => {
     const el = chartRef.current;
     if (!el) return;
     const svgEl = el.querySelector(".recharts-wrapper svg");
     if (!svgEl) return;
 
-    // Clonar SVG y fijar viewBox para que escale correctamente
     const clone = svgEl.cloneNode(true);
     const w = svgEl.getAttribute("width") || svgEl.getBoundingClientRect().width;
     const h = svgEl.getAttribute("height") || svgEl.getBoundingClientRect().height;
@@ -382,18 +549,23 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
     clone.removeAttribute("style");
     const svgData = new XMLSerializer().serializeToString(clone);
 
-    const edadTxt = fechaNacimiento ? formatEdadTexto(fechaNacimiento) : "";
-    const nacTxt = fechaNacimiento ? formatFechaNac(fechaNacimiento) : "";
+    const edadTxt  = fechaNacimiento ? formatEdadTexto(fechaNacimiento) : "";
+    const nacTxt   = fechaNacimiento ? formatFechaNac(fechaNacimiento) : "";
     const infoExtra = fechaNacimiento ? `F. Nac: ${nacTxt} · Edad actual: ${edadTxt}` : "";
+    const hoy = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
+    const tipDescarga = !autoPrint
+      ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#1d4ed8">
+           💡 <strong>Para guardar como PDF:</strong> Presiona <kbd>Ctrl+P</kbd> → Destino: <em>Guardar como PDF</em> → Orientación: <em>Horizontal</em>
+         </div>` : "";
 
-    const win = window.open("", "", "width=1050,height=750");
+    const win = window.open("", "_blank", "width=1050,height=750");
     if (!win) return;
-    win.document.write(`<html><head><title>Curva de Crecimiento - ${indInfo.label}</title>
+    win.document.write(`<html><head><title>Curva de Crecimiento - ${escHtml(indInfo.label)}</title>
       <style>
         @page{size:landscape;margin:12mm}
         *{box-sizing:border-box}
         body{font-family:Arial,Helvetica,sans-serif;padding:20px 30px;text-align:center;color:#1a1a1a;margin:0}
-        h2{margin:0 0 2px;font-size:17px}
+        h2{margin:0 0 2px;font-size:17px;color:#166ae8}
         .sub{margin:0 0 4px;color:#6c757d;font-size:12px}
         .info{margin:0 0 12px;color:#166ae8;font-size:12px;font-weight:600}
         .chart-wrap{width:100%;max-height:65vh;display:flex;justify-content:center}
@@ -402,9 +574,11 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
         .legend span{display:flex;align-items:center;gap:4px}
         .line{width:12px;height:3px;border-radius:2px;display:inline-block}
         .footer{margin-top:12px;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:6px}
+        @media print{body{padding:8px 20px} .no-print{display:none!important}}
       </style></head><body>
-      <h2>Curva de Crecimiento: ${indInfo.label}</h2>
-      <p class="sub">${sexoPaciente === "M" ? "Niños" : "Niñas"} — Estándares OMS · ${mediciones.length} mediciones</p>
+      ${tipDescarga ? `<div class="no-print">${tipDescarga}</div>` : ""}
+      <h2>Curva de Crecimiento: ${escHtml(indInfo.label)}</h2>
+      <p class="sub">${sexoPaciente === "M" ? "Niños" : "Niñas"} — Estándares OMS · ${mediciones.length} medición${mediciones.length !== 1 ? "es" : ""}</p>
       ${infoExtra ? `<p class="info">${infoExtra}</p>` : ""}
       <div class="chart-wrap">${svgData}</div>
       <div class="legend">
@@ -412,10 +586,52 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
         <span><span class="line" style="background:#f59e0b"></span> Riesgo (±2 DE)</span>
         <span><span class="line" style="background:#ef4444"></span> Alerta (±3 DE)</span>
       </div>
-      <div class="footer">Generado el ${new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}</div>
+      <div class="footer">Generado el ${hoy} — Estándares de Crecimiento OMS</div>
       </body></html>`);
     win.document.close();
-    setTimeout(() => win.print(), 400);
+    win.focus();
+    if (autoPrint) setTimeout(() => win.print(), 400);
+  };
+
+  const handlePrint          = () => abrirVentanaCurvaActual(true);
+  const handleDescargarActual = () => abrirVentanaCurvaActual(false);
+
+  // ─────────────────────────────────────────────────────────
+  // IMPRIMIR / DESCARGAR — consolidado (5 curvas)
+  // ─────────────────────────────────────────────────────────
+  const handleConsolidado = async (modo) => {
+    setShowMenuImprimir(false);
+    setShowMenuDescargar(false);
+    setGenerandoConsolidado(true);
+
+    // Esperar a que las gráficas ocultas estén renderizadas
+    await new Promise(r => setTimeout(r, 600));
+
+    const svgSections = INDICADORES.map(ind => {
+      const container = hiddenChartsRef.current[ind.key];
+      if (!container) return { ind, svg: null };
+      const svgEl = container.querySelector(".recharts-wrapper svg");
+      if (!svgEl) return { ind, svg: null };
+      const clone = svgEl.cloneNode(true);
+      const w = svgEl.getAttribute("width") || svgEl.getBoundingClientRect().width;
+      const h = svgEl.getAttribute("height") || svgEl.getBoundingClientRect().height;
+      clone.setAttribute("viewBox", `0 0 ${w} ${h}`);
+      clone.setAttribute("width", "100%");
+      clone.setAttribute("height", "auto");
+      clone.removeAttribute("style");
+      return { ind, svg: new XMLSerializer().serializeToString(clone) };
+    });
+
+    const html = generateConsolidadoHTML(svgSections, mediciones, sexoPaciente, fechaNacimiento);
+    const win  = window.open("", "_blank", "width=1200,height=900");
+    if (!win) { setGenerandoConsolidado(false); return; }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      if (modo === "print") win.print();
+      setGenerandoConsolidado(false);
+    }, 700);
   };
 
   // ─────────────────────────────────────────────────────────
@@ -462,46 +678,206 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
         justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center",
         gap: isMobile ? 10 : 12, marginBottom: isMobile ? 14 : 20,
       }}>
-        {/* Tabs indicadores — scroll horizontal en mobile */}
-        <div style={{
-          display: "flex", gap: 4, overflowX: "auto", WebkitOverflowScrolling: "touch",
-          paddingBottom: 2, flexShrink: 0,
-        }}>
-          {INDICADORES.map(ind => (
-            <button
-              key={ind.key}
-              onClick={() => setIndicador(ind.key)}
-              style={{
-                padding: isMobile ? "6px 10px" : "8px 16px", borderRadius: 8,
-                fontSize: isMobile ? 11 : 13, fontWeight: 600, whiteSpace: "nowrap",
-                border: indicador === ind.key ? "none" : `1px solid ${C.border}`,
-                background: indicador === ind.key
-                  ? `linear-gradient(135deg, ${C.accent}, ${C.accentD})`
-                  : "transparent",
-                color: indicador === ind.key ? "#fff" : C.muted,
-                cursor: "pointer", transition: "all 0.2s ease",
-                flexShrink: 0,
-              }}
-            >
-              {isMobile ? ind.labelCorto : ind.label}
-            </button>
-          ))}
+        {/* Tabs indicadores + switch de rango */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          <div style={{
+            display: "flex", gap: 4, overflowX: "auto", WebkitOverflowScrolling: "touch",
+            paddingBottom: 2, flexShrink: 0,
+          }}>
+            {INDICADORES.map(ind => {
+              const deshabilitado = rango === "5_19" && ["pc-edad", "peso-talla"].includes(ind.key);
+              return (
+                <button
+                  key={ind.key}
+                  onClick={() => !deshabilitado && setIndicador(ind.key)}
+                  title={deshabilitado ? "No disponible para 5–19 años (OMS)" : ""}
+                  style={{
+                    padding: isMobile ? "6px 10px" : "8px 16px", borderRadius: 8,
+                    fontSize: isMobile ? 11 : 13, fontWeight: 600, whiteSpace: "nowrap",
+                    border: indicador === ind.key ? "none" : `1px solid ${C.border}`,
+                    background: indicador === ind.key
+                      ? `linear-gradient(135deg, ${C.accent}, ${C.accentD})`
+                      : "transparent",
+                    color: deshabilitado ? "#ccc" : indicador === ind.key ? "#fff" : C.muted,
+                    cursor: deshabilitado ? "not-allowed" : "pointer",
+                    transition: "all 0.2s ease", flexShrink: 0,
+                    opacity: deshabilitado ? 0.45 : 1,
+                  }}
+                >
+                  {isMobile ? ind.labelCorto : ind.label}
+                </button>
+              );
+            })}
+          </div>
+          {/* ── Switch rango OMS ── */}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: isMobile ? 9 : 10, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", whiteSpace: "nowrap" }}>
+              Ref. OMS:
+            </span>
+            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 8, overflow: "hidden" }}>
+              {[
+                { v: "0_5",  label: isMobile ? "0–5a" : "0–5 años" },
+                { v: "5_19", label: isMobile ? "5–19a" : "5–19 años" },
+              ].map(r => (
+                <button
+                  key={r.v}
+                  onClick={() => handleRangoChange(r.v)}
+                  style={{
+                    padding: isMobile ? "4px 9px" : "5px 13px",
+                    border: "none",
+                    background: rango === r.v ? C.accent : "transparent",
+                    color: rango === r.v ? "#fff" : C.muted,
+                    fontWeight: 600, fontSize: isMobile ? 10 : 11,
+                    cursor: "pointer", transition: "all 0.2s ease",
+                  }}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+            {rango === "5_19" && indicador === "peso-edad" && (
+              <span style={{ fontSize: 10, color: "#f59e0b", fontStyle: "italic" }}>
+                Solo hasta 10a (OMS)
+              </span>
+            )}
+            {rango === "5_19" && (
+              <span style={{ fontSize: 10, color: C.muted, fontStyle: "italic" }}>
+                WHO Growth Ref. 2007
+              </span>
+            )}
+          </div>
         </div>
         {/* Botones acción */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: isMobile ? "stretch" : "flex-end" }}>
-          <button
-            onClick={handlePrint}
-            style={{
-              background: "transparent", border: `1px solid ${C.border}`,
-              borderRadius: 10, padding: isMobile ? "8px 12px" : "10px 18px",
-              color: C.muted, fontWeight: 600, fontSize: isMobile ? 12 : 14, cursor: "pointer",
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              transition: "all 0.2s ease", flex: isMobile ? 1 : "none",
-            }}
-            title="Imprimir curva"
-          >
-            <i className="bi bi-printer" /> {!isMobile && "Imprimir"}
-          </button>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: isMobile ? "stretch" : "flex-end", position: "relative" }}>
+
+          {/* ── Botón IMPRIMIR con dropdown ── */}
+          <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+              <button
+                onClick={handlePrint}
+                style={{
+                  background: "transparent", border: "none",
+                  borderRight: `1px solid ${C.border}`,
+                  padding: isMobile ? "8px 10px" : "10px 14px",
+                  color: C.muted, fontWeight: 600, fontSize: isMobile ? 12 : 13,
+                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                }}
+                title="Imprimir curva actual"
+              >
+                <i className="bi bi-printer" /> {!isMobile && "Imprimir"}
+              </button>
+              <button
+                onClick={() => { setShowMenuImprimir(v => !v); setShowMenuDescargar(false); }}
+                style={{ background: "transparent", border: "none", padding: "8px 7px", color: C.muted, cursor: "pointer", fontSize: 11 }}
+                title="Más opciones de impresión"
+              >
+                <i className="bi bi-chevron-down" />
+              </button>
+            </div>
+            {showMenuImprimir && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 5px)", right: 0, zIndex: 300,
+                background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10,
+                boxShadow: "0 8px 28px rgba(0,0,0,0.13)", minWidth: 230, overflow: "hidden",
+              }}>
+                <div style={{ padding: "8px 14px 5px", fontSize: 10, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", borderBottom: `1px solid ${C.border}` }}>
+                  Opciones de impresión
+                </div>
+                <button
+                  onClick={() => { handlePrint(); setShowMenuImprimir(false); }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${C.border}` }}
+                >
+                  <i className="bi bi-printer" style={{ color: C.accent, fontSize: 15 }} />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Imprimir esta curva</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{indInfo?.label}</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => handleConsolidado("print")}
+                  disabled={generandoConsolidado}
+                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: generandoConsolidado ? "wait" : "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, opacity: generandoConsolidado ? 0.7 : 1 }}
+                >
+                  {generandoConsolidado
+                    ? <><span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} /> <span>Generando...</span></>
+                    : <>
+                        <i className="bi bi-printer-fill" style={{ color: "#7c3aed", fontSize: 15 }} />
+                        <div>
+                          <div style={{ fontWeight: 600 }}>Imprimir consolidado</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>5 curvas + historial completo</div>
+                        </div>
+                      </>
+                  }
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Botón DESCARGAR con dropdown ── */}
+          <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+              <button
+                onClick={handleDescargarActual}
+                style={{
+                  background: "transparent", border: "none",
+                  borderRight: `1px solid ${C.border}`,
+                  padding: isMobile ? "8px 10px" : "10px 14px",
+                  color: C.muted, fontWeight: 600, fontSize: isMobile ? 12 : 13,
+                  cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 6,
+                }}
+                title="Descargar esta curva como PDF"
+              >
+                <i className="bi bi-download" /> {!isMobile && "Descargar"}
+              </button>
+              <button
+                onClick={() => { setShowMenuDescargar(v => !v); setShowMenuImprimir(false); }}
+                style={{ background: "transparent", border: "none", padding: "8px 7px", color: C.muted, cursor: "pointer", fontSize: 11 }}
+                title="Más opciones de descarga"
+              >
+                <i className="bi bi-chevron-down" />
+              </button>
+            </div>
+            {showMenuDescargar && (
+              <div style={{
+                position: "absolute", top: "calc(100% + 5px)", right: 0, zIndex: 300,
+                background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10,
+                boxShadow: "0 8px 28px rgba(0,0,0,0.13)", minWidth: 240, overflow: "hidden",
+              }}>
+                <div style={{ padding: "8px 14px 5px", fontSize: 10, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", borderBottom: `1px solid ${C.border}` }}>
+                  Descargar como PDF
+                </div>
+                <button
+                  onClick={() => { handleDescargarActual(); setShowMenuDescargar(false); }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${C.border}` }}
+                >
+                  <i className="bi bi-file-earmark-arrow-down" style={{ color: C.accent, fontSize: 15 }} />
+                  <div>
+                    <div style={{ fontWeight: 600 }}>Esta curva (PDF)</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>{indInfo?.label}</div>
+                  </div>
+                </button>
+                <button
+                  onClick={() => { handleConsolidado("download"); setShowMenuDescargar(false); }}
+                  disabled={generandoConsolidado}
+                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: generandoConsolidado ? "wait" : "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, opacity: generandoConsolidado ? 0.7 : 1 }}
+                >
+                  {generandoConsolidado
+                    ? <><span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} /> <span>Generando...</span></>
+                    : <>
+                        <i className="bi bi-file-earmark-pdf" style={{ color: "#dc2626", fontSize: 15 }} />
+                        <div>
+                          <div style={{ fontWeight: 600 }}>Consolidado (PDF)</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>5 curvas + historial completo</div>
+                        </div>
+                      </>
+                  }
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* ── Nueva medición ── */}
           <button
             onClick={() => setShowForm(!showForm)}
             style={{
@@ -636,7 +1012,11 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
         }}>
           <div>
             <h6 style={{ margin: 0, fontWeight: 700, fontSize: isMobile ? 13 : 16, color: C.text }}>
-              {indInfo.label} — {sexoPaciente === "M" ? "Niños" : "Niñas"} {isPesoTalla ? "(45–110 cm)" : "(0–60 meses)"}
+              {indInfo.label} — {sexoPaciente === "M" ? "Niños" : "Niñas"}{" "}
+              {isPesoTalla ? "(45–110 cm)"
+                : rango === "5_19"
+                  ? (indicador === "peso-edad" ? "(5–10 años)" : "(5–19 años)")
+                  : "(0–60 meses)"}
             </h6>
             <span style={{ fontSize: isMobile ? 10 : 12, color: C.muted, lineHeight: 1.4, display: "block" }}>
               Estándares OMS · {mediciones.length} mediciones
@@ -670,10 +1050,14 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             <XAxis
               dataKey={xKey}
               type="number"
-              domain={isPesoTalla ? [45, 110] : [0, 60]}
+              domain={isPesoTalla ? [45, 110] : rango === "5_19" ? [60, indicador === "peso-edad" ? 120 : 228] : [0, 60]}
               ticks={isPesoTalla
                 ? (isMobile ? [45, 55, 65, 75, 85, 95, 105] : [45, 50, 55, 60, 65, 70, 75, 80, 85, 90, 95, 100, 105, 110])
-                : (isMobile ? [0, 6, 12, 24, 36, 48, 60] : [0, 3, 6, 9, 12, 18, 24, 30, 36, 42, 48, 54, 60])}
+                : rango === "5_19"
+                  ? (indicador === "peso-edad"
+                      ? [60, 72, 84, 96, 108, 120]
+                      : (isMobile ? [60, 84, 108, 132, 156, 180, 204, 228] : [60, 72, 84, 96, 108, 120, 132, 144, 156, 168, 180, 192, 204, 216, 228]))
+                  : (isMobile ? [0, 6, 12, 24, 36, 48, 60] : [0, 3, 6, 9, 12, 18, 24, 30, 36, 42, 48, 54, 60])}
               tickFormatter={isPesoTalla ? (v) => `${v}` : (v) => v >= 12 ? `${Math.floor(v/12)}a` : `${v}m`}
               label={isMobile ? undefined : { value: isPesoTalla ? "Talla (cm)" : "Edad", position: "insideBottomRight", offset: -5, style: { fontSize: 12, fill: C.muted } }}
               stroke={C.muted}
@@ -969,6 +1353,54 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             </table>
           </div>
         )}
+      </div>
+
+      {/* ══════════════════════════════════════════════════════ */}
+      {/* GRÁFICAS OCULTAS — para reporte consolidado          */}
+      {/* Se renderizan fuera de la vista para capturar SVGs   */}
+      {/* ══════════════════════════════════════════════════════ */}
+      <div style={{ position: "fixed", left: "-9999px", top: 0, pointerEvents: "none", overflow: "hidden", visibility: "hidden" }}>
+        {INDICADORES.map(ind => {
+          const curvas = todasCurvas[ind.key];
+          if (!curvas) return null;
+          const isPT = ind.key === "peso-talla";
+          const xk   = isPT ? "talla" : "mes";
+          const data = buildChartData(ind.key, mediciones, curvas);
+          return (
+            <div
+              key={ind.key}
+              ref={el => { hiddenChartsRef.current[ind.key] = el; }}
+              style={{ width: 900, height: 380 }}
+            >
+              <ComposedChart width={900} height={380} data={data} margin={{ top: 10, right: 20, left: 20, bottom: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(0,0,0,0.05)" />
+                <XAxis
+                  dataKey={xk}
+                  type="number"
+                  domain={isPT ? [45, 110] : [0, 60]}
+                  tickFormatter={isPT ? v => `${v}` : v => v >= 12 ? `${Math.floor(v / 12)}a` : `${v}m`}
+                  stroke={C.muted} fontSize={10} tick={{ fill: C.muted }}
+                />
+                <YAxis stroke={C.muted} fontSize={10} tick={{ fill: C.muted }} />
+                <Line type="monotone" dataKey="z-3" stroke="#ef4444" strokeWidth={1}   strokeDasharray="4 4" dot={false} />
+                <Line type="monotone" dataKey="z-2" stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                <Line type="monotone" dataKey="z-1" stroke="#10b981" strokeWidth={1}   strokeDasharray="3 3" dot={false} />
+                <Line type="monotone" dataKey="z0"  stroke="#0ea5e9" strokeWidth={2}   dot={false} />
+                <Line type="monotone" dataKey="z1"  stroke="#10b981" strokeWidth={1}   strokeDasharray="3 3" dot={false} />
+                <Line type="monotone" dataKey="z2"  stroke="#f59e0b" strokeWidth={1.5} strokeDasharray="4 4" dot={false} />
+                <Line type="monotone" dataKey="z3"  stroke="#ef4444" strokeWidth={1}   strokeDasharray="4 4" dot={false} />
+                <Line
+                  type="monotone"
+                  dataKey="paciente"
+                  stroke={C.accent}
+                  strokeWidth={2.5}
+                  dot={{ r: 5, fill: C.accent, stroke: "#fff", strokeWidth: 2 }}
+                  connectNulls
+                />
+              </ComposedChart>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

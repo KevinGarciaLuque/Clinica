@@ -14,8 +14,20 @@ router.get("/slots", auth(), async (req, res) => {
       return res.status(400).json({ ok: false, msg: "medico_id y fecha son obligatorios" });
     }
 
-    const diaSemana = new Date(fecha).getDay();          // 0=Dom
-    const diaLunes  = diaSemana === 0 ? 6 : diaSemana - 1; // 0=Lun
+    // Leer zona horaria de la clínica (o defecto: Honduras)
+    const [[tzRow]] = await pool.query(
+      "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='zona_horaria'",
+      [clinicaId]
+    );
+    const tz = tzRow?.valor || "America/Tegucigalpa";
+
+    // Determinar día de semana en la zona horaria de la clínica (sin depender del servidor)
+    // Usamos T12:00:00Z para que noon-UTC sea siempre el mismo día en cualquier TZ de ±11h
+    const nombreDia = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" })
+      .format(new Date(fecha + "T12:00:00Z"));
+    const WD_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const diaJS    = WD_MAP[nombreDia];           // 0=Dom, 1=Lun, ... 6=Sab
+    const diaLunes = diaJS === 0 ? 6 : diaJS - 1; // 0=Lun, ..., 6=Dom
 
     const [horarios] = await pool.query(
       "SELECT hora_inicio, hora_fin, slot_minutos FROM horarios_medico WHERE medico_id=? AND clinica_id=? AND dia_semana=? AND activo=1",
@@ -95,7 +107,11 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 // ──────────────────────────────────────────────
 router.patch("/:id/estado", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
-    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    if (!clinicaId && req.user.super) {
+      const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
+      clinicaId = row?.clinica_id;
+    }
     const { estado } = req.body;
     const estadosValidos = ["PENDIENTE","CONFIRMADA","EN_ESPERA","EN_ATENCION","COMPLETADA","CANCELADA","NO_ASISTIO"];
     if (!estadosValidos.includes(estado)) {
@@ -116,8 +132,13 @@ router.patch("/:id/estado", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","S
 // ──────────────────────────────────────────────
 router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
-    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
-    const { inicio, fin, medico_id, tipo_consulta, motivo, notas_internas } = req.body;
+    let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    // SUPER_ADMIN sin tenant: obtener clinica_id de la propia cita
+    if (!clinicaId && req.user.super) {
+      const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
+      clinicaId = row?.clinica_id;
+    }
+    const { inicio, fin, medico_id, tipo_consulta, motivo, canal, notas_internas } = req.body;
 
     // Anti-solapamiento (excluye la cita actual)
     if (inicio && fin) {
@@ -145,10 +166,11 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
          medico_id=COALESCE(?,medico_id),
          tipo_consulta=COALESCE(?,tipo_consulta),
          motivo=COALESCE(?,motivo),
+         canal=COALESCE(?,canal),
          notas_internas=COALESCE(?,notas_internas)
        WHERE id=? AND clinica_id=?`,
       [inicio||null, fin||null, medico_id||null,
-       tipo_consulta||null, motivo||null, notas_internas||null,
+       tipo_consulta||null, motivo||null, canal||null, notas_internas||null,
        req.params.id, clinicaId]
     );
     res.json({ ok: true });
@@ -202,7 +224,11 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
 // ──────────────────────────────────────────────
 router.delete("/:id/permanente", auth("ADMIN","MEDICO","SUPER_ADMIN"), async (req, res) => {
   try {
-    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    if (!clinicaId && req.user.super) {
+      const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
+      clinicaId = row?.clinica_id;
+    }
     await pool.query(
       "DELETE FROM citas WHERE id=? AND clinica_id=?",
       [req.params.id, clinicaId]
@@ -218,12 +244,77 @@ router.delete("/:id/permanente", auth("ADMIN","MEDICO","SUPER_ADMIN"), async (re
 // ──────────────────────────────────────────────
 router.delete("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
-    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    if (!clinicaId && req.user.super) {
+      const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
+      clinicaId = row?.clinica_id;
+    }
     await pool.query(
       "UPDATE citas SET estado='CANCELADA' WHERE id=? AND clinica_id=?",
       [req.params.id, clinicaId]
     );
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────
+// GET /api/citas/:id/pendientes
+// Devuelve el plan de la última consulta + estudios pendientes del paciente
+// (para mostrar en la vista Agenda de la siguiente cita)
+// ──────────────────────────────────────────────
+router.get("/:id/pendientes", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    if (!clinicaId && req.user.super) {
+      const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
+      clinicaId = row?.clinica_id;
+    }
+
+    // Obtener el paciente de esta cita
+    const [[cita]] = await pool.query(
+      "SELECT paciente_id FROM citas WHERE id=? AND clinica_id=?",
+      [req.params.id, clinicaId]
+    );
+    if (!cita) return res.status(404).json({ ok: false, msg: "Cita no encontrada" });
+
+    const pacienteId = cita.paciente_id;
+
+    // Última historia clínica con plan/indicaciones
+    const [[historia]] = await pool.query(
+      `SELECT hc.id, hc.plan, hc.creado_en, hc.diagnostico_cie,
+              d.descripcion AS diagnostico_desc
+       FROM historias_clinicas hc
+       LEFT JOIN cie10 d ON d.codigo = hc.diagnostico_cie
+       WHERE hc.paciente_id = ? AND hc.clinica_id = ?
+       ORDER BY hc.creado_en DESC LIMIT 1`,
+      [pacienteId, clinicaId]
+    );
+
+    // Estudios pendientes (SOLICITADO) del paciente
+    const [estudios] = await pool.query(
+      `SELECT es.id, es.tipo, es.descripcion, es.urgente, es.creado_en
+       FROM estudios_solicitudes es
+       WHERE es.paciente_id = ? AND es.clinica_id = ? AND es.estado = 'SOLICITADO'
+       ORDER BY es.urgente DESC, es.creado_en DESC`,
+      [pacienteId, clinicaId]
+    );
+
+    const hayPendientes = (historia?.plan && historia.plan.trim()) || estudios.length > 0;
+
+    res.json({
+      ok: true,
+      data: {
+        plan:            historia?.plan?.trim() || null,
+        diagnostico_cie: historia?.diagnostico_cie || null,
+        diagnostico_desc: historia?.diagnostico_desc || null,
+        ultima_consulta: historia?.creado_en || null,
+        estudios,
+        total: (historia?.plan?.trim() ? 1 : 0) + estudios.length,
+        hay_pendientes: !!hayPendientes,
+      }
+    });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

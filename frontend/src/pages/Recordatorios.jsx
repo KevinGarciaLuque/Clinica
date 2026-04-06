@@ -83,7 +83,10 @@ const Recordatorios = () => {
     try {
       const { data } = await api.get("/recordatorios/config/smtp");
       if (data.config) {
-        setSmtpConfig({ ...data.config, smtp_pass: "" }); // No mostrar contraseña
+        setSmtpConfig((prev) => ({
+          ...data.config,
+          smtp_pass: prev.smtp_pass || "", // Conservar contraseña si el usuario ya la escribió
+        }));
       }
     } catch (error) {
       console.error("Error cargando config SMTP:", error);
@@ -118,7 +121,9 @@ const Recordatorios = () => {
     try {
       const { data } = await api.get("/recordatorios/config/automatico");
       if (data.config) {
-        setConfigAutomatico(data.config);
+        // Normalizar hora de "HH:MM:SS" a "HH:MM" para el input type="time"
+        const hora = (data.config.hora_ejecucion_diaria || "08:00:00").slice(0, 5);
+        setConfigAutomatico({ ...data.config, hora_ejecucion_diaria: hora });
       }
     } catch (error) {
       console.error("Error cargando config automático:", error);
@@ -395,16 +400,16 @@ const Recordatorios = () => {
                       </Form.Label>
                       <Form.Control
                         type="password"
-                        placeholder="Contraseña o App Password"
+                        placeholder={smtpConfig.id ? "Dejar vacío para mantener la actual" : "Contraseña o App Password"}
                         value={smtpConfig.smtp_pass}
                         onChange={(e) => setSmtpConfig({ ...smtpConfig, smtp_pass: e.target.value })}
                         required={!smtpConfig.id}
                       />
                       <Form.Text className="text-muted">
-                        Para Gmail, usa una{" "}
-                        <a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">
-                          contraseña de aplicación
-                        </a>
+                        {smtpConfig.id && !smtpConfig.smtp_pass
+                          ? "✅ Contraseña guardada — déjala vacía para no cambiarla"
+                          : <>Para Gmail, usa una{" "}<a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noreferrer">contraseña de aplicación</a></>
+                        }
                       </Form.Text>
                     </Form.Group>
                   </Col>
@@ -887,7 +892,7 @@ const Recordatorios = () => {
                         }
                       />
                       <Form.Text className="text-muted">
-                        Hora en que el sistema verifica las citas y envía recordatorios
+                        El sistema verifica recordatorios cada hora. Esta preferencia se guarda como referencia.
                       </Form.Text>
                     </Form.Group>
                   </Col>
@@ -907,8 +912,9 @@ const Recordatorios = () => {
             <Card.Body>
               <h5 className="mb-3">Historial de Recordatorios (últimos 50)</h5>
 
-              <Table responsive hover size="sm">
-                <thead>
+              <div style={{ maxHeight: "450px", overflowY: "auto" }}>
+              <Table responsive hover size="sm" className="mb-0">
+                <thead className="sticky-top table-light">
                   <tr>
                     <th>Fecha</th>
                     <th>Paciente</th>
@@ -948,12 +954,11 @@ const Recordatorios = () => {
                   ))}
                 </tbody>
               </Table>
+              </div>
             </Card.Body>
           </Card>
         </Tab>
       </Tabs>
-
-      {/* ═══ MODAL: Nueva/Editar Plantilla ═══ */}
       <ModalPlantilla
         show={showModalPlantilla}
         onHide={() => {

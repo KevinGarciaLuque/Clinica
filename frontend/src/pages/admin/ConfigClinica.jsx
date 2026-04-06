@@ -127,8 +127,7 @@ export default function ConfigClinica() {
   // Pestañas según el rol del usuario
   const allTabs = [
     { key: "general", label: "Datos generales", icon: "bi-building", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
-    { key: "comunicacion", label: "Email / SMTP", icon: "bi-envelope", roles: ["SUPER_ADMIN", "ADMIN"] },
-    { key: "agenda", label: "Agenda", icon: "bi-calendar3", roles: ["SUPER_ADMIN", "ADMIN"] },
+    { key: "agenda", label: "Agenda", icon: "bi-calendar3", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
     { key: "receta", label: "Formato Receta", icon: "bi-file-earmark-medical", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
     { key: "laboratorio", label: "Formato Laboratorio", icon: "bi-capsule", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
     { key: "estudios", label: "Formato Estudios", icon: "bi-clipboard2-pulse", roles: ["SUPER_ADMIN", "ADMIN", "MEDICO"] },
@@ -261,47 +260,57 @@ export default function ConfigClinica() {
       )}
 
       {/* ══════════════════════════════════════════════════════════════ */}
-      {/* Tab: Email / SMTP */}
-      {/* ══════════════════════════════════════════════════════════════ */}
-      {tab === "comunicacion" && (
-        <form onSubmit={guardarConfig}>
-          <div className="row g-3">
-            <div className="col-12">
-              <div className="alert alert-info py-2 small">
-                <i className="bi bi-info-circle me-2" />
-                Configura el servidor SMTP para enviar recordatorios de citas y verificaciones de email.
-              </div>
-            </div>
-            {[
-              ["smtp_host", "Host SMTP", "smtp.gmail.com"],
-              ["smtp_port", "Puerto SMTP", "587"],
-              ["smtp_user", "Usuario / Email", "tu@gmail.com"],
-              ["smtp_pass", "Contraseña de aplicación", "••••••••"],
-              ["email_from", "Remitente (from)", "Clínica <noreply@clinica.com>"],
-            ].map(([k, l, ph]) => (
-              <div className="col-md-6" key={k}>
-                <label className="form-label">{l}</label>
-                <input className="form-control" placeholder={ph}
-                  type={k === "smtp_pass" ? "password" : "text"}
-                  value={config[k] || ""}
-                  onChange={(e) => setConfig({ ...config, [k]: e.target.value })} />
-              </div>
-            ))}
-            <div className="col-12">
-              <button type="submit" className="btn btn-primary" disabled={guardando}>
-                {guardando ? "Guardando..." : "Guardar configuración SMTP"}
-              </button>
-            </div>
-          </div>
-        </form>
-      )}
-
-      {/* ══════════════════════════════════════════════════════════════ */}
       {/* Tab: Agenda */}
       {/* ══════════════════════════════════════════════════════════════ */}
       {tab === "agenda" && (
         <form onSubmit={guardarConfig}>
           <div className="row g-3">
+            <div className="col-md-6">
+              <label className="form-label fw-semibold">
+                <i className="bi bi-globe me-2 text-primary" />
+                Zona horaria de la clínica
+              </label>
+              <select className="form-select"
+                value={config["zona_horaria"] || "America/Tegucigalpa"}
+                onChange={(e) => setConfig({ ...config, zona_horaria: e.target.value })}>
+                <optgroup label="Centroamérica">
+                  <option value="America/Tegucigalpa">Honduras (UTC-6)</option>
+                  <option value="America/Guatemala">Guatemala (UTC-6)</option>
+                  <option value="America/El_Salvador">El Salvador (UTC-6)</option>
+                  <option value="America/Managua">Nicaragua (UTC-6)</option>
+                  <option value="America/Costa_Rica">Costa Rica (UTC-6)</option>
+                  <option value="America/Panama">Panamá (UTC-5)</option>
+                </optgroup>
+                <optgroup label="México">
+                  <option value="America/Mexico_City">México Centro (UTC-6)</option>
+                  <option value="America/Monterrey">México Norte (UTC-6)</option>
+                  <option value="America/Tijuana">México Noroeste/Tijuana (UTC-7)</option>
+                </optgroup>
+                <optgroup label="Sudamérica">
+                  <option value="America/Bogota">Colombia (UTC-5)</option>
+                  <option value="America/Lima">Perú (UTC-5)</option>
+                  <option value="America/Guayaquil">Ecuador (UTC-5)</option>
+                  <option value="America/Caracas">Venezuela (UTC-4)</option>
+                  <option value="America/La_Paz">Bolivia (UTC-4)</option>
+                  <option value="America/Santiago">Chile (UTC-4/-3)</option>
+                  <option value="America/Argentina/Buenos_Aires">Argentina (UTC-3)</option>
+                  <option value="America/Sao_Paulo">Brasil (UTC-3/-2)</option>
+                </optgroup>
+                <optgroup label="Caribe">
+                  <option value="America/Santo_Domingo">Rep. Dominicana (UTC-4)</option>
+                  <option value="America/Puerto_Rico">Puerto Rico (UTC-4)</option>
+                </optgroup>
+                <optgroup label="Norteamérica">
+                  <option value="America/New_York">USA Este (UTC-5/-4)</option>
+                  <option value="America/Chicago">USA Centro (UTC-6/-5)</option>
+                  <option value="America/Denver">USA Montaña (UTC-7/-6)</option>
+                  <option value="America/Los_Angeles">USA Oeste (UTC-8/-7)</option>
+                </optgroup>
+              </select>
+              <small className="text-muted">
+                Afecta el cálculo de disponibilidad de slots en citas.
+              </small>
+            </div>
             <div className="col-md-6">
               <label className="form-label">Duración de slot por defecto (minutos)</label>
               <select className="form-select"

@@ -83,12 +83,12 @@ export default function App() {
           </RolRoute>
         } />
         <Route path="/admin/servicios" element={
-          <RolRoute roles={["ADMIN","SUPER_ADMIN"]}>
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Servicios />
           </RolRoute>
         } />
         <Route path="/admin/horarios" element={
-          <RolRoute roles={["ADMIN","SUPER_ADMIN"]}>
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Horarios />
           </RolRoute>
         } />
@@ -100,7 +100,7 @@ export default function App() {
 
         {/* Módulo de recordatorios */}
         <Route path="/recordatorios" element={
-          <RolRoute roles={["ADMIN","SUPER_ADMIN"]}>
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Recordatorios />
           </RolRoute>
         } />

@@ -3,6 +3,7 @@ const cors = require("cors");
 const helmet = require("helmet");
 const morgan = require("morgan");
 const path = require("path");
+const cron = require("node-cron");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
@@ -33,6 +34,13 @@ app.options("*", cors(corsOptions));
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
+    frameguard: false,
+    contentSecurityPolicy: {
+      directives: {
+        ...helmet.contentSecurityPolicy.getDefaultDirectives(),
+        "frame-ancestors": ["*"],
+      },
+    },
   })
 );
 
@@ -138,4 +146,17 @@ app.use((err, req, res, next) => {
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log("✅ Servidor corriendo en puerto", PORT);
+});
+
+// ===== CRON: Recordatorios automáticos (cada hora) =====
+const enviarRecordatorios = require("./scripts/enviar-recordatorios");
+cron.schedule("0 * * * *", async () => {
+  const ahora = new Date();
+  const horaActual = `${String(ahora.getHours()).padStart(2, "0")}:${String(ahora.getMinutes()).padStart(2, "0")}`;
+  console.log(`⏰ [CRON] ${horaActual} — Verificando recordatorios automáticos...`);
+  try {
+    await enviarRecordatorios();
+  } catch (err) {
+    console.error("❌ [CRON] Error en recordatorios:", err.message);
+  }
 });

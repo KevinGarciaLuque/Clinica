@@ -50,9 +50,9 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
     if (!rows.length) {
       const [base] = await pool.query(
         `SELECT clave, nombre, icono, ruta FROM modulos_sistema
-         WHERE clave IN (?,?,?,?,?,?) AND disponible=1 AND ${catFilter}
+         WHERE clave IN (?,?,?,?,?,?,?) AND disponible=1 AND ${catFilter}
          ORDER BY orden`,
-        ["dashboard","pacientes","citas","historia_clinica","chat_ia","estudios"]
+        ["dashboard","pacientes","citas","consulta","historia_clinica","chat_ia","estudios"]
       );
       return res.json({ ok: true, data: base });
     }
