@@ -1514,9 +1514,9 @@ export default function PerfilPaciente() {
       {docViewer && (() => {
         const esImagen = docViewer.mime_type?.startsWith('image/');
         const esPdf    = docViewer.mime_type === 'application/pdf';
-        const url      = docViewer.ruta_archivo?.startsWith('http')
-          ? docViewer.ruta_archivo
-          : `${API_BASE}/uploads/pacientes/${docViewer.ruta_archivo}`;
+        const token    = localStorage.getItem('token') || '';
+        // Siempre usar el endpoint /view del backend (genera URL firmada de Cloudinary)
+        const url      = `${API_BASE}/api/pacientes/${id}/documentos/${docViewer.id}/view?auth_token=${token}`;
         const tipoInfo = TIPOS_DOC.find(t => t.value === docViewer.tipo) || TIPOS_DOC[TIPOS_DOC.length - 1];
         return (
           <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} tabIndex="-1"

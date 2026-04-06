@@ -17,12 +17,16 @@ function auth(...roles) {
   return async (req, res, next) => {
     try {
       // 1. Obtener token del header Authorization: Bearer <token>
+      //    o del query param ?auth_token= (para iframes y descargas directas)
       const header = req.headers.authorization || "";
-      if (!header.startsWith("Bearer ")) {
+      let token;
+      if (header.startsWith("Bearer ")) {
+        token = header.slice(7);
+      } else if (req.query.auth_token) {
+        token = req.query.auth_token;
+      } else {
         return res.status(401).json({ ok: false, msg: "Token requerido" });
       }
-
-      const token = header.slice(7);
 
       // 2. Verificar firma
       let payload;
