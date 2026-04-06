@@ -290,13 +290,10 @@ function generateConsolidadoHTML(svgSections, mediciones, sexoPaciente, fechaNac
     .legend span { display: flex; align-items: center; gap: 4px; }
     .leg-l { width: 14px; height: 2px; border-radius: 1px; display: inline-block; }
     .footer { margin-top: 14px; padding-top: 8px; border-top: 1px solid #dee2e6; display: flex; justify-content: space-between; font-size: 9px; color: #aaa; }
-    @media print { .tip-descarga, .no-print { display: none !important; } .chart-sec { break-inside: avoid; } }
+    @media print { .no-print { display: none !important; } .chart-sec { break-inside: avoid; } }
   </style>
 </head>
 <body>
-  <div class="tip-descarga no-print">
-    💡 <strong>Para guardar como PDF:</strong> Presiona <kbd>Ctrl+P</kbd> (o <kbd>Cmd+P</kbd>) → Destino: <em>Guardar como PDF</em> → Orientación: <em>Horizontal</em> → Guardar
-  </div>
   <div class="header">
     <div>
       <h1>📈 Reporte Consolidado &mdash; Curvas de Crecimiento OMS</h1>
@@ -553,11 +550,6 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
     const nacTxt   = fechaNacimiento ? formatFechaNac(fechaNacimiento) : "";
     const infoExtra = fechaNacimiento ? `F. Nac: ${nacTxt} · Edad actual: ${edadTxt}` : "";
     const hoy = new Date().toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" });
-    const tipDescarga = !autoPrint
-      ? `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;padding:10px 16px;margin-bottom:16px;font-size:12px;color:#1d4ed8">
-           💡 <strong>Para guardar como PDF:</strong> Presiona <kbd>Ctrl+P</kbd> → Destino: <em>Guardar como PDF</em> → Orientación: <em>Horizontal</em>
-         </div>` : "";
-
     const win = window.open("", "_blank", "width=1050,height=750");
     if (!win) return;
     win.document.write(`<html><head><title>Curva de Crecimiento - ${escHtml(indInfo.label)}</title>
@@ -576,7 +568,6 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
         .footer{margin-top:12px;font-size:9px;color:#aaa;border-top:1px solid #eee;padding-top:6px}
         @media print{body{padding:8px 20px} .no-print{display:none!important}}
       </style></head><body>
-      ${tipDescarga ? `<div class="no-print">${tipDescarga}</div>` : ""}
       <h2>Curva de Crecimiento: ${escHtml(indInfo.label)}</h2>
       <p class="sub">${sexoPaciente === "M" ? "Niños" : "Niñas"} — Estándares OMS · ${mediciones.length} medición${mediciones.length !== 1 ? "es" : ""}</p>
       ${infoExtra ? `<p class="info">${infoExtra}</p>` : ""}
@@ -590,11 +581,11 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
       </body></html>`);
     win.document.close();
     win.focus();
-    if (autoPrint) setTimeout(() => win.print(), 400);
+    setTimeout(() => win.print(), 400);
   };
 
-  const handlePrint          = () => abrirVentanaCurvaActual(true);
-  const handleDescargarActual = () => abrirVentanaCurvaActual(false);
+  const handlePrint           = () => abrirVentanaCurvaActual(true);
+  const handleDescargarActual  = () => abrirVentanaCurvaActual(false);
 
   // ─────────────────────────────────────────────────────────
   // IMPRIMIR / DESCARGAR — consolidado (5 curvas)
@@ -629,7 +620,7 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
     win.document.close();
     win.focus();
     setTimeout(() => {
-      if (modo === "print") win.print();
+      win.print();
       setGenerandoConsolidado(false);
     }, 700);
   };
@@ -748,27 +739,33 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
           </div>
         </div>
         {/* Botones acción */}
-        <div style={{ display: "flex", gap: 8, alignItems: "center", justifyContent: isMobile ? "stretch" : "flex-end", position: "relative" }}>
+        <div style={{
+          display: "flex", gap: 8, alignItems: "center",
+          justifyContent: isMobile ? "flex-start" : "flex-end",
+          width: isMobile ? "100%" : "auto",
+        }}>
 
           {/* ── Botón IMPRIMIR con dropdown ── */}
-          <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ position: "relative", flex: isMobile ? 1 : "none" }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", width: "100%" }}>
               <button
                 onClick={handlePrint}
                 style={{
                   background: "transparent", border: "none",
                   borderRight: `1px solid ${C.border}`,
-                  padding: isMobile ? "8px 10px" : "10px 14px",
+                  padding: isMobile ? "9px 10px" : "10px 14px",
                   color: C.muted, fontWeight: 600, fontSize: isMobile ? 12 : 13,
-                  cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                  cursor: "pointer", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 5, flex: 1,
                 }}
                 title="Imprimir curva actual"
               >
-                <i className="bi bi-printer" /> {!isMobile && "Imprimir"}
+                <i className="bi bi-printer" />
+                <span>{isMobile ? "Impr." : "Imprimir"}</span>
               </button>
               <button
                 onClick={() => { setShowMenuImprimir(v => !v); setShowMenuDescargar(false); }}
-                style={{ background: "transparent", border: "none", padding: "8px 7px", color: C.muted, cursor: "pointer", fontSize: 11 }}
+                style={{ background: "transparent", border: "none", padding: "9px 8px", color: C.muted, cursor: "pointer", fontSize: 11, flexShrink: 0 }}
                 title="Más opciones de impresión"
               >
                 <i className="bi bi-chevron-down" />
@@ -776,18 +773,20 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             </div>
             {showMenuImprimir && (
               <div style={{
-                position: "absolute", top: "calc(100% + 5px)", right: 0, zIndex: 300,
+                position: "absolute", top: "calc(100% + 5px)",
+                left: 0, right: "auto", zIndex: 300,
                 background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10,
-                boxShadow: "0 8px 28px rgba(0,0,0,0.13)", minWidth: 230, overflow: "hidden",
+                boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+                width: "min(260px, calc(100vw - 24px))", overflow: "hidden",
               }}>
                 <div style={{ padding: "8px 14px 5px", fontSize: 10, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", borderBottom: `1px solid ${C.border}` }}>
                   Opciones de impresión
                 </div>
                 <button
                   onClick={() => { handlePrint(); setShowMenuImprimir(false); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${C.border}` }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${C.border}` }}
                 >
-                  <i className="bi bi-printer" style={{ color: C.accent, fontSize: 15 }} />
+                  <i className="bi bi-printer" style={{ color: C.accent, fontSize: 15, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: 600 }}>Imprimir esta curva</div>
                     <div style={{ fontSize: 11, color: C.muted }}>{indInfo?.label}</div>
@@ -796,12 +795,12 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
                 <button
                   onClick={() => handleConsolidado("print")}
                   disabled={generandoConsolidado}
-                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: generandoConsolidado ? "wait" : "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, opacity: generandoConsolidado ? 0.7 : 1 }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "12px 14px", textAlign: "left", cursor: generandoConsolidado ? "wait" : "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, opacity: generandoConsolidado ? 0.7 : 1 }}
                 >
                   {generandoConsolidado
                     ? <><span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} /> <span>Generando...</span></>
                     : <>
-                        <i className="bi bi-printer-fill" style={{ color: "#7c3aed", fontSize: 15 }} />
+                        <i className="bi bi-printer-fill" style={{ color: "#7c3aed", fontSize: 15, flexShrink: 0 }} />
                         <div>
                           <div style={{ fontWeight: 600 }}>Imprimir consolidado</div>
                           <div style={{ fontSize: 11, color: C.muted }}>5 curvas + historial completo</div>
@@ -814,25 +813,26 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
           </div>
 
           {/* ── Botón DESCARGAR con dropdown ── */}
-          <div style={{ position: "relative" }} onMouseDown={e => e.stopPropagation()}>
-            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden" }}>
+          <div style={{ position: "relative", flex: isMobile ? 1 : "none" }} onMouseDown={e => e.stopPropagation()}>
+            <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", width: "100%" }}>
               <button
                 onClick={handleDescargarActual}
                 style={{
                   background: "transparent", border: "none",
                   borderRight: `1px solid ${C.border}`,
-                  padding: isMobile ? "8px 10px" : "10px 14px",
+                  padding: isMobile ? "9px 10px" : "10px 14px",
                   color: C.muted, fontWeight: 600, fontSize: isMobile ? 12 : 13,
-                  cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 6,
+                  cursor: "pointer", display: "flex", alignItems: "center",
+                  justifyContent: "center", gap: 5, flex: 1,
                 }}
                 title="Descargar esta curva como PDF"
               >
-                <i className="bi bi-download" /> {!isMobile && "Descargar"}
+                <i className="bi bi-download" />
+                <span>{isMobile ? "PDF" : "Descargar"}</span>
               </button>
               <button
                 onClick={() => { setShowMenuDescargar(v => !v); setShowMenuImprimir(false); }}
-                style={{ background: "transparent", border: "none", padding: "8px 7px", color: C.muted, cursor: "pointer", fontSize: 11 }}
+                style={{ background: "transparent", border: "none", padding: "9px 8px", color: C.muted, cursor: "pointer", fontSize: 11, flexShrink: 0 }}
                 title="Más opciones de descarga"
               >
                 <i className="bi bi-chevron-down" />
@@ -840,18 +840,20 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             </div>
             {showMenuDescargar && (
               <div style={{
-                position: "absolute", top: "calc(100% + 5px)", right: 0, zIndex: 300,
+                position: "absolute", top: "calc(100% + 5px)",
+                left: 0, right: "auto", zIndex: 300,
                 background: "#fff", border: `1px solid ${C.border}`, borderRadius: 10,
-                boxShadow: "0 8px 28px rgba(0,0,0,0.13)", minWidth: 240, overflow: "hidden",
+                boxShadow: "0 8px 28px rgba(0,0,0,0.18)",
+                width: "min(260px, calc(100vw - 24px))", overflow: "hidden",
               }}>
                 <div style={{ padding: "8px 14px 5px", fontSize: 10, color: C.muted, fontWeight: 700, textTransform: "uppercase", letterSpacing: ".06em", borderBottom: `1px solid ${C.border}` }}>
                   Descargar como PDF
                 </div>
                 <button
                   onClick={() => { handleDescargarActual(); setShowMenuDescargar(false); }}
-                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${C.border}` }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "12px 14px", textAlign: "left", cursor: "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, borderBottom: `1px solid ${C.border}` }}
                 >
-                  <i className="bi bi-file-earmark-arrow-down" style={{ color: C.accent, fontSize: 15 }} />
+                  <i className="bi bi-file-earmark-arrow-down" style={{ color: C.accent, fontSize: 15, flexShrink: 0 }} />
                   <div>
                     <div style={{ fontWeight: 600 }}>Esta curva (PDF)</div>
                     <div style={{ fontSize: 11, color: C.muted }}>{indInfo?.label}</div>
@@ -860,15 +862,15 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
                 <button
                   onClick={() => { handleConsolidado("download"); setShowMenuDescargar(false); }}
                   disabled={generandoConsolidado}
-                  style={{ width: "100%", background: "none", border: "none", padding: "11px 14px", textAlign: "left", cursor: generandoConsolidado ? "wait" : "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, opacity: generandoConsolidado ? 0.7 : 1 }}
+                  style={{ width: "100%", background: "none", border: "none", padding: "12px 14px", textAlign: "left", cursor: generandoConsolidado ? "wait" : "pointer", fontSize: 13, color: C.text, display: "flex", alignItems: "center", gap: 10, opacity: generandoConsolidado ? 0.7 : 1 }}
                 >
                   {generandoConsolidado
                     ? <><span className="spinner-border spinner-border-sm" style={{ width: 14, height: 14 }} /> <span>Generando...</span></>
                     : <>
-                        <i className="bi bi-file-earmark-pdf" style={{ color: "#dc2626", fontSize: 15 }} />
+                        <i className="bi bi-file-earmark-pdf" style={{ color: "#dc2626", fontSize: 15, flexShrink: 0 }} />
                         <div>
                           <div style={{ fontWeight: 600 }}>Consolidado (PDF)</div>
-                          <div style={{ fontSize: 11, color: C.muted }}>5 curvas + historial completo</div>
+                          <div style={{ fontSize: 11, color: C.muted }}>5 curvas + historial</div>
                         </div>
                       </>
                   }
@@ -882,10 +884,11 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             onClick={() => setShowForm(!showForm)}
             style={{
               background: showForm ? "rgba(239,68,68,0.9)" : `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-              border: "none", borderRadius: 10, padding: isMobile ? "8px 14px" : "10px 20px",
+              border: "none", borderRadius: 10, padding: isMobile ? "9px 12px" : "10px 20px",
               color: "#fff", fontWeight: 700, fontSize: isMobile ? 12 : 14, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
               boxShadow: "0 4px 14px rgba(13,110,253,.3)", flex: isMobile ? 2 : "none",
+              whiteSpace: "nowrap",
             }}
           >
             <i className={`bi ${showForm ? "bi-x-lg" : "bi-plus-circle"}`} />

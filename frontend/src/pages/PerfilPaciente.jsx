@@ -1103,9 +1103,12 @@ export default function PerfilPaciente() {
                   <div className="text-center py-5">
                     <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
                     <p className="text-muted mt-3">No hay consultas registradas</p>
-                    <Link to={`/consulta?paciente_id=${id}`} className="btn btn-primary">
-                      <i className="bi bi-plus-circle me-1" />Crear primera consulta
-                    </Link>
+                    <button
+                      className="btn btn-success"
+                      onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
+                    >
+                      <i className="bi bi-plus-circle me-1" />Nueva Consulta
+                    </button>
                   </div>
                 ) : (() => {
                   const filtradas = historias.filter(h => {
