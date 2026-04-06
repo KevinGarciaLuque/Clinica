@@ -1348,9 +1348,11 @@ export default function PerfilPaciente() {
                   <div className="list-group list-group-flush">
                     {documentos.map((doc) => {
                       const tipoInfo = TIPOS_DOC.find(t => t.value === doc.tipo) || TIPOS_DOC[TIPOS_DOC.length - 1];
-                      const esImagen = doc.ruta_archivo?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-                      const esPdf = doc.ruta_archivo?.match(/\.pdf$/i);
-                      const urlArchivo = `${API_BASE}/uploads/pacientes/${doc.ruta_archivo}`;
+                      const esImagen = doc.mime_type?.startsWith('image/');
+                      const esPdf = doc.mime_type === 'application/pdf';
+                      const urlArchivo = doc.ruta_archivo?.startsWith('http')
+                        ? doc.ruta_archivo
+                        : `${API_BASE}/uploads/pacientes/${doc.ruta_archivo}`;
                       const peso = doc.tamano_bytes
                         ? doc.tamano_bytes >= 1024 * 1024
                           ? (doc.tamano_bytes / (1024 * 1024)).toFixed(1) + " MB"
@@ -1510,9 +1512,11 @@ export default function PerfilPaciente() {
       )}
       {/* Modal visor de documento */}
       {docViewer && (() => {
-        const esImagen = docViewer.ruta_archivo?.match(/\.(jpg|jpeg|png|gif|webp)$/i);
-        const esPdf    = docViewer.ruta_archivo?.match(/\.pdf$/i);
-        const url      = `${API_BASE}/uploads/pacientes/${docViewer.ruta_archivo}`;
+        const esImagen = docViewer.mime_type?.startsWith('image/');
+        const esPdf    = docViewer.mime_type === 'application/pdf';
+        const url      = docViewer.ruta_archivo?.startsWith('http')
+          ? docViewer.ruta_archivo
+          : `${API_BASE}/uploads/pacientes/${docViewer.ruta_archivo}`;
         const tipoInfo = TIPOS_DOC.find(t => t.value === docViewer.tipo) || TIPOS_DOC[TIPOS_DOC.length - 1];
         return (
           <div className="modal fade show d-block" style={{ backgroundColor: "rgba(0,0,0,0.75)" }} tabIndex="-1"
