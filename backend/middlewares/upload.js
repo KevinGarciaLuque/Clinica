@@ -12,26 +12,8 @@ function ensureDir(dir) {
 ensureDir(path.join(BASE_DIR, "pacientes"));
 ensureDir(path.join(BASE_DIR, "clinicas"));
 
-// ── Storage engine para pacientes ───────────────────────────────────────
-const storagePacientes = multer.diskStorage({
-  destination(req, file, cb) {
-    const dest = path.join(BASE_DIR, "pacientes");
-    ensureDir(dest);
-    cb(null, dest);
-  },
-  filename(req, file, cb) {
-    const ext  = path.extname(file.originalname).toLowerCase();
-    const now  = new Date();
-    const yyyy = now.getFullYear();
-    const mm   = String(now.getMonth() + 1).padStart(2, "0");
-    const dd   = String(now.getDate()).padStart(2, "0");
-    const hh   = String(now.getHours()).padStart(2, "0");
-    const min  = String(now.getMinutes()).padStart(2, "0");
-    const ss   = String(now.getSeconds()).padStart(2, "0");
-    const rand = Math.random().toString(36).slice(2, 6);
-    cb(null, `${yyyy}-${mm}-${dd}_${hh}${min}${ss}-${rand}${ext}`);
-  },
-});
+// ── Storage engine para pacientes (memory → Cloudinary) ─────────────────
+const storagePacientes = multer.memoryStorage();
 
 // ── Storage engine para logos de clínica ───────────────────────────────
 const storageClinicas = multer.diskStorage({

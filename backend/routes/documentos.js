@@ -6,12 +6,12 @@
  * DELETE /:docId → elimina un documento
  */
 
-const router  = require("express").Router({ mergeParams: true });
-const path    = require("path");
-const fs      = require("fs");
-const pool    = require("../db");
-const auth    = require("../middlewares/auth");
-const upload  = require("../middlewares/upload");
+const router       = require("express").Router({ mergeParams: true });
+const pool         = require("../db");
+const auth         = require("../middlewares/auth");
+const upload       = require("../middlewares/upload");
+const cloudinary   = require("../utils/cloudinary");
+const streamifier  = require("streamifier");
 
 // ── GET /api/pacientes/:pacienteId/documentos ─────────────
 router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
@@ -97,20 +97,34 @@ router.post(
       
       const [[p]] = await pool.query(queryPaciente, paramsPaciente);
       if (!p) {
-        fs.unlinkSync(req.file.path); // Borrar archivo subido si no es válido
         return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
       }
 
       const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
+
+      // Subir a Cloudinary desde el buffer en memoria
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          {
+            folder:        `clinica/pacientes/${clinicaIdFinal}`,
+            resource_type: "auto",
+            use_filename:  false,
+          },
+          (err, result) => (err ? reject(err) : resolve(result))
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+
       const [r] = await pool.query(
         `INSERT INTO documentos_paciente
-           (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por)
-         VALUES (?,?,?,?,?,?,?,?)`,
+           (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, cloudinary_public_id, mime_type, tamano_bytes, subido_por)
+         VALUES (?,?,?,?,?,?,?,?,?)`,
         [
           pacienteId, clinicaIdFinal,
           tipo,
           req.file.originalname,
-          req.file.filename,     // sólo el nombre, no la ruta absoluta
+          uploadResult.secure_url,
+          uploadResult.public_id,
           req.file.mimetype,
           req.file.size,
           usuarioId,
@@ -127,13 +141,10 @@ router.post(
           nombre_original: req.file.originalname,
           mime_type:       req.file.mimetype,
           tamano_bytes:    req.file.size,
+          ruta_archivo:    uploadResult.secure_url,
         },
       });
     } catch (e) {
-      // Si falla BD, borrar el archivo físico
-      if (req.file?.path) {
-        try { fs.unlinkSync(req.file.path); } catch {}
-      }
       res.status(500).json({ ok: false, msg: e.message });
     }
   }
@@ -159,9 +170,14 @@ router.delete("/:docId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPE
     const [[doc]] = await pool.query(query, params);
     if (!doc) return res.status(404).json({ ok: false, msg: "Documento no encontrado" });
 
-    // Borrar archivo físico
-    const filePath = path.join(__dirname, "../uploads/pacientes", doc.ruta_archivo);
-    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+    // Borrar de Cloudinary si tiene public_id
+    if (doc.cloudinary_public_id) {
+      try {
+        await cloudinary.uploader.destroy(doc.cloudinary_public_id, { resource_type: "auto" });
+      } catch (cErr) {
+        console.warn("[DELETE doc] Cloudinary destroy failed:", cErr.message);
+      }
+    }
 
     await pool.query("DELETE FROM documentos_paciente WHERE id=?", [docId]);
 
@@ -185,13 +201,11 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SU
     );
     if (!doc) return res.status(404).json({ ok: false, msg: "Documento no encontrado" });
 
-    const filePath = path.join(__dirname, "../uploads/pacientes", doc.ruta_archivo);
-    if (!fs.existsSync(filePath))
-      return res.status(404).json({ ok: false, msg: "Archivo no encontrado en el servidor" });
+    if (!doc.ruta_archivo)
+      return res.status(404).json({ ok: false, msg: "Archivo no encontrado" });
 
-    res.setHeader("Content-Type", doc.mime_type);
-    res.setHeader("Content-Disposition", `inline; filename="${encodeURIComponent(doc.nombre_original)}"`);
-    fs.createReadStream(filePath).pipe(res);
+    // ruta_archivo es la URL de Cloudinary — redirigir al cliente
+    return res.redirect(doc.ruta_archivo);
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
