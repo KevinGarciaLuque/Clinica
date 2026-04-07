@@ -1,9 +1,11 @@
-const router = require("express").Router();
-const pool   = require("../db");
-const auth   = require("../middlewares/auth");
-const upload = require("../middlewares/upload");
-const fs     = require("fs");
-const path   = require("path");
+const router      = require("express").Router();
+const pool        = require("../db");
+const auth        = require("../middlewares/auth");
+const upload      = require("../middlewares/upload");
+const cloudinary  = require("../utils/cloudinary");
+const streamifier = require("streamifier");
+const fs          = require("fs");
+const path        = require("path");
 
 // GET /api/pacientes
 router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
@@ -213,43 +215,45 @@ router.post(
     try {
       if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
 
-      const clinicaId = req.tenant?.clinica_id;
-      const { id }    = req.params;
+      const clinicaId    = req.tenant?.clinica_id;
+      const { id }       = req.params;
       const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
-      // Verificar que el paciente existe (SUPER_ADMIN puede a cualquiera)
+      // Verificar que el paciente existe
       let query, params;
       if (isSuperAdmin) {
-        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=?";
+        query  = "SELECT id, foto_perfil, foto_cloudinary_id, clinica_id FROM pacientes WHERE id=?";
         params = [id];
       } else {
-        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+        query  = "SELECT id, foto_perfil, foto_cloudinary_id, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
         params = [id, clinicaId];
       }
-      
       const [[p]] = await pool.query(query, params);
-      if (!p) {
-        fs.unlink(req.file.path, () => {});
-        return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
-      }
+      if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
-      // Eliminar foto anterior si existe
-      if (p.foto_perfil) {
-        const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
-        if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
-      }
-
-      // Guardar ruta relativa (pacientes/filename.jpg)
-      const relativePath = "pacientes/" + req.file.filename;
       const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
+
+      // Eliminar foto anterior de Cloudinary si existe
+      if (p.foto_cloudinary_id) {
+        try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
+      }
+
+      // Subir nueva foto a Cloudinary desde el buffer en memoria
+      const uploadResult = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: `clinica/pacientes/${clinicaIdFinal}/perfil`, resource_type: "image" },
+          (err, result) => (err ? reject(err) : resolve(result))
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+
       await pool.query(
-        "UPDATE pacientes SET foto_perfil=? WHERE id=? AND clinica_id=?",
-        [relativePath, id, clinicaIdFinal]
+        "UPDATE pacientes SET foto_perfil=?, foto_cloudinary_id=? WHERE id=? AND clinica_id=?",
+        [uploadResult.secure_url, uploadResult.public_id, id, clinicaIdFinal]
       );
 
-      res.json({ ok: true, foto_perfil: relativePath });
+      res.json({ ok: true, foto_perfil: uploadResult.secure_url });
     } catch (e) {
-      if (req.file) fs.unlink(req.file.path, () => {});
       res.status(500).json({ ok: false, msg: e.message });
     }
   }
@@ -261,31 +265,31 @@ router.delete(
   auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   async (req, res) => {
     try {
-      const clinicaId = req.tenant?.clinica_id;
-      const { id }    = req.params;
+      const clinicaId    = req.tenant?.clinica_id;
+      const { id }       = req.params;
       const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
       let query, params;
       if (isSuperAdmin) {
-        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=?";
+        query  = "SELECT id, foto_perfil, foto_cloudinary_id, clinica_id FROM pacientes WHERE id=?";
         params = [id];
       } else {
-        query = "SELECT id, foto_perfil, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+        query  = "SELECT id, foto_perfil, foto_cloudinary_id, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
         params = [id, clinicaId];
       }
-      
       const [[p]] = await pool.query(query, params);
       if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
-      if (p.foto_perfil) {
-        const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
-        if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
-        const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
-        await pool.query(
-          "UPDATE pacientes SET foto_perfil=NULL WHERE id=? AND clinica_id=?",
-          [id, clinicaIdFinal]
-        );
+      if (p.foto_cloudinary_id) {
+        try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
       }
+
+      const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
+      await pool.query(
+        "UPDATE pacientes SET foto_perfil=NULL, foto_cloudinary_id=NULL WHERE id=? AND clinica_id=?",
+        [id, clinicaIdFinal]
+      );
+
       res.json({ ok: true });
     } catch (e) {
       res.status(500).json({ ok: false, msg: e.message });

@@ -413,7 +413,7 @@ export default function PerfilPaciente() {
             <div style={{ width: 80, height: 80 }}>
               {paciente.foto_perfil ? (
                 <img
-                  src={`${API_BASE}/uploads/${paciente.foto_perfil}`}
+                  src={paciente.foto_perfil?.startsWith('http') ? paciente.foto_perfil : `${API_BASE}/uploads/${paciente.foto_perfil}`}
                   alt="Foto"
                   className="rounded-circle border border-3 border-primary"
                   style={{ width: 80, height: 80, objectFit: "cover" }}
@@ -587,7 +587,7 @@ export default function PerfilPaciente() {
                       <div className="d-flex align-items-center gap-3">
                         {(fotoPreview || paciente.foto_perfil) && (
                           <img
-                            src={fotoPreview || `${API_BASE}/uploads/${paciente.foto_perfil}`}
+                            src={fotoPreview || (paciente.foto_perfil?.startsWith('http') ? paciente.foto_perfil : `${API_BASE}/uploads/${paciente.foto_perfil}`)}
                             alt="Preview"
                             style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 12 }}
                           />

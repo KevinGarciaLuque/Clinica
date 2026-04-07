@@ -376,7 +376,7 @@ export default function HistoriaClinica() {
                               onClick={(e) => {
                                 e.stopPropagation();
                                 if (p.foto_perfil) {
-                                  setModalFoto(`${API_BASE}/uploads/${p.foto_perfil}`);
+                                  setModalFoto(p.foto_perfil?.startsWith('http') ? p.foto_perfil : `${API_BASE}/uploads/${p.foto_perfil}`);
                                 }
                               }}
                               onMouseEnter={(e) => {
@@ -397,7 +397,7 @@ export default function HistoriaClinica() {
                               style={{
                               width: 38, height: 38, borderRadius: "50%",
                               background: p.foto_perfil ? "transparent" : "rgba(13,110,253,0.1)",
-                              backgroundImage: p.foto_perfil ? `url(${API_BASE}/uploads/${p.foto_perfil})` : "none",
+                              backgroundImage: p.foto_perfil ? `url(${p.foto_perfil?.startsWith('http') ? p.foto_perfil : `${API_BASE}/uploads/${p.foto_perfil}`})` : "none",
                               backgroundSize: "cover",
                               backgroundPosition: "center",
                               display: "flex", alignItems: "center", justifyContent: "center",

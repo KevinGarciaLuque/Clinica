@@ -19,6 +19,8 @@ const pool    = require("../db");
 const { v4: uuidv4 } = require("uuid");
 const { enviarEmail, templateVerificacion, templateBienvenida } = require("../utils/mailer");
 const upload  = require("../middlewares/upload");
+const cloudinary  = require("../utils/cloudinary");
+const streamifier = require("streamifier");
 const fs      = require("fs");
 const path    = require("path");
 
@@ -224,37 +226,38 @@ router.post("/:id/foto", upload.single("foto"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
 
-    const { id }        = req.params;
+    const { id }         = req.params;
     const { clinica_id } = req.body;
-    if (!clinica_id) {
-      fs.unlink(req.file.path, () => {});
+    if (!clinica_id)
       return res.status(400).json({ ok: false, msg: "clinica_id requerido" });
-    }
 
     const [[p]] = await pool.query(
-      "SELECT id, foto_perfil FROM pacientes WHERE id=? AND clinica_id=?",
+      "SELECT id, foto_cloudinary_id FROM pacientes WHERE id=? AND clinica_id=?",
       [id, clinica_id]
     );
-    if (!p) {
-      fs.unlink(req.file.path, () => {});
-      return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+
+    // Eliminar foto anterior de Cloudinary si existe
+    if (p.foto_cloudinary_id) {
+      try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
     }
 
-    // Eliminar foto anterior si existe
-    if (p.foto_perfil) {
-      const oldPath = path.join(__dirname, "../uploads", p.foto_perfil);
-      if (fs.existsSync(oldPath)) fs.unlink(oldPath, () => {});
-    }
+    // Subir a Cloudinary desde el buffer en memoria
+    const uploadResult = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: `clinica/pacientes/${clinica_id}/perfil`, resource_type: "image" },
+        (err, result) => (err ? reject(err) : resolve(result))
+      );
+      streamifier.createReadStream(req.file.buffer).pipe(stream);
+    });
 
-    const relativePath = "pacientes/" + req.file.filename;
     await pool.query(
-      "UPDATE pacientes SET foto_perfil=? WHERE id=?",
-      [relativePath, id]
+      "UPDATE pacientes SET foto_perfil=?, foto_cloudinary_id=? WHERE id=?",
+      [uploadResult.secure_url, uploadResult.public_id, id]
     );
 
-    res.json({ ok: true, foto_perfil: relativePath });
+    res.json({ ok: true, foto_perfil: uploadResult.secure_url });
   } catch (e) {
-    if (req.file) fs.unlink(req.file.path, () => {});
     res.status(500).json({ ok: false, msg: e.message });
   }
 });
