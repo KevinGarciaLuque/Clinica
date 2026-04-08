@@ -234,7 +234,7 @@ const GUIA_VACUNAS = [
   { vacuna: "VPH (Virus del Papiloma Humano)", grupo: "Niñas****", edad: "11 años" },
   { vacuna: "SRP-JL (Sarampión, Rubéola y Parotiditis)", grupo: "Grupos en riesgo", edad: "Mayores de 5 años (una dos dosis adicional)" },
   { vacuna: "Influenza", grupo: "Dos dosis", edad: "Niños de 6 meses a 8 años vacunados por primera vez" },
-  { vacuna: "Influenza", grupo: "Dosis actual", edad: "Grupos en riesgo: embarazadas, enfermos crónicos, adultos mayores de 60 a." },
+  { vacuna: "Influenza", grupo: "Dosis actual", edad: "Grupos en riesgo: embarazadas, enfermos crónicos, adultos mayores de 60 años." },
   { vacuna: "Fiebre Amarilla", grupo: "Desde dosis", edad: "Mayores de 9 meses al primer año / es recomendada al viajar a zonas de transmisión" },
   { vacuna: "Meningococo conjugada cuadrivalente (Meningitis)", grupo: "Grupos en riesgo", edad: "Niños de 9 a 23 meses (según riesgo de 2-3 dosis)" },
 ];
