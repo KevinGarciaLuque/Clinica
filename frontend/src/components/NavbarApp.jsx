@@ -238,7 +238,8 @@ export default function NavbarApp({ onMenuClick }) {
               }
             `}</style>
             <div
-              title={`Plan ${planBadge.label}${diasRestantes !== null ? ` — ${diasRestantes} días restantes` : ""}`}
+              title={`Plan ${planBadge.label}${diasRestantes !== null ? ` — ${diasRestantes} días restantes` : ""} · Click para solicitar plan`}
+              onClick={() => window.dispatchEvent(new CustomEvent("solicitarPlan"))}
               style={{
                 display: "flex", alignItems: "center", gap: 6,
                 background: planBadge.bg,
@@ -246,7 +247,7 @@ export default function NavbarApp({ onMenuClick }) {
                 borderRadius: 8,
                 padding: "4px 10px",
                 animation: planBadge.pulse ? "licencia-pulse 2s infinite" : "none",
-                cursor: "default",
+                cursor: "pointer",
                 userSelect: "none",
               }}
             >

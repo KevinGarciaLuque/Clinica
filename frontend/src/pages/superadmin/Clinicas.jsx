@@ -410,7 +410,7 @@ export default function Clinicas() {
                 {/* Info */}
                 <div style={{ flex: 1, minWidth: 0 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap", marginBottom: 4 }}>
-                    <span style={{ fontSize: 14, fontWeight: 700, color: C.text }}>
+                    <span style={{ fontSize: 14, fontWeight: 700, color: "#102546" }}>
                       {s.clinica_nombre}
                     </span>
                     <span style={{
@@ -749,13 +749,14 @@ export default function Clinicas() {
           <div style={{
             background: C.surface, border: `1px solid ${C.border}`,
             borderRadius: 18, width: "100%", maxWidth: 680,
-            maxHeight: "90vh", overflowY: "auto",
+            maxHeight: "90vh", display: "flex", flexDirection: "column",
             boxShadow: "0 24px 80px rgba(0,0,0,.5)",
           }}>
             {/* Header modal */}
             <div style={{
               padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
               display: "flex", alignItems: "center", gap: 14,
+              flexShrink: 0,
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 10,
@@ -786,8 +787,8 @@ export default function Clinicas() {
               </button>
             </div>
 
-            <form onSubmit={guardar}>
-              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 24 }}>
+            <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 24, overflowY: "auto", flex: 1 }}>
 
                 {error && (
                   <div style={{
@@ -1418,7 +1419,7 @@ export default function Clinicas() {
                 <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 17 }}>
                   Gestionar Licencia
                 </h5>
-                <span style={{ fontSize: 12, color: C.muted }}>
+                <span style={{ fontSize: 12, color: "#ffffff", fontWeight: 600 }}>
                   {clinicaLicencia.nombre}
                 </span>
               </div>

@@ -33,25 +33,45 @@ const PLANES = [
 export default function LicenciaVencidaModal() {
   const { user, licenciaInfo, logout } = useAuth();
   const [visible, setVisible]           = useState(false);
+  const [manualOpen, setManualOpen]     = useState(false);
   const [planSel, setPlanSel]           = useState("anual");
   const [mensaje, setMensaje]           = useState("");
   const [enviando, setEnviando]         = useState(false);
   const [enviado, setEnviado]           = useState(false);
   const [errorMsg, setErrorMsg]         = useState("");
 
-  useEffect(() => {
-    if (user && !user.super && licenciaInfo?.vencida) {
-      setVisible(true);
-    } else {
-      setVisible(false);
-    }
-  }, [user, licenciaInfo]);
+  const esVencida = !!(user && !user.super && licenciaInfo?.vencida);
 
   useEffect(() => {
-    const handler = () => setVisible(true);
-    window.addEventListener("licenciaVencida", handler);
-    return () => window.removeEventListener("licenciaVencida", handler);
-  }, []);
+    if (esVencida) {
+      setVisible(true);
+      setManualOpen(false);
+    } else if (!manualOpen) {
+      setVisible(false);
+    }
+  }, [esVencida]); // eslint-disable-line
+
+  useEffect(() => {
+    const handlerVencida = () => setVisible(true);
+    const handlerManual  = () => {
+      if (!esVencida) {
+        setManualOpen(true);
+        setEnviado(false);
+        setErrorMsg("");
+        setMensaje("");
+        setPlanSel("anual");
+      }
+      setVisible(true);
+    };
+    window.addEventListener("licenciaVencida", handlerVencida);
+    window.addEventListener("solicitarPlan",   handlerManual);
+    return () => {
+      window.removeEventListener("licenciaVencida", handlerVencida);
+      window.removeEventListener("solicitarPlan",   handlerManual);
+    };
+  }, [esVencida]); // eslint-disable-line
+
+  const cerrarManual = () => { setVisible(false); setManualOpen(false); };
 
   if (!visible) return null;
 
@@ -77,75 +97,119 @@ export default function LicenciaVencidaModal() {
     }
   };
 
+  // colores del header según estado
+  const hColor  = enviado ? C.success : manualOpen ? C.accent : C.danger;
+  const hBorder = enviado ? "rgba(16,185,129,.4)" : manualOpen ? "rgba(33,150,243,.4)" : "rgba(239,68,68,.4)";
+  const hBg     = enviado
+    ? "linear-gradient(135deg, rgba(16,185,129,.15), rgba(16,185,129,.08))"
+    : manualOpen
+      ? "linear-gradient(135deg, rgba(33,150,243,.15), rgba(33,150,243,.08))"
+      : "linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.08))";
+  const hIcon   = enviado ? "bi-check-circle-fill" : manualOpen ? "bi-arrow-up-circle-fill" : "bi-lock-fill";
+  const hTitle  = enviado ? "Solicitud Enviada" : manualOpen ? "Solicitar Plan" : "Licencia Vencida";
+  const hSub    = enviado
+    ? "El administrador fue notificado y revisará tu solicitud"
+    : manualOpen
+      ? "Elige el plan que deseas y envía tu solicitud al administrador"
+      : "El acceso a tu clínica ha sido suspendido";
+
   return (
-    <div style={{
-      position: "fixed", inset: 0, zIndex: 9999,
-      background: "rgba(0,0,0,.85)", backdropFilter: "blur(8px)",
-      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-    }}>
-      <div style={{
-        background: C.surface,
-        border: `2px solid ${enviado ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}`,
-        borderRadius: 20, width: "100%", maxWidth: 500,
-        boxShadow: `0 24px 80px ${enviado ? "rgba(16,185,129,.2)" : "rgba(239,68,68,.25)"}`,
-        overflow: "hidden", maxHeight: "95vh", overflowY: "auto",
-      }}>
+    <div
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,.85)", backdropFilter: "blur(8px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      }}
+      onClick={manualOpen && !esVencida ? cerrarManual : undefined}
+    >
+      <div
+        style={{
+          background: C.surface,
+          border: `2px solid ${hBorder}`,
+          borderRadius: 20, width: "100%", maxWidth: 500,
+          boxShadow: `0 24px 80px ${enviado ? "rgba(16,185,129,.2)" : manualOpen ? "rgba(33,150,243,.2)" : "rgba(239,68,68,.25)"}`,
+          overflow: "hidden", maxHeight: "95vh", overflowY: "auto",
+        }}
+        onClick={e => e.stopPropagation()}
+      >
 
         {/* Header */}
         <div style={{
-          background: enviado
-            ? "linear-gradient(135deg, rgba(16,185,129,.15), rgba(16,185,129,.08))"
-            : "linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.08))",
+          background: hBg,
           padding: "28px 32px 24px",
           textAlign: "center",
-          borderBottom: `1px solid ${enviado ? "rgba(16,185,129,.2)" : "rgba(239,68,68,.2)"}`,
+          borderBottom: `1px solid ${hBorder}`,
+          position: "relative",
         }}>
+          {/* Botón cerrar — solo en apertura manual */}
+          {manualOpen && !esVencida && (
+            <button
+              onClick={cerrarManual}
+              style={{
+                position: "absolute", top: 12, right: 14,
+                background: "rgba(255,255,255,.07)", border: "none",
+                borderRadius: 8, width: 30, height: 30, cursor: "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: C.muted, fontSize: 16,
+              }}
+            >
+              <i className="bi bi-x" />
+            </button>
+          )}
           <div style={{
             width: 72, height: 72, borderRadius: 20, margin: "0 auto 16px",
-            background: enviado ? "rgba(16,185,129,.15)" : "rgba(239,68,68,.15)",
-            border: `2px solid ${enviado ? "rgba(16,185,129,.4)" : "rgba(239,68,68,.4)"}`,
+            background: `${hColor}26`,
+            border: `2px solid ${hBorder}`,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <i
-              className={`bi ${enviado ? "bi-check-circle-fill" : "bi-lock-fill"}`}
-              style={{ fontSize: 30, color: enviado ? C.success : C.danger }}
-            />
+            <i className={`bi ${hIcon}`} style={{ fontSize: 30, color: hColor }} />
           </div>
-          <h4 style={{ color: enviado ? C.success : C.danger, margin: 0, fontWeight: 700, fontSize: 20 }}>
-            {enviado ? "Solicitud Enviada" : "Licencia Vencida"}
+          <h4 style={{ color: hColor, margin: 0, fontWeight: 700, fontSize: 20 }}>
+            {hTitle}
           </h4>
           <p style={{ color: C.muted, margin: "8px 0 0", fontSize: 13 }}>
-            {enviado
-              ? "El administrador fue notificado y revisará tu solicitud"
-              : "El acceso a tu clínica ha sido suspendido"}
+            {hSub}
           </p>
         </div>
 
         {/* Cuerpo */}
         <div style={{ padding: "24px 32px" }}>
 
-          {/* Info del plan vencido */}
+          {/* Info del plan actual */}
           <div style={{
-            background: "rgba(239,68,68,.06)", border: "1px solid rgba(239,68,68,.2)",
+            background: manualOpen && !esVencida ? `${planInfo.color}10` : "rgba(239,68,68,.06)",
+            border: `1px solid ${manualOpen && !esVencida ? `${planInfo.color}40` : "rgba(239,68,68,.2)"}`,
             borderRadius: 12, padding: "14px 18px", marginBottom: 20,
           }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: manualOpen && !esVencida ? 0 : 8 }}>
               <i className={`bi ${planInfo.icon}`} style={{ color: planInfo.color, fontSize: 16 }} />
               <span style={{ fontSize: 13, fontWeight: 700, color: C.text }}>
                 Plan {planInfo.label}
               </span>
-              <span style={{
-                marginLeft: "auto", fontSize: 11, fontWeight: 700,
-                background: "rgba(239,68,68,.15)", color: C.danger,
-                border: "1px solid rgba(239,68,68,.3)", borderRadius: 6, padding: "2px 8px",
-              }}>
-                VENCIDO
-              </span>
+              {!manualOpen || esVencida ? (
+                <span style={{
+                  marginLeft: "auto", fontSize: 11, fontWeight: 700,
+                  background: "rgba(239,68,68,.15)", color: C.danger,
+                  border: "1px solid rgba(239,68,68,.3)", borderRadius: 6, padding: "2px 8px",
+                }}>
+                  VENCIDO
+                </span>
+              ) : (
+                <span style={{
+                  marginLeft: "auto", fontSize: 11, fontWeight: 700,
+                  background: `${planInfo.color}20`, color: planInfo.color,
+                  border: `1px solid ${planInfo.color}50`, borderRadius: 6, padding: "2px 8px",
+                }}>
+                  ACTIVO · {licenciaInfo?.dias_restantes ?? "—"}d
+                </span>
+              )}
             </div>
-            <div style={{ fontSize: 13, color: C.muted }}>
-              <i className="bi bi-calendar-x me-2" style={{ color: C.danger }} />
-              Venció el <strong style={{ color: C.text }}>{fechaVencimiento}</strong>
-            </div>
+            {(!manualOpen || esVencida) && (
+              <div style={{ fontSize: 13, color: C.muted, marginTop: 8 }}>
+                <i className="bi bi-calendar-x me-2" style={{ color: C.danger }} />
+                Venció el <strong style={{ color: C.text }}>{fechaVencimiento}</strong>
+              </div>
+            )}
           </div>
 
           {!enviado ? (
@@ -264,7 +328,22 @@ export default function LicenciaVencidaModal() {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "0 32px 24px" }}>
+        <div style={{ padding: "0 32px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {manualOpen && !esVencida && (
+            <button
+              onClick={cerrarManual}
+              style={{
+                width: "100%", background: "transparent",
+                border: `1px solid ${C.border}`, borderRadius: 10,
+                padding: "10px 0", color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.accent; e.currentTarget.style.color = C.accent; }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted; }}
+            >
+              <i className="bi bi-x-circle me-2" />
+              Cerrar
+            </button>
+          )}
           <button
             onClick={logout}
             style={{

@@ -36,7 +36,7 @@ const VACUNAS_IZQUIERDA = [
   {
     codigo: "VPI",
     nombre: "VPI (Poliomielitis)",
-    descripcion: "Injectable",
+    descripcion: "Inyectable",
     notas: "* Solo aplica para inmunosuprimidos",
     dosis: [
       { key: "primera", label: "Primera" },
@@ -200,7 +200,7 @@ const VACUNAS_DERECHA = [
   },
   {
     codigo: "MENINGOCOCO",
-    nombre: "MENINGOCOCO\nconjugada cuadrivalente\n(Meningitis)*",
+    nombre: "MENINGOCOCO\nconjugada cuadrivalente\n(Meningitis)**",
     descripcion: "(grupos en riesgo)",
     dosis: [
       { key: "primera", label: "Primera" },
@@ -229,10 +229,10 @@ const GUIA_VACUNAS = [
   { vacuna: "Hepatitis A", grupo: "Niños 1 a 10 años", edad: "A partir de los 12 meses (2 dosis)" },
   { vacuna: "DPT (Difteria, Tétanos y Tos Ferina)", grupo: "Refuerzo", edad: "15-18 meses, 4 años" },
   { vacuna: "Td (Tétanos y Difteria)", grupo: "Embarazadas No vacunadas / Grupos en riesgo", edad: "Primera vez, al mes, 6 meses, 1 año, 1 año / Según calendario" },
-  { vacuna: "Tdap acélular (Tétanos, Difteria, Tos Ferina)", grupo: "Embarazadas (27-40 SG)***", edad: "En cada embarazo" },
+  { vacuna: "Tdap acélular (Tétanos, Difteria, Tos Ferina)", grupo: "Embarazadas (27-36 SG)***/ Grupos en riesgo***", edad: "En cada embarazo/ dosis única" },
   { vacuna: "Hepatitis B Adultos", grupo: "Grupos en riesgo (mayores de 15 años)", edad: "Primera vez, al mes, 2 meses, 12 meses" },
   { vacuna: "VPH (Virus del Papiloma Humano)", grupo: "Niñas****", edad: "11 años" },
-  { vacuna: "SRP-JL (Sarampión, Rubéola y Parotiditis)", grupo: "Grupos en riesgo", edad: "Mejores de 50 años (una dos dosis adicinas)" },
+  { vacuna: "SRP-JL (Sarampión, Rubéola y Parotiditis)", grupo: "Grupos en riesgo", edad: "Mayores de 5 años (una dos dosis adicional)" },
   { vacuna: "Influenza", grupo: "Dos dosis", edad: "Niños de 6 meses a 8 años vacunados por primera vez" },
   { vacuna: "Influenza", grupo: "Dosis actual", edad: "Grupos en riesgo: embarazadas, enfermos crónicos, adultos mayores de 60 a." },
   { vacuna: "Fiebre Amarilla", grupo: "Desde dosis", edad: "Mayores de 9 meses al primer año / es recomendada al viajar a zonas de transmisión" },
@@ -954,7 +954,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
             <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
             <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
             <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Día</th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Mes</th>
+            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10, whiteSpace: "nowrap" }}>Mes</th>
             <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Año</th>
             <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>(Día, nombre del mes y año)</th>
             <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
