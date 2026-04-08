@@ -396,6 +396,121 @@ function ModalVacuna({ datos, onClose, onGuardar, cargando }) {
 }
 
 // ══════════════════════════════════════════════════════════
+// MODAL PARA OTRAS VACUNAS / JORNADAS (nombre libre)
+// ══════════════════════════════════════════════════════════
+function ModalOtraVacuna({ datos, onClose, onGuardar, onEliminar, cargando }) {
+  const [form, setForm] = useState({
+    vacuna_nombre: datos?.registro?.vacuna_nombre || "",
+    dosis_nombre:  datos?.registro?.dosis_nombre  || "",
+    fecha_dia:     datos?.registro?.fecha_dia      || "",
+    fecha_mes:     datos?.registro?.fecha_mes      || "",
+    fecha_ano:     datos?.registro?.fecha_ano      || "",
+    proxima_cita:  datos?.registro?.proxima_cita   || "",
+    nombre_vacunador: datos?.registro?.nombre_vacunador || "",
+    lote:          datos?.registro?.lote           || "",
+    observaciones: datos?.registro?.observaciones  || "",
+  });
+
+  const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+  const titulo = datos?.seccion === "OTRAS" ? "Otra Vacuna" : "Vacuna Jornada / Campaña";
+  const esEdicion = !!datos?.registro;
+
+  return (
+    <div className="modal d-block" style={{ background: "rgba(0,0,0,0.5)", zIndex: 1055 }}>
+      <div className="modal-dialog modal-md">
+        <div className="modal-content">
+          <div className="modal-header" style={{ background: PAI.amarillo }}>
+            <h5 className="modal-title fw-bold" style={{ color: "#000" }}>
+              <i className="bi bi-syringe me-2" />
+              {esEdicion ? "Editar" : "Registrar"} — {titulo}
+            </h5>
+            <button className="btn-close" onClick={onClose} />
+          </div>
+          <div className="modal-body">
+            <form onSubmit={e => { e.preventDefault(); onGuardar(form); }}>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Nombre de la Vacuna <span className="text-danger">*</span></label>
+                <input
+                  name="vacuna_nombre"
+                  className="form-control form-control-sm"
+                  value={form.vacuna_nombre}
+                  onChange={handleChange}
+                  placeholder="Ej: Hepatitis A, Fiebre Tifoidea, COVID-19..."
+                  required
+                />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Dosis</label>
+                <input
+                  name="dosis_nombre"
+                  className="form-control form-control-sm"
+                  value={form.dosis_nombre}
+                  onChange={handleChange}
+                  placeholder="Ej: Primera, Única, Refuerzo..."
+                />
+              </div>
+              <div className="row g-2 mb-3">
+                <div className="col-3">
+                  <label className="form-label small fw-semibold">Día</label>
+                  <input name="fecha_dia" type="number" min="1" max="31" className="form-control form-control-sm"
+                    value={form.fecha_dia} onChange={handleChange} placeholder="DD" />
+                </div>
+                <div className="col-3">
+                  <label className="form-label small fw-semibold">Mes</label>
+                  <input name="fecha_mes" type="number" min="1" max="12" className="form-control form-control-sm"
+                    value={form.fecha_mes} onChange={handleChange} placeholder="MM" />
+                </div>
+                <div className="col-6">
+                  <label className="form-label small fw-semibold">Año</label>
+                  <input name="fecha_ano" type="number" min="2000" max="2100" className="form-control form-control-sm"
+                    value={form.fecha_ano} onChange={handleChange} placeholder="AAAA" />
+                </div>
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Próxima Cita</label>
+                <input name="proxima_cita" className="form-control form-control-sm"
+                  value={form.proxima_cita} onChange={handleChange} placeholder="Ej: 6 meses, 03/2027..." />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Nombre del Vacunador</label>
+                <input name="nombre_vacunador" className="form-control form-control-sm"
+                  value={form.nombre_vacunador} onChange={handleChange} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Lote (opcional)</label>
+                <input name="lote" className="form-control form-control-sm"
+                  value={form.lote} onChange={handleChange} />
+              </div>
+              <div className="mb-3">
+                <label className="form-label small fw-semibold">Observaciones</label>
+                <textarea name="observaciones" className="form-control form-control-sm" rows={2}
+                  value={form.observaciones} onChange={handleChange} />
+              </div>
+              <div className="d-flex gap-2 justify-content-between align-items-center">
+                {esEdicion && (
+                  <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onEliminar(datos.registro.id)}>
+                    <i className="bi bi-trash me-1" />Eliminar
+                  </button>
+                )}
+                <div className="d-flex gap-2 ms-auto">
+                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
+                  <button type="submit" className="btn btn-sm fw-bold text-dark" disabled={cargando}
+                    style={{ background: PAI.amarillo }}>
+                    {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-check-lg me-1" />}
+                    Guardar
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════
 // MODAL PARA VITAMINA A
 // ══════════════════════════════════════════════════════════
 function ModalVitaminaA({ datos, onClose, onGuardar, cargando }) {
@@ -734,6 +849,47 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
     });
   };
 
+  // ── Abrir modal otra vacuna (nombre libre) ─────────────
+  const abrirModalOtraVacuna = (seccion, registro = null) => {
+    setModal({ tipo: "otra", datos: { seccion, registro } });
+  };
+
+  // ── Guardar otra vacuna ────────────────────────────────
+  const handleGuardarOtraVacuna = async (formData) => {
+    setGuardando(true);
+    const { datos } = modal;
+    try {
+      if (datos.registro) {
+        await api.put(`/vacunas/${datos.registro.id}`, formData);
+      } else {
+        await api.post("/vacunas", {
+          ...formData,
+          paciente_id: pacienteId,
+          vacuna_codigo: datos.seccion === "OTRAS" ? "OTRAS" : "JORNADAS",
+          dosis_orden: 1,
+        });
+      }
+      await cargarDatos();
+      setModal(null);
+    } catch (e) {
+      alert("Error: " + (e?.response?.data?.msg || e.message));
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  // ── Eliminar otra vacuna ───────────────────────────────
+  const handleEliminarOtraVacuna = async (id) => {
+    if (!window.confirm("¿Eliminar este registro?")) return;
+    try {
+      await api.delete(`/vacunas/${id}`);
+      await cargarDatos();
+      setModal(null);
+    } catch (e) {
+      alert("Error: " + e.message);
+    }
+  };
+
   // ── Calcular edad ──────────────────────────────────────
   const calcEdad = () => {
     if (!paciente?.fecha_nacimiento) return "";
@@ -896,22 +1052,39 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
   );
 
   // ──────────────────────────────────────────────────────
-  // RENDER OTRAS VACUNAS Y JORNADAS (filas abiertas)
+  // RENDER OTRAS VACUNAS Y JORNADAS (filas clickeables)
   // ──────────────────────────────────────────────────────
-  const renderFilasAbiertas = (titulo, n) => {
-    const filasRegistro = registros.filter(r => r.vacuna_codigo === (titulo === "OTRAS" ? "OTRAS" : "JORNADAS"));
-    const filas = Math.max(n, filasRegistro.length + 1);
+  const renderFilasAbiertas = (seccion, n) => {
+    const codigo = seccion === "OTRAS" ? "OTRAS" : "JORNADAS";
+    const filasRegistro = registros.filter(r => r.vacuna_codigo === codigo);
+    // Siempre mostrar al menos n filas vacías adicionales para nuevas entradas
+    const filasVacias = Math.max(n - filasRegistro.length, 1);
+
+    const tdStyle = { border: "1px solid #ccc", padding: "5px 4px", fontSize: 11, verticalAlign: "middle" };
+    const thStyle = { background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 };
 
     return (
       <div className="mb-1">
+        {/* Encabezado con botón agregar */}
         <div style={{
           background: PAI.amarillo,
           fontWeight: "bold",
           fontSize: 11,
           padding: "3px 8px",
           border: "1px solid #999",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
         }}>
-          {titulo === "OTRAS" ? "OTRAS VACUNAS:" : "VACUNAS APLICADAS EN JORNADAS / CAMPAÑAS:"}
+          <span>{seccion === "OTRAS" ? "OTRAS VACUNAS:" : "VACUNAS APLICADAS EN JORNADAS / CAMPAÑAS:"}</span>
+          <button
+            className="btn btn-sm py-0 px-2"
+            style={{ background: PAI.azulOscuro, color: "#fff", fontSize: 10, lineHeight: 1.4 }}
+            onClick={() => abrirModalOtraVacuna(seccion)}
+            title="Agregar vacuna"
+          >
+            <i className="bi bi-plus-lg me-1" />Agregar
+          </button>
         </div>
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
           <colgroup>
@@ -925,30 +1098,62 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
           </colgroup>
           <thead>
             <tr>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 }}>Vacuna</th>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 }}>Dosis</th>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10, textAlign: "center" }}>Día</th>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10, textAlign: "center" }}>Mes</th>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10, textAlign: "center" }}>Año</th>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 }}>Próxima Cita</th>
-              <th style={{ background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 }}>Nombre del vacunador</th>
+              <th style={thStyle}>Vacuna</th>
+              <th style={thStyle}>Dosis</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Día</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Mes</th>
+              <th style={{ ...thStyle, textAlign: "center" }}>Año</th>
+              <th style={thStyle}>Próxima Cita</th>
+              <th style={thStyle}>Nombre del vacunador</th>
             </tr>
           </thead>
           <tbody>
-            {Array.from({ length: filas }).map((_, i) => {
-              const reg = filasRegistro[i];
+            {/* Filas con registros existentes (editables) */}
+            {filasRegistro.map((reg) => {
+              const dia = reg.fecha_dia ? String(reg.fecha_dia).padStart(2, "0") : "";
+              const mes = reg.fecha_mes ? String(reg.fecha_mes).padStart(2, "0") : "";
+              const ano = reg.fecha_ano ? String(reg.fecha_ano) : "";
               return (
-                <tr key={i} style={{ background: reg ? "#e8f5e9" : "#fff" }}>
-                  <td style={{ border: "1px solid #ccc", padding: "6px 4px", height: 28 }}>{reg?.vacuna_nombre || ""}</td>
-                  <td style={{ border: "1px solid #ccc", padding: "6px 4px" }}>{reg?.dosis_nombre || ""}</td>
-                  <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
-                  <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
-                  <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
-                  <td style={{ border: "1px solid #ccc", padding: "6px 4px" }}>{reg?.proxima_cita || ""}</td>
-                  <td style={{ border: "1px solid #ccc", padding: "6px 4px" }}>{reg?.nombre_vacunador || ""}</td>
+                <tr
+                  key={reg.id}
+                  style={{ background: "#e8f5e9", cursor: "pointer" }}
+                  onClick={() => abrirModalOtraVacuna(seccion, reg)}
+                  title="Clic para editar"
+                >
+                  <td style={{ ...tdStyle, fontWeight: "bold", color: "#1a5e29" }}>
+                    {reg.vacuna_nombre}
+                  </td>
+                  <td style={tdStyle}>{reg.dosis_nombre || "—"}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{dia}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{mes}</td>
+                  <td style={{ ...tdStyle, textAlign: "center" }}>{ano}</td>
+                  <td style={tdStyle}>{reg.proxima_cita || ""}</td>
+                  <td style={tdStyle}>
+                    <span>{reg.nombre_vacunador || ""}</span>
+                    <i className="bi bi-pencil-square ms-2 text-secondary" style={{ fontSize: 10 }} />
+                  </td>
                 </tr>
               );
             })}
+            {/* Filas vacías clickeables para agregar */}
+            {Array.from({ length: filasVacias }).map((_, i) => (
+              <tr
+                key={`empty-${i}`}
+                style={{ background: "#fffde7", cursor: "pointer" }}
+                onClick={() => abrirModalOtraVacuna(seccion)}
+                title="Clic para registrar nueva vacuna"
+              >
+                <td style={{ ...tdStyle, color: "#bbb", fontStyle: "italic" }}>
+                  {i === 0 ? "Clic para registrar..." : ""}
+                </td>
+                <td style={{ border: "1px solid #ccc", height: 28 }}>&nbsp;</td>
+                <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
+                <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
+                <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
+                <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
+                <td style={{ border: "1px solid #ccc" }}>&nbsp;</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
@@ -1452,6 +1657,15 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
           datos={modal.datos}
           onClose={() => setModal(null)}
           onGuardar={handleGuardarVitamina}
+          cargando={guardando}
+        />
+      )}
+      {modal?.tipo === "otra" && (
+        <ModalOtraVacuna
+          datos={modal.datos}
+          onClose={() => setModal(null)}
+          onGuardar={handleGuardarOtraVacuna}
+          onEliminar={handleEliminarOtraVacuna}
           cargando={guardando}
         />
       )}

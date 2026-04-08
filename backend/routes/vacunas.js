@@ -77,6 +77,7 @@ router.put("/:id", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_ADMIN"), async (r
   try {
     const clinicaId = req.tenant?.clinica_id;
     const {
+      vacuna_nombre, dosis_nombre,
       fecha_dia, fecha_mes, fecha_ano, proxima_cita, nombre_vacunador, lote, observaciones,
     } = req.body;
 
@@ -89,10 +90,12 @@ router.put("/:id", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_ADMIN"), async (r
 
     await pool.query(
       `UPDATE vacunas_aplicadas
-       SET fecha_dia=?, fecha_mes=?, fecha_ano=?, fecha_aplicacion=?,
+       SET vacuna_nombre=COALESCE(?,vacuna_nombre), dosis_nombre=COALESCE(?,dosis_nombre),
+           fecha_dia=?, fecha_mes=?, fecha_ano=?, fecha_aplicacion=?,
            proxima_cita=?, nombre_vacunador=?, lote=?, observaciones=?
        WHERE id=? AND clinica_id=?`,
       [
+        vacuna_nombre || null, dosis_nombre || null,
         fecha_dia || null, fecha_mes || null, fecha_ano || null, fecha_aplicacion,
         proxima_cita || null, nombre_vacunador || null, lote || null, observaciones || null,
         req.params.id, clinicaId,
