@@ -15,6 +15,7 @@ const API_BASE_PP = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE_PP = { BORRADOR: "warning text-dark", FIRMADA: "success" };
 import CurvaCrecimiento from "../components/CurvaCrecimiento";
 import AntecedentesClinico from "../components/AntecedentesClinico";
+import VacunasCarnet from "../components/VacunasCarnet";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -508,6 +509,14 @@ export default function PerfilPaciente() {
             onClick={() => setTab("crecimiento")}
           >
             <i className="bi bi-graph-up-arrow me-2" />Curvas de Crecimiento
+          </button>
+        </li>
+        <li className="nav-item">
+          <button
+            className={`nav-link ${tab === "vacunas" ? "active" : ""}`}
+            onClick={() => setTab("vacunas")}
+          >
+            <i className="bi bi-syringe me-2" />Vacunas
           </button>
         </li>
         <li className="nav-item">
@@ -1428,6 +1437,13 @@ export default function PerfilPaciente() {
             />
           </div>
         </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: VACUNAS */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "vacunas" && (
+        <VacunasCarnet paciente={paciente} pacienteId={id} />
       )}
 
       {/* ─────────────────────────────────────────────────────── */}
