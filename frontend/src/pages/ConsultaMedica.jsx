@@ -244,6 +244,19 @@ export default function Consulta() {
           firmada={firmada}
         />
       )}
+
+      {/* Modal consulta sin cita agendada */}
+      {showConsultaModal && consultaPaciente && (
+        <ModalConsultaSinCita
+          paciente={consultaPaciente}
+          onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
+          onCreated={(citaId) => {
+            setShowConsultaModal(false);
+            navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+            setConsultaPaciente(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1051,18 +1064,6 @@ function AntecedentesTab({ pacienteId, firmada }) {
         </div>
       </div>
 
-      {/* Modal consulta sin cita agendada */}
-      {showConsultaModal && consultaPaciente && (
-        <ModalConsultaSinCita
-          paciente={consultaPaciente}
-          onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
-          onCreated={(citaId) => {
-            setShowConsultaModal(false);
-            navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
-            setConsultaPaciente(null);
-          }}
-        />
-      )}
     </div>
   );
 }
