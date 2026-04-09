@@ -128,7 +128,8 @@ export default function LicenciaVencidaModal() {
           border: `2px solid ${hBorder}`,
           borderRadius: 20, width: "100%", maxWidth: 500,
           boxShadow: `0 24px 80px ${enviado ? "rgba(16,185,129,.2)" : manualOpen ? "rgba(33,150,243,.2)" : "rgba(239,68,68,.25)"}`,
-          overflow: "hidden", maxHeight: "95vh", overflowY: "auto",
+          overflow: "hidden", maxHeight: "95vh",
+          display: "flex", flexDirection: "column",
         }}
         onClick={e => e.stopPropagation()}
       >
@@ -172,6 +173,8 @@ export default function LicenciaVencidaModal() {
           </p>
         </div>
 
+        {/* Cuerpo + Footer — scrollable */}
+        <div style={{ overflowY: "auto", flex: 1 }}>
         {/* Cuerpo */}
         <div style={{ padding: "24px 32px" }}>
 
@@ -328,7 +331,7 @@ export default function LicenciaVencidaModal() {
         </div>
 
         {/* Footer */}
-        <div style={{ padding: "0 32px 24px", display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ padding: "0 32px 24px", display: "flex", flexDirection: "column", gap: 8, borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
           {manualOpen && !esVencida && (
             <button
               onClick={cerrarManual}
@@ -358,6 +361,7 @@ export default function LicenciaVencidaModal() {
             Cerrar sesión
           </button>
         </div>
+        </div>{/* fin scroll wrapper */}
       </div>
     </div>
   );
