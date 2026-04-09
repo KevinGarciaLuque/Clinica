@@ -35,8 +35,10 @@ import SeguimientoPostOp       from "./pages/estetica/SeguimientoPostOp";
 import FichaEstetica           from "./pages/estetica/FichaEstetica";
 
 // Módulos adicionales
-import Recordatorios from "./pages/Recordatorios";
-import Catalogos from "./pages/Catalogos";
+import Recordatorios   from "./pages/Recordatorios";
+import Catalogos       from "./pages/Catalogos";
+import CrecimientoPage from "./pages/CrecimientoPage";
+import VacunasPage     from "./pages/VacunasPage";
 
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
@@ -75,6 +77,8 @@ export default function App() {
         <Route path="/historia"               element={<HistoriaClinica />} />
         <Route path="/estudios"               element={<Estudios />} />
         <Route path="/catalogos"              element={<Catalogos />} />
+        <Route path="/crecimiento"            element={<CrecimientoPage />} />
+        <Route path="/vacunas"                element={<VacunasPage />} />
 
         {/* Rutas de administración (ADMIN + SUPER_ADMIN) */}
         <Route path="/admin/usuarios" element={

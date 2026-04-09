@@ -42,6 +42,12 @@ router.get("/slots", auth(), async (req, res) => {
       [clinicaId, medico_id, fecha]
     );
 
+    // Formatea Date como ISO local (sin 'Z') para que el frontend lo trate como hora local
+    const toLocalISO = d => {
+      const p = n => String(n).padStart(2, '0');
+      return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+    };
+
     const slots = [];
     for (const h of horarios) {
       let cursor = new Date(`${fecha}T${h.hora_inicio}`);
@@ -53,8 +59,8 @@ router.get("/slots", auth(), async (req, res) => {
         );
         if (!ocup) {
           slots.push({
-            inicio: cursor.toISOString(),
-            fin:    slotFin.toISOString(),
+            inicio: toLocalISO(cursor),
+            fin:    toLocalISO(slotFin),
             label:  `${cursor.toTimeString().slice(0,5)} - ${slotFin.toTimeString().slice(0,5)}`,
           });
         }

@@ -176,6 +176,11 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
         [clinicaId, args.medico_id, fechaReal]
       );
 
+      const toLocalISO = d => {
+        const p = n => String(n).padStart(2, '0');
+        return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+      };
+
       const slots = [];
       for (const h of horarios) {
         let cursor = new Date(`${fechaReal}T${h.hora_inicio}`);
@@ -183,7 +188,7 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
         while (cursor < fin) {
           const slotFin = new Date(cursor.getTime() + h.slot_minutos * 60000);
           const ocup = ocupadas.some(c => new Date(c.inicio) < slotFin && new Date(c.fin) > cursor);
-          if (!ocup) slots.push({ inicio: cursor.toISOString(), fin: slotFin.toISOString() });
+          if (!ocup) slots.push({ inicio: toLocalISO(cursor), fin: toLocalISO(slotFin) });
           cursor = slotFin;
         }
       }
