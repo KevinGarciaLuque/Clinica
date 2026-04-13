@@ -105,9 +105,7 @@ function CitasExpandable({ collapsed, onNavigate }) {
           // Si no está activo: navega normalmente (NavLink), el useEffect abre el sub-menú
         }}
         title={collapsed ? "Citas" : undefined}
-        className={({ isActive }) =>
-          `nav-link d-flex align-items-center gap-2 sidebar-link ${isActive ? "active" : ""}`
-        }
+        className={`nav-link d-flex align-items-center gap-2 sidebar-link ${isActive && !showSub ? "active" : isActive && showSub ? "sidebar-link-open" : ""}`}
         style={{
           fontSize: "0.84rem",
           padding: collapsed ? "9px 0" : "7px 11px",
@@ -189,9 +187,7 @@ function PacientesExpandable({ collapsed, onNavigate }) {
           // Si no está activo: navega normalmente (NavLink), el useEffect abre el sub-menú
         }}
         title={collapsed ? "Pacientes" : undefined}
-        className={({ isActive: na }) =>
-          `nav-link d-flex align-items-center gap-2 sidebar-link ${isActive ? "active" : ""}`
-        }
+        className={`nav-link d-flex align-items-center gap-2 sidebar-link ${isActive && !showSub ? "active" : isActive && showSub ? "sidebar-link-open" : ""}`}
         style={{
           fontSize: "0.84rem",
           padding: collapsed ? "9px 0" : "7px 11px",
@@ -332,6 +328,13 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           font-weight: 600;
         }
         .sidebar-link.active i { color: ${C.accent}; }
+        /* Padre expandido con sub-menú abierto: sutil, sin fondo fuerte */
+        .sidebar-link-open {
+          color: #fff !important;
+          font-weight: 600;
+          box-shadow: inset 3px 0 0 ${C.accent};
+        }
+        .sidebar-link-open i { color: ${C.accent}; }
 
         /* ── Sub-menú animación ── */
         @keyframes slideDown {
