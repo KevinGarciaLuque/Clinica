@@ -276,7 +276,7 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
           <li key={item.to}>
             <NavLink
               to={item.to}
-              end={item.to === "/"}
+              end
               onClick={onNavigate}
               title={collapsed ? item.label : undefined}
               className={({ isActive }) =>
@@ -321,7 +321,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
       <style>{`
         /* ── Links ── */
         .sidebar-link { color: ${C.textNormal}; }
-        .sidebar-link:hover {
+        .sidebar-link:hover:not(.active) {
           background: ${C.hover} !important;
           color: #fff !important;
         }
