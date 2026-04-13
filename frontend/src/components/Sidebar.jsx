@@ -102,7 +102,7 @@ function CitasExpandable({ collapsed, onNavigate }) {
         end
         onClick={(e) => {
           if (isActive) { e.preventDefault(); setOpen(o => !o); }
-          onNavigate?.();
+          // Si no está activo: navega normalmente (NavLink), el useEffect abre el sub-menú
         }}
         title={collapsed ? "Citas" : undefined}
         className={({ isActive }) =>
@@ -186,7 +186,7 @@ function PacientesExpandable({ collapsed, onNavigate }) {
         end
         onClick={(e) => {
           if (isActive) { e.preventDefault(); setOpen(o => !o); }
-          onNavigate?.();
+          // Si no está activo: navega normalmente (NavLink), el useEffect abre el sub-menú
         }}
         title={collapsed ? "Pacientes" : undefined}
         className={({ isActive: na }) =>
