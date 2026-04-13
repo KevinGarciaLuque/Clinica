@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import dayjs from "dayjs";
@@ -164,13 +165,14 @@ function eventPropGetter(event) {
 
 // ─── componente principal ─────────────────────────────────────────────────────
 export default function Citas() {
-  const [activeTab, setActiveTab]   = useState("calendario");
+  const [searchParams] = useSearchParams();
+  const [activeTab, setActiveTab]   = useState(searchParams.get("tab") || "calendario");
   const [events,    setEvents]      = useState([]);
   const [medicos,   setMedicos]     = useState([]);
   const [filterMed, setFilterMed]   = useState("");
   const [filterMedText, setFilterMedText] = useState("");
   const [showMedList, setShowMedList] = useState(false);
-  const [view,      setView]        = useState(Views.MONTH);
+  const [view,      setView]        = useState(searchParams.get("view") === "agenda" ? Views.AGENDA : Views.MONTH);
   const [date,      setDate]        = useState(new Date());
   const [loading,   setLoading]     = useState(false);
   const [showNew,   setShowNew]     = useState(false);
@@ -180,6 +182,15 @@ export default function Citas() {
   const [sala,      setSala]        = useState([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showEdit,         setShowEdit]          = useState(false);
+
+  // Sincronizar estado con cambios en la URL (cuando se navega desde el sidebar)
+  useEffect(() => {
+    const tab = searchParams.get("tab") || "calendario";
+    const viewParam = searchParams.get("view");
+    setActiveTab(tab);
+    if (tab === "sala") return;
+    setView(viewParam === "agenda" ? Views.AGENDA : Views.MONTH);
+  }, [searchParams]);
 
   useEffect(() => {
     api.get("/usuarios/medicos")

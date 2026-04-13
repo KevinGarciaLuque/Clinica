@@ -69,7 +69,7 @@ export default function PerfilPaciente() {
   const [subTabDatos, setSubTabDatos] = useState("paciente");
 
   // Sub-pestañas dentro de Historial Clínico
-  const [subTabHistorial, setSubTabHistorial] = useState("antecedentes");
+  const [subTabHistorial, setSubTabHistorial] = useState("consultas");
 
   // Historial de consultas - filtros y expansión
   const [filtroDesde,  setFiltroDesde]  = useState("");
@@ -1032,21 +1032,21 @@ export default function PerfilPaciente() {
           <ul className="nav nav-tabs mb-3">
             <li className="nav-item">
               <button
-                className={`nav-link ${subTabHistorial === "antecedentes" ? "active" : ""}`}
-                onClick={() => setSubTabHistorial("antecedentes")}
-              >
-                <i className="bi bi-heart-pulse me-1" />
-                Alergias y Antecedentes
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
                 className={`nav-link ${subTabHistorial === "consultas" ? "active" : ""}`}
                 onClick={() => setSubTabHistorial("consultas")}
               >
                 <i className="bi bi-clock-history me-1" />
                 Historial de Consultas
                 <span className="badge bg-secondary ms-1" style={{ fontSize: "0.7rem" }}>{historias.length}</span>
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${subTabHistorial === "antecedentes" ? "active" : ""}`}
+                onClick={() => setSubTabHistorial("antecedentes")}
+              >
+                <i className="bi bi-heart-pulse me-1" />
+                Alergias y Antecedentes
               </button>
             </li>
           </ul>

@@ -40,7 +40,7 @@ export default function HistoriaClinica() {
   const [modalFoto,    setModalFoto]    = useState(null);    // modal foto grande
   const [showConsultaModal,  setShowConsultaModal]  = useState(false);
   const [consultaPaciente,   setConsultaPaciente]   = useState(null);
-  const [activeTabHist,      setActiveTabHist]      = useState("alergias");
+  const [activeTabHist,      setActiveTabHist]      = useState("historial");
   const [filtroDesde,        setFiltroDesde]        = useState("");
   const [filtroHasta,        setFiltroHasta]        = useState("");
 
@@ -152,7 +152,7 @@ export default function HistoriaClinica() {
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Consulta — ${det.pac_apellidos}, ${det.pac_nombres} — ${dayjs(det.creado_en).format("DD/MM/YYYY")}</title>
+  <title>Consulta — ${det.pac_nombres} ${det.pac_apellidos} — ${dayjs(det.creado_en).format("DD/MM/YYYY")}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 24px 32px; }
@@ -183,7 +183,7 @@ export default function HistoriaClinica() {
   <div class="header">
     <div class="header-left">
       <h1>Historia Clínica Electrónica</h1>
-      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}${det.especialidad ? ` — ${det.especialidad}` : ""}</p>
+      <p>Dr. ${det.med_nombres} ${det.med_apellidos}${det.especialidad ? ` — ${det.especialidad}` : ""}</p>
     </div>
     <div class="header-right">
       <p><strong>Fecha:</strong> ${dayjs(det.creado_en).format("DD/MM/YYYY HH:mm")}</p>
@@ -193,7 +193,7 @@ export default function HistoriaClinica() {
   </div>
 
   <div class="paciente">
-    <h2>${det.pac_apellidos}, ${det.pac_nombres}</h2>
+    <h2>${det.pac_nombres} ${det.pac_apellidos}</h2>
     <div class="datos">
       ${det.fecha_nacimiento ? `<span>Nacimiento: ${dayjs(det.fecha_nacimiento).format("DD/MM/YYYY")}</span>` : ""}
       ${det.sexo ? `<span>Sexo: ${det.sexo}</span>` : ""}
@@ -236,7 +236,7 @@ export default function HistoriaClinica() {
   <div class="firma">
     <div class="firma-box">
       <div class="linea"></div>
-      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>
+      <p>Dr. ${det.med_nombres} ${det.med_apellidos}</p>
       ${det.especialidad ? `<p>${det.especialidad}</p>` : ""}
     </div>
   </div>
@@ -535,21 +535,21 @@ export default function HistoriaClinica() {
           <ul className="nav nav-tabs mb-3">
             <li className="nav-item">
               <button
-                className={`nav-link ${activeTabHist === "alergias" ? "active" : ""}`}
-                onClick={() => setActiveTabHist("alergias")}
-              >
-                <i className="bi bi-heart-pulse me-1"></i>
-                Alergias y Antecedentes
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
                 className={`nav-link ${activeTabHist === "historial" ? "active" : ""}`}
                 onClick={() => setActiveTabHist("historial")}
               >
                 <i className="bi bi-clock-history me-1"></i>
                 Historial de Consultas
                 <span className="badge bg-secondary ms-1" style={{ fontSize: "0.7rem" }}>{historias.length}</span>
+              </button>
+            </li>
+            <li className="nav-item">
+              <button
+                className={`nav-link ${activeTabHist === "alergias" ? "active" : ""}`}
+                onClick={() => setActiveTabHist("alergias")}
+              >
+                <i className="bi bi-heart-pulse me-1"></i>
+                Alergias y Antecedentes
               </button>
             </li>
           </ul>
@@ -649,7 +649,7 @@ export default function HistoriaClinica() {
                           <span className={`badge bg-${ESTADO_BADGE[h.estado]?.split(" ")[0]} ${ESTADO_BADGE[h.estado]?.split(" ")[1] || ""} me-2`}>
                             {h.estado}
                           </span>
-                          <strong className="small">Dr. {h.med_apellidos}, {h.med_nombres}</strong>
+                          <strong className="small">Dr. {h.med_nombres} {h.med_apellidos}</strong>
                           {h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
                         </div>
                         <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>

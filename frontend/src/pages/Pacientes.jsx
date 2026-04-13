@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
@@ -32,11 +32,12 @@ const FORM_VACIO = {
 export default function Pacientes() {
   const { user }  = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [q,      setQ]      = useState("");
   const [lista,  setLista]  = useState([]);
   const [msg,    setMsg]    = useState({ tipo: "", texto: "" });
   const [form,   setForm]   = useState(FORM_VACIO);
-  const [showForm, setShowForm] = useState(false);
+  const [showForm, setShowForm] = useState(searchParams.get("nuevo") === "true");
   const [editandoId, setEditandoId] = useState(null);
   const [fotoFile, setFotoFile] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
@@ -45,6 +46,15 @@ export default function Pacientes() {
   const [showConsultaModal, setShowConsultaModal] = useState(false);
   const [consultaPaciente, setConsultaPaciente] = useState(null);
   const [checkingCita, setCheckingCita] = useState(false);
+
+  // Sincronizar con cambios de URL (ej: click en "Registrar" del sidebar)
+  useEffect(() => {
+    if (searchParams.get("nuevo") === "true") {
+      setShowForm(true);
+      setEditandoId(null);
+      setForm(FORM_VACIO);
+    }
+  }, [searchParams]);
 
   const cargar = async () => {
     setMsg({ tipo: "", texto: "" });
