@@ -135,28 +135,76 @@ export default function Horarios() {
   }));
 
   return (
-    <div>
-      <style>{`
-        .dia-card:hover {
-          box-shadow: 0 4px 16px rgba(33,150,243,0.18) !important;
-          transform: translateY(-2px);
-        }
-      `}</style>
-      <div className="d-flex justify-content-between align-items-center mb-3">
-        <h4 className="mb-0">Horarios de Médicos</h4>
-        <button className="btn btn-primary btn-sm" onClick={abrirNuevo} disabled={!medicoSel}>
-          + Agregar bloque
+    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+
+      {/* ═══ HEADER ═══ */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <i className="bi bi-clock-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+          </div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Horarios de Médicos</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
+              Configura los bloques horarios por médico
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => abrirNuevo()}
+          disabled={!medicoSel}
+          style={{
+            background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.22)",
+            borderRadius: 8, color: "#e2e8f0", padding: "6px 14px",
+            fontSize: "0.8rem", cursor: medicoSel ? "pointer" : "not-allowed",
+            fontWeight: 500, display: "flex", alignItems: "center", gap: 6,
+            opacity: medicoSel ? 1 : 0.5,
+          }}>
+          <i className="bi bi-plus-lg"></i> Agregar bloque
         </button>
       </div>
 
-      {error && <div className="alert alert-danger py-2">{error}</div>}
+      <div style={{ padding: "20px 24px" }}>
 
-      {/* Selector de médico */}
-      <div className="card mb-4">
-        <div className="card-body">
-          <label className="form-label fw-semibold">Seleccionar médico</label>
-          <select className="form-select" value={medicoSel}
-            onChange={(e) => setMedicoSel(e.target.value)}>
+        {/* Error */}
+        {error && (
+          <div style={{
+            marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+            display: "flex", alignItems: "center", justifyContent: "space-between",
+            background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca",
+          }}>
+            <span><i className="bi bi-x-circle-fill me-2"></i>{error}</span>
+            <button onClick={() => setError("")} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
+          </div>
+        )}
+
+        {/* Selector de médico */}
+        <div style={{
+          background: "#fff", borderRadius: 12, padding: "20px 24px",
+          boxShadow: "0 2px 8px rgba(0,0,0,.06)", marginBottom: 20,
+        }}>
+          <label style={{ fontWeight: 700, fontSize: "0.87rem", color: "#374151", display: "block", marginBottom: 8 }}>
+            <i className="bi bi-person-badge-fill me-2" style={{ color: "#2563eb" }}></i>
+            Seleccionar médico
+          </label>
+          <select
+            value={medicoSel}
+            onChange={(e) => setMedicoSel(e.target.value)}
+            style={{
+              width: "100%", padding: "9px 12px", borderRadius: 8,
+              border: "1px solid #e5e7eb", fontSize: "0.9rem",
+              background: "#fff", color: "#111827", outline: "none",
+            }}
+          >
             <option value="">— Elige un médico —</option>
             {medicos.map((m) => (
               <option key={m.id} value={m.id}>
@@ -165,114 +213,178 @@ export default function Horarios() {
             ))}
           </select>
         </div>
-      </div>
 
-      {cargando ? (
-        <div className="text-center py-5"><div className="spinner-border" /></div>
-      ) : medicoSel ? (
-        <div className="row g-3">
-          {porDia.map(({ dia, idx, bloques }) => (
-            <div key={idx} className="col-md-6 col-lg-4">
+        {/* Contenido */}
+        {cargando ? (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>
+            <div className="spinner-border text-primary" role="status" style={{ width: "1.5rem", height: "1.5rem" }}></div>
+            <div style={{ marginTop: 10, fontSize: "0.85rem" }}>Cargando...</div>
+          </div>
+        ) : !medicoSel ? (
+          <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>
+            <i className="bi bi-calendar2-week" style={{ fontSize: "3rem", opacity: 0.3, display: "block", marginBottom: 12 }}></i>
+            <p style={{ fontSize: "0.9rem", margin: 0 }}>Selecciona un médico para ver y configurar su horario.</p>
+          </div>
+        ) : (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 16 }}>
+            {porDia.map(({ dia, idx, bloques }) => (
               <div
-                className={`card h-100 dia-card ${bloques.length ? "border-primary" : "border"}`}
+                key={idx}
                 onClick={() => abrirNuevo(idx)}
-                style={{ cursor: "pointer", transition: "box-shadow 0.18s, transform 0.18s" }}
+                style={{
+                  background: "#fff", borderRadius: 12, overflow: "hidden",
+                  boxShadow: "0 1px 4px rgba(0,0,0,.06)",
+                  border: bloques.length ? "1px solid #bfdbfe" : "1px solid #e5e7eb",
+                  cursor: "pointer", transition: "box-shadow .15s, transform .15s",
+                }}
+                onMouseEnter={e => { e.currentTarget.style.boxShadow = "0 4px 16px rgba(37,99,235,.15)"; e.currentTarget.style.transform = "translateY(-2px)"; }}
+                onMouseLeave={e => { e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,.06)"; e.currentTarget.style.transform = "translateY(0)"; }}
               >
-                <div className={`card-header d-flex justify-content-between align-items-center ${bloques.length ? "bg-primary text-white" : "bg-light"}`}>
-                  <span className="fw-semibold">{dia}</span>
-                  <div className="d-flex align-items-center gap-2">
-                    <span className={`badge ${bloques.length ? "bg-white text-primary" : "bg-secondary bg-opacity-25 text-secondary"}`}>
+                {/* Card header */}
+                <div style={{
+                  background: bloques.length ? "linear-gradient(135deg, #1a2744 0%, #243b72 100%)" : "#f8fafc",
+                  padding: "10px 14px",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                  borderBottom: bloques.length ? "none" : "1px solid #e5e7eb",
+                }}>
+                  <span style={{ fontWeight: 700, fontSize: "0.9rem", color: bloques.length ? "#fff" : "#374151" }}>
+                    {dia}
+                  </span>
+                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                    <span style={{
+                      background: bloques.length ? "rgba(255,255,255,.2)" : "#e5e7eb",
+                      color: bloques.length ? "#e2e8f0" : "#6b7280",
+                      borderRadius: 20, padding: "2px 10px", fontSize: "0.7rem", fontWeight: 700,
+                    }}>
                       {bloques.length > 0 ? `${bloques.length} bloque${bloques.length > 1 ? "s" : ""}` : "Libre"}
                     </span>
-                    <span
-                      className={`badge rounded-circle d-flex align-items-center justify-content-center ${bloques.length ? "bg-white text-primary" : "bg-primary text-white"}`}
-                      style={{ width: 22, height: 22, fontSize: "1rem", lineHeight: 1 }}
-                      title="Agregar bloque"
-                    >+</span>
+                    <span style={{
+                      width: 22, height: 22, borderRadius: "50%",
+                      background: bloques.length ? "rgba(255,255,255,.2)" : "#2563eb",
+                      color: bloques.length ? "#fff" : "#fff",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      fontSize: "1rem", fontWeight: 700,
+                    }}>+</span>
                   </div>
                 </div>
-                <div className="card-body p-2">
+
+                {/* Card body */}
+                <div style={{ padding: "10px 12px" }}>
                   {bloques.length === 0 ? (
-                    <p className="text-muted small mb-0 text-center py-3">
+                    <p style={{ textAlign: "center", color: "#9ca3af", fontSize: "0.82rem", margin: "12px 0", padding: "8px 0" }}>
                       <i className="bi bi-plus-circle me-1"></i>Click para agregar horario
                     </p>
                   ) : (
                     bloques.map((b) => (
-                      <div key={b.id} className="d-flex justify-content-between align-items-center border rounded p-2 mb-1">
+                      <div key={b.id} style={{
+                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        background: "#eff6ff", border: "1px solid #bfdbfe",
+                        borderRadius: 8, padding: "8px 10px", marginBottom: 6,
+                      }}>
                         <div>
-                          <span className="fw-semibold">{to12h(b.hora_inicio)} - {to12h(b.hora_fin)}</span>
-                          <span className="text-muted small ms-2">({b.slot_minutos} min/turno)</span>
+                          <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e40af" }}>
+                            {to12h(b.hora_inicio)} – {to12h(b.hora_fin)}
+                          </span>
+                          <span style={{ fontSize: "0.75rem", color: "#6b7280", marginLeft: 8 }}>
+                            ({b.slot_minutos} min/turno)
+                          </span>
                         </div>
                         <button
-                          className="btn btn-outline-danger btn-sm"
                           onClick={(e) => { e.stopPropagation(); eliminar(b.id); }}
-                        >✕</button>
+                          style={{
+                            background: "transparent", border: "1px solid #ef4444",
+                            borderRadius: 6, color: "#ef4444",
+                            padding: "2px 8px", fontSize: "0.78rem", cursor: "pointer", fontWeight: 700,
+                          }}>✕</button>
                       </div>
                     ))
                   )}
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      ) : (
-        <div className="text-center text-muted py-5">
-          <p>Selecciona un médico para ver y configurar su horario.</p>
-        </div>
-      )}
+            ))}
+          </div>
+        )}
+      </div>
 
+      {/* ═══ MODAL ═══ */}
       {showModal && (
-        <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }}>
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Nuevo bloque horario</h5>
-                <button className="btn-close" onClick={() => setShowModal(false)} />
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
+          <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 480, boxShadow: "0 8px 32px rgba(0,0,0,.2)", overflow: "hidden" }}>
+            {/* Modal header */}
+            <div style={{
+              background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+              padding: "14px 20px",
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <i className="bi bi-clock-fill" style={{ color: "#7dd3fc" }}></i>
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Nuevo bloque horario</span>
               </div>
-              <form onSubmit={guardar}>
-                <div className="modal-body">
-                  {error && <div className="alert alert-danger py-2">{error}</div>}
-                  <div className="row g-3">
-                    <div className="col-12">
-                      <label className="form-label">Médico</label>
-                      <select className="form-select" value={form.medico_id}
-                        onChange={(e) => setForm({ ...form, medico_id: e.target.value })}>
-                        <option value="">— Elige —</option>
-                        {medicos.map((m) => (
-                          <option key={m.id} value={m.id}>Dr(a). {m.apellidos}, {m.nombres}</option>
-                        ))}
-                      </select>
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label">Día de la semana</label>
-                      <select className="form-select" value={form.dia_semana}
-                        onChange={(e) => setForm({ ...form, dia_semana: Number(e.target.value) })}>
-                        {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
-                      </select>
-                    </div>
-                    <div className="col-md-6">
-                      <TimePicker12h label="Hora inicio" value={form.hora_inicio}
-                        onChange={(v) => setForm({ ...form, hora_inicio: v })} required />
-                    </div>
-                    <div className="col-md-6">
-                      <TimePicker12h label="Hora fin" value={form.hora_fin}
-                        onChange={(v) => setForm({ ...form, hora_fin: v })} required />
-                    </div>
-                    <div className="col-12">
-                      <label className="form-label">Duración de cada turno</label>
-                      <select className="form-select" value={form.slot_minutos}
-                        onChange={(e) => setForm({ ...form, slot_minutos: Number(e.target.value) })}>
-                        {SLOTS.map((s) => <option key={s} value={s}>{s} minutos</option>)}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-                <div className="modal-footer">
-                  <button type="button" className="btn btn-secondary" onClick={() => setShowModal(false)}>Cancelar</button>
-                  <button type="submit" className="btn btn-primary">Guardar</button>
-                </div>
-              </form>
+              <button onClick={() => setShowModal(false)} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", padding: "2px 8px", fontSize: "1rem" }}>×</button>
             </div>
+            {/* Modal body */}
+            <form onSubmit={guardar}>
+              <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 14 }}>
+                {error && (
+                  <div style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fecaca", borderRadius: 8, padding: "8px 14px", fontSize: "0.84rem" }}>
+                    {error}
+                  </div>
+                )}
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 }}>Médico</label>
+                  <select
+                    value={form.medico_id}
+                    onChange={(e) => setForm({ ...form, medico_id: e.target.value })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: "0.87rem" }}
+                  >
+                    <option value="">— Elige —</option>
+                    {medicos.map((m) => (
+                      <option key={m.id} value={m.id}>Dr(a). {m.apellidos}, {m.nombres}</option>
+                    ))}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 }}>Día de la semana</label>
+                  <select
+                    value={form.dia_semana}
+                    onChange={(e) => setForm({ ...form, dia_semana: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: "0.87rem" }}
+                  >
+                    {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
+                  </select>
+                </div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                  <TimePicker12h label="Hora inicio" value={form.hora_inicio}
+                    onChange={(v) => setForm({ ...form, hora_inicio: v })} required />
+                  <TimePicker12h label="Hora fin" value={form.hora_fin}
+                    onChange={(v) => setForm({ ...form, hora_fin: v })} required />
+                </div>
+                <div>
+                  <label style={{ fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 }}>Duración de cada turno</label>
+                  <select
+                    value={form.slot_minutos}
+                    onChange={(e) => setForm({ ...form, slot_minutos: Number(e.target.value) })}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: "0.87rem" }}
+                  >
+                    {SLOTS.map((s) => <option key={s} value={s}>{s} minutos</option>)}
+                  </select>
+                </div>
+              </div>
+              {/* Modal footer */}
+              <div style={{ padding: "12px 24px 20px", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+                <button type="button" onClick={() => setShowModal(false)} style={{
+                  background: "transparent", border: "1px solid #d1d5db", borderRadius: 8,
+                  padding: "8px 20px", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: "0.87rem",
+                }}>Cancelar</button>
+                <button type="submit" style={{
+                  background: "#2563eb", border: "none", borderRadius: 8,
+                  padding: "8px 22px", color: "#fff", fontWeight: 600, fontSize: "0.87rem", cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 7,
+                }}>
+                  <i className="bi bi-check-lg"></i> Guardar
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

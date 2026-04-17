@@ -8,36 +8,52 @@ export default function Catalogos() {
   const [tab, setTab] = useState("medicamentos");
 
   return (
-    <div className="container-fluid py-3">
-      <h4 className="fw-bold mb-3">
-        <i className="bi bi-journal-bookmark-fill text-primary me-2"></i>
-        Catálogos
-      </h4>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+      {/* ═══ HEADER ═══ */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px 0",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <i className="bi bi-journal-bookmark-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+          </div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Catálogos</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Medicamentos, Diagnósticos y Estudios</div>
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {[
+            { key: "medicamentos", label: "💊 Medicamentos" },
+            { key: "diagnosticos", label: "🩺 Diagnósticos" },
+            { key: "estudios",     label: "🧪 Estudios" },
+          ].map(t => (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                padding: "7px 20px", fontSize: "0.82rem", fontWeight: 600,
+                borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer",
+                background: tab === t.key ? "#fff" : "rgba(255,255,255,.1)",
+                color: tab === t.key ? "#1a2744" : "rgba(255,255,255,.75)",
+                transition: "background .15s",
+              }}
+            >{t.label}</button>
+          ))}
+        </div>
+      </div>
 
-      <ul className="nav nav-tabs mb-3">
-        <li className="nav-item">
-          <button className={`nav-link ${tab === "medicamentos" ? "active" : ""}`}
-            onClick={() => setTab("medicamentos")}>
-            💊 Medicamentos
-          </button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${tab === "diagnosticos" ? "active" : ""}`}
-            onClick={() => setTab("diagnosticos")}>
-            🩺 Diagnósticos
-          </button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${tab === "estudios" ? "active" : ""}`}
-            onClick={() => setTab("estudios")}>
-            🧪 Estudios
-          </button>
-        </li>
-      </ul>
-
-      {tab === "medicamentos" && <CatalogoMedicamentos />}
-      {tab === "diagnosticos" && <CatalogoDiagnosticos />}
-      {tab === "estudios" && <CatalogoEstudios />}
+      <div style={{ padding: "20px 24px" }}>
+        {tab === "medicamentos" && <CatalogoMedicamentos />}
+        {tab === "diagnosticos" && <CatalogoDiagnosticos />}
+        {tab === "estudios" && <CatalogoEstudios />}
+      </div>
     </div>
   );
 }
@@ -147,31 +163,57 @@ function CatalogoMedicamentos() {
 
   return (
     <div>
+      {/* Alert */}
       {alert && (
-        <div className={`alert alert-${alert.t} py-2 alert-dismissible`}>
-          {alert.m} <button className="btn-close" onClick={() => setAlert(null)} />
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: alert.t === "success" ? "#dcfce7" : "#fee2e2",
+          color: alert.t === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${alert.t === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span>{alert.m}</span>
+          <button onClick={() => setAlert(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
         </div>
       )}
 
-      <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
-        <div className="position-relative" style={{ flex: 1, maxWidth: 350 }}>
-          <i className="bi bi-search position-absolute" style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
-          <input className="form-control form-control-sm ps-5" placeholder="Buscar medicamento…"
-            value={q} onChange={e => { setQ(e.target.value); setPage(1); }} />
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+        <div style={{
+          flex: 1, maxWidth: 350, background: "#fff", borderRadius: 10, padding: "7px 12px",
+          display: "flex", alignItems: "center", gap: 8,
+          boxShadow: "0 1px 4px rgba(0,0,0,.06)", border: "1px solid #e5e7eb",
+        }}>
+          <i className="bi bi-search" style={{ color: "#9ca3af", fontSize: "0.85rem" }}></i>
+          <input value={q} onChange={e => { setQ(e.target.value); setPage(1); }} placeholder="Buscar medicamento…"
+            style={{ border: "none", outline: "none", flex: 1, fontSize: "0.88rem", background: "transparent" }} />
         </div>
-        <button className="btn btn-primary btn-sm ms-auto" onClick={abrirNuevo}>
-          <i className="bi bi-plus-circle me-1"></i>Nuevo Medicamento
+        <button onClick={abrirNuevo} style={{
+          marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: 8,
+          color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <i className="bi bi-plus-circle"></i> Nuevo Medicamento
         </button>
       </div>
 
-      {/* Form modal */}
+      {/* Inline form panel */}
       {showForm && (
-        <div className="card border-primary shadow-sm mb-3">
-          <div className="card-header bg-primary bg-opacity-10 fw-semibold d-flex justify-content-between">
-            <span>{editId ? "Editar Medicamento" : "Nuevo Medicamento"}</span>
-            <button className="btn-close" onClick={() => setShowForm(false)} />
+        <div style={{
+          background: "#fff", border: "1px solid #bfdbfe", borderRadius: 12,
+          marginBottom: 20, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.07)",
+        }}>
+          <div style={{
+            background: "#eff6ff", padding: "12px 20px", borderBottom: "1px solid #bfdbfe",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e40af" }}>
+              <i className="bi bi-capsule me-2"></i>
+              {editId ? "Editar Medicamento" : "Nuevo Medicamento"}
+            </span>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
           </div>
-          <div className="card-body row g-2">
+          <div className="row g-2" style={{ padding: "16px 20px" }}>
             <div className="col-md-4">
               <label className="form-label small fw-semibold">Nombre Genérico *</label>
               <input className="form-control form-control-sm" value={form.nombre_generico}
@@ -202,12 +244,11 @@ function CatalogoMedicamentos() {
               <input className="form-control form-control-sm" value={form.contraindicaciones}
                 onChange={e => setForm(f => ({ ...f, contraindicaciones: e.target.value }))} />
             </div>
-
             <div className="col-12">
-              <hr className="my-2" />
-              <p className="text-muted small mb-2 fw-semibold">
+              <div style={{ borderTop: "1px solid #e5e7eb", margin: "4px 0 8px" }}></div>
+              <p style={{ fontSize: "0.78rem", color: "#9ca3af", margin: 0, fontWeight: 600 }}>
                 <i className="bi bi-lightning-fill text-warning me-1"></i>
-                Valores por defecto para prescripción (se auto-llenan al seleccionar este medicamento)
+                Valores por defecto para prescripción
               </p>
             </div>
             <div className="col-md-3">
@@ -234,67 +275,67 @@ function CatalogoMedicamentos() {
                 value={form.instrucciones_default}
                 onChange={e => setForm(f => ({ ...f, instrucciones_default: e.target.value }))} />
             </div>
-
-            <div className="col-12 d-flex gap-2 mt-2">
-              <button className="btn btn-primary btn-sm" onClick={guardar} disabled={saving}>
+            <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={guardar} disabled={saving} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
                 {saving ? "Guardando…" : editId ? "Actualizar" : "Crear"}
               </button>
-              <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", color: "#374151", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tabla de medicamentos */}
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th style={{ width: 32 }}></th>
-              <th>Medicamento</th>
-              <th>Presentación</th>
-              <th>Vía</th>
-              <th>Dosis Default</th>
-              <th>Duración</th>
-              <th>Instrucciones</th>
-              <th style={{ width: 90 }}>Acciones</th>
+      {/* Table */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc" }}>
+              <th style={{ width: 32, padding: "10px 8px", borderBottom: "2px solid #e5e7eb" }}></th>
+              {["Medicamento", "Presentación", "Vía", "Dosis Default", "Duración", "Instrucciones", "Acciones"].map(h => (
+                <th key={h} style={{
+                  padding: "10px 12px", fontSize: "0.73rem", fontWeight: 700,
+                  color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                  borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {list.map(m => {
               const esFav = favSet.has(m.id);
               return (
-              <tr key={m.id} className={esFav ? "table-warning" : ""}>
-                <td className="text-center">
-                  <button
-                    className="btn btn-sm border-0 p-0"
-                    title={esFav ? "Quitar de favoritos" : "Marcar como favorito"}
+              <tr key={m.id}
+                style={{ borderBottom: "1px solid #f3f4f6", background: esFav ? "#fffbeb" : "transparent" }}
+                onMouseEnter={e => { if (!esFav) e.currentTarget.style.background = "#fafafa"; }}
+                onMouseLeave={e => { e.currentTarget.style.background = esFav ? "#fffbeb" : "transparent"; }}>
+                <td style={{ padding: "10px 8px", textAlign: "center" }}>
+                  <button title={esFav ? "Quitar de favoritos" : "Marcar como favorito"}
                     onClick={(e) => toggleFav(m, e)}
-                    style={{ fontSize: "1.1rem", lineHeight: 1 }}>
-                    <i className={`bi bi-star${esFav ? "-fill text-warning" : " text-muted"}`}></i>
+                    style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", lineHeight: 1 }}>
+                    <i className={`bi bi-star${esFav ? "-fill" : ""}`} style={{ color: esFav ? "#f59e0b" : "#d1d5db" }}></i>
                   </button>
                 </td>
-                <td>
-                  <div className="fw-semibold">
-                    {esFav && <i className="bi bi-star-fill text-warning me-1" style={{ fontSize: "0.65rem" }}></i>}
+                <td style={{ padding: "10px 12px" }}>
+                  <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>
+                    {esFav && <i className="bi bi-star-fill" style={{ color: "#f59e0b", fontSize: "0.65rem", marginRight: 4 }}></i>}
                     {m.nombre_generico}
                   </div>
-                  {m.nombre_comercial && <small className="text-muted">{m.nombre_comercial}</small>}
+                  {m.nombre_comercial && <div style={{ fontSize: "0.78rem", color: "#9ca3af" }}>{m.nombre_comercial}</div>}
                 </td>
-                <td><small>{m.presentacion || "—"}</small></td>
-                <td><small>{m.via_administracion || "—"}</small></td>
-                <td><small>{m.dosis_default || <span className="text-muted">—</span>}</small></td>
-                <td><small>{m.duracion_default || <span className="text-muted">—</span>}</small></td>
-                <td><small>{m.instrucciones_default || <span className="text-muted">—</span>}</small></td>
-                <td>
-                  <div className="d-flex gap-1">
-                    <button className="btn btn-outline-primary btn-sm" title="Editar"
-                      onClick={() => abrirEditar(m)}>
-                      <i className="bi bi-pencil"></i>
+                <td style={{ padding: "10px 12px", fontSize: "0.83rem", color: "#374151" }}>{m.presentacion || "—"}</td>
+                <td style={{ padding: "10px 12px", fontSize: "0.83rem", color: "#374151" }}>{m.via_administracion || "—"}</td>
+                <td style={{ padding: "10px 12px", fontSize: "0.83rem", color: "#374151" }}>{m.dosis_default || <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                <td style={{ padding: "10px 12px", fontSize: "0.83rem", color: "#374151" }}>{m.duracion_default || <span style={{ color: "#d1d5db" }}>—</span>}</td>
+                <td style={{ padding: "10px 12px", fontSize: "0.83rem", color: m.instrucciones_default ? "#374151" : "#d1d5db", maxWidth: 180 }}>{m.instrucciones_default || "—"}</td>
+                <td style={{ padding: "10px 12px" }}>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => abrirEditar(m)} title="Editar"
+                      style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, color: "#2563eb", padding: "4px 8px", cursor: "pointer" }}>
+                      <i className="bi bi-pencil" style={{ fontSize: "0.82rem" }}></i>
                     </button>
-                    <button className="btn btn-outline-danger btn-sm" title="Desactivar"
-                      onClick={() => toggleActivo(m.id)}>
-                      <i className="bi bi-trash3"></i>
+                    <button onClick={() => toggleActivo(m.id)} title="Desactivar"
+                      style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 7, color: "#e11d48", padding: "4px 8px", cursor: "pointer" }}>
+                      <i className="bi bi-trash3" style={{ fontSize: "0.82rem" }}></i>
                     </button>
                   </div>
                 </td>
@@ -302,19 +343,22 @@ function CatalogoMedicamentos() {
             );})}
             {list.length === 0 && (
               <tr>
-                <td colSpan={8} className="text-center text-muted py-4">Sin medicamentos encontrados.</td>
+                <td colSpan={8} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                  <i className="bi bi-capsule" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                  Sin medicamentos encontrados.
+                </td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
 
-      <div className="d-flex gap-2">
+      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
         {page > 1 && (
-          <button className="btn btn-outline-secondary btn-sm" onClick={() => setPage(p => p - 1)}>← Anterior</button>
+          <button onClick={() => setPage(p => p - 1)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 14px", fontSize: "0.82rem", color: "#374151", cursor: "pointer", fontWeight: 600 }}>← Anterior</button>
         )}
         {list.length === 30 && (
-          <button className="btn btn-outline-secondary btn-sm" onClick={() => setPage(p => p + 1)}>Siguiente →</button>
+          <button onClick={() => setPage(p => p + 1)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 14px", fontSize: "0.82rem", color: "#374151", cursor: "pointer", fontWeight: 600 }}>Siguiente →</button>
         )}
       </div>
     </div>
@@ -433,31 +477,57 @@ function CatalogoDiagnosticos() {
 
   return (
     <div>
+      {/* Alert */}
       {alert && (
-        <div className={`alert alert-${alert.t} py-2 alert-dismissible`}>
-          {alert.m} <button className="btn-close" onClick={() => setAlert(null)} />
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: alert.t === "success" ? "#dcfce7" : "#fee2e2",
+          color: alert.t === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${alert.t === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span>{alert.m}</span>
+          <button onClick={() => setAlert(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
         </div>
       )}
 
-      <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
-        <div className="position-relative" style={{ flex: 1, maxWidth: 350 }}>
-          <i className="bi bi-search position-absolute" style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
-          <input className="form-control form-control-sm ps-5" placeholder="Buscar diagnóstico…"
-            value={q} onChange={e => setQ(e.target.value)} />
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+        <div style={{
+          flex: 1, maxWidth: 350, background: "#fff", borderRadius: 10, padding: "7px 12px",
+          display: "flex", alignItems: "center", gap: 8,
+          boxShadow: "0 1px 4px rgba(0,0,0,.06)", border: "1px solid #e5e7eb",
+        }}>
+          <i className="bi bi-search" style={{ color: "#9ca3af", fontSize: "0.85rem" }}></i>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar diagnóstico…"
+            style={{ border: "none", outline: "none", flex: 1, fontSize: "0.88rem", background: "transparent" }} />
         </div>
-        <button className="btn btn-primary btn-sm ms-auto" onClick={abrirNuevo}>
-          <i className="bi bi-plus-circle me-1"></i>Nuevo Diagnóstico
+        <button onClick={abrirNuevo} style={{
+          marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: 8,
+          color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <i className="bi bi-plus-circle"></i> Nuevo Diagnóstico
         </button>
       </div>
 
-      {/* Form */}
+      {/* Inline form panel */}
       {showForm && (
-        <div className="card border-primary shadow-sm mb-3">
-          <div className="card-header bg-primary bg-opacity-10 fw-semibold d-flex justify-content-between">
-            <span>{editId ? "Editar Diagnóstico" : "Nuevo Diagnóstico"}</span>
-            <button className="btn-close" onClick={() => setShowForm(false)} />
+        <div style={{
+          background: "#fff", border: "1px solid #bfdbfe", borderRadius: 12,
+          marginBottom: 20, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.07)",
+        }}>
+          <div style={{
+            background: "#eff6ff", padding: "12px 20px", borderBottom: "1px solid #bfdbfe",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e40af" }}>
+              <i className="bi bi-clipboard2-pulse me-2"></i>
+              {editId ? "Editar Diagnóstico" : "Nuevo Diagnóstico"}
+            </span>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
           </div>
-          <div className="card-body row g-2">
+          <div className="row g-2" style={{ padding: "16px 20px" }}>
             <div className="col-md-6">
               <label className="form-label small fw-semibold">Nombre del catálogo *</label>
               <input className="form-control form-control-sm" placeholder="Ej: Faringitis aguda"
@@ -523,26 +593,28 @@ function CatalogoDiagnosticos() {
               <button className="btn btn-link btn-sm p-0" onClick={addDxSec}>+ Diagnóstico secundario</button>
             </div>
 
-            <div className="col-12 d-flex gap-2 mt-2">
-              <button className="btn btn-primary btn-sm" onClick={guardar} disabled={saving}>
+            <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={guardar} disabled={saving} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
                 {saving ? "Guardando…" : editId ? "Actualizar" : "Crear"}
               </button>
-              <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", color: "#374151", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th>Nombre</th>
-              <th>CIE-10</th>
-              <th>Descripción</th>
-              <th>Dx Secundarios</th>
-              <th style={{ width: 120 }}>Acciones</th>
+      {/* Table */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc" }}>
+              {["Nombre", "CIE-10", "Descripción", "Dx Secundarios", "Acciones"].map(h => (
+                <th key={h} style={{
+                  padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                  color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                  borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
@@ -550,29 +622,33 @@ function CatalogoDiagnosticos() {
               let sec = d.diagnosticos_secundarios;
               if (typeof sec === "string") { try { sec = JSON.parse(sec); } catch { sec = []; } }
               return (
-                <tr key={d.id}>
-                  <td className="fw-semibold">{d.nombre}</td>
-                  <td><span className="badge bg-info text-dark">{d.codigo_cie}</span></td>
-                  <td><small>{d.descripcion_cie}</small></td>
-                  <td>
+                <tr key={d.id} style={{ borderBottom: "1px solid #f3f4f6" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "11px 14px", fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>{d.nombre}</td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 700 }}>{d.codigo_cie}</span>
+                  </td>
+                  <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: "#374151" }}>{d.descripcion_cie}</td>
+                  <td style={{ padding: "11px 14px" }}>
                     {(sec || []).length > 0
                       ? (sec || []).map((s, i) => (
-                          <span key={i} className="badge bg-light text-dark border me-1" style={{ fontSize: "0.72rem" }}>
+                          <span key={i} style={{ background: "#f3f4f6", color: "#374151", border: "1px solid #e5e7eb", borderRadius: 6, padding: "1px 7px", fontSize: "0.72rem", marginRight: 4 }}>
                             {s.cie}: {s.descripcion}
                           </span>
                         ))
-                      : <span className="text-muted">—</span>
+                      : <span style={{ color: "#d1d5db" }}>—</span>
                     }
                   </td>
-                  <td>
-                    <div className="d-flex gap-1">
-                      <button className="btn btn-outline-primary btn-sm" title="Editar"
-                        onClick={() => abrirEditar(d)}>
-                        <i className="bi bi-pencil"></i>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => abrirEditar(d)} title="Editar"
+                        style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, color: "#2563eb", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-pencil" style={{ fontSize: "0.82rem" }}></i>
                       </button>
-                      <button className="btn btn-outline-danger btn-sm" title="Desactivar"
-                        onClick={() => toggleActivo(d.id)}>
-                        <i className="bi bi-trash3"></i>
+                      <button onClick={() => toggleActivo(d.id)} title="Desactivar"
+                        style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 7, color: "#e11d48", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-trash3" style={{ fontSize: "0.82rem" }}></i>
                       </button>
                     </div>
                   </td>
@@ -581,7 +657,10 @@ function CatalogoDiagnosticos() {
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan={5} className="text-center text-muted py-4">Sin diagnósticos en catálogo.</td>
+                <td colSpan={5} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                  <i className="bi bi-clipboard2" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                  Sin diagnósticos en catálogo.
+                </td>
               </tr>
             )}
           </tbody>
@@ -671,36 +750,62 @@ function CatalogoEstudios() {
 
   return (
     <div>
+      {/* Alert */}
       {alert && (
-        <div className={`alert alert-${alert.t} py-2 alert-dismissible`}>
-          {alert.m} <button className="btn-close" onClick={() => setAlert(null)} />
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: alert.t === "success" ? "#dcfce7" : "#fee2e2",
+          color: alert.t === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${alert.t === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span>{alert.m}</span>
+          <button onClick={() => setAlert(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
         </div>
       )}
 
-      <div className="d-flex gap-2 mb-3 align-items-center flex-wrap">
-        <div className="position-relative" style={{ flex: 1, maxWidth: 350 }}>
-          <i className="bi bi-search position-absolute" style={{ left: 12, top: "50%", transform: "translateY(-50%)", color: "#94a3b8" }} />
-          <input className="form-control form-control-sm ps-5" placeholder="Buscar estudio…"
-            value={q} onChange={e => setQ(e.target.value)} />
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{
+          flex: 1, maxWidth: 350, background: "#fff", borderRadius: 10, padding: "7px 12px",
+          display: "flex", alignItems: "center", gap: 8,
+          boxShadow: "0 1px 4px rgba(0,0,0,.06)", border: "1px solid #e5e7eb",
+        }}>
+          <i className="bi bi-search" style={{ color: "#9ca3af", fontSize: "0.85rem" }}></i>
+          <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar estudio…"
+            style={{ border: "none", outline: "none", flex: 1, fontSize: "0.88rem", background: "transparent" }} />
         </div>
         <select className="form-select form-select-sm" style={{ maxWidth: 180 }}
           value={catFiltro} onChange={e => setCatFiltro(e.target.value)}>
           <option value="">Todas las categorías</option>
           {CATEGORIAS.map(c => <option key={c} value={c}>{c}</option>)}
         </select>
-        <button className="btn btn-primary btn-sm ms-auto" onClick={abrirNuevo}>
-          <i className="bi bi-plus-circle me-1"></i>Nuevo Estudio
+        <button onClick={abrirNuevo} style={{
+          marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: 8,
+          color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <i className="bi bi-plus-circle"></i> Nuevo Estudio
         </button>
       </div>
 
-      {/* Form */}
+      {/* Inline form panel */}
       {showForm && (
-        <div className="card border-primary shadow-sm mb-3">
-          <div className="card-header bg-primary bg-opacity-10 fw-semibold d-flex justify-content-between">
-            <span>{editId ? "Editar Estudio" : "Nuevo Estudio"}</span>
-            <button className="btn-close" onClick={() => setShowForm(false)} />
+        <div style={{
+          background: "#fff", border: "1px solid #bfdbfe", borderRadius: 12,
+          marginBottom: 20, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.07)",
+        }}>
+          <div style={{
+            background: "#eff6ff", padding: "12px 20px", borderBottom: "1px solid #bfdbfe",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e40af" }}>
+              <i className="bi bi-file-earmark-medical me-2"></i>
+              {editId ? "Editar Estudio" : "Nuevo Estudio"}
+            </span>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
           </div>
-          <div className="card-body row g-2">
+          <div className="row g-2" style={{ padding: "16px 20px" }}>
             <div className="col-md-5">
               <label className="form-label small fw-semibold">Nombre del estudio *</label>
               <input className="form-control form-control-sm"
@@ -722,42 +827,54 @@ function CatalogoEstudios() {
                 value={form.descripcion}
                 onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
             </div>
-            <div className="col-12 d-flex gap-2 mt-2">
-              <button className="btn btn-primary btn-sm" onClick={guardar} disabled={saving}>
+            <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={guardar} disabled={saving} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
                 {saving ? "Guardando…" : editId ? "Actualizar" : "Crear"}
               </button>
-              <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", color: "#374151", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
             </div>
           </div>
         </div>
       )}
 
-      {/* Tabla */}
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th>Nombre del Estudio</th>
-              <th>Categoría</th>
-              <th>Descripción</th>
-              <th style={{ width: 120 }}>Acciones</th>
+      {/* Table */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <thead>
+            <tr style={{ background: "#f8fafc" }}>
+              {["Nombre del Estudio", "Categoría", "Descripción", "Acciones"].map(h => (
+                <th key={h} style={{
+                  padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                  color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                  borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                }}>{h}</th>
+              ))}
             </tr>
           </thead>
           <tbody>
             {list.map(e => (
-              <tr key={e.id}>
-                <td className="fw-semibold">{e.nombre}</td>
-                <td><span className={`badge ${catBadge(e.categoria)}`}>{e.categoria}</span></td>
-                <td><small>{e.descripcion || <span className="text-muted">—</span>}</small></td>
-                <td>
-                  <div className="d-flex gap-1">
-                    <button className="btn btn-outline-primary btn-sm" title="Editar"
-                      onClick={() => abrirEditar(e)}>
-                      <i className="bi bi-pencil"></i>
+              <tr key={e.id} style={{ borderBottom: "1px solid #f3f4f6" }}
+                onMouseEnter={ev => ev.currentTarget.style.background = "#fafafa"}
+                onMouseLeave={ev => ev.currentTarget.style.background = "transparent"}>
+                <td style={{ padding: "11px 14px", fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>{e.nombre}</td>
+                <td style={{ padding: "11px 14px" }}>
+                  <span style={{
+                    background: e.categoria === "LABORATORIO" ? "#eff6ff" : e.categoria === "IMAGENOLOGIA" ? "#e0f2fe" : "#f3f4f6",
+                    color: e.categoria === "LABORATORIO" ? "#2563eb" : e.categoria === "IMAGENOLOGIA" ? "#0369a1" : "#6b7280",
+                    border: `1px solid ${e.categoria === "LABORATORIO" ? "#bfdbfe" : e.categoria === "IMAGENOLOGIA" ? "#bae6fd" : "#e5e7eb"}`,
+                    borderRadius: 20, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 700,
+                  }}>{e.categoria}</span>
+                </td>
+                <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: e.descripcion ? "#374151" : "#d1d5db" }}>{e.descripcion || "—"}</td>
+                <td style={{ padding: "11px 14px" }}>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <button onClick={() => abrirEditar(e)} title="Editar"
+                      style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, color: "#2563eb", padding: "4px 8px", cursor: "pointer" }}>
+                      <i className="bi bi-pencil" style={{ fontSize: "0.82rem" }}></i>
                     </button>
-                    <button className="btn btn-outline-danger btn-sm" title="Desactivar"
-                      onClick={() => toggleActivo(e.id)}>
-                      <i className="bi bi-trash3"></i>
+                    <button onClick={() => toggleActivo(e.id)} title="Desactivar"
+                      style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 7, color: "#e11d48", padding: "4px 8px", cursor: "pointer" }}>
+                      <i className="bi bi-trash3" style={{ fontSize: "0.82rem" }}></i>
                     </button>
                   </div>
                 </td>
@@ -765,7 +882,10 @@ function CatalogoEstudios() {
             ))}
             {list.length === 0 && (
               <tr>
-                <td colSpan={4} className="text-center text-muted py-4">Sin estudios en catálogo.</td>
+                <td colSpan={4} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                  <i className="bi bi-file-earmark-medical" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                  Sin estudios en catálogo.
+                </td>
               </tr>
             )}
           </tbody>

@@ -14,13 +14,13 @@ const DnDCalendar = withDragAndDrop(Calendar);
 
 // ─── colores por estado ───────────────────────────────────────────────────────
 const ESTADO_COLOR = {
-  PENDIENTE:    { bg: "#ffc107", fg: "#000" },
-  CONFIRMADA:   { bg: "#0d6efd", fg: "#fff" },
-  EN_ESPERA:    { bg: "#6610f2", fg: "#fff" },
-  EN_ATENCION:  { bg: "#198754", fg: "#fff" },
-  COMPLETADA:   { bg: "#6c757d", fg: "#fff" },
-  CANCELADA:    { bg: "#dc3545", fg: "#fff" },
-  NO_ASISTIO:   { bg: "#fd7e14", fg: "#fff" },
+  PENDIENTE:   { bg: "#fef9c3", fg: "#854d0e", dot: "#eab308" },
+  CONFIRMADA:  { bg: "#dbeafe", fg: "#1e40af", dot: "#3b82f6" },
+  EN_ESPERA:   { bg: "#ede9fe", fg: "#5b21b6", dot: "#8b5cf6" },
+  EN_ATENCION: { bg: "#dcfce7", fg: "#166534", dot: "#22c55e" },
+  COMPLETADA:  { bg: "#f1f5f9", fg: "#475569", dot: "#94a3b8" },
+  CANCELADA:   { bg: "#fee2e2", fg: "#991b1b", dot: "#ef4444" },
+  NO_ASISTIO:  { bg: "#ffedd5", fg: "#9a3412", dot: "#f97316" },
 };
 
 const ESTADOS = Object.keys(ESTADO_COLOR);
@@ -294,80 +294,93 @@ export default function Citas() {
   };
 
   return (
-    <div className="container-fluid py-3">
+    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
       <style>{`
         .event-hover:hover {
           transform: translateY(-1px);
           box-shadow: 0 2px 8px rgba(0,0,0,0.15);
           opacity: 0.95;
         }
-        
-        /* Hover en celdas del calendario */
         .rbc-time-slot:hover {
-          background-color: rgba(13, 110, 253, 0.08) !important;
+          background-color: rgba(59, 130, 246, 0.06) !important;
           cursor: pointer;
-          transition: background-color 0.2s ease;
         }
-        
-        .rbc-day-slot:hover .rbc-time-slot {
-          background-color: rgba(13, 110, 253, 0.05) !important;
-        }
-        
-        .rbc-time-slot:hover::before {
-          content: '';
-          position: absolute;
-          top: 0;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          border: 1px dashed rgba(13, 110, 253, 0.3);
-          pointer-events: none;
-        }
-        
-        /* Hover en vista de mes */
         .rbc-month-view .rbc-day-bg:hover {
-          background-color: rgba(13, 110, 253, 0.05) !important;
+          background-color: rgba(59, 130, 246, 0.04) !important;
           cursor: pointer;
-          transition: background-color 0.2s ease;
         }
-        
-        .rbc-month-view .rbc-date-cell:hover {
-          background-color: rgba(13, 110, 253, 0.1) !important;
-          border-radius: 4px;
-        }
-
-        /* Mostrar 3 eventos por día */
-        .rbc-month-row {
-          min-height: 90px;
-        }
-        .rbc-event {
-          padding: 1px 4px !important;
-          font-size: 0.72rem !important;
-          line-height: 1.3 !important;
-        }
-        .rbc-event-content {
-          font-size: 0.72rem !important;
-        }
+        .rbc-month-row { min-height: 90px; }
+        .rbc-event { padding: 1px 4px !important; font-size: 0.72rem !important; line-height: 1.3 !important; }
+        .rbc-event-content { font-size: 0.72rem !important; }
+        .rbc-toolbar button { font-size: 0.83rem !important; padding: 5px 13px !important; border-radius: 7px !important; }
+        .rbc-toolbar button.rbc-active { background: #2563eb !important; color: #fff !important; border-color: #2563eb !important; }
       `}</style>
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h4 className="mb-0 fw-bold">Agenda de Citas</h4>
-        <button className="btn btn-primary btn-sm" onClick={() => { setSlotInfo(null); setShowNew(true); }}>
-          + Nueva Cita
+
+      {/* Header */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <i className="bi bi-calendar-week-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+          </div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Agenda de Citas</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
+              {dayjs().format("dddd D [de] MMMM [de] YYYY")}
+            </div>
+          </div>
+        </div>
+        <button
+          onClick={() => { setSlotInfo(null); setShowNew(true); }}
+          style={{
+            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+            border: "none", borderRadius: 8, color: "#fff",
+            padding: "7px 18px", fontSize: "0.83rem", cursor: "pointer",
+            fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
+            boxShadow: "0 2px 8px rgba(59,130,246,.35)",
+          }}>
+          <i className="bi bi-plus-lg"></i> Nueva Cita
         </button>
       </div>
 
-      <ul className="nav nav-tabs mb-3">
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === "calendario" ? "active" : ""}`}
-            onClick={() => setActiveTab("calendario")}>Calendario</button>
-        </li>
-        <li className="nav-item">
-          <button className={`nav-link ${activeTab === "sala" ? "active" : ""}`}
-            onClick={() => setActiveTab("sala")}>Sala de Espera</button>
-        </li>
-      </ul>
+      <div style={{ padding: "20px 24px" }}>
+        {/* Tabs */}
+        <div style={{
+          background: "#fff", borderRadius: "12px 12px 0 0",
+          borderBottom: "1px solid #e5e7eb", display: "flex", padding: "0 6px",
+          boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+        }}>
+          {[
+            { id: "calendario", icon: "bi-calendar3",        label: "Calendario" },
+            { id: "sala",       icon: "bi-person-lines-fill", label: "Sala de Espera" },
+          ].map(t => (
+            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+              background: "none", border: "none",
+              borderBottom: activeTab === t.id ? "2.5px solid #3b82f6" : "2.5px solid transparent",
+              color: activeTab === t.id ? "#2563eb" : "#6b7280",
+              fontWeight: activeTab === t.id ? 700 : 500,
+              padding: "12px 20px", fontSize: "0.87rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
+            }}>
+              <i className={`bi ${t.icon}`}></i>{t.label}
+            </button>
+          ))}
+        </div>
 
-      {activeTab === "calendario" && (
+        {/* Tab content */}
+        <div style={{
+          background: "#fff", borderRadius: "0 0 12px 12px",
+          boxShadow: "0 2px 8px rgba(0,0,0,.06)", padding: "16px 20px",
+        }}>
+          {activeTab === "calendario" && (
         <>
           <div className="d-flex gap-2 mb-3 flex-wrap align-items-center">
             <div className="position-relative" style={{ maxWidth: 300 }}>
@@ -406,17 +419,21 @@ export default function Citas() {
                 ) : null;
               })()}
             </div>
-            <div className="d-flex gap-1 flex-wrap ms-auto">
+            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginLeft: "auto" }}>
               {ESTADOS.map(est => (
-                <span key={est} className="badge"
-                  style={{ background: ESTADO_COLOR[est].bg, color: ESTADO_COLOR[est].fg, fontSize: "0.7rem" }}>
+                <span key={est} style={{
+                  background: ESTADO_COLOR[est].bg, color: ESTADO_COLOR[est].fg,
+                  borderRadius: 20, padding: "3px 9px", fontSize: "0.69rem", fontWeight: 700,
+                  display: "inline-flex", alignItems: "center", gap: 4,
+                }}>
+                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: ESTADO_COLOR[est].dot, display: "inline-block" }}></span>
                   {est}
                 </span>
               ))}
             </div>
           </div>
-          {loading && <div className="text-muted small mb-2">Cargando citas…</div>}
-          <div style={{ height: "calc(100vh - 270px)", minHeight: 500 }}>
+          {loading && <div style={{ fontSize: "0.82rem", color: "#9ca3af", marginBottom: 8 }}>Cargando citas...</div>}
+          <div style={{ height: "calc(100vh - 310px)", minHeight: 480 }}>
             <DnDCalendar
               localizer={localizer}
               events={events}
@@ -455,19 +472,18 @@ export default function Citas() {
         </>
       )}
 
-      {activeTab === "sala" && (
-        <SalaEspera 
-          sala={sala} 
-          onEstadoChange={(id, estado) => {
-            api.patch(`/citas/${id}/estado`, { estado })
-              .then(() => {
-                // Recargar para actualizar la lista en tiempo real
-                loadSalaEspera();
-              })
-              .catch(err => alert(err.response?.data?.msg || "Error"));
-          }}
-        />
-      )}
+          {activeTab === "sala" && (
+            <SalaEspera
+              sala={sala}
+              onEstadoChange={(id, estado) => {
+                api.patch(`/citas/${id}/estado`, { estado })
+                  .then(() => loadSalaEspera())
+                  .catch(err => alert(err.response?.data?.msg || "Error"));
+              }}
+            />
+          )}
+        </div>
+      </div>
 
       {showNew && (
         <ModalNuevaCita
@@ -514,57 +530,126 @@ export default function Citas() {
   );
 }
 
+// ─── Badge de estado ─────────────────────────────────────────────────────────
+function EstadoBadgeCitas({ estado }) {
+  const c = ESTADO_COLOR[estado] || { bg: "#f1f5f9", fg: "#475569", dot: "#94a3b8" };
+  return (
+    <span style={{
+      background: c.bg, color: c.fg, borderRadius: 20,
+      padding: "3px 10px", fontSize: "0.7rem", fontWeight: 700,
+      display: "inline-flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+    }}>
+      <span style={{ width: 6, height: 6, borderRadius: "50%", background: c.dot, display: "inline-block" }}></span>
+      {estado.replace(/_/g, " ")}
+    </span>
+  );
+}
+
 // ─── Sala de Espera ───────────────────────────────────────────────────────────
 function SalaEspera({ sala, onEstadoChange }) {
   const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
+
   return (
     <div>
-      <h6 className="text-muted mb-3">Citas de hoy — {dayjs().format("dddd D [de] MMMM")}</h6>
-      {sala.length === 0 && <p className="text-muted">No hay citas para hoy.</p>}
-      {sala.length > 0 && (
-        <div className="alert alert-info py-2 mb-3">
-          <small>
-            <i className="bi bi-info-circle me-1"></i>
-            Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIÓ
-          </small>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
+        <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>
+          Sala de Espera - {dayjs().format("dddd D [de] MMMM")}
+        </span>
+        {sala.length > 0 && (
+          <span style={{ background: "#ede9fe", color: "#7c3aed", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
+            {sala.length}
+          </span>
+        )}
+      </div>
+
+      {sala.length === 0 && (
+        <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+          <i className="bi bi-person-check" style={{ fontSize: "2.8rem", opacity: .3 }}></i>
+          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay pacientes en sala de espera.</p>
         </div>
       )}
-      <div className="table-responsive">
-        <table className="table table-hover align-middle">
-          <thead className="table-light">
-            <tr>
-              <th>#</th><th>Paciente</th><th>Médico</th><th>Hora</th><th>Estado</th><th>Acciones</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sala.map((c, i) => (
-              <tr key={c.id}>
-                <td className="text-muted">{i + 1}</td>
-                <td>{c.paciente_apellidos}, {c.paciente_nombres}<br/>
-                  <small className="text-muted">{c.paciente_tel}</small></td>
-                <td>Dr. {c.medico_apellidos}<br/>
-                  <small className="text-muted">{c.especialidad}</small></td>
-                <td className="text-nowrap">{dayjs(c.inicio).format("h:mm A")} – {dayjs(c.fin).format("h:mm A")}</td>
-                <td>
-                  <span className="badge"
-                    style={{ background: ESTADO_COLOR[c.estado]?.bg, color: ESTADO_COLOR[c.estado]?.fg }}>
-                    {c.estado}
-                  </span>
-                </td>
-                <td>
-                  {FLUJO.filter(e => e !== c.estado).map(e => (
-                    <button key={e} className="btn btn-outline-secondary btn-sm me-1"
-                      style={{ fontSize: "0.7rem" }} onClick={() => onEstadoChange(c.id, e)}>
-                      → {e.replace("_", " ")}
-                    </button>
+
+      {sala.length > 0 && (
+        <>
+          <div style={{
+            background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8,
+            padding: "8px 14px", marginBottom: 16, fontSize: "0.79rem", color: "#0369a1",
+            display: "flex", alignItems: "center", gap: 7,
+          }}>
+            <i className="bi bi-info-circle"></i>
+            Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIO
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: "#f8fafc" }}>
+                  {["#", "Paciente", "Medico", "Hora", "Estado", "Acciones"].map(h => (
+                    <th key={h} style={{
+                      padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                      color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                      borderBottom: "2px solid #e5e7eb", whiteSpace: "nowrap", textAlign: "left",
+                    }}>{h}</th>
                   ))}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
+                </tr>
+              </thead>
+              <tbody>
+                {sala.map((c, i) => (
+                  <FilaSala key={c.id} c={c} i={i}
+                    flujo={FLUJO} onEstadoChange={onEstadoChange} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
     </div>
+  );
+}
+
+function FilaSala({ c, i, flujo, onEstadoChange }) {
+  const [hover, setHover] = useState(false);
+  const btnStyle = (color) => ({
+    background: "transparent", border: `1px solid ${color}`,
+    borderRadius: 7, color, padding: "3px 10px", fontSize: "0.72rem",
+    cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap",
+  });
+  return (
+    <tr
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        borderBottom: "1px solid #f1f5f9",
+        background: hover ? "#f8fafd" : "#fff",
+        transition: "background .12s",
+      }}>
+      <td style={{ padding: "12px 14px", color: "#9ca3af", fontWeight: 700, fontSize: "0.82rem" }}>{i + 1}</td>
+      <td style={{ padding: "12px 14px" }}>
+        <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#111827" }}>
+          {c.paciente_apellidos}, {c.paciente_nombres}
+        </div>
+        <div style={{ fontSize: "0.74rem", color: "#9ca3af", marginTop: 2 }}>{c.paciente_tel}</div>
+      </td>
+      <td style={{ padding: "12px 14px" }}>
+        <div style={{ fontSize: "0.85rem", color: "#374151", fontWeight: 600 }}>Dr. {c.medico_apellidos}</div>
+        <div style={{ fontSize: "0.74rem", color: "#9ca3af", marginTop: 2 }}>{c.especialidad}</div>
+      </td>
+      <td style={{ padding: "12px 14px", fontSize: "0.83rem", color: "#374151", whiteSpace: "nowrap" }}>
+        {dayjs(c.inicio).format("h:mm A")} - {dayjs(c.fin).format("h:mm A")}
+      </td>
+      <td style={{ padding: "12px 14px" }}>
+        <EstadoBadgeCitas estado={c.estado} />
+      </td>
+      <td style={{ padding: "12px 14px" }}>
+        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {flujo.filter(e => e !== c.estado).map(e => (
+            <button key={e} onClick={() => onEstadoChange(c.id, e)}
+              style={btnStyle(ESTADO_COLOR[e]?.dot || "#6b7280")}>
+              {e.replace(/_/g, " ")}
+            </button>
+          ))}
+        </div>
+      </td>
+    </tr>
   );
 }
 

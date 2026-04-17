@@ -267,26 +267,48 @@ export default function HistoriaClinica() {
     : "";
 
   return (
-    <div className="container-fluid py-3" style={{ maxWidth: 960 }}>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
       {/* Header */}
-      <div className="d-flex align-items-center justify-content-between mb-3">
-        <h4 className="fw-bold mb-0">Historia Clínica Electrónica</h4>
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+        display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <i className="bi bi-journal-medical" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+          </div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Historia Clínica Electrónica</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Historial del paciente</div>
+          </div>
+        </div>
         {selPacId && (
           <button
-            className="btn btn-primary btn-sm"
-            onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}>
+            onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
+            style={{
+              background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)",
+              borderRadius: 8, padding: "7px 16px", color: "#fff", fontWeight: 600,
+              fontSize: "0.82rem", cursor: "pointer",
+            }}>
             + Nueva Consulta
           </button>
         )}
       </div>
+      <div style={{ padding: "20px 24px", maxWidth: 980 }}>
 
       {/* Búsqueda de paciente (si no viene de URL) */}
       {!paciente_id && !selPacId && (
         <div style={{
-          background: C.card, border: `1px solid ${C.border}`,
-          borderRadius: 14, overflow: "hidden",
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
-          marginBottom: 24,
+          background: "#fff", border: "1px solid #e5e7eb",
+          borderRadius: 12, overflow: "hidden",
+          boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+          marginBottom: 20,
         }}>
           <div style={{ padding: "20px 24px" }}>
             <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center" }}>
@@ -461,17 +483,17 @@ export default function HistoriaClinica() {
       )}
 
       {loading && (
-        <div className="text-center py-5 text-muted">
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#6b7280" }}>
           <div className="spinner-border spinner-border-sm me-2" />Cargando…
         </div>
       )}
 
       {!loading && !paciente && selPacId && (
-        <div className="alert alert-warning">Paciente no encontrado.</div>
+        <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8, padding: "12px 16px", color: "#92400e", fontSize: "0.9rem" }}>Paciente no encontrado.</div>
       )}
 
       {!loading && !selPacId && !paciente_id && (
-        <div className="text-muted text-center py-5">Busca un paciente para ver su historia clínica.</div>
+        <div style={{ textAlign: "center", padding: "60px 20px", color: "#9ca3af", fontSize: "0.9rem" }}>Busca un paciente para ver su historia clínica.</div>
       )}
 
       {paciente && (
@@ -507,52 +529,49 @@ export default function HistoriaClinica() {
           )}
 
           {/* Tarjeta del paciente */}
-          <div className="card border-0 shadow-sm mb-4">
-            <div className="card-body">
-              <div className="row align-items-start">
-                <div className="col-auto">
-                  <div className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold"
-                    style={{ width: 56, height: 56, fontSize: "1.3rem" }}>
-                    {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
-                  </div>
-                </div>
-                <div className="col">
-                  <h5 className="mb-1">{paciente.apellidos}, {paciente.nombres}</h5>
-                  <div className="d-flex flex-wrap gap-3 text-muted small">
-                    {paciente.dni && <span>DNI: {paciente.dni}</span>}
-                    {paciente.fecha_nacimiento && <span>{dayjs(paciente.fecha_nacimiento).format("DD/MM/YYYY")} — {edad}</span>}
-                    {paciente.sexo && <span>Sexo: {paciente.sexo}</span>}
-                    {paciente.telefono && <span>📞 {paciente.telefono}</span>}
-                    {paciente.email && <span>✉ {paciente.email}</span>}
-                  </div>
-                </div>
+          <div style={{
+            background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12,
+            padding: "16px 20px", marginBottom: 16, boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+            display: "flex", alignItems: "center", gap: 16,
+          }}>
+            <div style={{
+              width: 52, height: 52, borderRadius: "50%",
+              background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontWeight: 700, fontSize: "1.2rem", flexShrink: 0,
+            }}>
+              {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
+            </div>
+            <div>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 4 }}>
+                {paciente.apellidos}, {paciente.nombres}
               </div>
-
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px", color: "#6b7280", fontSize: "0.82rem" }}>
+                {paciente.dni && <span>DNI: {paciente.dni}</span>}
+                {paciente.fecha_nacimiento && <span>{dayjs(paciente.fecha_nacimiento).format("DD/MM/YYYY")} — {edad}</span>}
+                {paciente.sexo && <span>Sexo: {paciente.sexo}</span>}
+                {paciente.telefono && <span>📞 {paciente.telefono}</span>}
+                {paciente.email && <span>✉ {paciente.email}</span>}
+              </div>
             </div>
           </div>
 
-          {/* ── Pestañas ─────────────────────────────────────────────── */}
-          <ul className="nav nav-tabs mb-3">
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activeTabHist === "historial" ? "active" : ""}`}
-                onClick={() => setActiveTabHist("historial")}
-              >
-                <i className="bi bi-clock-history me-1"></i>
-                Historial de Consultas
-                <span className="badge bg-secondary ms-1" style={{ fontSize: "0.7rem" }}>{historias.length}</span>
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
-                className={`nav-link ${activeTabHist === "alergias" ? "active" : ""}`}
-                onClick={() => setActiveTabHist("alergias")}
-              >
-                <i className="bi bi-heart-pulse me-1"></i>
-                Alergias y Antecedentes
-              </button>
-            </li>
-          </ul>
+          {/* ── Pestañas ───────────────────────────────────────────── */}
+          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+            {[
+              { key: "historial", label: `🕐 Historial (${historias.length})` },
+              { key: "alergias",  label: "🩺 Alergias y Antecedentes" },
+            ].map(t => (
+              <button key={t.key} onClick={() => setActiveTabHist(t.key)} style={{
+                padding: "7px 18px", fontSize: "0.82rem", fontWeight: 600, borderRadius: 8,
+                border: activeTabHist === t.key ? "none" : "1px solid #e5e7eb",
+                cursor: "pointer",
+                background: activeTabHist === t.key ? "#1a2744" : "#fff",
+                color: activeTabHist === t.key ? "#fff" : "#6b7280",
+                boxShadow: activeTabHist === t.key ? "0 2px 8px rgba(26,39,68,.2)" : "none",
+              }}>{t.label}</button>
+            ))}
+          </div>
 
           {/* ── Tab 1: Alergias y Antecedentes ───────────────────────── */}
           {activeTabHist === "alergias" && (
@@ -573,50 +592,54 @@ export default function HistoriaClinica() {
             return (
             <div>
               {/* Filtro por fecha */}
-              <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                <small className="text-muted fw-semibold">Filtrar por fecha:</small>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14, flexWrap: "wrap" }}>
+                <span style={{ fontSize: "0.8rem", fontWeight: 600, color: "#6b7280" }}>Filtrar por fecha:</span>
                 <input
                   type="date"
                   className="form-control form-control-sm"
                   style={{ width: 150 }}
                   value={filtroDesde}
                   onChange={e => setFiltroDesde(e.target.value)}
-                  placeholder="Desde"
                 />
-                <span className="text-muted small">—</span>
+                <span style={{ color: "#9ca3af", fontSize: "0.8rem" }}>—</span>
                 <input
                   type="date"
                   className="form-control form-control-sm"
                   style={{ width: 150 }}
                   value={filtroHasta}
                   onChange={e => setFiltroHasta(e.target.value)}
-                  placeholder="Hasta"
                 />
                 {(filtroDesde || filtroHasta) && (
                   <button
-                    className="btn btn-outline-secondary btn-sm"
                     onClick={() => { setFiltroDesde(""); setFiltroHasta(""); }}
+                    style={{
+                      background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6,
+                      padding: "3px 10px", fontSize: "0.78rem", cursor: "pointer", color: "#374151",
+                    }}
                   >
                     <i className="bi bi-x-circle me-1"></i>Limpiar
                   </button>
                 )}
-                <small className="text-muted ms-auto">
+                <span style={{ marginLeft: "auto", fontSize: "0.78rem", color: "#9ca3af" }}>
                   {historiasFiltradas.length} de {historias.length} consulta{historias.length !== 1 ? "s" : ""}
-                </small>
+                </span>
               </div>
 
               {historias.length === 0 && (
-                <div className="text-center py-4 text-muted">
+                <div style={{ textAlign: "center", padding: "40px 20px", color: "#9ca3af" }}>
                   No hay consultas registradas.
                   <br />
-                  <Link to={`/consulta?paciente_id=${paciente.id}`} className="btn btn-outline-primary btn-sm mt-2">
+                  <Link to={`/consulta?paciente_id=${paciente.id}`}
+                    style={{ display: "inline-block", marginTop: 10, background: "#2563eb", color: "#fff",
+                      padding: "6px 16px", borderRadius: 8, textDecoration: "none", fontSize: "0.82rem", fontWeight: 600 }}>
                     Abrir primera consulta
                   </Link>
                 </div>
               )}
 
               {historias.length > 0 && historiasFiltradas.length === 0 && (
-                <div className="alert alert-warning py-2">
+                <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: 8,
+                  padding: "10px 16px", color: "#92400e", fontSize: "0.85rem" }}>
                   <i className="bi bi-search me-2"></i>
                   No hay consultas en el rango de fechas seleccionado.
                 </div>
@@ -642,117 +665,117 @@ export default function HistoriaClinica() {
                   </div>
 
                   {/* Tarjeta de consulta */}
-                  <div className="card border-0 shadow-sm flex-grow-1 mb-2">
-                    <div className="card-body py-2">
-                      <div className="d-flex justify-content-between align-items-start flex-wrap gap-1">
-                        <div>
-                          <span className={`badge bg-${ESTADO_BADGE[h.estado]?.split(" ")[0]} ${ESTADO_BADGE[h.estado]?.split(" ")[1] || ""} me-2`}>
-                            {h.estado}
-                          </span>
-                          <strong className="small">Dr. {h.med_nombres} {h.med_apellidos}</strong>
-                          {h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
-                        </div>
-                        <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
+                  <div style={{
+                    background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
+                    padding: "12px 16px", flex: 1, marginBottom: 8,
+                    boxShadow: "0 1px 4px rgba(0,0,0,.05)",
+                  }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 4 }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{
+                          background: h.estado === "FIRMADA" ? "#dcfce7" : "#fef9c3",
+                          color: h.estado === "FIRMADA" ? "#166534" : "#854d0e",
+                          border: `1px solid ${h.estado === "FIRMADA" ? "#bbf7d0" : "#fde68a"}`,
+                          borderRadius: 6, padding: "2px 8px", fontSize: "0.72rem", fontWeight: 700,
+                        }}>{h.estado}</span>
+                        <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "#1e293b" }}>Dr. {h.med_nombres} {h.med_apellidos}</span>
+                        {h.especialidad && <span style={{ fontSize: "0.8rem", color: "#9ca3af" }}>({h.especialidad})</span>}
                       </div>
-
-                      {h.diagnostico_cie && (
-                        <div className="small mt-1">
-                          <span className="badge bg-light text-dark border me-1">CIE: {h.diagnostico_cie}</span>
-                          {h.plan && <span className="text-muted">{h.plan.substring(0, 80)}{h.plan.length > 80 ? "…" : ""}</span>}
-                        </div>
-                      )}
-                      {h.subjetivo && !h.diagnostico_cie && (
-                        <div className="small text-muted mt-1">
-                          {h.subjetivo.substring(0, 100)}{h.subjetivo.length > 100 ? "…" : ""}
-                        </div>
-                      )}
-
-                      {/* Signos vitales resumidos */}
-                      {(vitals.pa || vitals.fc || vitals.temp) && (
-                        <div className="d-flex flex-wrap gap-2 mt-1">
-                          {vitals.pa    && <small className="text-muted">P.A. {vitals.pa} mmHg</small>}
-                          {vitals.fc    && <small className="text-muted">· FC {vitals.fc} bpm</small>}
-                          {vitals.temp  && <small className="text-muted">· T {vitals.temp}°C</small>}
-                          {vitals.peso  && <small className="text-muted">· Peso {vitals.peso} kg</small>}
-                        </div>
-                      )}
-
-                      {/* Acciones */}
-                      <div className="d-flex gap-2 mt-2 flex-wrap">
-                        <button className="btn btn-outline-secondary btn-sm"
-                          onClick={() => toggleExpand(h.id)}>
-                          {expanded ? "Ocultar detalle" : "Ver detalle"}
-                        </button>
-                        {h.estado === "BORRADOR" && (
-                          <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-outline-primary btn-sm">
-                            ✏ Editar
-                          </Link>
-                        )}
-                        {h.estado === "FIRMADA" && (
-                          <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-link btn-sm p-0">
-                            Ver completa
-                          </Link>
-                        )}
-                        <button
-                          className="btn btn-outline-secondary btn-sm ms-auto"
-                          title="Imprimir consulta"
-                          onClick={() => imprimirConsulta(h)}
-                        >
-                          <i className="bi bi-printer me-1"></i>Imprimir
-                        </button>
-                      </div>
-
-                      {/* Detalle expandido */}
-                      {expanded && det && (
-                        <div className="border-top mt-2 pt-2">
-                          {/* Prescripciones */}
-                          {det.prescripciones?.length > 0 && (
-                            <div className="mb-2">
-                              <div className="small fw-semibold mb-1">💊 Prescripción(es):</div>
-                              {det.prescripciones.map(p => (
-                                <div key={p.id} className="small text-muted ps-2 mb-1">
-                                  <div className="d-flex align-items-center gap-2 mb-1">
-                                    <span>Receta #{p.id}</span>
-                                    <span className="badge bg-secondary">{p.estado}</span>
-                                    <button className="btn btn-outline-primary btn-sm py-0 px-1"
-                                      style={{ fontSize: "0.72rem" }}
-                                      onClick={() => printRx(p.id)}>
-                                      <i className="bi bi-printer me-1"></i>PDF
-                                    </button>
-                                  </div>
-                                  {p.items?.filter(Boolean).map((it, i) => (
-                                    <div key={i} className="ps-2">• {it.medicamento_nombre || it.medicamento_texto}{it.dosis ? ` — ${it.dosis}` : ""}</div>
-                                  ))}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Estudios */}
-                          {det.estudios?.length > 0 && (
-                            <div className="mb-2">
-                              <div className="small fw-semibold mb-1">🧪 Estudios solicitados:</div>
-                              {det.estudios.map(s => (
-                                <div key={s.id} className="small text-muted ps-2">
-                                  [{s.tipo}] {s.descripcion} — {s.estado}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-
-                          {/* Plan completo */}
-                          {det.plan && (
-                            <div>
-                              <div className="small fw-semibold mb-1">Plan:</div>
-                              <div className="small text-muted" style={{ whiteSpace: "pre-wrap" }}>{det.plan}</div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {expanded && !det && (
-                        <div className="mt-2 text-muted small">Cargando detalle…</div>
-                      )}
+                      <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</span>
                     </div>
+
+                    {h.diagnostico_cie && (
+                      <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                        <span style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd",
+                          borderRadius: 5, padding: "2px 8px", fontSize: "0.75rem", fontWeight: 700 }}>CIE: {h.diagnostico_cie}</span>
+                        {h.plan && <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>{h.plan.substring(0, 80)}{h.plan.length > 80 ? "…" : ""}</span>}
+                      </div>
+                    )}
+                    {h.subjetivo && !h.diagnostico_cie && (
+                      <div style={{ marginTop: 4, fontSize: "0.82rem", color: "#6b7280" }}>
+                        {h.subjetivo.substring(0, 100)}{h.subjetivo.length > 100 ? "…" : ""}
+                      </div>
+                    )}
+
+                    {/* Signos vitales resumidos */}
+                    {(vitals.pa || vitals.fc || vitals.temp) && (
+                      <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginTop: 4 }}>
+                        {vitals.pa   && <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>P.A. {vitals.pa} mmHg</span>}
+                        {vitals.fc   && <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>· FC {vitals.fc} bpm</span>}
+                        {vitals.temp && <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>· T {vitals.temp}°C</span>}
+                        {vitals.peso && <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>· Peso {vitals.peso} kg</span>}
+                      </div>
+                    )}
+
+                    {/* Acciones */}
+                    <div style={{ display: "flex", gap: 8, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+                      <button onClick={() => toggleExpand(h.id)} style={{
+                        background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 6,
+                        padding: "4px 12px", fontSize: "0.78rem", cursor: "pointer", color: "#374151",
+                      }}>{expanded ? "Ocultar detalle" : "Ver detalle"}</button>
+                      {h.estado === "BORRADOR" && (
+                        <Link to={`/consulta-medica?historia_id=${h.id}`} style={{
+                          background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 6,
+                          padding: "4px 12px", fontSize: "0.78rem", color: "#2563eb", fontWeight: 600,
+                          textDecoration: "none",
+                        }}>✏ Editar</Link>
+                      )}
+                      {h.estado === "FIRMADA" && (
+                        <Link to={`/consulta-medica?historia_id=${h.id}`} style={{
+                          fontSize: "0.78rem", color: "#2563eb", textDecoration: "none", fontWeight: 500,
+                        }}>Ver completa</Link>
+                      )}
+                      <button onClick={() => imprimirConsulta(h)} style={{
+                        marginLeft: "auto", background: "#f1f5f9", border: "1px solid #e2e8f0",
+                        borderRadius: 6, padding: "4px 12px", fontSize: "0.78rem", cursor: "pointer", color: "#374151",
+                      }}><i className="bi bi-printer me-1"></i>Imprimir</button>
+                    </div>
+
+                    {/* Detalle expandido */}
+                    {expanded && det && (
+                      <div style={{ borderTop: "1px solid #e5e7eb", marginTop: 10, paddingTop: 10 }}>
+                        {det.prescripciones?.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: 4, color: "#374151" }}>💊 Prescripción(es):</div>
+                            {det.prescripciones.map(p => (
+                              <div key={p.id} style={{ fontSize: "0.8rem", color: "#6b7280", paddingLeft: 8, marginBottom: 4 }}>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 2 }}>
+                                  <span>Receta #{p.id}</span>
+                                  <span style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 4,
+                                    padding: "1px 6px", fontSize: "0.72rem", color: "#374151" }}>{p.estado}</span>
+                                  <button onClick={() => printRx(p.id)} style={{
+                                    background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 5,
+                                    padding: "1px 8px", fontSize: "0.72rem", cursor: "pointer", color: "#2563eb",
+                                  }}><i className="bi bi-printer me-1"></i>PDF</button>
+                                </div>
+                                {p.items?.filter(Boolean).map((it, i) => (
+                                  <div key={i} style={{ paddingLeft: 8 }}>• {it.medicamento_nombre || it.medicamento_texto}{it.dosis ? ` — ${it.dosis}` : ""}</div>
+                                ))}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {det.estudios?.length > 0 && (
+                          <div style={{ marginBottom: 8 }}>
+                            <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: 4, color: "#374151" }}>🧪 Estudios solicitados:</div>
+                            {det.estudios.map(s => (
+                              <div key={s.id} style={{ fontSize: "0.8rem", color: "#6b7280", paddingLeft: 8 }}>
+                                [{s.tipo}] {s.descripcion} — {s.estado}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        {det.plan && (
+                          <div>
+                            <div style={{ fontSize: "0.8rem", fontWeight: 600, marginBottom: 4, color: "#374151" }}>Plan:</div>
+                            <div style={{ fontSize: "0.8rem", color: "#6b7280", whiteSpace: "pre-wrap" }}>{det.plan}</div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                    {expanded && !det && (
+                      <div style={{ marginTop: 8, fontSize: "0.8rem", color: "#9ca3af" }}>Cargando detalle…</div>
+                    )}
                   </div>
                 </div>
               );
@@ -807,6 +830,7 @@ export default function HistoriaClinica() {
           />
         </div>
       )}
+      </div>
     </div>
   );
 }

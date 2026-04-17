@@ -151,112 +151,222 @@ export default function Consulta() {
     ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") + " años"
     : "";
 
+  const TAB_LIST = [
+    { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
+    { id: "rx",           icon: "bi-capsule",          label: "Prescripción" },
+    { id: "estudios",     icon: "bi-eyedropper",       label: "Estudios" },
+    { id: "antecedentes", icon: "bi-folder2-open",     label: "Antecedentes" },
+  ];
+
   return (
-    <div className="container-fluid py-3">
-      {/* Header */}
-      <div className="d-flex align-items-start justify-content-between mb-3 flex-wrap gap-2">
-        <div>
-          <button className="btn btn-link p-0 text-muted me-2" onClick={() => navigate(-1)}>← Volver</button>
-          <h5 className="d-inline mb-0 fw-bold">
-            Consulta Médica
-            {firmada && <span className="badge bg-success ms-2">FIRMADA</span>}
-            {!firmada && hid && <span className="badge bg-warning text-dark ms-2">BORRADOR</span>}
-          </h5>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+      {/* ── Header barra superior ── */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "14px 24px",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+      }}>
+        <div className="d-flex align-items-center gap-3">
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)",
+              borderRadius: 8, color: "#fff", padding: "5px 14px", fontSize: "0.82rem",
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <i className="bi bi-arrow-left"></i> Volver
+          </button>
+          <div>
+            <div className="d-flex align-items-center gap-2">
+              <i className="bi bi-clipboard2-pulse" style={{ color: "#7dd3fc", fontSize: "1.1rem" }}></i>
+              <span style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem", letterSpacing: "0.01em" }}>
+                Consulta Médica
+              </span>
+              {firmada && (
+                <span style={{ background: "#22c55e", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 600 }}>
+                  FIRMADA
+                </span>
+              )}
+              {!firmada && hid && (
+                <span style={{ background: "#f59e0b", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 600 }}>
+                  BORRADOR
+                </span>
+              )}
+            </div>
+            <div style={{ color: "rgba(255,255,255,.55)", fontSize: "0.75rem", marginTop: 1 }}>
+              Historia Clínica Electrónica
+            </div>
+          </div>
         </div>
         {!firmada && (
           <div className="d-flex gap-2">
-            <button className="btn btn-outline-secondary btn-sm" onClick={() => handleSave(false)} disabled={saving}>
-              {saving ? "Guardando…" : "Guardar Borrador"}
+            <button
+              onClick={() => handleSave(false)}
+              disabled={saving}
+              style={{
+                background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.25)",
+                borderRadius: 8, color: "#e2e8f0", padding: "6px 16px", fontSize: "0.82rem",
+                cursor: "pointer", fontWeight: 500,
+              }}>
+              <i className="bi bi-floppy me-1"></i>{saving ? "Guardando…" : "Borrador"}
             </button>
-            <button className="btn btn-success btn-sm" onClick={() => handleSave(true)} disabled={saving}>
-              ✓ Firmar y Cerrar
+            <button
+              onClick={() => handleSave(true)}
+              disabled={saving}
+              style={{
+                background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                border: "none", borderRadius: 8, color: "#fff",
+                padding: "6px 18px", fontSize: "0.82rem",
+                cursor: "pointer", fontWeight: 600,
+                boxShadow: "0 2px 8px rgba(34,197,94,.4)",
+              }}>
+              <i className="bi bi-check2-circle me-1"></i>Firmar y Cerrar
             </button>
           </div>
         )}
       </div>
 
-      {/* Paciente banner */}
-      {paciente && (
-        <div className="alert alert-light border py-2 mb-3 d-flex align-items-center gap-3">
-          <div className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold"
-            style={{ width: 44, height: 44, flexShrink: 0 }}>
-            {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
-          </div>
-          <div>
-            <div className="fw-semibold">{paciente.apellidos}, {paciente.nombres}</div>
-            <small className="text-muted">{edad}{edad ? " · " : ""}{paciente.fecha_nacimiento ? dayjs(paciente.fecha_nacimiento).format("DD/MM/YYYY") : ""}</small>
-          </div>
-          {paciente && (
+      <div className="px-3 px-md-4 pt-3">
+        {/* ── Banner paciente ── */}
+        {paciente && (
+          <div style={{
+            background: "#fff",
+            borderRadius: 12,
+            padding: "12px 18px",
+            marginBottom: 16,
+            display: "flex",
+            alignItems: "center",
+            gap: 14,
+            boxShadow: "0 1px 6px rgba(0,0,0,.07)",
+            border: "1px solid #e5e7eb",
+          }}>
+            <div style={{
+              width: 46, height: 46, borderRadius: "50%", flexShrink: 0,
+              background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+              color: "#fff", display: "flex", alignItems: "center",
+              justifyContent: "center", fontWeight: 700, fontSize: "1rem",
+              boxShadow: "0 2px 8px rgba(59,130,246,.35)",
+            }}>
+              {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontWeight: 700, fontSize: "0.97rem", color: "#111827" }}>
+                {paciente.apellidos}, {paciente.nombres}
+              </div>
+              <div style={{ color: "#6b7280", fontSize: "0.78rem", marginTop: 2 }}>
+                {edad && <span>{edad}</span>}
+                {edad && paciente.fecha_nacimiento && <span style={{ margin: "0 5px", opacity: .5 }}>·</span>}
+                {paciente.fecha_nacimiento && <span>{dayjs(paciente.fecha_nacimiento).format("DD/MM/YYYY")}</span>}
+              </div>
+            </div>
             <button
-              className="ms-auto btn btn-success btn-sm"
               onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
-            >
-              <i className="bi bi-plus-lg me-1" />Nueva Consulta
+              style={{
+                background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                border: "none", borderRadius: 8, color: "#fff",
+                padding: "6px 14px", fontSize: "0.8rem", cursor: "pointer",
+                fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+                boxShadow: "0 2px 6px rgba(34,197,94,.3)",
+              }}>
+              <i className="bi bi-plus-lg"></i> Nueva Consulta
             </button>
-          )}
-        </div>
-      )}
+          </div>
+        )}
 
-      {alertMsg && (
-        <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible`}>
-          {alertMsg.msg}
-          <button className="btn-close" onClick={() => setAlertMsg(null)} />
-        </div>
-      )}
+        {alertMsg && (
+          <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
+            {alertMsg.msg}
+            <button className="btn-close" onClick={() => setAlertMsg(null)} />
+          </div>
+        )}
 
-      {/* Tabs */}
-      <ul className="nav nav-tabs mb-3">
-        {[
-          { id: "soap",        label: "📋 SOAP" },
-          { id: "rx",          label: "💊 Prescripción" },
-          { id: "estudios",    label: "🧪 Estudios" },
-          { id: "antecedentes",label: "📁 Antecedentes" },
-        ].map(t => (
-          <li key={t.id} className="nav-item">
-            <button className={`nav-link ${tab === t.id ? "active" : ""}`} onClick={() => setTab(t.id)}>
+        {/* ── Tabs principales ── */}
+        <div style={{
+          background: "#fff",
+          borderRadius: "12px 12px 0 0",
+          borderBottom: "1px solid #e5e7eb",
+          display: "flex",
+          padding: "0 6px",
+          boxShadow: "0 1px 4px rgba(0,0,0,.04)",
+          marginBottom: 0,
+          overflowX: "auto",
+        }}>
+          {TAB_LIST.map(t => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              style={{
+                background: "none",
+                border: "none",
+                borderBottom: tab === t.id ? "2.5px solid #3b82f6" : "2.5px solid transparent",
+                color: tab === t.id ? "#2563eb" : "#6b7280",
+                fontWeight: tab === t.id ? 700 : 500,
+                padding: "12px 18px",
+                fontSize: "0.85rem",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                whiteSpace: "nowrap",
+                transition: "all .15s",
+              }}>
+              <i className={`bi ${t.icon}`}></i>
               {t.label}
             </button>
-          </li>
-        ))}
-      </ul>
+          ))}
+        </div>
 
-      {/* ── SOAP ── */}
-      {tab === "soap" && (
-        <SoapTab
-          soap={soap} setSoap={setSoap}
-          vitals={vitals} setVitals={setVitals}
-          firmada={firmada}
-        />
-      )}
+        {/* Contenido de tab */}
+        <div style={{
+          background: "#fff",
+          borderRadius: "0 0 12px 12px",
+          boxShadow: "0 1px 6px rgba(0,0,0,.06)",
+          padding: "20px",
+          marginBottom: 24,
+        }}>
 
-      {/* ── Prescripción ── */}
-      {tab === "rx" && (
-        <PrescripcionTab
-          historiaId={hid}
-          pacienteId={paciente?.id || pacId}
-          citaId={citaId}
-          firmada={firmada}
-          diagnosticoCie={soap.diagnostico_cie}
-          diagnosticoDesc={soap.diagnostico_desc}
-        />
-      )}
+          {/* ── SOAP ── */}
+          {tab === "soap" && (
+            <SoapTab
+              soap={soap} setSoap={setSoap}
+              vitals={vitals} setVitals={setVitals}
+              firmada={firmada}
+            />
+          )}
 
-      {/* ── Estudios ── */}
-      {tab === "estudios" && (
-        <EstudiosTab
-          historiaId={hid}
-          pacienteId={paciente?.id || pacId}
-          firmada={firmada}
-        />
-      )}
+          {/* ── Prescripción ── */}
+          {tab === "rx" && (
+            <PrescripcionTab
+              historiaId={hid}
+              pacienteId={paciente?.id || pacId}
+              citaId={citaId}
+              firmada={firmada}
+              diagnosticoCie={soap.diagnostico_cie}
+              diagnosticoDesc={soap.diagnostico_desc}
+            />
+          )}
 
-      {/* ── Antecedentes ── */}
-      {tab === "antecedentes" && (
-        <AntecedentesTab
-          pacienteId={paciente?.id || pacId}
-          firmada={firmada}
-        />
-      )}
+          {/* ── Estudios ── */}
+          {tab === "estudios" && (
+            <EstudiosTab
+              historiaId={hid}
+              pacienteId={paciente?.id || pacId}
+              firmada={firmada}
+            />
+          )}
+
+          {/* ── Antecedentes ── */}
+          {tab === "antecedentes" && (
+            <AntecedentesTab
+              pacienteId={paciente?.id || pacId}
+              firmada={firmada}
+            />
+          )}
+        </div>{/* /tab-content */}
+      </div>{/* /px-3 */}
 
       {/* Modal consulta sin cita agendada */}
       {showConsultaModal && consultaPaciente && (
@@ -514,177 +624,192 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
     <div className="row g-3">
       {/* Signos vitales */}
       <div className="col-12">
-        <div className="card border-0 shadow-sm">
-          <div className="card-body">
-            <h6 className="fw-semibold mb-3">Signos Vitales</h6>
-            <div className="row g-2">
-              {VITALS_FIELDS.map(f => (
-                <div key={f.key} className="col-6 col-md-3">
-                  <label className="form-label small mb-1">{f.label} <span className="text-muted">{f.unit}</span></label>
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div style={{ width: 28, height: 28, borderRadius: 7, background: "linear-gradient(135deg,#ef4444,#dc2626)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <i className="bi bi-heart-pulse-fill" style={{ color: "#fff", fontSize: "0.75rem" }}></i>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>Signos Vitales</span>
+          </div>
+          <div className="row g-2">
+            {VITALS_FIELDS.map(f => (
+              <div key={f.key} className="col-6 col-md-3">
+                <div style={{ background: "#f8fafc", borderRadius: 8, padding: "8px 10px", border: "1px solid #e5e7eb" }}>
+                  <div style={{ fontSize: "0.68rem", color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
+                    {f.label} <span style={{ color: "#9ca3af" }}>{f.unit}</span>
+                  </div>
                   <input
-                    className="form-control form-control-sm"
+                    className="form-control form-control-sm border-0 p-0"
+                    style={{ background: "transparent", fontWeight: 600, fontSize: "0.9rem", color: "#111827" }}
                     placeholder={f.placeholder}
                     value={vitals[f.key] || ""}
                     readOnly={f.readOnly || firmada}
                     onChange={f.readOnly ? undefined : e => setVitals(v => ({ ...v, [f.key]: e.target.value }))}
                   />
                 </div>
-              ))}
-            </div>
+              </div>
+            ))}
           </div>
         </div>
       </div>
 
       {/* Subjetivo */}
       <div className="col-md-6">
-        <div className="card border-0 shadow-sm h-100">
-          <div className="card-body">
-            <SoapTextareaIA
-              label="S — Subjetivo"
-              sublabel="(Síntomas referidos por el paciente)"
-              campo="subjetivo"
-              rows={3}
-              value={soap.subjetivo}
-              onChange={e => setSoap(s => ({ ...s, subjetivo: e.target.value }))}
-              readOnly={firmada}
-              placeholder="Motivo de consulta, síntomas, evolución…"
-              especialidad={especialidad}
-              diagnosticoCie={soap.diagnostico_cie}
-              diagnosticoDesc={soap.diagnostico_desc}
-            />
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 20px", height: "100%", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 800, color: "#3b82f6", fontSize: "0.75rem" }}>S</span>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1e3a5f" }}>Subjetivo</span>
+            <small style={{ color: "#9ca3af", fontSize: "0.72rem" }}>Síntomas referidos por el paciente</small>
           </div>
+          <SoapTextareaIA
+            campo="subjetivo" rows={4}
+            value={soap.subjetivo}
+            onChange={e => setSoap(s => ({ ...s, subjetivo: e.target.value }))}
+            readOnly={firmada}
+            placeholder="Motivo de consulta, síntomas, evolución…"
+            especialidad={especialidad}
+            diagnosticoCie={soap.diagnostico_cie}
+            diagnosticoDesc={soap.diagnostico_desc}
+          />
         </div>
       </div>
 
       {/* Examen físico */}
       <div className="col-md-6">
-        <div className="card border-0 shadow-sm h-100">
-          <div className="card-body">
-            <SoapTextareaIA
-              label="O — Objetivo"
-              sublabel="(Hallazgos al examen físico)"
-              campo="objetivo"
-              rows={3}
-              value={soap.examen_fisico}
-              onChange={e => setSoap(s => ({ ...s, examen_fisico: e.target.value }))}
-              readOnly={firmada}
-              placeholder="Examen físico, hallazgos relevantes…"
-              especialidad={especialidad}
-              diagnosticoCie={soap.diagnostico_cie}
-              diagnosticoDesc={soap.diagnostico_desc}
-            />
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 20px", height: "100%", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#f0fdf4", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 800, color: "#22c55e", fontSize: "0.75rem" }}>O</span>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1e3a5f" }}>Objetivo</span>
+            <small style={{ color: "#9ca3af", fontSize: "0.72rem" }}>Hallazgos al examen físico</small>
           </div>
+          <SoapTextareaIA
+            campo="objetivo" rows={4}
+            value={soap.examen_fisico}
+            onChange={e => setSoap(s => ({ ...s, examen_fisico: e.target.value }))}
+            readOnly={firmada}
+            placeholder="Examen físico, hallazgos relevantes…"
+            especialidad={especialidad}
+            diagnosticoCie={soap.diagnostico_cie}
+            diagnosticoDesc={soap.diagnostico_desc}
+          />
         </div>
       </div>
 
       {/* Diagnóstico */}
       <div className="col-md-6">
-        <div className="card border-0 shadow-sm h-100">
-          <div className="card-body">
-            <label className="form-label fw-semibold">
-              A — Diagnóstico <small className="text-muted fw-normal">(CIE-10)</small>
-            </label>
-
-            {/* Catálogo de diagnósticos frecuentes del médico */}
-            {!firmada && (
-              <div className="position-relative mb-2">
-                <div className="input-group input-group-sm">
-                  <span className="input-group-text bg-warning bg-opacity-10 text-warning border-end-0">
-                    <i className="bi bi-lightning-fill"></i>
-                  </span>
-                  <input className="form-control border-start-0" placeholder="Mis diagnósticos frecuentes…"
-                    value={catDxQuery}
-                    onChange={e => setCatDxQuery(e.target.value)}
-                    onFocus={() => catDxList.length > 0 && setShowCatDx(true)} />
-                </div>
-                {showCatDx && catDxList.length > 0 && (
-                  <ul className="list-group position-absolute z-3 shadow"
-                    style={{ top: "100%", left: 0, right: 0, maxHeight: 180, overflowY: "auto" }}>
-                    {catDxList.map(c => (
-                      <li key={c.id} className="list-group-item list-group-item-action py-1 px-2"
-                        style={{ cursor: "pointer", fontSize: "0.82rem" }}
-                        onMouseDown={() => selCatDx(c)}>
-                        <i className="bi bi-lightning-fill text-warning me-1"></i>
-                        <strong>{c.nombre}</strong>
-                        {c.codigo_cie && <span className="ms-1 badge text-bg-light border" style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>{c.codigo_cie}</span>}
-                        {c.descripcion_cie && <span className="text-muted ms-1">{c.descripcion_cie}</span>}
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            )}
-
-            {/* Diagnóstico principal — chip cuando está seleccionado, buscador cuando no */}
-            <CieBuscador
-              value={soap.diagnostico_cie}
-              desc={soap.diagnostico_desc}
-              readOnly={firmada}
-              onChange={(code, desc) => setSoap(s => ({ ...s, diagnostico_cie: code, diagnostico_desc: desc }))}
-              onClear={() => setSoap(s => ({ ...s, diagnostico_cie: "", diagnostico_desc: "" }))}
-            />
-
-            {/* Diagnósticos secundarios */}
-            {soap.diagnosticos_secundarios.length > 0 && (
-              <p className="text-muted small mb-1 mt-3" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                Secundarios
-              </p>
-            )}
-            {soap.diagnosticos_secundarios.map((dx, i) => (
-              <div key={i} className="d-flex gap-2 align-items-center mt-1">
-                <div className="flex-grow-1">
-                  <CieBuscador
-                    value={dx.cie}
-                    desc={dx.descripcion}
-                    readOnly={firmada}
-                    placeholder={`Secundario ${i + 1}…`}
-                    onChange={(code, desc) => setSoap(s => ({
-                      ...s,
-                      diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) =>
-                        j === i ? { cie: code, descripcion: desc } : d
-                      ),
-                    }))}
-                    onClear={() => setSoap(s => ({
-                      ...s,
-                      diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) =>
-                        j === i ? { cie: "", descripcion: "" } : d
-                      ),
-                    }))}
-                  />
-                </div>
-                {!firmada && (
-                  <button className="btn btn-outline-danger btn-sm" style={{ flexShrink: 0 }}
-                    onClick={() => remDxSec(i)}>✕</button>
-                )}
-              </div>
-            ))}
-            {!firmada && (
-              <button className="btn btn-link btn-sm mt-2 p-0 text-decoration-none" onClick={addDxSec}>
-                <i className="bi bi-plus-circle me-1"></i>+ Diagnóstico secundario
-              </button>
-            )}
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 20px", height: "100%", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#fef3c7", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 800, color: "#d97706", fontSize: "0.75rem" }}>A</span>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1e3a5f" }}>Diagnóstico</span>
+            <small style={{ color: "#9ca3af", fontSize: "0.72rem" }}>CIE-10</small>
           </div>
+
+          {/* Catálogo de diagnósticos frecuentes del médico */}
+          {!firmada && (
+            <div className="position-relative mb-2">
+              <div className="input-group input-group-sm">
+                <span className="input-group-text bg-warning bg-opacity-10 text-warning border-end-0">
+                  <i className="bi bi-lightning-fill"></i>
+                </span>
+                <input className="form-control border-start-0" placeholder="Mis diagnósticos frecuentes…"
+                  value={catDxQuery}
+                  onChange={e => setCatDxQuery(e.target.value)}
+                  onFocus={() => catDxList.length > 0 && setShowCatDx(true)} />
+              </div>
+              {showCatDx && catDxList.length > 0 && (
+                <ul className="list-group position-absolute z-3 shadow"
+                  style={{ top: "100%", left: 0, right: 0, maxHeight: 180, overflowY: "auto" }}>
+                  {catDxList.map(c => (
+                    <li key={c.id} className="list-group-item list-group-item-action py-1 px-2"
+                      style={{ cursor: "pointer", fontSize: "0.82rem" }}
+                      onMouseDown={() => selCatDx(c)}>
+                      <i className="bi bi-lightning-fill text-warning me-1"></i>
+                      <strong>{c.nombre}</strong>
+                      {c.codigo_cie && <span className="ms-1 badge text-bg-light border" style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>{c.codigo_cie}</span>}
+                      {c.descripcion_cie && <span className="text-muted ms-1">{c.descripcion_cie}</span>}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
+          {/* Diagnóstico principal */}
+          <CieBuscador
+            value={soap.diagnostico_cie}
+            desc={soap.diagnostico_desc}
+            readOnly={firmada}
+            onChange={(code, desc) => setSoap(s => ({ ...s, diagnostico_cie: code, diagnostico_desc: desc }))}
+            onClear={() => setSoap(s => ({ ...s, diagnostico_cie: "", diagnostico_desc: "" }))}
+          />
+
+          {/* Diagnósticos secundarios */}
+          {soap.diagnosticos_secundarios.length > 0 && (
+            <p className="text-muted small mb-1 mt-3" style={{ fontSize: "0.72rem", textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>
+              Secundarios
+            </p>
+          )}
+          {soap.diagnosticos_secundarios.map((dx, i) => (
+            <div key={i} className="d-flex gap-2 align-items-center mt-1">
+              <div className="flex-grow-1">
+                <CieBuscador
+                  value={dx.cie} desc={dx.descripcion}
+                  readOnly={firmada}
+                  placeholder={`Secundario ${i + 1}…`}
+                  onChange={(code, desc) => setSoap(s => ({
+                    ...s,
+                    diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) =>
+                      j === i ? { cie: code, descripcion: desc } : d
+                    ),
+                  }))}
+                  onClear={() => setSoap(s => ({
+                    ...s,
+                    diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) =>
+                      j === i ? { cie: "", descripcion: "" } : d
+                    ),
+                  }))}
+                />
+              </div>
+              {!firmada && (
+                <button className="btn btn-outline-danger btn-sm" style={{ flexShrink: 0 }}
+                  onClick={() => remDxSec(i)}>✕</button>
+              )}
+            </div>
+          ))}
+          {!firmada && (
+            <button className="btn btn-link btn-sm mt-2 p-0 text-decoration-none" onClick={addDxSec}>
+              <i className="bi bi-plus-circle me-1"></i>+ Diagnóstico secundario
+            </button>
+          )}
         </div>
       </div>
 
       {/* Plan */}
       <div className="col-md-6">
-        <div className="card border-0 shadow-sm h-100">
-          <div className="card-body">
-            <SoapTextareaIA
-              label="P — Plan"
-              sublabel="(Tratamiento, indicaciones, seguimiento)"
-              campo="plan"
-              rows={4}
-              value={soap.plan}
-              onChange={e => setSoap(s => ({ ...s, plan: e.target.value }))}
-              readOnly={firmada}
-              placeholder="Tratamiento indicado, próxima cita, derivaciones…"
-              especialidad={especialidad}
-              diagnosticoCie={soap.diagnostico_cie}
-              diagnosticoDesc={soap.diagnostico_desc}
-            />
+        <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 20px", height: "100%", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
+          <div className="d-flex align-items-center gap-2 mb-3">
+            <div style={{ width: 24, height: 24, borderRadius: 6, background: "#f5f3ff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <span style={{ fontWeight: 800, color: "#8b5cf6", fontSize: "0.75rem" }}>P</span>
+            </div>
+            <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1e3a5f" }}>Plan</span>
+            <small style={{ color: "#9ca3af", fontSize: "0.72rem" }}>Tratamiento, indicaciones, seguimiento</small>
           </div>
+          <SoapTextareaIA
+            campo="plan" rows={5}
+            value={soap.plan}
+            onChange={e => setSoap(s => ({ ...s, plan: e.target.value }))}
+            readOnly={firmada}
+            placeholder="Tratamiento indicado, próxima cita, derivaciones…"
+            especialidad={especialidad}
+            diagnosticoCie={soap.diagnostico_cie}
+            diagnosticoDesc={soap.diagnostico_desc}
+          />
         </div>
       </div>
     </div>
@@ -700,24 +825,33 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoC
   return (
     <div>
       {/* Sub-tabs */}
-      <ul className="nav nav-pills nav-fill mb-3" style={{ background: "#f8f9fa", borderRadius: 8, padding: "4px" }}>
+      <div style={{ display: "flex", gap: 0, marginBottom: 20, borderRadius: 10, overflow: "hidden", border: "1px solid #e5e7eb", background: "#f8fafc" }}>
         {[
-          { id: "receta",     icon: "bi-prescription2",         label: "Nueva Receta" },
-          { id: "historial",  icon: "bi-clock-history",         label: "Historial" },
-          { id: "sugeridas",  icon: "bi-stars",                  label: "Sugeridas por CIE-10" },
-          { id: "favoritas",  icon: "bi-bookmark-heart-fill",    label: "Mis Favoritas" },
-        ].map(t => (
-          <li key={t.id} className="nav-item">
-            <button
-              className={`nav-link py-1 px-2 ${subTab === t.id ? "active" : "text-muted"}`}
-              style={{ fontSize: "0.82rem" }}
-              onClick={() => setSubTab(t.id)}
-            >
-              <i className={`bi ${t.icon} me-1`}></i>{t.label}
-            </button>
-          </li>
+          { id: "receta",    icon: "bi-prescription2",      label: "Nueva Receta",       color: "#3b82f6" },
+          { id: "historial", icon: "bi-clock-history",      label: "Historial",          color: "#8b5cf6" },
+          { id: "sugeridas", icon: "bi-stars",               label: "Sugeridas CIE-10",  color: "#f59e0b" },
+          { id: "favoritas", icon: "bi-bookmark-heart-fill", label: "Mis Favoritas",     color: "#ef4444" },
+        ].map((t, i) => (
+          <button key={t.id}
+            onClick={() => setSubTab(t.id)}
+            style={{
+              flex: 1, padding: "10px 6px",
+              background: subTab === t.id ? "#fff" : "transparent",
+              border: "none",
+              borderRight: i < 3 ? "1px solid #e5e7eb" : "none",
+              borderBottom: subTab === t.id ? `2.5px solid ${t.color}` : "none",
+              color: subTab === t.id ? t.color : "#6b7280",
+              fontWeight: subTab === t.id ? 700 : 500,
+              fontSize: "0.78rem",
+              cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+              transition: "all .15s",
+            }}>
+            <i className={`bi ${t.icon}`}></i>
+            <span className="d-none d-sm-inline">{t.label}</span>
+          </button>
         ))}
-      </ul>
+      </div>
 
       {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} />}
       {subTab === "historial" && <SubHistorialPaciente pacienteId={pacienteId} />}
@@ -858,150 +992,210 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada }) {
   return (
     <div>
       {alertMsg && (
-        <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`}>
+        <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
           {alertMsg.msg} <button className="btn-close" onClick={() => setAlertMsg(null)} />
         </div>
       )}
 
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h6 className="mb-0">Recetas de esta consulta</h6>
+        <div>
+          <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>Recetas de esta consulta</span>
+          {list.length > 0 && <span className="ms-2 badge" style={{ background: "#eff6ff", color: "#3b82f6", fontSize: "0.72rem" }}>{list.length}</span>}
+        </div>
         {!firmada && !showForm && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Receta</button>
+          <button
+            onClick={() => setShowForm(true)}
+            style={{
+              background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none",
+              borderRadius: 8, color: "#fff", padding: "6px 16px", fontSize: "0.82rem",
+              cursor: "pointer", fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+              boxShadow: "0 2px 8px rgba(59,130,246,.3)",
+            }}>
+            <i className="bi bi-plus-lg"></i> Nueva Receta
+          </button>
         )}
       </div>
 
-      {list.length === 0 && !showForm && <p className="text-muted">Sin recetas aún.</p>}
+      {list.length === 0 && !showForm && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#9ca3af" }}>
+          <i className="bi bi-prescription2" style={{ fontSize: "2.5rem", opacity: .3 }}></i>
+          <p className="mt-2 small">Sin recetas para esta consulta.</p>
+        </div>
+      )}
+
       {list.map(p => (
-        <div key={p.id} className="card border-0 shadow-sm mb-2">
-          <div className="card-body py-2 d-flex align-items-center justify-content-between">
+        <div key={p.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#3b82f6,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <i className="bi bi-capsule-pill" style={{ color: "#fff", fontSize: "0.85rem" }}></i>
+            </div>
             <div>
-              <span className="badge bg-secondary me-2">{p.estado}</span>
-              <strong>{p.total_items} medicamento(s)</strong>
-              <small className="text-muted ms-2">{dayjs(p.creado_en).format("DD/MM/YYYY HH:mm")}</small>
+              <span className={`badge me-2 ${p.estado === "ENTREGADA" ? "bg-success" : p.estado === "CANCELADA" ? "bg-secondary" : "bg-warning text-dark"}`} style={{ fontSize: "0.68rem" }}>{p.estado}</span>
+              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{p.total_items} medicamento(s)</span>
+              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(p.creado_en).format("DD/MM/YYYY HH:mm")}</div>
             </div>
-            <div className="d-flex gap-1">
-              {p.estado === "ACTIVA" && !firmada && (
-                <button className="btn btn-outline-success btn-sm"
-                  onClick={() => api.patch(`/prescripciones/${p.id}/estado`, { estado: "ENTREGADA" })
-                    .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, estado: "ENTREGADA" } : x)))}>
-                  Marcar entregada
-                </button>
-              )}
-              <button className="btn btn-outline-primary btn-sm" onClick={() => printRx(p.id)}>
-                <i className="bi bi-printer me-1"></i>Receta PDF
+          </div>
+          <div className="d-flex gap-1">
+            {p.estado === "ACTIVA" && !firmada && (
+              <button className="btn btn-outline-success btn-sm"
+                style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                onClick={() => api.patch(`/prescripciones/${p.id}/estado`, { estado: "ENTREGADA" })
+                  .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, estado: "ENTREGADA" } : x)))}>
+                <i className="bi bi-check-lg me-1"></i>Entregar
               </button>
-            </div>
+            )}
+            <button
+              onClick={() => printRx(p.id)}
+              style={{
+                background: "transparent", border: "1px solid #3b82f6",
+                borderRadius: 7, color: "#3b82f6", padding: "4px 12px",
+                fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
+              }}>
+              <i className="bi bi-printer me-1"></i>PDF
+            </button>
           </div>
         </div>
       ))}
 
       {showForm && (
-        <div className="card border-primary shadow-sm mt-3">
-          <div className="card-header fw-semibold d-flex justify-content-between align-items-center">
-            <span>Nueva Receta</span>
-            <button className="btn btn-outline-warning btn-sm"
+        <div style={{ border: "1px solid #bfdbfe", borderRadius: 12, marginTop: 12, overflow: "hidden", boxShadow: "0 2px 12px rgba(59,130,246,.1)" }}>
+          <div style={{ background: "linear-gradient(135deg,#eff6ff,#dbeafe)", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <i className="bi bi-prescription2" style={{ color: "#3b82f6" }}></i>
+              <span style={{ fontWeight: 700, color: "#1e40af", fontSize: "0.9rem" }}>Nueva Receta</span>
+            </div>
+            <button
               title="Guardar como favorita"
-              onClick={() => setShowSaveFav(s => !s)}>
-              <i className="bi bi-bookmark-heart me-1"></i>Guardar como favorita
+              onClick={() => setShowSaveFav(s => !s)}
+              style={{
+                background: showSaveFav ? "#fef3c7" : "transparent", border: "1px solid #fbbf24",
+                borderRadius: 7, color: "#d97706", padding: "4px 12px",
+                fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
+              }}>
+              <i className="bi bi-bookmark-heart me-1"></i>Guardar favorita
             </button>
           </div>
+
           {showSaveFav && (
-            <div className="border-bottom px-3 py-2 d-flex gap-2 align-items-center" style={{ background: "#fffbeb" }}>
+            <div style={{ borderBottom: "1px solid #e5e7eb", padding: "10px 18px", background: "#fffbeb", display: "flex", gap: 8, alignItems: "center" }}>
               <input className="form-control form-control-sm" placeholder="Nombre de la favorita (ej: IRA en adultos)"
-                value={favNombre} onChange={e => setFavNombre(e.target.value)} style={{ maxWidth: 300 }} />
-              <button className="btn btn-warning btn-sm text-nowrap" onClick={handleSaveFavorita} disabled={savingFav}>
+                value={favNombre} onChange={e => setFavNombre(e.target.value)} style={{ maxWidth: 320, borderRadius: 7 }} />
+              <button
+                onClick={handleSaveFavorita} disabled={savingFav}
+                style={{ background: "#f59e0b", border: "none", borderRadius: 7, color: "#fff", padding: "5px 14px", fontSize: "0.78rem", cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap" }}>
                 {savingFav ? "Guardando…" : "⭐ Guardar"}
               </button>
             </div>
           )}
-          <div className="card-body">
+
+          <div style={{ padding: "18px" }}>
             {items.map((item, idx) => (
-              <div key={idx} className="border rounded p-2 mb-2 position-relative">
-                <div className="fw-semibold small mb-2 text-muted d-flex justify-content-between align-items-center">
-                  <span>Medicamento {idx + 1}</span>
+              <div key={idx} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "14px", marginBottom: 12, position: "relative" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                  <span style={{ fontSize: "0.75rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    Medicamento {idx + 1}
+                  </span>
                   {item.medicamento_id && (
-                    <span className="badge bg-success bg-opacity-10 text-success" style={{ fontSize: "0.7rem" }}>
-                      <i className="bi bi-lightning-fill me-1"></i>Auto-llenado desde catálogo
+                    <span style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 20, color: "#16a34a", fontSize: "0.67rem", fontWeight: 600, padding: "2px 8px" }}>
+                      <i className="bi bi-lightning-fill me-1"></i>Auto-llenado
                     </span>
                   )}
                 </div>
                 <div className="row g-2">
                   <div className="col-12 position-relative">
-                    <label className="form-label small mb-1">Medicamento</label>
+                    <label className="form-label small mb-1" style={{ color: "#374151", fontWeight: 600 }}>Medicamento</label>
                     <input className="form-control form-control-sm" placeholder="Buscar o escribir…"
+                      style={{ borderRadius: 7 }}
                       value={item.medicamento_texto}
                       onFocus={() => { if (!item.medicamento_texto) searchMed("", idx); }}
                       onChange={e => { setItem(idx, "medicamento_texto", e.target.value); setItem(idx, "medicamento_id", null); searchMed(e.target.value, idx); }}
                       onBlur={() => setTimeout(() => setMedSearch([]), 200)} />
                     {medSearch?.idx === idx && medSearch.list?.length > 0 && (
                       <ul className="list-group position-absolute z-3 shadow"
-                        style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto" }}>
+                        style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto", borderRadius: 8 }}>
                         {medSearch.soloFavoritos && (
-                          <li className="list-group-item py-1 px-2 bg-warning bg-opacity-10 text-warning fw-semibold"
-                            style={{ fontSize: "0.72rem", pointerEvents: "none" }}>
+                          <li className="list-group-item py-1 px-2" style={{ background: "#fffbeb", fontSize: "0.72rem", color: "#d97706", fontWeight: 700, pointerEvents: "none" }}>
                             <i className="bi bi-star-fill me-1"></i>Mis medicamentos favoritos
                           </li>
                         )}
                         {medSearch.list.map(m => {
                           const esFav = medFavSet.has(m.id) || m.es_favorito === 1;
                           return (
-                          <li key={m.id} className="list-group-item list-group-item-action py-1"
-                            style={{ cursor: "pointer", fontSize: "0.8rem" }}
-                            onClick={() => selMed(m, idx)}>
-                            {esFav && <i className="bi bi-star-fill text-warning me-1" style={{ fontSize: "0.7rem" }}></i>}
-                            <strong>{m.nombre_generico}</strong>
-                            {m.presentacion && <span className="text-muted ms-1">({m.presentacion})</span>}
-                            {(m.dosis_default || m.duracion_default) && (
-                              <span className="text-success ms-2" style={{ fontSize: "0.7rem" }}>
-                                <i className="bi bi-lightning-fill"></i> con defaults
-                              </span>
-                            )}
-                          </li>
-                        );})}
+                            <li key={m.id} className="list-group-item list-group-item-action py-1"
+                              style={{ cursor: "pointer", fontSize: "0.8rem" }}
+                              onClick={() => selMed(m, idx)}>
+                              {esFav && <i className="bi bi-star-fill text-warning me-1" style={{ fontSize: "0.7rem" }}></i>}
+                              <strong>{m.nombre_generico}</strong>
+                              {m.presentacion && <span className="text-muted ms-1">({m.presentacion})</span>}
+                              {(m.dosis_default || m.duracion_default) && (
+                                <span className="text-success ms-2" style={{ fontSize: "0.7rem" }}>
+                                  <i className="bi bi-lightning-fill"></i> con defaults
+                                </span>
+                              )}
+                            </li>
+                          );
+                        })}
                       </ul>
                     )}
                   </div>
                   <div className="col-md-3">
-                    <label className="form-label small mb-1">Dosis</label>
-                    <input className="form-control form-control-sm" placeholder="500mg c/8h"
+                    <label className="form-label small mb-1" style={{ fontWeight: 600, color: "#374151" }}>Dosis</label>
+                    <input className="form-control form-control-sm" placeholder="500mg c/8h" style={{ borderRadius: 7 }}
                       value={item.dosis} onChange={e => setItem(idx, "dosis", e.target.value)} />
                   </div>
                   <div className="col-md-3">
-                    <label className="form-label small mb-1">Duración</label>
-                    <input className="form-control form-control-sm" placeholder="7 días"
+                    <label className="form-label small mb-1" style={{ fontWeight: 600, color: "#374151" }}>Duración</label>
+                    <input className="form-control form-control-sm" placeholder="7 días" style={{ borderRadius: 7 }}
                       value={item.duracion} onChange={e => setItem(idx, "duracion", e.target.value)} />
                   </div>
                   <div className="col-md-3">
-                    <label className="form-label small mb-1">Cantidad</label>
-                    <input className="form-control form-control-sm" placeholder="21 tabletas"
+                    <label className="form-label small mb-1" style={{ fontWeight: 600, color: "#374151" }}>Cantidad</label>
+                    <input className="form-control form-control-sm" placeholder="21 tabletas" style={{ borderRadius: 7 }}
                       value={item.cantidad} onChange={e => setItem(idx, "cantidad", e.target.value)} />
                   </div>
                   <div className="col-md-3">
-                    <label className="form-label small mb-1">Instrucciones</label>
-                    <input className="form-control form-control-sm" placeholder="Tomar con alimentos…"
+                    <label className="form-label small mb-1" style={{ fontWeight: 600, color: "#374151" }}>Instrucciones</label>
+                    <input className="form-control form-control-sm" placeholder="Tomar con alimentos…" style={{ borderRadius: 7 }}
                       value={item.instrucciones} onChange={e => setItem(idx, "instrucciones", e.target.value)} />
                   </div>
                 </div>
                 {items.length > 1 && (
-                  <button className="btn btn-outline-danger btn-sm position-absolute top-0 end-0 m-1"
-                    onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}>✕</button>
+                  <button
+                    onClick={() => setItems(prev => prev.filter((_, i) => i !== idx))}
+                    style={{ position: "absolute", top: 8, right: 8, background: "#fee2e2", border: "none", borderRadius: 6, color: "#dc2626", width: 24, height: 24, fontSize: "0.75rem", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                    ✕
+                  </button>
                 )}
               </div>
             ))}
-            <button className="btn btn-outline-primary btn-sm me-2"
-              onClick={() => setItems(prev => [...prev, { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" }])}>
-              + Agregar medicamento
+
+            <button
+              onClick={() => setItems(prev => [...prev, { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" }])}
+              style={{ background: "#eff6ff", border: "1px dashed #93c5fd", borderRadius: 8, color: "#3b82f6", padding: "7px 16px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600 }}>
+              <i className="bi bi-plus-lg me-1"></i>Agregar medicamento
             </button>
+
             <div className="mt-3">
-              <label className="form-label small">Notas adicionales</label>
-              <textarea className="form-control form-control-sm" rows={2}
+              <label className="form-label small" style={{ fontWeight: 600, color: "#374151" }}>Notas adicionales</label>
+              <textarea className="form-control form-control-sm" rows={2} style={{ borderRadius: 7 }}
                 value={notas} onChange={e => setNotas(e.target.value)} />
             </div>
+
             <div className="d-flex gap-2 mt-3">
-              <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={saving}>
+              <button
+                onClick={handleSubmit} disabled={saving}
+                style={{
+                  background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none",
+                  borderRadius: 8, color: "#fff", padding: "7px 20px", fontSize: "0.83rem",
+                  cursor: "pointer", fontWeight: 700, boxShadow: "0 2px 8px rgba(59,130,246,.35)",
+                }}>
                 {saving ? "Guardando…" : "Crear Receta"}
               </button>
-              <button className="btn btn-outline-secondary btn-sm" onClick={() => setShowForm(false)}>Cancelar</button>
+              <button
+                onClick={() => setShowForm(false)}
+                style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: 8, color: "#64748b", padding: "7px 16px", fontSize: "0.83rem", cursor: "pointer", fontWeight: 600 }}>
+                Cancelar
+              </button>
             </div>
           </div>
         </div>

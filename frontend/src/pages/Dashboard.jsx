@@ -163,7 +163,7 @@ export default function Dashboard() {
   return (
     <div style={{
       minHeight: "100vh",
-      background: "linear-gradient(135deg, #506adb 0%, #20244c 100%)",
+      background: "#f0f2f5",
       padding: "0",
       margin: isMobile ? "-1rem" : "-1.5rem",
       width: isMobile ? "calc(100% + 2rem)" : "calc(100% + 3rem)"
@@ -173,73 +173,61 @@ export default function Dashboard() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.5 }}
       >
-        {/* Header con glassmorphism */}
+        {/* Header */}
         <motion.div 
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.6, type: "spring" }}
           style={{
-            background: "rgba(255, 255, 255, 0.15)",
-            backdropFilter: "blur(20px)",
-            borderRadius: "0",
-            padding: isMobile ? "16px 12px" : "28px 32px",
-            marginBottom: isMobile ? "8px" : "16px",
-            border: "1px solid rgba(255,255,255,0.2)",
-            boxShadow: "0 8px 32px rgba(0,0,0,0.1)",
+            background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+            padding: isMobile ? "14px 16px" : "16px 24px",
+            marginBottom: 0,
+            boxShadow: "0 2px 12px rgba(0,0,0,.18)",
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
-            gap: "16px"
+            gap: "12px"
           }}
         >
-          <div>
-            <h2 style={{ 
-              margin: 0, 
-              fontWeight: "800", 
-              fontSize: isMobile ? "22px" : "32px",
-              color: "#fff",
-              textShadow: "0 2px 10px rgba(0,0,0,0.1)",
-              fontFamily: "'Inter', sans-serif"
+          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+              display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
             }}>
-              ✨ Dashboard
-            </h2>
-            <p style={{ 
-              margin: "4px 0 0", 
-              color: "rgba(255,255,255,0.9)",
-              textTransform: "capitalize",
-              fontSize: isMobile ? "11px" : "14px",
-              fontWeight: "500"
-            }}>
-              {hoy}
-            </p>
+              <i className="bi bi-speedometer2" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+            </div>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: isMobile ? "1rem" : "1.05rem" }}>
+                Dashboard
+              </div>
+              <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem", textTransform: "capitalize" }}>
+                {hoy}
+              </div>
+            </div>
           </div>
           <div style={{
-            background: "rgba(255,255,255,0.2)",
-            borderRadius: isMobile ? "12px" : "16px",
-            padding: isMobile ? "8px 12px" : "12px 20px",
-            backdropFilter: "blur(10px)",
-            border: "1px solid rgba(255,255,255,0.3)",
+            background: "rgba(255,255,255,.1)",
+            borderRadius: 10,
+            padding: isMobile ? "6px 12px" : "8px 16px",
+            border: "1px solid rgba(255,255,255,.2)",
             width: isMobile ? "100%" : "auto"
           }}>
-            <span style={{ 
-              color: "rgba(255,255,255,0.9)", 
-              fontSize: isMobile ? "11px" : "14px",
-              fontWeight: "500"
-            }}>
+            <span style={{ color: "rgba(255,255,255,.7)", fontSize: "0.82rem", fontWeight: 500 }}>
               Bienvenido/a,{" "}
             </span>
-            <strong style={{ color: "#fff", fontSize: isMobile ? "12px" : "15px" }}>
+            <strong style={{ color: "#fff", fontSize: "0.85rem" }}>
               {user?.nombres} {user?.apellidos}
             </strong>
             <span style={{
-              marginLeft: isMobile ? "6px" : "10px",
-              background: "linear-gradient(135deg, rgba(255,255,255,0.3), rgba(255,255,255,0.2))",
-              padding: isMobile ? "2px 8px" : "4px 12px",
-              borderRadius: isMobile ? "6px" : "8px",
-              fontSize: isMobile ? "10px" : "12px",
-              color: "#fff",
-              fontWeight: "600",
+              marginLeft: 8,
+              background: "rgba(255,255,255,.18)",
+              padding: "2px 10px",
+              borderRadius: 6,
+              fontSize: "0.72rem",
+              color: "#e2e8f0",
+              fontWeight: 600,
               display: "inline-block"
             }}>
               {user?.tipo}
@@ -254,7 +242,7 @@ export default function Dashboard() {
             style={{
               textAlign: "center",
               padding: "80px 20px",
-              color: "#fff"
+              color: "#6b7280"
             }}
           >
             <div className="spinner-border spinner-border-lg" style={{ width: "3rem", height: "3rem" }} />
@@ -270,8 +258,8 @@ export default function Dashboard() {
             initial="hidden"
             animate="visible"
           >
-            {/* KPIs con gradientes */}
-            <div className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'} mb-3`}>
+            {/* KPIs */}
+            <div className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'}`} style={{ paddingTop: isMobile ? 8 : 20, marginBottom: isMobile ? 8 : 16 }}>
               <KpiCard 
                 label="Total Pacientes" 
                 value={stats.total_pacientes} 
@@ -320,20 +308,20 @@ export default function Dashboard() {
                 variants={itemVariants}
                 className={isMobile ? "mx-1" : "mx-3"}
                 style={{
-                  background: "rgba(255,255,255,0.95)",
-                  backdropFilter: "blur(10px)",
-                  borderRadius: "12px",
+                  background: "#fff",
+                  borderRadius: 12,
                   padding: isMobile ? "12px" : "20px",
-                  marginBottom: isMobile ? "8px" : "16px",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.08)"
+                  marginBottom: isMobile ? 8 : 16,
+                  boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+                  border: "1px solid #e5e7eb"
                 }}
               >
                 <h6 style={{ 
-                  fontWeight: "700", 
-                  marginBottom: isMobile ? "12px" : "20px",
-                  fontSize: isMobile ? "15px" : "18px",
-                  color: "#1a1a1a"
+                  fontWeight: 700, 
+                  marginBottom: isMobile ? 10 : 16,
+                  fontSize: "0.9rem",
+                  color: "#374151",
+                  margin: "0 0 14px"
                 }}>
                   Estados de citas hoy
                 </h6>
@@ -370,12 +358,11 @@ export default function Dashboard() {
                 variants={itemVariants}
               >
                 <div style={{
-                  background: "rgba(255,255,255,0.95)",
-                  backdropFilter: "blur(10px)",
-                  borderRadius: isMobile ? "12px" : "20px",
+                  background: "#fff",
+                  borderRadius: 12,
                   padding: isMobile ? "12px" : "20px",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 2px 8px rgba(0,0,0,.06)",
                   height: "100%"
                 }}>
                   <div style={{ 
@@ -387,29 +374,25 @@ export default function Dashboard() {
                     gap: isMobile ? "8px" : "0"
                   }}>
                     <h6 style={{ 
-                      fontWeight: "700", 
+                      fontWeight: 700, 
                       margin: 0,
-                      fontSize: isMobile ? "15px" : "18px",
-                      color: "#1a1a1a"
+                      fontSize: "0.92rem",
+                      color: "#1e293b"
                     }}>
                       🏥 Sala de Espera — Hoy
                     </h6>
                     <Link 
                       to="/citas" 
                       style={{
-                        background: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)",
+                        background: "#2563eb",
                         color: "#fff",
-                        padding: isMobile ? "6px 12px" : "8px 20px",
-                        borderRadius: isMobile ? "10px" : "12px",
+                        padding: isMobile ? "5px 12px" : "6px 16px",
+                        borderRadius: 8,
                         textDecoration: "none",
-                        fontSize: isMobile ? "11px" : "14px",
-                        fontWeight: "600",
-                        boxShadow: "0 4px 12px rgba(102, 126, 234, 0.4)",
-                        transition: "transform 0.2s",
+                        fontSize: "0.8rem",
+                        fontWeight: 600,
                         display: "inline-block"
                       }}
-                      onMouseEnter={(e) => e.target.style.transform = "translateY(-2px)"}
-                      onMouseLeave={(e) => e.target.style.transform = "translateY(0)"}
                     >
                       Ver agenda
                     </Link>
@@ -498,12 +481,11 @@ export default function Dashboard() {
                 variants={itemVariants}
               >
                 <div style={{
-                  background: "rgba(255,255,255,0.95)",
-                  backdropFilter: "blur(10px)",
-                  borderRadius: "12px",
+                  background: "#fff",
+                  borderRadius: 12,
                   padding: isMobile ? "12px" : "20px",
-                  border: "1px solid rgba(255,255,255,0.3)",
-                  boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+                  border: "1px solid #e5e7eb",
+                  boxShadow: "0 2px 8px rgba(0,0,0,.06)",
                   height: "100%"
                 }}>
                   <div style={{ 
@@ -515,29 +497,25 @@ export default function Dashboard() {
                     gap: isMobile ? "8px" : "0"
                   }}>
                     <h6 style={{ 
-                      fontWeight: "700", 
+                      fontWeight: 700, 
                       margin: 0,
-                      fontSize: isMobile ? "15px" : "18px",
-                      color: "#1a1a1a"
+                      fontSize: "0.92rem",
+                      color: "#1e293b"
                     }}>
                       👤 Últimos Pacientes
                     </h6>
                     <Link 
                       to="/pacientes"
                       style={{
-                        background: "linear-gradient(135deg, #f093fb 0%, #f5576c 100%)",
+                        background: "#2563eb",
                         color: "#fff",
-                        padding: isMobile ? "4px 10px" : "6px 16px",
-                        borderRadius: isMobile ? "8px" : "10px",
+                        padding: isMobile ? "4px 10px" : "5px 14px",
+                        borderRadius: 8,
                         textDecoration: "none",
-                        fontSize: isMobile ? "10px" : "12px",
-                        fontWeight: "600",
-                        boxShadow: "0 4px 12px rgba(240, 147, 251, 0.4)",
-                        transition: "transform 0.2s",
+                        fontSize: "0.78rem",
+                        fontWeight: 600,
                         display: "inline-block"
                       }}
-                      onMouseEnter={(e) => e.target.style.transform = "translateY(-2px)"}
-                      onMouseLeave={(e) => e.target.style.transform = "translateY(0)"}
                     >
                       Ver todos
                     </Link>
@@ -611,7 +589,8 @@ export default function Dashboard() {
             {(user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN") && (
               <motion.div
                 variants={itemVariants}
-                className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'} mt-3`}
+                className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'}`}
+                style={{ marginTop: isMobile ? 8 : 16, paddingBottom: isMobile ? 8 : 24 }}
               >
                 {[
                   { to: "/admin/usuarios", label: "Usuarios", icon: "👤", gradient: "linear-gradient(135deg, #667eea 0%, #764ba2 100%)" },
@@ -630,13 +609,12 @@ export default function Dashboard() {
                         to={l.to} 
                         style={{
                           display: "block",
-                          background: "rgba(255,255,255,0.95)",
-                          backdropFilter: "blur(10px)",
-                          borderRadius: "12px",
+                          background: "#fff",
+                          borderRadius: 12,
                           padding: isMobile ? "12px" : "16px",
                           textDecoration: "none",
-                          border: "1px solid rgba(255,255,255,0.3)",
-                          boxShadow: "0 8px 32px rgba(0,0,0,0.08)",
+                          border: "1px solid #e5e7eb",
+                          boxShadow: "0 2px 8px rgba(0,0,0,.06)",
                           textAlign: "center",
                           position: "relative",
                           overflow: "hidden"

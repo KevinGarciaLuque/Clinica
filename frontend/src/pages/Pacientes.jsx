@@ -172,41 +172,38 @@ export default function Pacientes() {
   const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   return (
-    <div style={{ color: C.text, minHeight: "100vh" }}>
-      {/* Banner */}
+    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+      {/* Header plano */}
       <div style={{
-        background: `linear-gradient(135deg, #214a87 0%, #176DC8 100%)`,
-        borderRadius: 16, padding: "24px 28px", marginBottom: 24,
-        border: `1px solid ${C.border}`, boxShadow: "0 4px 24px rgba(13,110,253,0.15)",
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 14,
-            background: "rgba(255,255,255,0.2)",
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <i className="bi bi-people-fill" style={{ fontSize: 22, color: "#fff" }} />
+            <i className="bi bi-people-fill" style={{ fontSize: "1rem", color: "#7dd3fc" }} />
           </div>
           <div>
-            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 22, color: "#fff" }}>Pacientes</h4>
-            <span style={{ color: "rgba(255,255,255,0.9)", fontSize: 13 }}>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Pacientes</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
               Gestión de pacientes — {lista.length} registros
-            </span>
+            </div>
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           <button
             onClick={() => window.open(`/registro?clinica_id=${user?.clinica_id || ""}`, "_blank")}
             style={{
-              background: "rgba(255,255,255,0.15)",
-              border: "1px solid rgba(255,255,255,0.3)", borderRadius: 10, padding: "10px 20px",
-              color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 8,
-              transition: "all 0.2s ease",
+              background: "rgba(255,255,255,.1)",
+              border: "1px solid rgba(255,255,255,.22)", borderRadius: 8, padding: "6px 14px",
+              color: "#e2e8f0", fontWeight: 500, fontSize: "0.8rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
             }}
-            onMouseEnter={(e) => e.target.style.background = "rgba(255,255,255,0.25)"}
-            onMouseLeave={(e) => e.target.style.background = "rgba(255,255,255,0.15)"}
           >
             <i className="bi bi-box-arrow-up-right" /> Link de registro
           </button>
@@ -227,69 +224,52 @@ export default function Pacientes() {
               }
             }}
             style={{
-              background: showForm ? "rgba(239,68,68,0.9)" : "#fff",
-              border: "none", 
-              borderRadius: 10, 
-              padding: "11px 22px",
-              color: showForm ? "#fff" : C.accent, 
-              fontWeight: 700, 
-              fontSize: 14, 
-              cursor: "pointer",
-              display: "flex", 
-              alignItems: "center", 
-              gap: 8,
-              boxShadow: showForm ? "0 4px 12px rgba(239,68,68,0.3)" : "0 4px 16px rgba(0,0,0,0.15)",
-              transition: "all 0.2s ease",
-            }}
-            onMouseEnter={(e) => {
-              if (!showForm) {
-                e.target.style.transform = "translateY(-2px)";
-                e.target.style.boxShadow = "0 6px 20px rgba(0,0,0,0.2)";
-              }
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.transform = "translateY(0)";
-              e.target.style.boxShadow = showForm ? "0 4px 12px rgba(239,68,68,0.3)" : "0 4px 16px rgba(0,0,0,0.15)";
+              background: showForm ? "rgba(239,68,68,.85)" : "rgba(255,255,255,.1)",
+              border: `1px solid ${showForm ? "rgba(239,68,68,.5)" : "rgba(255,255,255,.22)"}`,
+              borderRadius: 8, padding: "6px 14px",
+              color: "#e2e8f0", fontWeight: 500, fontSize: "0.8rem", cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 6,
             }}
           >
-            <i className={`bi ${showForm ? "bi-x-lg" : "bi-person-plus-fill"}`} style={{ fontSize: 15 }} />
+            <i className={`bi ${showForm ? "bi-x-lg" : "bi-person-plus-fill"}`} />
             {showForm ? "Cancelar" : "Nuevo paciente"}
           </button>
         </div>
       </div>
 
-      {/* Toast mensaje */}
+      {/* Mensaje inline */}
       {msg.texto && (
         <div style={{
-          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
-          background: msg.tipo === "success" ? "rgba(16,185,129,.95)" : "rgba(239,68,68,.95)",
-          borderRadius: 12, padding: "12px 20px",
-          color: "#fff", fontWeight: 600, fontSize: 14,
-          display: "flex", alignItems: "center", gap: 8,
-          boxShadow: msg.tipo === "success" ? "0 8px 24px rgba(16,185,129,.3)" : "0 8px 24px rgba(239,68,68,.3)",
+          margin: "16px 24px 0",
+          padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: msg.tipo === "success" ? "#dcfce7" : "#fee2e2",
+          color: msg.tipo === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${msg.tipo === "success" ? "#bbf7d0" : "#fecaca"}`,
         }}>
-          <i className={`bi ${msg.tipo === "success" ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"}`} />
-          {msg.texto}
+          <span>
+            <i className={`bi ${msg.tipo === "success" ? "bi-check-circle-fill" : "bi-x-circle-fill"} me-2`}></i>
+            {msg.texto}
+          </span>
           <button onClick={() => setMsg({ tipo: "", texto: "" })}
-            style={{ background: "none", border: "none", color: "#fff", cursor: "pointer", marginLeft: 10, fontSize: 16 }}>
-            <i className="bi bi-x" />
-          </button>
+            style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit", padding: "0 4px" }}>×</button>
         </div>
       )}
 
       {/* Formulario nuevo paciente */}
       {showForm && (
+        <div style={{ padding: "20px 24px 0" }}>
         <div style={{
-          background: C.card, border: `1px solid ${C.border}`,
-          borderRadius: 14, padding: "20px 24px", marginBottom: 24,
-          boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+          background: "#fff", border: "1px solid #e5e7eb",
+          borderRadius: 12, padding: "20px 24px",
+          boxShadow: "0 2px 8px rgba(0,0,0,.06)",
         }}>
           <div style={{
             display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
-            paddingBottom: 16, borderBottom: `1px solid ${C.border}`,
+            paddingBottom: 16, borderBottom: "1px solid #e5e7eb",
           }}>
-            <i className={`bi ${editandoId ? "bi-pencil-square" : "bi-person-plus-fill"}`} style={{ color: C.accent, fontSize: 16 }} />
-            <h6 style={{ margin: 0, fontWeight: 700, fontSize: 15, color: C.text }}>
+            <i className={`bi ${editandoId ? "bi-pencil-square" : "bi-person-plus-fill"}`} style={{ color: "#2563eb", fontSize: 16 }} />
+            <h6 style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: "#111827" }}>
               {editandoId ? "Editar paciente" : "Nuevo paciente"}
             </h6>
           </div>
@@ -398,16 +378,14 @@ export default function Pacientes() {
                 setFotoFile(null);
                 setFotoPreview(null);
               }}
-                style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9,
-                         padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600 }}>
+                style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8,
+                  padding: "8px 20px", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: "0.87rem" }}>
                 Cancelar
               </button>
               <button type="submit"
                 style={{
-                  background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-                  border: "none", borderRadius: 9, padding: "10px 26px",
-                  color: "#fff", fontWeight: 700, cursor: "pointer",
-                  boxShadow: `0 4px 14px rgba(13,110,253,.4)`,
+                  background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 22px",
+                  color: "#fff", fontWeight: 600, fontSize: "0.87rem", cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 8,
                 }}>
                 <i className="bi bi-floppy" /> {editandoId ? "Actualizar" : "Guardar"} paciente
@@ -415,74 +393,36 @@ export default function Pacientes() {
             </div>
           </form>
         </div>
+        </div>
       )}
 
       {/* Búsqueda + tabla */}
+      <div style={{ padding: "20px 24px" }}>
       <div style={{
-        background: C.card, border: `1px solid ${C.border}`,
-        borderRadius: 14, overflow: "hidden",
-        boxShadow: "0 2px 8px rgba(0,0,0,0.05)",
+        background: "#fff", borderRadius: 12, overflow: "hidden",
+        boxShadow: "0 2px 8px rgba(0,0,0,.06)",
       }}>
         <div style={{ padding: "20px 24px" }}>
           <div style={{ display: "flex", gap: 10, marginBottom: 20, alignItems: "center" }}>
-            <div style={{ 
-              position: "relative", 
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-            }}>
+            <div style={{ position: "relative", flex: 1, display: "flex", alignItems: "center" }}>
               <i className="bi bi-search" style={{
-                position: "absolute",
-                left: 12,
-                color: C.muted,
-                fontSize: 16,
-                pointerEvents: "none",
+                position: "absolute", left: 12,
+                color: "#9ca3af", fontSize: 15, pointerEvents: "none",
               }} />
               <input
-                style={{ 
-                  ...inputSt, 
-                  paddingLeft: 38,
-                  width: "100%",
-                  fontSize: 14,
-                  border: `2px solid ${C.border}`,
-                  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
-                }}
+                style={{ ...inputSt, paddingLeft: 38, width: "100%", border: "1px solid #e5e7eb" }}
                 placeholder="Buscar paciente por nombre, DNI, teléfono o email..."
                 value={q}
                 onChange={e => setQ(e.target.value)}
                 onKeyDown={e => e.key === "Enter" && cargar()}
-                onFocus={(e) => {
-                  e.target.style.borderColor = C.accent;
-                  e.target.style.boxShadow = `0 0 0 3px rgba(13,110,253,0.1)`;
-                }}
-                onBlur={(e) => {
-                  e.target.style.borderColor = C.border;
-                  e.target.style.boxShadow = "none";
-                }}
               />
             </div>
             <button onClick={cargar}
               style={{
-                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-                border: "none", borderRadius: 8,
-                padding: "10px 20px", 
-                color: "#fff", 
-                cursor: "pointer",
-                display: "flex", 
-                alignItems: "center", 
-                gap: 8,
-                fontWeight: 600,
-                fontSize: 14,
-                boxShadow: "0 2px 8px rgba(13,110,253,0.3)",
-                transition: "all 0.2s ease",
-              }}
-              onMouseEnter={(e) => {
-                e.target.style.transform = "translateY(-1px)";
-                e.target.style.boxShadow = "0 4px 12px rgba(13,110,253,0.4)";
-              }}
-              onMouseLeave={(e) => {
-                e.target.style.transform = "translateY(0)";
-                e.target.style.boxShadow = "0 2px 8px rgba(13,110,253,0.3)";
+                background: "#2563eb", border: "none", borderRadius: 8,
+                padding: "8px 20px", color: "#fff", cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 7,
+                fontWeight: 600, fontSize: "0.87rem",
               }}
             >
               <i className="bi bi-search" /> Buscar
@@ -492,31 +432,14 @@ export default function Pacientes() {
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
-                <tr style={{ background: `linear-gradient(135deg, #214a87 0%, #176DC8 100%)`, border: `1px solid ${C.border}` }}>
-                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
-                              color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    Paciente
-                  </th>
-                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
-                              color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    DNI
-                  </th>
-                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
-                              color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    Teléfono
-                  </th>
-                  <th style={{ padding: "12px 16px", textAlign: "left", fontSize: 12, fontWeight: 700,
-                              color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    Email
-                  </th>
-                  <th style={{ padding: "12px 16px", textAlign: "center", fontSize: 12, fontWeight: 700,
-                              color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    Estado
-                  </th>
-                  <th style={{ padding: "12px 16px", fontSize: 12, fontWeight: 700,
-                              color: "#fff", textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    Acciones
-                  </th>
+                <tr style={{ background: "#f8fafc" }}>
+                  {["Paciente", "DNI", "Teléfono", "Email", "Estado", "Acciones"].map(h => (
+                    <th key={h} style={{
+                      padding: "10px 16px", fontSize: "0.73rem", fontWeight: 700,
+                      color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                      borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                    }}>{h}</th>
+                  ))}
                 </tr>
               </thead>
               <tbody>
@@ -683,6 +606,7 @@ export default function Pacientes() {
             </table>
           </div>
         </div>
+      </div>
       </div>
 
       {/* Modal consulta sin cita agendada */}
