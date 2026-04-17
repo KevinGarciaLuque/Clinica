@@ -172,7 +172,7 @@ export default function Pacientes() {
   const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
       {/* Header plano */}
       <div style={{
         background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
@@ -396,8 +396,8 @@ export default function Pacientes() {
         </div>
       )}
 
-      {/* Búsqueda + tabla */}
-      <div style={{ padding: "20px 24px" }}>
+      {/* Búsqueda + tabla — solo cuando no se está registrando un nuevo paciente */}
+      {!(showForm && !editandoId) && <div style={{ padding: "20px 24px" }}>
       <div style={{
         background: "#fff", borderRadius: 12, overflow: "hidden",
         boxShadow: "0 2px 8px rgba(0,0,0,.06)",
@@ -607,7 +607,7 @@ export default function Pacientes() {
           </div>
         </div>
       </div>
-      </div>
+      </div>}
 
       {/* Modal consulta sin cita agendada */}
       {showConsultaModal && consultaPaciente && (

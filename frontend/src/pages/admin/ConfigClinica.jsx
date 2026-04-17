@@ -139,36 +139,66 @@ export default function ConfigClinica() {
   if (cargando) return <div className="text-center py-5"><div className="spinner-border" /></div>;
 
   return (
-    <div>
-      <div className="d-flex align-items-center gap-3 mb-4">
-        <i className="bi bi-gear-fill" style={{ fontSize: "1.8rem", color: "#2196f3" }} />
-        <div>
-          <h4 className="mb-0">Configuración de la Clínica</h4>
-          <small className="text-muted">{clinica?.nombre}</small>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
+
+      {/* ═══ HEADER ═══ */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px 0",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+          <div style={{
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <i className="bi bi-gear-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+          </div>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Configuración de la Clínica</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>{clinica?.nombre}</div>
+          </div>
+        </div>
+
+        {/* Tabs dentro del header */}
+        <div style={{ display: "flex", gap: 4 }}>
+          {tabsVisibles.map(({ key, label, icon }) => (
+            <button
+              key={key}
+              onClick={() => setTab(key)}
+              style={{
+                padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600,
+                borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer",
+                background: tab === key ? "#fff" : "rgba(255,255,255,.1)",
+                color: tab === key ? "#1a2744" : "rgba(255,255,255,.75)",
+                transition: "background .15s",
+                display: "flex", alignItems: "center", gap: 6,
+              }}
+            >
+              <i className={`bi ${icon}`}></i>
+              {label}
+            </button>
+          ))}
         </div>
       </div>
 
+      <div style={{ padding: "20px 24px" }}>
+
       {msg.texto && (
-        <div className={`alert alert-${msg.tipo} py-2 alert-dismissible`} role="alert">
-          {msg.texto}
-          <button type="button" className="btn-close" onClick={() => setMsg({ tipo: "", texto: "" })} />
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: msg.tipo === "success" ? "#dcfce7" : "#fee2e2",
+          color: msg.tipo === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${msg.tipo === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span><i className={`bi ${msg.tipo === "success" ? "bi-check-circle-fill" : "bi-x-circle-fill"} me-2`}></i>{msg.texto}</span>
+          <button onClick={() => setMsg({ tipo: "", texto: "" })} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
         </div>
       )}
 
-      {/* Tabs */}
-      <ul className="nav nav-tabs mb-4">
-        {tabsVisibles.map(({ key, label, icon }) => (
-          <li key={key} className="nav-item">
-            <button 
-              className={`nav-link ${tab === key ? "active" : ""}`} 
-              onClick={() => setTab(key)}
-            >
-              <i className={`bi ${icon} me-2`} />
-              {label}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", padding: "24px" }}>
 
       {/* ══════════════════════════════════════════════════════════════ */}
       {/* Tab: Datos generales */}
@@ -588,6 +618,8 @@ export default function ConfigClinica() {
           </div>
         </form>
       )}
+      </div>{/* card blanco */}
+      </div>{/* padding */}
     </div>
   );
 }

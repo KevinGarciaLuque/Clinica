@@ -160,6 +160,15 @@ export default function Dashboard() {
 
   const hoy = dayjs().format("dddd D [de] MMMM YYYY");
 
+  const hora = dayjs().hour();
+  const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
+  const emojiSaludo = hora < 12 ? "☀️" : hora < 19 ? "🌤️" : "🌙";
+  const fraseMedico = hora < 12
+    ? "Listo/a para hacer la diferencia hoy"
+    : hora < 19
+    ? "Continúa con el gran trabajo de hoy"
+    : "Gracias por tu dedicación de hoy";
+
   return (
     <div style={{
       minHeight: "100vh",
@@ -207,31 +216,83 @@ export default function Dashboard() {
               </div>
             </div>
           </div>
-          <div style={{
-            background: "rgba(255,255,255,.1)",
-            borderRadius: 10,
-            padding: isMobile ? "6px 12px" : "8px 16px",
-            border: "1px solid rgba(255,255,255,.2)",
-            width: isMobile ? "100%" : "auto"
-          }}>
-            <span style={{ color: "rgba(255,255,255,.7)", fontSize: "0.82rem", fontWeight: 500 }}>
-              Bienvenido/a,{" "}
-            </span>
-            <strong style={{ color: "#fff", fontSize: "0.85rem" }}>
-              {user?.nombres} {user?.apellidos}
-            </strong>
-            <span style={{
-              marginLeft: 8,
-              background: "rgba(255,255,255,.18)",
-              padding: "2px 10px",
-              borderRadius: 6,
-              fontSize: "0.72rem",
-              color: "#e2e8f0",
-              fontWeight: 600,
-              display: "inline-block"
-            }}>
-              {user?.tipo}
-            </span>
+        </motion.div>
+
+        {/* Banner de bienvenida centrado */}
+        <motion.div
+          initial={{ opacity: 0, y: -16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.7, type: "spring", delay: 0.15 }}
+          style={{
+            background: "#fff",
+            borderBottom: "1px solid #e9ecef",
+            padding: isMobile ? "14px 16px" : "18px 32px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            position: "relative",
+            overflow: "hidden",
+          }}
+        >
+
+          <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
+            {/* Emoji saludo animado: flota + saluda continuamente */}
+            <motion.div
+              animate={{
+                y: [0, -6, 0, -4, 0],
+                rotate: [0, 0, 14, -10, 14, 0, 0],
+                scale: [1, 1.08, 1, 1.05, 1],
+              }}
+              transition={{
+                duration: 2.8,
+                repeat: Infinity,
+                repeatDelay: 2.5,
+                ease: "easeInOut",
+              }}
+              style={{ display: "inline-block", fontSize: isMobile ? 30 : 38, marginBottom: 6, lineHeight: 1, cursor: "default" }}
+            >
+              {emojiSaludo}
+            </motion.div>
+
+            {/* Saludo principal */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: isMobile ? 4 : 8 }}>
+              <span style={{ color: "#6b7280", fontSize: isMobile ? "0.95rem" : "1.1rem", fontWeight: 500 }}>
+                {saludo},
+              </span>
+              <motion.span
+                initial={{ opacity: 0, x: 10 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.45 }}
+                style={{
+                  color: "#1e293b",
+                  fontSize: isMobile ? "1rem" : "1.18rem",
+                  fontWeight: 800,
+                  letterSpacing: "0.01em",
+                }}
+              >
+                {user?.titulo ? `${user.titulo} ` : ""}{user?.nombres} {user?.apellidos}
+              </motion.span>
+            </div>
+
+            {/* Frase motivacional */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              style={{
+                marginTop: 5,
+                color: "#9ca3af",
+                fontSize: isMobile ? "0.73rem" : "0.8rem",
+                fontStyle: "italic",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 6,
+              }}
+            >
+              <i className="bi bi-activity" style={{ color: "#10b981", fontSize: "0.8rem" }} />
+              {fraseMedico}
+            </motion.div>
           </div>
         </motion.div>
 

@@ -36,6 +36,7 @@ import FichaEstetica           from "./pages/estetica/FichaEstetica";
 
 // Módulos adicionales
 import Recordatorios   from "./pages/Recordatorios";
+import PerfilUsuario   from "./pages/PerfilUsuario";
 import Catalogos       from "./pages/Catalogos";
 import CrecimientoPage from "./pages/CrecimientoPage";
 import VacunasPage     from "./pages/VacunasPage";
@@ -76,6 +77,7 @@ export default function App() {
         <Route path="/historia/:paciente_id"  element={<HistoriaClinica />} />
         <Route path="/historia"               element={<HistoriaClinica />} />
         <Route path="/estudios"               element={<Estudios />} />
+        <Route path="/perfil"                 element={<PerfilUsuario />} />
         <Route path="/catalogos"              element={<Catalogos />} />
         <Route path="/crecimiento"            element={<CrecimientoPage />} />
         <Route path="/vacunas"                element={<VacunasPage />} />

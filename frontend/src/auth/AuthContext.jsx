@@ -72,8 +72,17 @@ export function AuthProvider({ children }) {
     setLicenciaInfo(null);
   };
 
+  /** Actualiza el usuario en estado y localStorage (tras editar perfil) */
+  const updateUser = (cambios) => {
+    setUser(prev => {
+      const updated = { ...prev, ...cambios };
+      localStorage.setItem("user", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, logout, cargarModulos }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, logout, cargarModulos, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

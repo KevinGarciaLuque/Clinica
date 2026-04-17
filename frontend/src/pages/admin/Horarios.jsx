@@ -135,7 +135,7 @@ export default function Horarios() {
   }));
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
 
       {/* ═══ HEADER ═══ */}
       <div style={{

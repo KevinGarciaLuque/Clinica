@@ -99,6 +99,7 @@ function auth(...roles) {
 
       // 7. Adjuntar usuario al request para uso en rutas
       req.user = {
+        uid: user.id,          // alias usado en rutas /auth/me
         id: user.id,
         clinica_id: user.clinica_id,
         tipo: user.tipo,

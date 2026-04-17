@@ -60,7 +60,7 @@ export default function Consulta() {
   ];
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
       <div style={{
         background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
         padding: "16px 24px",
@@ -76,7 +76,7 @@ export default function Consulta() {
             <i className="bi bi-clipboard2-pulse-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
           </div>
           <div>
-            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Agenda de Consulta</div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Consulta Médica</div>
             <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
               {dayjs().format("dddd D [de] MMMM [de] YYYY")}
             </div>

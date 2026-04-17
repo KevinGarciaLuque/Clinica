@@ -74,7 +74,7 @@ export default function Servicios() {
   const labelSt = { fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 };
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
 
       {/* ═══ HEADER ═══ */}
       <div style={{

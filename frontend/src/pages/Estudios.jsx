@@ -2,7 +2,7 @@
  * ESTUDIOS E IMÁGENES
  * Gestión de solicitudes de estudios clínicos, resultados y visualización de imágenes médicas
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
@@ -19,35 +19,38 @@ const TIPOS_ESTUDIO = [
 ];
 
 const ESTADOS = [
-  { value: "SOLICITADO", label: "Solicitado", color: "warning" },
-  { value: "EN_PROCESO", label: "En Proceso", color: "info" },
-  { value: "COMPLETADO", label: "Completado", color: "success" },
-  { value: "CANCELADO", label: "Cancelado", color: "secondary" },
+  { value: "SOLICITADO",  label: "Solicitado",  color: "#f59e0b", bg: "rgba(245,158,11,0.12)",  border: "rgba(245,158,11,0.35)" },
+  { value: "EN_PROCESO",  label: "En Proceso",  color: "#0ea5e9", bg: "rgba(14,165,233,0.12)",   border: "rgba(14,165,233,0.35)" },
+  { value: "COMPLETADO",  label: "Completado",  color: "#10b981", bg: "rgba(16,185,129,0.12)",  border: "rgba(16,185,129,0.35)" },
+  { value: "CANCELADO",   label: "Cancelado",   color: "#6b7280", bg: "rgba(107,114,128,0.12)", border: "rgba(107,114,128,0.35)" },
 ];
 
-export default function Estudios() {
-  const navigate = useNavigate();
-  
-  const [estudios, setEstudios] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [filtroTipo, setFiltroTipo] = useState("");
-  const [filtroEstado, setFiltroEstado] = useState("");
-  const [busqueda, setBusqueda] = useState("");
-  const [showModal, setShowModal] = useState(false);
-  const [selectedEstudio, setSelectedEstudio] = useState(null);
+const C = {
+  bg: "#f0f2f5", surface: "#ffffff",
+  border: "rgba(0,0,0,0.08)", accent: "#166ae8",
+  text: "#1a1a1a", muted: "#6c757d",
+};
 
-  // Cargar estudios
-  useEffect(() => {
-    loadEstudios();
-  }, [filtroTipo, filtroEstado]);
+export default function Estudios() {
+  const navigate    = useNavigate();
+  const detailRef   = useRef(null);
+
+  const [estudios,        setEstudios]        = useState([]);
+  const [loading,         setLoading]         = useState(true);
+  const [filtroTipo,      setFiltroTipo]      = useState("");
+  const [filtroEstado,    setFiltroEstado]    = useState("");
+  const [busqueda,        setBusqueda]        = useState("");
+  const [selectedEstudio, setSelectedEstudio] = useState(null);
+  const [hoveredRow,      setHoveredRow]      = useState(null);
+
+  useEffect(() => { loadEstudios(); }, [filtroTipo, filtroEstado]);
 
   const loadEstudios = async () => {
     try {
       setLoading(true);
       const params = {};
-      if (filtroTipo) params.tipo = filtroTipo;
+      if (filtroTipo)   params.tipo   = filtroTipo;
       if (filtroEstado) params.estado = filtroEstado;
-      
       const res = await api.get("/estudios", { params });
       setEstudios(res.data.data || []);
     } catch (error) {
@@ -57,7 +60,6 @@ export default function Estudios() {
     }
   };
 
-  // Filtrar estudios por búsqueda
   const estudiosFiltrados = estudios.filter(e => {
     if (!busqueda) return true;
     const texto = busqueda.toLowerCase();
@@ -69,14 +71,12 @@ export default function Estudios() {
     );
   });
 
-  const getEstadoBadge = (estado) => {
-    const est = ESTADOS.find(e => e.value === estado);
-    return est ? est.color : "secondary";
-  };
+  const getEstadoMeta = (estado) =>
+    ESTADOS.find(e => e.value === estado) || ESTADOS[3];
 
   const handleVerDetalle = (estudio) => {
     setSelectedEstudio(estudio);
-    setShowModal(true);
+    setTimeout(() => detailRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const handleCambiarEstado = async (id, nuevoEstado) => {
@@ -86,257 +86,337 @@ export default function Estudios() {
       if (selectedEstudio?.id === id) {
         setSelectedEstudio({ ...selectedEstudio, estado: nuevoEstado });
       }
-    } catch (error) {
+    } catch {
       alert("Error al actualizar estado");
     }
   };
 
   return (
-    <div className="container-fluid py-3">
-      {/* Header */}
-      <div className="d-flex justify-content-between align-items-center mb-4">
+    <div style={{ background: C.bg, minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
+
+      {/* ── Header ─────────────────────────────────────────────────────── */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+        display: "flex", alignItems: "center", gap: 12,
+      }}>
+        <div style={{
+          width: 38, height: 38, borderRadius: 10,
+          background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+        }}>
+          <i className="bi bi-flask" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+        </div>
         <div>
-          <h4 className="fw-bold mb-1">🧪 Estudios e Imágenes</h4>
-          <p className="text-muted small mb-0">
-            Gestión de solicitudes de estudios clínicos y resultados
-          </p>
+          <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Estudios e Imágenes</div>
+          <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Gestión de solicitudes de estudios clínicos y resultados</div>
         </div>
       </div>
 
-      {/* Filtros */}
-      <div className="card shadow-sm mb-3">
-        <div className="card-body">
-          <div className="row g-3">
-            <div className="col-md-4">
+      <div style={{ padding: "20px 24px", maxWidth: 1100 }}>
+
+        {/* ── Panel de detalle (se muestra al hacer clic en Ver) ──────── */}
+        {selectedEstudio && (
+          <div ref={detailRef}>
+            {/* Botón volver */}
+            <button
+              onClick={() => setSelectedEstudio(null)}
+              style={{
+                background: "rgba(22,106,232,0.1)", border: `1px solid ${C.border}`,
+                borderRadius: 8, padding: "8px 16px", color: C.accent,
+                fontWeight: 600, fontSize: 14, cursor: "pointer",
+                display: "flex", alignItems: "center", gap: 8, marginBottom: 16,
+              }}
+            >
+              <i className="bi bi-arrow-left" /> Volver a la lista
+            </button>
+
+            {/* Tarjeta encabezado del estudio */}
+            <div style={{
+              background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12,
+              padding: "16px 20px", marginBottom: 16, boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+              display: "flex", alignItems: "center", gap: 16,
+            }}>
+              <div style={{
+                width: 52, height: 52, borderRadius: "50%",
+                background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                color: "#fff", fontWeight: 700, fontSize: "1.2rem", flexShrink: 0,
+              }}>
+                {selectedEstudio.paciente_nombres?.[0]}{selectedEstudio.paciente_apellidos?.[0]}
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 4 }}>
+                  {selectedEstudio.paciente_apellidos}, {selectedEstudio.paciente_nombres}
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", color: "#6b7280", fontSize: "0.82rem" }}>
+                  <span>Médico: Dr. {selectedEstudio.medico_apellidos}{selectedEstudio.medico_nombres ? `, ${selectedEstudio.medico_nombres}` : ""}</span>
+                  <span>Fecha: {dayjs(selectedEstudio.fecha_solicitud || selectedEstudio.creado_en).format("DD/MM/YYYY HH:mm")}</span>
+                  <span>Estudio #<strong>{selectedEstudio.id}</strong></span>
+                </div>
+              </div>
+              {/* Badge tipo */}
+              <span style={{
+                background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.35)",
+                borderRadius: 6, padding: "4px 12px", fontSize: "0.78rem", fontWeight: 700,
+                color: "#0ea5e9", textTransform: "uppercase", flexShrink: 0,
+              }}>
+                {selectedEstudio.tipo}
+              </span>
+            </div>
+
+            {/* Contenido del detalle */}
+            <div style={{
+              background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12,
+              padding: "20px 24px", boxShadow: "0 2px 8px rgba(0,0,0,.06)", marginBottom: 20,
+            }}>
+              {/* Estado */}
+              <div style={{ marginBottom: 20 }}>
+                <div style={{
+                  fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase",
+                  letterSpacing: ".05em", color: C.muted, marginBottom: 8,
+                }}>Estado del estudio</div>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  {ESTADOS.map(e => (
+                    <button
+                      key={e.value}
+                      onClick={() => handleCambiarEstado(selectedEstudio.id, e.value)}
+                      style={{
+                        background: selectedEstudio.estado === e.value ? e.bg : "transparent",
+                        border: `1px solid ${selectedEstudio.estado === e.value ? e.border : C.border}`,
+                        borderRadius: 8, padding: "6px 14px", fontSize: "0.8rem",
+                        fontWeight: selectedEstudio.estado === e.value ? 700 : 500,
+                        color: selectedEstudio.estado === e.value ? e.color : C.muted,
+                        cursor: "pointer",
+                        transition: "all 0.15s",
+                      }}
+                    >
+                      {e.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Descripción */}
+              <div style={{ marginBottom: selectedEstudio.resultado ? 20 : 0 }}>
+                <div style={{
+                  fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase",
+                  letterSpacing: ".05em", color: "#166ae8",
+                  borderBottom: "1px solid #dde3f5", paddingBottom: 4, marginBottom: 10,
+                }}>Descripción / Indicaciones</div>
+                <div style={{
+                  background: "#f8faff", border: "1px solid #e5e7eb", borderRadius: 8,
+                  padding: "12px 16px", fontSize: "0.88rem", color: "#374151",
+                  whiteSpace: "pre-wrap", lineHeight: 1.6,
+                }}>
+                  {selectedEstudio.descripcion || "Sin descripción"}
+                </div>
+              </div>
+
+              {/* Resultado */}
+              {selectedEstudio.resultado && (
+                <div style={{ marginTop: 20 }}>
+                  <div style={{
+                    fontSize: "0.72rem", fontWeight: 700, textTransform: "uppercase",
+                    letterSpacing: ".05em", color: "#10b981",
+                    borderBottom: "1px solid #d1fae5", paddingBottom: 4, marginBottom: 10,
+                  }}>Resultado</div>
+                  <div style={{
+                    background: "rgba(16,185,129,0.06)", border: "1px solid rgba(16,185,129,0.25)",
+                    borderRadius: 8, padding: "12px 16px", fontSize: "0.88rem", color: "#374151",
+                    whiteSpace: "pre-wrap", lineHeight: 1.6,
+                  }}>
+                    {selectedEstudio.resultado}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Filtros ─────────────────────────────────────────────────── */}
+        <div style={{
+          background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12,
+          padding: "16px 20px", marginBottom: 16, boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+        }}>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", alignItems: "center" }}>
+            <div style={{ position: "relative", flex: "1 1 200px", minWidth: 180 }}>
+              <i className="bi bi-search" style={{
+                position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)",
+                color: C.muted, fontSize: 14, pointerEvents: "none",
+              }} />
               <input
                 type="text"
-                className="form-control"
-                placeholder="🔍 Buscar por paciente o descripción..."
+                style={{
+                  background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.text, padding: "8px 12px 8px 34px", width: "100%", fontSize: 14,
+                  outline: "none",
+                }}
+                placeholder="Buscar por paciente o descripción..."
                 value={busqueda}
-                onChange={(e) => setBusqueda(e.target.value)}
+                onChange={e => setBusqueda(e.target.value)}
+                onFocus={e => { e.target.style.borderColor = C.accent; e.target.style.boxShadow = "0 0 0 3px rgba(22,106,232,0.1)"; }}
+                onBlur={e  => { e.target.style.borderColor = C.border; e.target.style.boxShadow = "none"; }}
               />
             </div>
-            <div className="col-md-3">
-              <select
-                className="form-select"
-                value={filtroTipo}
-                onChange={(e) => setFiltroTipo(e.target.value)}
-              >
-                <option value="">Todos los tipos</option>
-                {TIPOS_ESTUDIO.map(t => (
-                  <option key={t.value} value={t.value}>{t.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-3">
-              <select
-                className="form-select"
-                value={filtroEstado}
-                onChange={(e) => setFiltroEstado(e.target.value)}
-              >
-                <option value="">Todos los estados</option>
-                {ESTADOS.map(e => (
-                  <option key={e.value} value={e.value}>{e.label}</option>
-                ))}
-              </select>
-            </div>
-            <div className="col-md-2">
+            <select
+              style={{
+                background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.text, padding: "8px 12px", fontSize: 14, outline: "none",
+                flex: "0 0 180px",
+              }}
+              value={filtroTipo}
+              onChange={e => setFiltroTipo(e.target.value)}
+            >
+              <option value="">Todos los tipos</option>
+              {TIPOS_ESTUDIO.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+            </select>
+            <select
+              style={{
+                background: "#fff", border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.text, padding: "8px 12px", fontSize: 14, outline: "none",
+                flex: "0 0 170px",
+              }}
+              value={filtroEstado}
+              onChange={e => setFiltroEstado(e.target.value)}
+            >
+              <option value="">Todos los estados</option>
+              {ESTADOS.map(e => <option key={e.value} value={e.value}>{e.label}</option>)}
+            </select>
+            {(busqueda || filtroTipo || filtroEstado) && (
               <button
-                className="btn btn-outline-secondary w-100"
-                onClick={() => {
-                  setFiltroTipo("");
-                  setFiltroEstado("");
-                  setBusqueda("");
+                onClick={() => { setFiltroTipo(""); setFiltroEstado(""); setBusqueda(""); }}
+                style={{
+                  background: "#f1f5f9", border: `1px solid ${C.border}`, borderRadius: 8,
+                  padding: "8px 14px", fontSize: "0.82rem", cursor: "pointer", color: "#374151",
+                  display: "flex", alignItems: "center", gap: 6,
                 }}
               >
-                <i className="bi bi-x-circle me-1"></i>
-                Limpiar
+                <i className="bi bi-x-circle" /> Limpiar
               </button>
-            </div>
+            )}
+            <span style={{ marginLeft: "auto", fontSize: "0.78rem", color: C.muted }}>
+              {estudiosFiltrados.length} estudio{estudiosFiltrados.length !== 1 ? "s" : ""}
+            </span>
           </div>
         </div>
-      </div>
 
-      {/* Tabla de estudios */}
-      {loading ? (
-        <div className="text-center py-5">
-          <div className="spinner-border text-primary" role="status">
-            <span className="visually-hidden">Cargando...</span>
+        {/* ── Tabla de estudios ────────────────────────────────────────── */}
+        {loading ? (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "#6b7280" }}>
+            <div className="spinner-border spinner-border-sm me-2" /> Cargando…
           </div>
-        </div>
-      ) : estudiosFiltrados.length === 0 ? (
-        <div className="card shadow-sm">
-          <div className="card-body text-center py-5 text-muted">
-            <i className="bi bi-inbox display-1 d-block mb-3 opacity-25"></i>
-            <p className="mb-0">No se encontraron estudios con los filtros aplicados</p>
+        ) : estudiosFiltrados.length === 0 ? (
+          <div style={{
+            background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12,
+            padding: "60px 24px", textAlign: "center", color: C.muted,
+            boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+          }}>
+            <i className="bi bi-inbox" style={{ fontSize: "3rem", opacity: 0.25, display: "block", marginBottom: 12 }} />
+            No se encontraron estudios con los filtros aplicados
           </div>
-        </div>
-      ) : (
-        <div className="card shadow-sm">
-          <div className="card-body p-0">
-            <div className="table-responsive">
-              <table className="table table-hover align-middle mb-0">
-                <thead className="table-light">
-                  <tr>
-                    <th className="px-3">Fecha Solicitud</th>
-                    <th>Paciente</th>
-                    <th>Tipo</th>
-                    <th>Descripción</th>
-                    <th>Estado</th>
-                    <th>Médico Solicitante</th>
-                    <th className="text-end px-3">Acciones</th>
+        ) : (
+          <div style={{
+            background: "#fff", border: `1px solid ${C.border}`, borderRadius: 12,
+            overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.06)",
+          }}>
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "linear-gradient(135deg, #214a87 0%, #176DC8 100%)" }}>
+                    {["Fecha Solicitud", "Paciente", "Tipo", "Descripción", "Estado", "Médico Solicitante", ""].map(col => (
+                      <th key={col} style={{
+                        padding: "12px 16px", textAlign: col === "" ? "right" : "left",
+                        fontSize: 12, fontWeight: 700, color: "#fff",
+                        textTransform: "uppercase", letterSpacing: ".05em",
+                      }}>{col}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {estudiosFiltrados.map((estudio) => (
-                    <tr key={estudio.id} style={{ cursor: "pointer" }}>
-                      <td className="px-3">
-                        <small className="text-muted">
+                  {estudiosFiltrados.map(estudio => {
+                    const meta = getEstadoMeta(estudio.estado);
+                    const isSelected = selectedEstudio?.id === estudio.id;
+                    return (
+                      <tr
+                        key={estudio.id}
+                        onMouseEnter={() => setHoveredRow(estudio.id)}
+                        onMouseLeave={() => setHoveredRow(null)}
+                        style={{
+                          borderBottom: `1px solid ${C.border}`,
+                          background: isSelected
+                            ? "rgba(22,106,232,0.05)"
+                            : hoveredRow === estudio.id
+                            ? "rgba(13,110,253,0.03)"
+                            : "transparent",
+                          transition: "background 0.15s",
+                        }}
+                      >
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
                           {dayjs(estudio.fecha_solicitud || estudio.creado_en).format("DD/MM/YYYY")}
-                        </small>
-                      </td>
-                      <td>
-                        <div className="d-flex align-items-center gap-2">
-                          <div
-                            className="rounded-circle bg-primary bg-opacity-10 text-primary d-flex align-items-center justify-content-center fw-bold"
-                            style={{ width: 32, height: 32, fontSize: "0.75rem" }}
-                          >
-                            {estudio.paciente_nombres?.[0]}{estudio.paciente_apellidos?.[0]}
-                          </div>
-                          <div>
-                            <div className="small fw-semibold">
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                            <div style={{
+                              width: 34, height: 34, borderRadius: "50%",
+                              background: "rgba(22,106,232,0.1)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                              color: C.accent, fontWeight: 700, fontSize: 12, flexShrink: 0,
+                            }}>
+                              {estudio.paciente_nombres?.[0]}{estudio.paciente_apellidos?.[0]}
+                            </div>
+                            <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>
                               {estudio.paciente_apellidos}, {estudio.paciente_nombres}
                             </div>
                           </div>
-                        </div>
-                      </td>
-                      <td>
-                        <span className="badge bg-info bg-opacity-10 text-info">
-                          {estudio.tipo}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="small" style={{ maxWidth: 250 }}>
-                          {estudio.descripcion?.substring(0, 60)}
-                          {estudio.descripcion?.length > 60 ? "..." : ""}
-                        </div>
-                      </td>
-                      <td>
-                        <span className={`badge bg-${getEstadoBadge(estudio.estado)}`}>
-                          {estudio.estado}
-                        </span>
-                      </td>
-                      <td>
-                        <small className="text-muted">
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{
+                            background: "rgba(14,165,233,0.12)", border: "1px solid rgba(14,165,233,0.3)",
+                            borderRadius: 5, padding: "3px 9px", fontSize: "0.75rem", fontWeight: 700,
+                            color: "#0ea5e9",
+                          }}>{estudio.tipo}</span>
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: "#374151", maxWidth: 240 }}>
+                          {estudio.descripcion?.substring(0, 60)}{estudio.descripcion?.length > 60 ? "…" : ""}
+                        </td>
+                        <td style={{ padding: "12px 16px" }}>
+                          <span style={{
+                            background: meta.bg, border: `1px solid ${meta.border}`,
+                            borderRadius: 5, padding: "3px 9px", fontSize: "0.75rem", fontWeight: 700,
+                            color: meta.color,
+                          }}>{estudio.estado}</span>
+                        </td>
+                        <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
                           Dr. {estudio.medico_apellidos}
-                        </small>
-                      </td>
-                      <td className="text-end px-3">
-                        <button
-                          className="btn btn-sm btn-outline-primary"
-                          onClick={() => handleVerDetalle(estudio)}
-                        >
-                          <i className="bi bi-eye me-1"></i>
-                          Ver
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td style={{ padding: "12px 16px", textAlign: "right" }}>
+                          <button
+                            onClick={() => handleVerDetalle(estudio)}
+                            style={{
+                              background: isSelected ? C.accent : "#eff6ff",
+                              border: `1px solid ${isSelected ? C.accent : "#bfdbfe"}`,
+                              borderRadius: 7, padding: "5px 14px",
+                              fontSize: "0.78rem", fontWeight: 600,
+                              color: isSelected ? "#fff" : C.accent,
+                              cursor: "pointer", transition: "all 0.15s",
+                              display: "flex", alignItems: "center", gap: 5, whiteSpace: "nowrap",
+                            }}
+                          >
+                            <i className={`bi bi-${isSelected ? "check2" : "eye"}`} />
+                            {isSelected ? "Viendo" : "Ver"}
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Modal de detalle */}
-      {showModal && selectedEstudio && (
-        <div className="modal show d-block" style={{ backgroundColor: "rgba(0,0,0,0.5)" }}>
-          <div className="modal-dialog modal-lg modal-dialog-centered">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">
-                  Detalle del Estudio #{selectedEstudio.id}
-                </h5>
-                <button
-                  type="button"
-                  className="btn-close"
-                  onClick={() => {
-                    setShowModal(false);
-                    setSelectedEstudio(null);
-                  }}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <div className="row g-3">
-                  <div className="col-md-6">
-                    <label className="form-label small text-muted mb-1">Paciente</label>
-                    <div className="fw-semibold">
-                      {selectedEstudio.paciente_apellidos}, {selectedEstudio.paciente_nombres}
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <label className="form-label small text-muted mb-1">Médico Solicitante</label>
-                    <div>Dr. {selectedEstudio.medico_apellidos}, {selectedEstudio.medico_nombres}</div>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small text-muted mb-1">Tipo de Estudio</label>
-                    <div>
-                      <span className="badge bg-info bg-opacity-10 text-info">
-                        {selectedEstudio.tipo}
-                      </span>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small text-muted mb-1">Estado</label>
-                    <div>
-                      <select
-                        className={`form-select form-select-sm bg-${getEstadoBadge(selectedEstudio.estado)} bg-opacity-10`}
-                        value={selectedEstudio.estado}
-                        onChange={(e) => handleCambiarEstado(selectedEstudio.id, e.target.value)}
-                      >
-                        {ESTADOS.map(e => (
-                          <option key={e.value} value={e.value}>{e.label}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="col-md-4">
-                    <label className="form-label small text-muted mb-1">Fecha Solicitud</label>
-                    <div>{dayjs(selectedEstudio.fecha_solicitud || selectedEstudio.creado_en).format("DD/MM/YYYY HH:mm")}</div>
-                  </div>
-                  <div className="col-12">
-                    <label className="form-label small text-muted mb-1">Descripción / Indicaciones</label>
-                    <div className="p-3 bg-light rounded" style={{ whiteSpace: "pre-wrap" }}>
-                      {selectedEstudio.descripcion || "Sin descripción"}
-                    </div>
-                  </div>
-                  {selectedEstudio.resultado && (
-                    <div className="col-12">
-                      <label className="form-label small text-muted mb-1">Resultado</label>
-                      <div className="p-3 bg-success bg-opacity-10 rounded" style={{ whiteSpace: "pre-wrap" }}>
-                        {selectedEstudio.resultado}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button
-                  type="button"
-                  className="btn btn-secondary"
-                  onClick={() => {
-                    setShowModal(false);
-                    setSelectedEstudio(null);
-                  }}
-                >
-                  Cerrar
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }

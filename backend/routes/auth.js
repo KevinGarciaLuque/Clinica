@@ -1,7 +1,24 @@
-const router = require("express").Router();
-const pool = require("../db");
-const argon2 = require("argon2");
-const jwt = require("jsonwebtoken");
+const router       = require("express").Router();
+const pool         = require("../db");
+const argon2       = require("argon2");
+const jwt          = require("jsonwebtoken");
+const auth         = require("../middlewares/auth");
+const cloudinary   = require("../utils/cloudinary");
+const multer       = require("multer");
+const streamifier  = require("streamifier");
+const fs           = require("fs");
+const path         = require("path");
+
+const USE_CLOUDINARY = !!(process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL);
+
+const uploadFoto = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (["image/jpeg","image/png","image/webp"].includes(file.mimetype)) return cb(null, true);
+    cb(Object.assign(new Error("Solo JPG, PNG o WEBP"), { code: "WRONG_TYPE" }));
+  },
+});
 
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
@@ -101,6 +118,11 @@ router.post("/login", async (req, res) => {
       { expiresIn: process.env.JWT_EXPIRES || "8h" },
     );
 
+    // Obtener foto_url del usuario
+    const [fotoRows] = await pool.query(
+      "SELECT foto_url FROM usuarios WHERE id=? LIMIT 1", [user.id]
+    );
+
     res.json({
       ok: true,
       token,
@@ -114,8 +136,131 @@ router.post("/login", async (req, res) => {
         email: user.email,
         tipo: user.tipo,
         super: esSuper,
+        foto_url: fotoRows[0]?.foto_url || null,
       },
     });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /api/auth/me  → datos completos del usuario autenticado ──────────────
+router.get("/me", auth(), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono,
+              numero_colegiatura, especialidad_id, foto_url,
+              (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
+       FROM usuarios u WHERE u.id=? LIMIT 1`,
+      [req.user.uid]
+    );
+    if (!rows.length) return res.status(404).json({ ok: false, msg: "Usuario no encontrado" });
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── PUT /api/auth/me  → actualizar propio perfil ──────────────────────────────
+router.put("/me", auth(), async (req, res) => {
+  try {
+    const { nombres, apellidos, telefono, foto_url, password_actual, password_nuevo } = req.body;
+
+    // Si quiere cambiar contraseña, verificar la actual
+    let passwordHash;
+    if (password_nuevo) {
+      if (!password_actual) {
+        return res.status(400).json({ ok: false, msg: "Debes ingresar tu contraseña actual" });
+      }
+      const [rows] = await pool.query(
+        "SELECT password_hash FROM usuarios WHERE id=?", [req.user.uid]
+      );
+      const valid = await argon2.verify(rows[0].password_hash, password_actual);
+      if (!valid) {
+        return res.status(401).json({ ok: false, msg: "Contraseña actual incorrecta" });
+      }
+      passwordHash = await argon2.hash(password_nuevo);
+    }
+
+    const fields = [];
+    const values = [];
+    if (nombres    !== undefined) { fields.push("nombres=?");   values.push(nombres || null); }
+    if (apellidos  !== undefined) { fields.push("apellidos=?"); values.push(apellidos || null); }
+    if (telefono   !== undefined) { fields.push("telefono=?");  values.push(telefono || null); }
+    if (foto_url   !== undefined) { fields.push("foto_url=?");  values.push(foto_url || null); }
+    if (passwordHash)             { fields.push("password_hash=?"); values.push(passwordHash); }
+
+    if (fields.length) {
+      values.push(req.user.uid);
+      await pool.query(`UPDATE usuarios SET ${fields.join(", ")} WHERE id=?`, values);
+    }
+
+    // Devolver usuario actualizado
+    const [rows] = await pool.query(
+      `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono, foto_url,
+              (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
+       FROM usuarios u WHERE u.id=? LIMIT 1`,
+      [req.user.uid]
+    );
+    res.json({ ok: true, data: rows[0] });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── POST /api/auth/me/foto  → subir foto de perfil ───────────────────────────
+// Producción (CLOUDINARY_CLOUD_NAME definido): sube a Cloudinary
+// Desarrollo  (sin credenciales):              guarda en uploads/usuarios/
+router.post("/me/foto", auth(), uploadFoto.single("foto"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
+
+    const [[u]] = await pool.query("SELECT foto_cloudinary_id FROM usuarios WHERE id=?", [req.user.uid]);
+
+    let foto_url, foto_cloudinary_id = null;
+
+    if (USE_CLOUDINARY) {
+      // ── Modo producción: Cloudinary ──────────────────────────────────────
+      if (u?.foto_cloudinary_id) {
+        try { await cloudinary.uploader.destroy(u.foto_cloudinary_id); } catch { /* ignorar */ }
+      }
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "clinica/usuarios/perfil", resource_type: "image",
+            transformation: [{ width: 400, height: 400, crop: "fill", gravity: "face" }] },
+          (err, r) => (err ? reject(err) : resolve(r))
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+      foto_url          = result.secure_url;
+      foto_cloudinary_id = result.public_id;
+    } else {
+      // ── Modo desarrollo: disco local ─────────────────────────────────────
+      const dir = path.join(__dirname, "../uploads/usuarios");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      const ext  = req.file.mimetype === "image/png" ? ".png"
+                 : req.file.mimetype === "image/webp" ? ".webp" : ".jpg";
+      const filename = `perfil-${req.user.uid}-${Date.now()}${ext}`;
+      const filepath  = path.join(dir, filename);
+
+      // Borrar foto anterior local si existe
+      if (u?.foto_cloudinary_id === null && u?.foto_url) {
+        const oldFile = path.join(__dirname, "..", u.foto_url.replace(/^\//, ""));
+        if (fs.existsSync(oldFile)) fs.unlink(oldFile, () => {});
+      }
+
+      fs.writeFileSync(filepath, req.file.buffer);
+      const baseUrl = `${req.protocol}://${req.get("host")}`;
+      foto_url = `${baseUrl}/uploads/usuarios/${filename}`;
+    }
+
+    await pool.query(
+      "UPDATE usuarios SET foto_url=?, foto_cloudinary_id=? WHERE id=?",
+      [foto_url, foto_cloudinary_id, req.user.uid]
+    );
+
+    res.json({ ok: true, foto_url });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

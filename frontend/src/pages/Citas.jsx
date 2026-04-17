@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
@@ -182,6 +182,7 @@ export default function Citas() {
   const [sala,      setSala]        = useState([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showEdit,         setShowEdit]          = useState(false);
+  const headerRef = useRef(null);
 
   // Sincronizar estado con cambios en la URL (cuando se navega desde el sidebar)
   useEffect(() => {
@@ -254,6 +255,7 @@ export default function Citas() {
   const onSelectEvent = (event) => {
     setSelEvent(event);
     setShowDet(true);
+    setTimeout(() => headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
   };
 
   const cambiarEstado = (estado) => {
@@ -294,7 +296,7 @@ export default function Citas() {
   };
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh" }}>
+    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
       <style>{`
         .event-hover:hover {
           transform: translateY(-1px);
@@ -317,7 +319,7 @@ export default function Citas() {
       `}</style>
 
       {/* Header */}
-      <div style={{
+      <div ref={headerRef} style={{
         background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
         padding: "16px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -332,7 +334,13 @@ export default function Citas() {
             <i className="bi bi-calendar-week-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
           </div>
           <div>
-            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Agenda de Citas</div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>
+              {activeTab === "sala"
+                ? "Sala de Espera"
+                : view === Views.AGENDA
+                ? "Agenda"
+                : "Programar Citas"}
+            </div>
             <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
               {dayjs().format("dddd D [de] MMMM [de] YYYY")}
             </div>

@@ -33,6 +33,8 @@ export default function NavbarApp({ onMenuClick }) {
   const [solicitudes, setSolicitudes]     = useState([]);
   const [showDropdown, setShowDropdown]   = useState(false);
   const dropdownRef                       = useRef(null);
+  const [showUserMenu, setShowUserMenu]   = useState(false);
+  const userMenuRef                       = useRef(null);
 
   useEffect(() => {
     if (!user?.super) return;
@@ -52,6 +54,9 @@ export default function NavbarApp({ onMenuClick }) {
       if (dropdownRef.current && !dropdownRef.current.contains(e.target)) {
         setShowDropdown(false);
       }
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
+        setShowUserMenu(false);
+      }
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -67,6 +72,21 @@ export default function NavbarApp({ onMenuClick }) {
   };
 
   return (
+    <>
+    <style>{`
+      @keyframes navline-slide {
+        0%   { background-position: -200% center; }
+        100% { background-position: 300% center; }
+      }
+      @keyframes navline-shine {
+        0%   { transform: translateX(-100%); }
+        100% { transform: translateX(400%); }
+      }
+      @keyframes licencia-pulse {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
+        50%       { box-shadow: 0 0 0 5px rgba(245,158,11,0); }
+      }
+    `}</style>
     <nav
       className="navbar navbar-dark bg-dark px-3 d-flex align-items-center justify-content-between"
       style={{ height: 56, minHeight: 56 }}
@@ -81,24 +101,13 @@ export default function NavbarApp({ onMenuClick }) {
         >
           <i className="bi bi-list fs-5" />
         </button>
-        <span className="navbar-brand mb-0 fw-bold d-flex align-items-center gap-2">
-          <i className="bi bi-hospital-fill text-primary fs-5" />
-          <span style={{ fontSize: "0.95rem" }}>
-            {user?.clinica_nombre || "Multi-Clínica"}
-          </span>
+        <span className="navbar-brand mb-0 d-flex align-items-center gap-2" style={{ fontWeight: 700 }}>
+          <div className="d-none d-sm-block" style={{ lineHeight: 1.25 }}>
+            <div style={{ fontSize: "0.9rem", color: "#fff", fontWeight: 700, letterSpacing: "0.03em" }}>
+              Sistema de Gestión Clínica
+            </div>
+          </div>
         </span>
-        {user?.clinica_nombre && (
-          <span 
-            className="d-none d-md-inline badge text-white-50 fw-normal" 
-            style={{ 
-              fontSize: "0.65rem", 
-              background: "rgba(255,255,255,0.1)",
-              letterSpacing: "0.03em"
-            }}
-          >
-            Multi-Clínica
-          </span>
-        )}
       </div>
 
       {/* Right side: user + logout */}
@@ -228,73 +237,191 @@ export default function NavbarApp({ onMenuClick }) {
           </div>
         )}
 
-        {/* Badge de plan/licencia (solo clínicas, no SUPER_ADMIN) */}
-        {planBadge && (
-          <>
-            <style>{`
-              @keyframes licencia-pulse {
-                0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
-                50%       { box-shadow: 0 0 0 5px rgba(245,158,11,0); }
-              }
-            `}</style>
-            <div
-              title={`Plan ${planBadge.label}${diasRestantes !== null ? ` — ${diasRestantes} días restantes` : ""} · Click para solicitar plan`}
-              onClick={() => window.dispatchEvent(new CustomEvent("solicitarPlan"))}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                background: planBadge.bg,
-                border: `1px solid ${planBadge.border}`,
-                borderRadius: 8,
-                padding: "4px 10px",
-                animation: planBadge.pulse ? "licencia-pulse 2s infinite" : "none",
-                cursor: "pointer",
-                userSelect: "none",
-              }}
-            >
-              <i className={`bi ${planBadge.icon}`} style={{ color: planBadge.color, fontSize: 13 }} />
-              <span
-                className="d-none d-sm-inline"
-                style={{ color: planBadge.color, fontSize: 11, fontWeight: 700, whiteSpace: "nowrap" }}
-              >
-                {planBadge.label}
-                {diasRestantes !== null && (
-                  <span style={{ opacity: .8, marginLeft: 4 }}>· {diasRestantes}d</span>
-                )}
-              </span>
-            </div>
-          </>
-        )}
 
-        <div className="d-flex align-items-center gap-2">
-          <div
-            className="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0"
+
+        {/* User menu dropdown */}
+        <div ref={userMenuRef} style={{ position: "relative" }}>
+          <button
+            onClick={() => setShowUserMenu(v => !v)}
             style={{
-              width: 32, height: 32, fontSize: "0.75rem",
+              background: showUserMenu ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.06)",
+              border: "1px solid rgba(255,255,255,.12)",
+              borderRadius: 10, padding: "4px 10px 4px 6px",
+              display: "flex", alignItems: "center", gap: 8,
+              cursor: "pointer", transition: "background .15s",
+            }}
+            onMouseEnter={e => { if (!showUserMenu) e.currentTarget.style.background = "rgba(255,255,255,.1)"; }}
+            onMouseLeave={e => { if (!showUserMenu) e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
+          >
+            <div style={{
+              width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
               background: esAlerta && planBadge
                 ? `linear-gradient(135deg, ${planBadge.color}, ${planBadge.color}bb)`
-                : "#0d6efd",
-            }}
-          >
-            {initials}
-          </div>
-          <div className="d-none d-md-block" style={{ lineHeight: 1.2 }}>
-            <div className="text-white fw-semibold" style={{ fontSize: "0.82rem" }}>
-              {user?.nombres} {user?.apellidos}
+                : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              overflow: "hidden", border: "2px solid rgba(255,255,255,.2)",
+            }}>
+              {user?.foto_url
+                ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.72rem" }}>{initials}</span>
+              }
             </div>
-            <span
-              className={`badge bg-${ROLE_COLOR[user?.tipo] ?? "secondary"}`}
-              style={{ fontSize: "0.6rem" }}
-            >
-              {user?.tipo}
-            </span>
-          </div>
+            <div className="d-none d-md-block" style={{ lineHeight: 1.25, textAlign: "left" }}>
+              <div style={{ color: "#f1f5f9", fontWeight: 600, fontSize: "0.8rem", whiteSpace: "nowrap" }}>
+                {user?.nombres} {user?.apellidos}
+              </div>
+              <div style={{ color: "rgba(255,255,255,.4)", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                {user?.tipo}
+              </div>
+            </div>
+            <i
+              className="bi bi-chevron-down d-none d-md-inline"
+              style={{
+                color: "rgba(255,255,255,.35)", fontSize: 10,
+                transform: showUserMenu ? "rotate(180deg)" : "none",
+                transition: "transform .2s",
+              }}
+            />
+          </button>
+
+          {showUserMenu && (
+            <div style={{
+              position: "absolute", top: 46, right: 0, zIndex: 1200,
+              background: "#1a2744", border: "1px solid rgba(255,255,255,.1)",
+              borderRadius: 14, width: 248, boxShadow: "0 16px 48px rgba(0,0,0,.55)",
+              overflow: "hidden",
+            }}>
+              {/* Header con info del usuario */}
+              <div style={{
+                padding: "16px",
+                background: "linear-gradient(135deg, #112240, #1a2744)",
+                borderBottom: "1px solid rgba(255,255,255,.07)",
+              }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                  <div style={{
+                    width: 44, height: 44, borderRadius: "50%", flexShrink: 0,
+                    background: esAlerta && planBadge
+                      ? `linear-gradient(135deg, ${planBadge.color}, ${planBadge.color}bb)`
+                      : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    overflow: "hidden", border: "2px solid rgba(255,255,255,.2)",
+                    boxShadow: "0 4px 12px rgba(0,0,0,.3)",
+                  }}>
+                    {user?.foto_url
+                      ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      : <span style={{ color: "#fff", fontWeight: 700, fontSize: "1rem" }}>{initials}</span>
+                    }
+                  </div>
+                  <div>
+                    <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: "0.9rem" }}>
+                      {user?.nombres} {user?.apellidos}
+                    </div>
+                    <div style={{ color: "rgba(255,255,255,.45)", fontSize: "0.72rem", marginTop: 1 }}>
+                      {user?.email}
+                    </div>
+                    <span style={{
+                      display: "inline-block", marginTop: 4,
+                      fontSize: "0.58rem", fontWeight: 700, letterSpacing: "0.07em",
+                      textTransform: "uppercase", padding: "2px 7px", borderRadius: 4,
+                      background: "rgba(59,130,246,.2)", color: "#93c5fd",
+                    }}>
+                      {user?.tipo}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Opciones */}
+              {/* Mi Perfil */}
+              <button
+                onClick={() => { navigate("/perfil"); setShowUserMenu(false); }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "11px 16px", background: "transparent",
+                  border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: "0.84rem",
+                  textAlign: "left",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <i className="bi bi-person-circle" style={{ fontSize: 15, color: "#64748b", width: 18, textAlign: "center" }} />
+                Mi Perfil
+              </button>
+
+              {/* Badge de plan/licencia debajo de Mi Perfil */}
+              {planBadge && (
+                <div
+                  title={`Plan ${planBadge.label}${diasRestantes !== null ? ` — ${diasRestantes} días restantes` : ""} · Click para solicitar plan`}
+                  onClick={() => { window.dispatchEvent(new CustomEvent("solicitarPlan")); setShowUserMenu(false); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 10,
+                    padding: "9px 16px",
+                    background: planBadge.bg,
+                    borderTop: `1px solid ${planBadge.border}`,
+                    borderBottom: `1px solid ${planBadge.border}`,
+                    animation: planBadge.pulse ? "licencia-pulse 2s infinite" : "none",
+                    cursor: "pointer", userSelect: "none",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.opacity = "0.85"}
+                  onMouseLeave={e => e.currentTarget.style.opacity = "1"}
+                >
+                  <i className={`bi ${planBadge.icon}`} style={{ fontSize: 15, color: planBadge.color, width: 18, textAlign: "center" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ color: planBadge.color, fontSize: "0.84rem", fontWeight: 700 }}>
+                      Plan {planBadge.label}
+                    </div>
+                    {diasRestantes !== null && (
+                      <div style={{ color: planBadge.color, opacity: 0.75, fontSize: "0.72rem" }}>
+                        {diasRestantes} días restantes
+                      </div>
+                    )}
+                  </div>
+                  <i className="bi bi-arrow-right-circle" style={{ fontSize: 13, color: planBadge.color, opacity: 0.7 }} />
+                </div>
+              )}
+
+              {/* Cambiar contraseña y Ayuda */}
+              {[
+                { icon: "bi-shield-lock",    label: "Cambiar contraseña",  action: () => { navigate("/cambiar-password"); setShowUserMenu(false); } },
+                { icon: "bi-headset",        label: "Ayuda y soporte",     action: () => setShowUserMenu(false) },
+              ].map(({ icon, label, action }) => (
+                <button
+                  key={label} onClick={action}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "11px 16px", background: "transparent",
+                    border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: "0.84rem",
+                    textAlign: "left",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <i className={`bi ${icon}`} style={{ fontSize: 15, color: "#64748b", width: 18, textAlign: "center" }} />
+                  {label}
+                </button>
+              ))}
+
+              <div style={{ height: 1, background: "rgba(255,255,255,.07)", margin: "4px 16px" }} />
+
+              <button
+                onClick={() => { salir(); setShowUserMenu(false); }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "11px 16px", marginBottom: 4, background: "transparent",
+                  border: "none", cursor: "pointer", color: "#f87171", fontSize: "0.84rem",
+                  textAlign: "left",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,.08)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <i className="bi bi-box-arrow-right" style={{ fontSize: 15, width: 18, textAlign: "center" }} />
+                Cerrar sesión
+              </button>
+            </div>
+          )}
         </div>
-        <button className="btn btn-outline-light btn-sm" onClick={salir}>
-          <i className="bi bi-box-arrow-right me-1 d-none d-sm-inline" />
-          <i className="bi bi-box-arrow-right d-sm-none" />
-          <span className="d-none d-sm-inline">Salir</span>
-        </button>
       </div>
     </nav>
+    </>
   );
 }

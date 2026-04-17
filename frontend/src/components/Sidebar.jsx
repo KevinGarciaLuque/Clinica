@@ -310,6 +310,7 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
 /* ─── Sidebar principal ──────────────────────────────────────────── */
 export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   const { user, modulos } = useAuth();
+  const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
   const { super: sItems, main, admin } = getMenuSections(user?.tipo, modulos);
 
   return (
@@ -395,65 +396,75 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
         background: C.bg,
       }}>
 
-        {/* ════════════ CABECERA LOGO ════════════ */}
+        {/* ════════════ CABECERA USUARIO ════════════ */}
         <div style={{
           flexShrink: 0,
-          padding: collapsed ? "14px 0 12px" : "14px 12px 12px",
+          padding: collapsed ? "10px 0 10px" : "12px 12px 14px",
           borderBottom: `1px solid ${C.divider}`,
+          position: "relative",
           display: "flex",
+          flexDirection: collapsed ? "row" : "column",
           alignItems: "center",
-          justifyContent: collapsed ? "center" : "space-between",
-          gap: 8,
+          justifyContent: "center",
         }}>
           {!collapsed && (
-            <div className="sidebar-logo-pill">
+            <>
+              {/* Foto grande centrada */}
               <div style={{
-                width: 28,
-                height: 28,
-                borderRadius: 7,
-                background: C.accent,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                flexShrink: 0,
+                width: 72, height: 72, borderRadius: "50%", flexShrink: 0,
+                background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden",
+                border: "3px solid rgba(255,255,255,.18)",
+                boxShadow: "0 4px 16px rgba(0,0,0,.5)",
+                alignSelf: "center",
               }}>
-                <i className="bi bi-hospital-fill" style={{ color: "#fff", fontSize: "0.85rem" }} />
+                {user?.foto_url
+                  ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ color: "#fff", fontWeight: 700, fontSize: "1.5rem" }}>{initials}</span>
+                }
               </div>
-              <div style={{ lineHeight: 1.2 }}>
-                <div style={{ color: "#fff", fontSize: "0.78rem", fontWeight: 700, letterSpacing: "0.01em" }}>
-                  Multi-Clínica
+              {/* Nombre y rol debajo */}
+              <div style={{ textAlign: "center", marginTop: 10, width: "100%" }}>
+                <div style={{
+                  color: "#fff", fontSize: "0.85rem", fontWeight: 700,
+                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
+                  padding: "0 8px",
+                }}>
+                  {user?.nombres} {user?.apellidos}
                 </div>
-                <div style={{ color: C.textMuted, fontSize: "0.58rem", letterSpacing: "0.04em" }}>
-                  Sistema de Gestión
+                <div style={{
+                  color: C.textMuted, fontSize: "0.68rem", marginTop: 2,
+                  letterSpacing: "0.04em",
+                }}>
+                  {user?.tipo ?? "Usuario"}
                 </div>
               </div>
-            </div>
+              {/* Línea divisora decorativa */}
+              <div style={{
+                width: 40, height: 2, borderRadius: 2, marginTop: 12,
+                background: "linear-gradient(90deg, transparent, #3b82f6, transparent)",
+                alignSelf: "center",
+              }} />
+            </>
           )}
 
           {collapsed && (
             <div style={{
-              width: 32,
-              height: 32,
-              borderRadius: 9,
-              background: C.accent,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
+              width: 36, height: 36, borderRadius: "50%",
+              background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              overflow: "hidden", border: "2px solid rgba(255,255,255,.15)",
+              boxShadow: "0 2px 8px rgba(0,0,0,.4)",
             }}>
-              <i className="bi bi-hospital-fill" style={{ color: "#fff", fontSize: "1rem" }} />
+              {user?.foto_url
+                ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                : <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.78rem" }}>{initials}</span>
+              }
             </div>
           )}
 
-          <button
-            onClick={onToggleCollapse}
-            className="btn-collapse-sidebar d-none d-lg-flex"
-            title={collapsed ? "Expandir menú" : "Colapsar menú"}
-          >
-            <i
-              className={`bi ${collapsed ? "bi-chevron-double-right" : "bi-chevron-double-left"}`}
-              style={{ fontSize: "0.75rem" }}
-            />
-          </button>
+
         </div>
 
         {/* ════════════ MENÚ (scrollable) ════════════ */}
