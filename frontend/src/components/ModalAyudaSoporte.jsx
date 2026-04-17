@@ -55,6 +55,32 @@ export default function ModalAyudaSoporte({ open, onClose }) {
   if (!open) return null;
 
   const content = (
+    <>
+    <style>{`
+      @media (max-width: 500px) {
+        .ayuda-modal-wrapper {
+          top: auto !important;
+          bottom: 0 !important;
+          left: 0 !important;
+          right: 0 !important;
+          transform: none !important;
+          width: 100% !important;
+        }
+        .ayuda-modal-box {
+          border-radius: 20px 20px 0 0 !important;
+          max-height: 88vh !important;
+        }
+        .ayuda-modal-header { padding: 16px 16px 0 !important; }
+        .ayuda-modal-body   { padding: 14px !important; }
+        .ayuda-modal-footer { padding: 10px 14px !important; }
+        .ayuda-tab-btn {
+          padding: 8px 10px !important;
+          flex: 1 !important;
+          justify-content: center !important;
+        }
+        .ayuda-tab-label { display: none !important; }
+      }
+    `}</style>
     <AnimatePresence>
       {open && (
         <>
@@ -73,7 +99,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
           />
 
           {/* Modal — wrapper fijo para centrado, motion.div solo anima */}
-          <div style={{
+          <div className="ayuda-modal-wrapper" style={{
             position: "fixed", zIndex: 2001,
             top: "50%", left: "50%",
             transform: "translate(-50%, -50%)",
@@ -81,6 +107,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
           }}>
           <motion.div
             key="modal"
+            className="ayuda-modal-box"
             initial={{ opacity: 0, scale: 0.92, y: 20 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.92, y: 20 }}
@@ -97,7 +124,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
             }}
           >
             {/* ── Header ── */}
-            <div style={{
+            <div className="ayuda-modal-header" style={{
               background: "linear-gradient(135deg, #1a2f5a 0%, #0f1e38 100%)",
               padding: "24px 24px 0",
               borderBottom: "1px solid rgba(255,255,255,.06)",
@@ -147,6 +174,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
                 ].map(t => (
                   <button
                     key={t.key}
+                    className="ayuda-tab-btn"
                     onClick={() => setTab(t.key)}
                     style={{
                       background: tab === t.key ? "rgba(37,99,235,.2)" : "transparent",
@@ -158,16 +186,17 @@ export default function ModalAyudaSoporte({ open, onClose }) {
                       cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
                       transition: "all .15s",
                     }}
+                    title={t.label}
                   >
                     <i className={`bi ${t.icon}`} />
-                    {t.label}
+                    <span className="ayuda-tab-label">{t.label}</span>
                   </button>
                 ))}
               </div>
             </div>
 
             {/* ── Contenido scrollable ── */}
-            <div style={{ overflowY: "auto", flex: 1, padding: 24 }}>
+            <div className="ayuda-modal-body" style={{ overflowY: "auto", flex: 1, padding: 24 }}>
 
               {/* TAB CONTACTO */}
               {tab === "contacto" && (
@@ -524,7 +553,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
             </div>
 
             {/* ── Footer ── */}
-            <div style={{
+            <div className="ayuda-modal-footer" style={{
               padding: "14px 24px",
               borderTop: "1px solid rgba(255,255,255,.06)",
               display: "flex", alignItems: "center", justifyContent: "space-between",
@@ -551,6 +580,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
         </>
       )}
     </AnimatePresence>
+    </>
   );
 
   return createPortal(content, document.body);

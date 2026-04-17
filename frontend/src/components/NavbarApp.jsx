@@ -67,9 +67,16 @@ export default function NavbarApp({ onMenuClick }) {
     es.onerror = () => {}; // reconexión automática del navegador
 
     // Fallback polling cada 60s (por si SSE falla)
+    // También reproduce sonido si aparecen respuestas nuevas
     const iv = setInterval(() => {
       api.get("/soporte/mis-respuestas")
-        .then(r => setMisRespuestas(r.data.data || []))
+        .then(r => {
+          const nuevas = r.data.data || [];
+          setMisRespuestas(prev => {
+            if (nuevas.length > prev.length) playNotificationSound();
+            return nuevas;
+          });
+        })
         .catch(() => {});
     }, 60000);
 
