@@ -117,6 +117,7 @@ app.use("/api/crecimiento", require("./routes/crecimiento"));
 app.use("/api/setup",     require("./routes/setup"));
 app.use("/api/reportes",  require("./routes/reportes"));
 app.use("/api/vacunas",   require("./routes/vacunas"));
+app.use("/api/soporte",   require("./routes/soporte"));
 
 // ===== 404 =====
 app.use((req, res) => {

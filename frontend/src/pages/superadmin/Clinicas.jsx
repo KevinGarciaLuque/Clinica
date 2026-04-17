@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
+import ClinicaDetallesModal from "../../components/ClinicaDetallesModal";
 
 /* ── Paleta ────────────────────────────────────────────────── */
 const C = {
@@ -63,10 +64,14 @@ export default function Clinicas() {
   const [allModulos, setAllModulos] = useState([]);
 
   // Modal de gestión de licencia
-  const [showLicenciaModal, setShowLicenciaModal] = useState(false);
-  const [clinicaLicencia, setClinicaLicencia]     = useState(null);
-  const [licenciaForm, setLicenciaForm]           = useState({ plan_tipo: "anual", inicio_manual: "", notas: "" });
-  const [licenciaGuardando, setLicenciaGuardando] = useState(false);
+  const [showLicenciaModal, setShowLicenciaModal]     = useState(false);
+  const [clinicaLicencia, setClinicaLicencia]         = useState(null);
+  const [licenciaForm, setLicenciaForm]               = useState({ plan_tipo: "anual", inicio_manual: "", notas: "" });
+  const [licenciaGuardando, setLicenciaGuardando]     = useState(false);
+
+  // Modal de detalles / uso de espacio
+  const [showDetallesModal, setShowDetallesModal] = useState(false);
+  const [clinicaDetalles, setClinicaDetalles]     = useState(null);
 
   // Solicitudes de licencia pendientes
   const [solicitudes, setSolicitudes]     = useState([]);
@@ -637,6 +642,20 @@ export default function Clinicas() {
                   padding: "12px 20px", borderTop: `1px solid ${C.border}`,
                   display: "flex", gap: 10,
                 }}>
+                  <button
+                    onClick={() => { setClinicaDetalles(c); setShowDetallesModal(true); }}
+                    title="Ver detalles de uso y almacenamiento"
+                    style={{
+                      background: "rgba(33,150,243,.08)", border: "1px solid rgba(33,150,243,.2)",
+                      borderRadius: 8, padding: "8px 10px",
+                      color: C.accent, fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(33,150,243,.18)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(33,150,243,.08)"}
+                  >
+                    <i className="bi bi-bar-chart-fill" />
+                  </button>
                   <button
                     onClick={() => abrirLicencia(c)}
                     title="Gestionar licencia"
@@ -1583,6 +1602,15 @@ export default function Clinicas() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* ── Modal de Detalles / Uso de Espacio ────────────── */}
+      {showDetallesModal && clinicaDetalles && (
+        <ClinicaDetallesModal
+          clinicaId={clinicaDetalles.id}
+          clinicaNombre={clinicaDetalles.nombre}
+          onClose={() => { setShowDetallesModal(false); setClinicaDetalles(null); }}
+        />
       )}
     </div>
   );

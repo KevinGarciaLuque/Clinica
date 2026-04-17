@@ -193,6 +193,154 @@ router.put("/solicitudes-licencia/:id/atender", auth("SUPER_ADMIN"), async (req,
   }
 });
 
+// ══════════════════════════════════════════════════════════════════════════
+//  GET /api/clinicas/:id/detalles  → estadísticas y consumo de espacio (SUPER_ADMIN)
+// ══════════════════════════════════════════════════════════════════════════
+router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+
+    // ── Info base de la clínica ──────────────────────────────
+    const [[clinica]] = await pool.query(
+      `SELECT c.id, c.nombre, c.slug, c.creado_en, c.activo, c.plan_tipo,
+              c.licencia_inicio, c.licencia_fin,
+              t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
+       FROM clinicas c LEFT JOIN tipos_clinica t ON t.id = c.tipo_id
+       WHERE c.id = ? LIMIT 1`,
+      [id]
+    );
+    if (!clinica) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    // ── Conteos en paralelo ──────────────────────────────────
+    const [
+      [[{ total_pacientes }]],
+      [[{ total_usuarios }]],
+      [[{ total_citas }]],
+      [[{ fotos_galeria }]],
+      [[{ fotos_perfil_pacientes }]],
+      [[{ fotos_perfil_usuarios }]],
+      [[{ total_documentos }]],
+      [[{ ultima_cita }]],
+      [top_usuarios],
+    ] = await Promise.all([
+      // Pacientes registrados
+      pool.query(
+        "SELECT COUNT(*) AS total_pacientes FROM pacientes WHERE clinica_id = ?",
+        [id]
+      ),
+      // Staff (excluye SUPER_ADMIN)
+      pool.query(
+        "SELECT COUNT(*) AS total_usuarios FROM usuarios WHERE clinica_id = ? AND tipo != 'SUPER_ADMIN'",
+        [id]
+      ),
+      // Citas totales
+      pool.query(
+        "SELECT COUNT(*) AS total_citas FROM citas WHERE clinica_id = ?",
+        [id]
+      ),
+      // Fotos de galería antes/después (vía pacientes de esa clínica)
+      pool.query(
+        `SELECT COUNT(*) AS fotos_galeria
+         FROM galeria_fotos gf
+         INNER JOIN pacientes p ON p.id = gf.paciente_id
+         WHERE p.clinica_id = ?`,
+        [id]
+      ),
+      // Fotos de perfil de pacientes en Cloudinary
+      pool.query(
+        `SELECT COUNT(*) AS fotos_perfil_pacientes
+         FROM pacientes
+         WHERE clinica_id = ? AND foto_cloudinary_id IS NOT NULL AND foto_cloudinary_id != ''`,
+        [id]
+      ),
+      // Fotos de perfil de usuarios en Cloudinary
+      pool.query(
+        `SELECT COUNT(*) AS fotos_perfil_usuarios
+         FROM usuarios
+         WHERE clinica_id = ?
+           AND foto_cloudinary_id IS NOT NULL AND foto_cloudinary_id != ''`,
+        [id]
+      ).catch(() => [[{ fotos_perfil_usuarios: 0 }]]), // tabla puede no tener esa col aún
+      // Documentos adjuntos de pacientes
+      pool.query(
+        `SELECT COUNT(*) AS total_documentos
+         FROM paciente_documentos
+         WHERE clinica_id = ?`,
+        [id]
+      ).catch(() => [[{ total_documentos: 0 }]]),
+      // Fecha de la última cita registrada
+      pool.query(
+        "SELECT MAX(inicio) AS ultima_cita FROM citas WHERE clinica_id = ?",
+        [id]
+      ),
+      // Top 5 usuarios por último acceso
+      pool.query(
+        `SELECT nombres, apellidos, tipo, ultimo_acceso
+         FROM usuarios
+         WHERE clinica_id = ? AND activo = 1 AND tipo != 'SUPER_ADMIN'
+         ORDER BY ultimo_acceso DESC LIMIT 5`,
+        [id]
+      ),
+    ]);
+
+    // ── Estimación de almacenamiento en nube ─────────────────
+    // Pesos promedio (KB): galería ~900, perfil paciente ~350, perfil usuario ~200, doc ~400
+    const KB_GALERIA   = 900;
+    const KB_PERF_PAC  = 350;
+    const KB_PERF_USR  = 200;
+    const KB_DOC       = 400;
+
+    const total_archivos_nube =
+      Number(fotos_galeria) +
+      Number(fotos_perfil_pacientes) +
+      Number(fotos_perfil_usuarios) +
+      Number(total_documentos);
+
+    const espacio_kb =
+      Number(fotos_galeria)          * KB_GALERIA  +
+      Number(fotos_perfil_pacientes) * KB_PERF_PAC +
+      Number(fotos_perfil_usuarios)  * KB_PERF_USR +
+      Number(total_documentos)       * KB_DOC;
+
+    const formatBytes = (kb) => {
+      if (kb < 1024)       return `${kb.toFixed(0)} KB`;
+      if (kb < 1048576)    return `${(kb / 1024).toFixed(2)} MB`;
+      return                      `${(kb / 1048576).toFixed(2)} GB`;
+    };
+
+    res.json({
+      ok: true,
+      data: {
+        clinica,
+        conteos: {
+          total_pacientes:        Number(total_pacientes),
+          total_usuarios:         Number(total_usuarios),
+          total_citas:            Number(total_citas),
+          fotos_galeria:          Number(fotos_galeria),
+          fotos_perfil_pacientes: Number(fotos_perfil_pacientes),
+          fotos_perfil_usuarios:  Number(fotos_perfil_usuarios),
+          total_documentos:       Number(total_documentos),
+          total_archivos_nube,
+        },
+        almacenamiento: {
+          espacio_kb,
+          espacio_legible:  formatBytes(espacio_kb),
+          desglose: {
+            galeria_fotos:    { cantidad: Number(fotos_galeria),          kb: Number(fotos_galeria) * KB_GALERIA },
+            perfil_pacientes: { cantidad: Number(fotos_perfil_pacientes), kb: Number(fotos_perfil_pacientes) * KB_PERF_PAC },
+            perfil_usuarios:  { cantidad: Number(fotos_perfil_usuarios),  kb: Number(fotos_perfil_usuarios)  * KB_PERF_USR },
+            documentos:       { cantidad: Number(total_documentos),       kb: Number(total_documentos) * KB_DOC },
+          },
+        },
+        ultima_cita:  ultima_cita || null,
+        top_usuarios: top_usuarios || [],
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // GET /api/clinicas/:id
 router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {

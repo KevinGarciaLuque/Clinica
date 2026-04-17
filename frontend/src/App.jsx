@@ -23,9 +23,10 @@ import Horarios    from "./pages/admin/Horarios";
 import ConfigClinica from "./pages/admin/ConfigClinica";
 
 // Super Admin
-import Clinicas  from "./pages/superadmin/Clinicas";
-import Database  from "./pages/superadmin/Database";
-import Reportes  from "./pages/superadmin/Reportes";
+import Clinicas          from "./pages/superadmin/Clinicas";
+import Database          from "./pages/superadmin/Database";
+import Reportes          from "./pages/superadmin/Reportes";
+import SoporteHistorial  from "./pages/superadmin/SoporteHistorial";
 
 // Módulos de Cirugía Estética
 import GaleriaEstetica         from "./pages/estetica/GaleriaEstetica";
@@ -125,6 +126,11 @@ export default function App() {
         <Route path="/superadmin/reportes" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <Reportes />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/soporte" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <SoporteHistorial />
           </RolRoute>
         } />
 

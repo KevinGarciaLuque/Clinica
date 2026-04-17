@@ -2,6 +2,10 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
 import api from "../api/api";
+import ModalAyudaSoporte from "./ModalAyudaSoporte";
+import { playNotificationSound } from "../utils/notificationSound";
+
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const ROLE_COLOR = {
   SUPER_ADMIN:   "danger",
@@ -31,21 +35,86 @@ export default function NavbarApp({ onMenuClick }) {
 
   // ── Notificaciones de solicitudes de licencia (solo SUPER_ADMIN) ──
   const [solicitudes, setSolicitudes]     = useState([]);
+  const [reportes, setReportes]           = useState([]);
   const [showDropdown, setShowDropdown]   = useState(false);
   const dropdownRef                       = useRef(null);
   const [showUserMenu, setShowUserMenu]   = useState(false);
   const userMenuRef                       = useRef(null);
+  const [showAyuda, setShowAyuda]             = useState(false);
+  const [misRespuestas, setMisRespuestas]     = useState([]);
+  const [showRespuestasDD, setShowRespuestasDD] = useState(false);
+  const respuestasRef                         = useRef(null);
+
+  // ── Respuestas a reportes de soporte (usuarios regulares) ──
+  useEffect(() => {
+    if (user?.super) return;
+    // Carga inicial
+    api.get("/soporte/mis-respuestas")
+      .then(r => setMisRespuestas(r.data.data || []))
+      .catch(() => {});
+
+    // SSE — notificaciones en tiempo real
+    const token = localStorage.getItem("token");
+    const es = new EventSource(`${API_URL}/api/soporte/stream?auth_token=${token}`);
+    es.addEventListener("respuesta_reporte", (e) => {
+      const data = JSON.parse(e.data);
+      setMisRespuestas(prev => {
+        if (prev.find(r => r.id === data.id)) return prev;
+        playNotificationSound();
+        return [data, ...prev];
+      });
+    });
+    es.onerror = () => {}; // reconexión automática del navegador
+
+    // Fallback polling cada 60s (por si SSE falla)
+    const iv = setInterval(() => {
+      api.get("/soporte/mis-respuestas")
+        .then(r => setMisRespuestas(r.data.data || []))
+        .catch(() => {});
+    }, 60000);
+
+    return () => { es.close(); clearInterval(iv); };
+  }, [user]);
+
+  const marcarRespuestaLeida = async (id) => {
+    try {
+      await api.put(`/soporte/mis-respuestas/${id}/leer`);
+      setMisRespuestas(prev => prev.filter(r => r.id !== id));
+    } catch {}
+  };
 
   useEffect(() => {
     if (!user?.super) return;
-    const fetchSolicitudes = () => {
+    const fetchTodo = () => {
       api.get("/clinicas/solicitudes-licencia")
         .then(r => setSolicitudes(r.data.data || []))
         .catch(() => {});
+      api.get("/soporte/reportes")
+        .then(r => setReportes(r.data.data || []))
+        .catch(() => {});
     };
-    fetchSolicitudes();
-    const interval = setInterval(fetchSolicitudes, 30000); // polling cada 30s
-    return () => clearInterval(interval);
+    fetchTodo();
+
+    // SSE — notificaciones en tiempo real para SUPER_ADMIN
+    const token = localStorage.getItem("token");
+    const es = new EventSource(`${API_URL}/api/soporte/stream?auth_token=${token}`);
+    es.addEventListener("nuevo_reporte", () => {
+      // Recarga la lista completa al llegar un nuevo reporte
+      api.get("/soporte/reportes")
+        .then(r => {
+          setReportes(prev => {
+            const nuevos = r.data.data || [];
+            if (nuevos.length > prev.length) playNotificationSound();
+            return nuevos;
+          });
+        })
+        .catch(() => {});
+    });
+    es.onerror = () => {};
+
+    // Fallback polling cada 30s
+    const iv = setInterval(fetchTodo, 30000);
+    return () => { es.close(); clearInterval(iv); };
   }, [user]);
 
   // Cerrar dropdown al hacer click fuera
@@ -56,6 +125,9 @@ export default function NavbarApp({ onMenuClick }) {
       }
       if (userMenuRef.current && !userMenuRef.current.contains(e.target)) {
         setShowUserMenu(false);
+      }
+      if (respuestasRef.current && !respuestasRef.current.contains(e.target)) {
+        setShowRespuestasDD(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -68,6 +140,13 @@ export default function NavbarApp({ onMenuClick }) {
       setSolicitudes(prev => prev.filter(s => s.id !== solicitudId));
       navigate(`/superadmin/clinicas`);
       setShowDropdown(false);
+    } catch {}
+  };
+
+  const atenderReporte = async (reporteId) => {
+    try {
+      await api.put(`/soporte/reportes/${reporteId}/atender`);
+      setReportes(prev => prev.filter(r => r.id !== reporteId));
     } catch {}
   };
 
@@ -113,131 +192,285 @@ export default function NavbarApp({ onMenuClick }) {
       {/* Right side: user + logout */}
       <div className="d-flex align-items-center gap-2 gap-md-3">
 
-        {/* 🔔 Notificaciones solicitudes licencia — solo SUPER_ADMIN */}
+        {/* 🔔 Notificaciones — solo SUPER_ADMIN */}
         {user?.super && (
           <div ref={dropdownRef} style={{ position: "relative" }}>
-            <button
-              onClick={() => setShowDropdown(v => !v)}
-              title={solicitudes.length ? `${solicitudes.length} solicitud(es) pendiente(s)` : "Sin solicitudes"}
-              style={{
-                background: solicitudes.length ? "rgba(245,158,11,.15)" : "rgba(255,255,255,.07)",
-                border: `1px solid ${solicitudes.length ? "rgba(245,158,11,.4)" : "rgba(255,255,255,.12)"}`,
-                borderRadius: 10, width: 36, height: 36,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                cursor: "pointer", position: "relative", flexShrink: 0,
-              }}
-            >
-              <i
-                className={`bi ${solicitudes.length ? "bi-bell-fill" : "bi-bell"}`}
-                style={{ color: solicitudes.length ? "#f59e0b" : "rgba(255,255,255,.6)", fontSize: 15 }}
-              />
-              {solicitudes.length > 0 && (
-                <span style={{
-                  position: "absolute", top: -5, right: -5,
-                  background: "#ef4444", color: "#fff",
-                  fontSize: 10, fontWeight: 700, borderRadius: "50%",
-                  width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
-                  border: "2px solid #1a1a2e",
-                }}>
-                  {solicitudes.length > 9 ? "9+" : solicitudes.length}
-                </span>
-              )}
-            </button>
+            {/* Botón campana — total = licencias + reportes */}
+            {(() => {
+              const total = solicitudes.length + reportes.length;
+              return (
+                <button
+                  onClick={() => setShowDropdown(v => !v)}
+                  title={total ? `${total} notificación(es) pendiente(s)` : "Sin notificaciones"}
+                  style={{
+                    background: total ? "rgba(245,158,11,.15)" : "rgba(255,255,255,.07)",
+                    border: `1px solid ${total ? "rgba(245,158,11,.4)" : "rgba(255,255,255,.12)"}`,
+                    borderRadius: 10, width: 36, height: 36,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    cursor: "pointer", position: "relative", flexShrink: 0,
+                  }}
+                >
+                  <i
+                    className={`bi ${total ? "bi-bell-fill" : "bi-bell"}`}
+                    style={{ color: total ? "#f59e0b" : "rgba(255,255,255,.6)", fontSize: 15 }}
+                  />
+                  {total > 0 && (
+                    <span style={{
+                      position: "absolute", top: -5, right: -5,
+                      background: "#ef4444", color: "#fff",
+                      fontSize: 10, fontWeight: 700, borderRadius: "50%",
+                      width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                      border: "2px solid #1a1a2e",
+                    }}>
+                      {total > 9 ? "9+" : total}
+                    </span>
+                  )}
+                </button>
+              );
+            })()}
 
-            {/* Dropdown de solicitudes */}
+            {/* Dropdown */}
             {showDropdown && (
               <div style={{
                 position: "absolute", top: 44, right: 0, zIndex: 1200,
                 background: "#112240", border: "1px solid rgba(255,255,255,.1)",
-                borderRadius: 14, width: 320, boxShadow: "0 16px 48px rgba(0,0,0,.6)",
-                overflow: "hidden",
+                borderRadius: 14, width: 340, boxShadow: "0 16px 48px rgba(0,0,0,.6)",
+                overflow: "hidden", maxHeight: 520, display: "flex", flexDirection: "column",
               }}>
+                {/* Header */}
                 <div style={{
                   padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.07)",
                   display: "flex", alignItems: "center", justifyContent: "space-between",
+                  flexShrink: 0,
                 }}>
                   <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 13 }}>
                     <i className="bi bi-bell-fill me-2" style={{ color: "#f59e0b" }} />
-                    Solicitudes de Licencia
+                    Notificaciones
                   </span>
                   <span style={{
-                    background: solicitudes.length ? "rgba(245,158,11,.2)" : "rgba(255,255,255,.05)",
-                    color: solicitudes.length ? "#f59e0b" : "#94a3b8",
+                    background: (solicitudes.length + reportes.length) ? "rgba(245,158,11,.2)" : "rgba(255,255,255,.05)",
+                    color: (solicitudes.length + reportes.length) ? "#f59e0b" : "#94a3b8",
                     fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
                   }}>
-                    {solicitudes.length} pendiente{solicitudes.length !== 1 ? "s" : ""}
+                    {solicitudes.length + reportes.length} pendiente{(solicitudes.length + reportes.length) !== 1 ? "s" : ""}
                   </span>
                 </div>
 
-                {solicitudes.length === 0 ? (
-                  <div style={{ padding: "20px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                    <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
-                    Sin solicitudes pendientes
-                  </div>
-                ) : (
-                  <div style={{ maxHeight: 360, overflowY: "auto" }}>
-                    {solicitudes.map(s => {
-                      const PLAN_COLOR = { trial: "#f59e0b", semestral: "#2196f3", anual: "#10b981" };
-                      const color = PLAN_COLOR[s.plan_solicitado] || "#94a3b8";
-                      const fecha = new Date(s.creado_en).toLocaleDateString("es-PE", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
-                      return (
-                        <div key={s.id} style={{
-                          padding: "12px 16px",
-                          borderBottom: "1px solid rgba(255,255,255,.05)",
-                        }}>
-                          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                            <div style={{
-                              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                              background: `${color}20`, border: `1px solid ${color}50`,
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                            }}>
-                              <i className="bi bi-building" style={{ color, fontSize: 14 }} />
-                            </div>
-                            <div style={{ flex: 1, minWidth: 0 }}>
-                              <div style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0", marginBottom: 2 }}>
-                                {s.clinica_nombre}
+                <div style={{ overflowY: "auto", flex: 1 }}>
+
+                  {/* ── Sección: Solicitudes de licencia ── */}
+                  {solicitudes.length > 0 && (
+                    <>
+                      <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#f59e0b", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        <i className="bi bi-key-fill me-1" /> Licencias
+                      </div>
+                      {solicitudes.map(s => {
+                        const PLAN_COLOR = { trial: "#f59e0b", semestral: "#2196f3", anual: "#10b981" };
+                        const color = PLAN_COLOR[s.plan_solicitado] || "#94a3b8";
+                        const fecha = new Date(s.creado_en).toLocaleDateString("es-HN", { day: "2-digit", month: "short" });
+                        return (
+                          <div key={s.id} style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                background: `${color}20`, border: `1px solid ${color}50`,
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                <i className="bi bi-building" style={{ color, fontSize: 13 }} />
                               </div>
-                              <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
-                                Solicita plan{" "}
-                                <span style={{ color, fontWeight: 700 }}>
-                                  {s.plan_solicitado.charAt(0).toUpperCase() + s.plan_solicitado.slice(1)}
-                                </span>
-                                {" · "}{fecha}
-                              </div>
-                              {s.mensaje && (
-                                <div style={{
-                                  background: "rgba(255,255,255,.04)", borderRadius: 6,
-                                  padding: "5px 8px", fontSize: 11, color: "#94a3b8",
-                                  fontStyle: "italic", marginBottom: 6,
-                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                                }}>
-                                  "{s.mensaje}"
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>{s.clinica_nombre}</div>
+                                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                                  Plan <span style={{ color, fontWeight: 700 }}>{s.plan_solicitado}</span> · {fecha}
                                 </div>
-                              )}
-                              <button
-                                onClick={() => atenderSolicitud(s.id, s.clinica_id)}
-                                style={{
-                                  background: `${color}20`, border: `1px solid ${color}50`,
-                                  borderRadius: 7, padding: "4px 10px",
-                                  color, fontSize: 11, fontWeight: 700, cursor: "pointer",
-                                }}
-                              >
-                                <i className="bi bi-key-fill me-1" />
-                                Gestionar licencia
-                              </button>
+                                <button onClick={() => atenderSolicitud(s.id, s.clinica_id)} style={{
+                                  marginTop: 5, background: `${color}20`, border: `1px solid ${color}50`,
+                                  borderRadius: 6, padding: "3px 9px", color, fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                }}>
+                                  <i className="bi bi-key-fill me-1" />Gestionar
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* ── Sección: Reportes de soporte ── */}
+                  {reportes.length > 0 && (
+                    <>
+                      <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#f87171", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        <i className="bi bi-bug-fill me-1" /> Problemas reportados
+                      </div>
+                      {reportes.map(r => {
+                        const fecha = new Date(r.creado_en).toLocaleDateString("es-HN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" });
+                        return (
+                          <div key={r.id} style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                background: "rgba(239,68,68,.15)", border: "1px solid rgba(239,68,68,.3)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                <i className="bi bi-bug-fill" style={{ color: "#f87171", fontSize: 13 }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                  {r.asunto}
+                                </div>
+                                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                                  {r.usuario_nombre}{r.clinica_nombre ? ` · ${r.clinica_nombre}` : ""} · {fecha}
+                                </div>
+                                <div style={{
+                                  marginTop: 4, fontSize: 11, color: "rgba(255,255,255,.35)",
+                                  overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                                }}>
+                                  {r.descripcion}
+                                </div>
+                                <button onClick={() => atenderReporte(r.id)} style={{
+                                  marginTop: 5, background: "rgba(239,68,68,.15)", border: "1px solid rgba(239,68,68,.3)",
+                                  borderRadius: 6, padding: "3px 9px", color: "#f87171", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                }}>
+                                  <i className="bi bi-check-lg me-1" />Marcar atendido
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* Sin notificaciones */}
+                  {solicitudes.length === 0 && reportes.length === 0 && (
+                    <div style={{ padding: "24px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                      <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
+                      Sin notificaciones pendientes
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer: ver historial completo */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", padding: "10px 14px", flexShrink: 0 }}>
+                  <button
+                    onClick={() => { navigate("/superadmin/soporte"); setShowDropdown(false); }}
+                    style={{
+                      width: "100%", padding: "8px 12px",
+                      background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.25)",
+                      borderRadius: 8, color: "#f87171", fontSize: "0.78rem", fontWeight: 700,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <i className="bi bi-bug-fill" style={{ fontSize: 12 }} />
+                    Ver historial completo de reportes
+                    <i className="bi bi-arrow-right" style={{ fontSize: 11, marginLeft: "auto" }} />
+                  </button>
+                </div>
               </div>
             )}
           </div>
         )}
 
 
+
+        {/* 🔔 Campana respuestas — solo usuarios regulares */}
+        {!user?.super && (
+          <div ref={respuestasRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowRespuestasDD(v => !v)}
+              title={misRespuestas.length ? `${misRespuestas.length} respuesta(s) a tus reportes` : "Sin notificaciones"}
+              style={{
+                background: misRespuestas.length ? "rgba(16,185,129,.15)" : "rgba(255,255,255,.07)",
+                border: `1px solid ${misRespuestas.length ? "rgba(16,185,129,.4)" : "rgba(255,255,255,.12)"}`,
+                borderRadius: 10, width: 36, height: 36,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", position: "relative", flexShrink: 0,
+              }}
+            >
+              <i
+                className={`bi ${misRespuestas.length ? "bi-bell-fill" : "bi-bell"}`}
+                style={{ color: misRespuestas.length ? "#10b981" : "rgba(255,255,255,.6)", fontSize: 15 }}
+              />
+              {misRespuestas.length > 0 && (
+                <span style={{
+                  position: "absolute", top: -5, right: -5,
+                  background: "#10b981", color: "#fff",
+                  fontSize: 10, fontWeight: 700, borderRadius: "50%",
+                  width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "2px solid #1a1a2e",
+                }}>
+                  {misRespuestas.length > 9 ? "9+" : misRespuestas.length}
+                </span>
+              )}
+            </button>
+
+            {showRespuestasDD && (
+              <div style={{
+                position: "absolute", top: 44, right: 0, zIndex: 1200,
+                background: "#112240", border: "1px solid rgba(255,255,255,.1)",
+                borderRadius: 14, width: 320, boxShadow: "0 16px 48px rgba(0,0,0,.6)",
+                overflow: "hidden",
+              }}>
+                {/* Header */}
+                <div style={{
+                  padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.07)",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 13 }}>
+                    <i className="bi bi-bell-fill me-2" style={{ color: "#10b981" }} />
+                    Respuestas a tus reportes
+                  </span>
+                  <span style={{
+                    background: "rgba(16,185,129,.2)", color: "#10b981",
+                    fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
+                  }}>
+                    {misRespuestas.length} nueva{misRespuestas.length !== 1 ? "s" : ""}
+                  </span>
+                </div>
+
+                {misRespuestas.length === 0 ? (
+                  <div style={{ padding: "28px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
+                    <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
+                    Sin notificaciones pendientes
+                  </div>
+                ) : (
+                  misRespuestas.map(r => (
+                    <div key={r.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                        <div style={{
+                          width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                          background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          <i className="bi bi-reply-fill" style={{ color: "#10b981", fontSize: 14 }} />
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {r.asunto}
+                          </div>
+                          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", lineHeight: 1.5, marginBottom: 7 }}>
+                            {r.respuesta}
+                          </div>
+                          <button
+                            onClick={() => { marcarRespuestaLeida(r.id); if (misRespuestas.length <= 1) setShowRespuestasDD(false); }}
+                            style={{
+                              background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
+                              borderRadius: 6, padding: "4px 10px", color: "#10b981",
+                              fontSize: 10, fontWeight: 700, cursor: "pointer",
+                            }}
+                          >
+                            <i className="bi bi-check-lg me-1" />Entendido
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {/* User menu dropdown */}
         <div ref={userMenuRef} style={{ position: "relative" }}>
@@ -253,18 +486,20 @@ export default function NavbarApp({ onMenuClick }) {
             onMouseEnter={e => { if (!showUserMenu) e.currentTarget.style.background = "rgba(255,255,255,.1)"; }}
             onMouseLeave={e => { if (!showUserMenu) e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
           >
-            <div style={{
-              width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-              background: esAlerta && planBadge
-                ? `linear-gradient(135deg, ${planBadge.color}, ${planBadge.color}bb)`
-                : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              overflow: "hidden", border: "2px solid rgba(255,255,255,.2)",
-            }}>
-              {user?.foto_url
-                ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                : <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.72rem" }}>{initials}</span>
-              }
+            <div style={{ position: "relative", flexShrink: 0 }}>
+              <div style={{
+                width: 30, height: 30, borderRadius: "50%",
+                background: esAlerta && planBadge
+                  ? `linear-gradient(135deg, ${planBadge.color}, ${planBadge.color}bb)`
+                  : "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden", border: "2px solid rgba(255,255,255,.2)",
+              }}>
+                {user?.foto_url
+                  ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.72rem" }}>{initials}</span>
+                }
+              </div>
             </div>
             <div className="d-none d-md-block" style={{ lineHeight: 1.25, textAlign: "left" }}>
               <div style={{ color: "#f1f5f9", fontWeight: 600, fontSize: "0.8rem", whiteSpace: "nowrap" }}>
@@ -332,6 +567,7 @@ export default function NavbarApp({ onMenuClick }) {
               </div>
 
               {/* Opciones */}
+
               {/* Mi Perfil */}
               <button
                 onClick={() => { navigate("/perfil"); setShowUserMenu(false); }}
@@ -380,26 +616,21 @@ export default function NavbarApp({ onMenuClick }) {
                 </div>
               )}
 
-              {/* Cambiar contraseña y Ayuda */}
-              {[
-                { icon: "bi-shield-lock",    label: "Cambiar contraseña",  action: () => { navigate("/cambiar-password"); setShowUserMenu(false); } },
-                { icon: "bi-headset",        label: "Ayuda y soporte",     action: () => setShowUserMenu(false) },
-              ].map(({ icon, label, action }) => (
-                <button
-                  key={label} onClick={action}
-                  style={{
-                    width: "100%", display: "flex", alignItems: "center", gap: 10,
-                    padding: "11px 16px", background: "transparent",
-                    border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: "0.84rem",
-                    textAlign: "left",
-                  }}
-                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <i className={`bi ${icon}`} style={{ fontSize: 15, color: "#64748b", width: 18, textAlign: "center" }} />
-                  {label}
-                </button>
-              ))}
+              {/* Ayuda y Soporte */}
+              <button
+                onClick={() => { setShowUserMenu(false); setShowAyuda(true); }}
+                style={{
+                  width: "100%", display: "flex", alignItems: "center", gap: 10,
+                  padding: "11px 16px", background: "transparent",
+                  border: "none", cursor: "pointer", color: "#cbd5e1", fontSize: "0.84rem",
+                  textAlign: "left",
+                }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              >
+                <i className="bi bi-headset" style={{ fontSize: 15, color: "#64748b", width: 18, textAlign: "center" }} />
+                Ayuda y soporte
+              </button>
 
               <div style={{ height: 1, background: "rgba(255,255,255,.07)", margin: "4px 16px" }} />
 
@@ -422,6 +653,8 @@ export default function NavbarApp({ onMenuClick }) {
         </div>
       </div>
     </nav>
+
+    <ModalAyudaSoporte open={showAyuda} onClose={() => setShowAyuda(false)} />
     </>
   );
 }
