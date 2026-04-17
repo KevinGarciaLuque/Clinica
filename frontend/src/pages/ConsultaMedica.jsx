@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const VITALS_FIELDS = [
@@ -63,17 +64,27 @@ export default function Consulta() {
           setPaciente({ id: h.paciente_id, nombres: h.pac_nombres, apellidos: h.pac_apellidos, fecha_nacimiento: h.fecha_nacimiento });
           const obj = typeof h.objetivo === "string" ? JSON.parse(h.objetivo || "{}") : (h.objetivo || {});
           setVitals(obj);
-          setSoap({
+          const secDx = typeof h.diagnosticos_secundarios === "string"
+            ? JSON.parse(h.diagnosticos_secundarios || "[]")
+            : (h.diagnosticos_secundarios || []);
+          setSoap(s => ({
+            ...s,
             subjetivo: h.subjetivo || "",
             objetivo:  obj,
             examen_fisico: h.examen_fisico || "",
             plan:       h.plan || "",
             diagnostico_cie:  h.diagnostico_cie || "",
             diagnostico_desc: "",
-            diagnosticos_secundarios: typeof h.diagnosticos_secundarios === "string"
-              ? JSON.parse(h.diagnosticos_secundarios || "[]")
-              : (h.diagnosticos_secundarios || []),
-          });
+            diagnosticos_secundarios: secDx,
+          }));
+          // recuperar la descripción del código CIE-10 guardado
+          if (h.diagnostico_cie) {
+            api.get("/historias/cie10/buscar", { params: { q: h.diagnostico_cie } })
+              .then(r => {
+                const found = r.data.data?.find(x => x.codigo === h.diagnostico_cie);
+                if (found) setSoap(s => ({ ...s, diagnostico_desc: found.descripcion }));
+              }).catch(() => {});
+          }
         })
         .catch(() => setAlertMsg({ type: "danger", msg: "No se pudo cargar la historia" }));
     }
@@ -225,6 +236,8 @@ export default function Consulta() {
           pacienteId={paciente?.id || pacId}
           citaId={citaId}
           firmada={firmada}
+          diagnosticoCie={soap.diagnostico_cie}
+          diagnosticoDesc={soap.diagnostico_desc}
         />
       )}
 
@@ -262,13 +275,192 @@ export default function Consulta() {
 }
 
 // ══════════════════════════════════════════════════════════════════════
+// Textarea con predicción de texto IA por especialidad
+// ══════════════════════════════════════════════════════════════════════
+function SoapTextareaIA({ label, sublabel, value, onChange, readOnly, rows = 3, placeholder, campo, especialidad, diagnosticoCie, diagnosticoDesc }) {
+  const [sugerencia, setSugerencia] = useState("");
+  const [cargando,   setCargando]   = useState(false);
+  const taRef = useRef(null);
+
+  // Limpiar sugerencia al cambiar diagnóstico o campo
+  useEffect(() => { setSugerencia(""); }, [diagnosticoCie, campo]);
+
+  useEffect(() => {
+    if (!value || value.trim().length < 10 || readOnly) { setSugerencia(""); return; }
+    setCargando(true);
+    setSugerencia("");
+    const t = setTimeout(() => {
+      api.post("/ia/soap-sugerencia", {
+        campo,
+        texto:           value,
+        especialidad:    especialidad || "Medicina General",
+        diagnostico_cie: diagnosticoCie || "",
+        diagnostico_desc: diagnosticoDesc || "",
+      })
+        .then(r => { if (r.data.sugerencia) setSugerencia(r.data.sugerencia); })
+        .catch(() => {})
+        .finally(() => setCargando(false));
+    }, 750);
+    return () => { clearTimeout(t); setCargando(false); };
+  }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const aceptar = () => {
+    const sep = value.trimEnd().endsWith(".") || value.trimEnd().endsWith(",") ? " " : " ";
+    onChange({ target: { value: value.trimEnd() + sep + sugerencia } });
+    setSugerencia("");
+    taRef.current?.focus();
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Tab" && sugerencia) { e.preventDefault(); aceptar(); }
+    if (e.key === "Escape")             { setSugerencia(""); }
+  };
+
+  return (
+    <div>
+      {label && (
+        <label className="form-label fw-semibold">
+          {label} {sublabel && <small className="text-muted fw-normal">{sublabel}</small>}
+        </label>
+      )}
+      <textarea
+        ref={taRef}
+        className="form-control"
+        rows={rows}
+        value={value}
+        onChange={onChange}
+        readOnly={readOnly}
+        placeholder={placeholder}
+        onKeyDown={handleKeyDown}
+      />
+      {/* Indicador de carga */}
+      {cargando && !readOnly && (
+        <div className="d-flex align-items-center gap-1 mt-1" style={{ minHeight: 20 }}>
+          <span className="spinner-border spinner-border-sm text-info"
+            style={{ width: "0.55rem", height: "0.55rem", borderWidth: "0.1em" }}></span>
+          <span className="text-muted" style={{ fontSize: "0.68rem" }}>IA pensando…</span>
+        </div>
+      )}
+      {/* Sugerencia */}
+      {sugerencia && !cargando && !readOnly && (
+        <div className="d-flex align-items-start gap-2 mt-1 px-2 py-1 rounded"
+          style={{ background: "rgba(13,110,253,0.05)", border: "1px dashed #93c5fd" }}>
+          <i className="bi bi-stars text-primary" style={{ fontSize: "0.75rem", marginTop: 2 }}></i>
+          <span className="flex-grow-1 text-secondary" style={{ fontSize: "0.8rem", lineHeight: 1.45 }}>
+            {sugerencia}
+          </span>
+          <button type="button"
+            className="btn btn-sm py-0 px-2 text-nowrap"
+            style={{ fontSize: "0.68rem", background: "#dbeafe", border: "none", color: "#1d4ed8" }}
+            onClick={aceptar}
+            title="Tab para aceptar">
+            Tab ↵
+          </button>
+          <button type="button"
+            className="btn btn-link btn-sm p-0 text-muted lh-1"
+            style={{ fontSize: "0.75rem" }}
+            onClick={() => setSugerencia("")}
+            title="Descartar sugerencia">
+            ✕
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Componente reutilizable: buscador CIE-10 con chip al seleccionar
+// ══════════════════════════════════════════════════════════════════════
+function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "Buscar código o descripción…" }) {
+  const [q, setQ]       = useState("");
+  const [list, setList] = useState([]);
+  const ref             = useRef(null);
+
+  // cerrar dropdown al clic fuera
+  useEffect(() => {
+    const fn = (e) => { if (ref.current && !ref.current.contains(e.target)) setList([]); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
+
+  useEffect(() => {
+    if (!q || q.length < 2) { setList([]); return; }
+    const t = setTimeout(() => {
+      api.get("/historias/cie10/buscar", { params: { q } })
+        .then(r => setList(r.data.data || []))
+        .catch(() => setList([]));
+    }, 300);
+    return () => clearTimeout(t);
+  }, [q]);
+
+  const sel = (item) => {
+    onChange(item.codigo, item.descripcion);
+    setQ("");
+    setList([]);
+  };
+
+  // Chip cuando ya hay un diagnóstico seleccionado
+  if (value) {
+    return (
+      <div className="d-flex align-items-center gap-2 px-2 py-2 rounded border"
+        style={{ background: "rgba(25,135,84,0.07)", minHeight: 36 }}>
+        <span className="badge bg-success" style={{ fontFamily: "monospace", fontSize: "0.78rem", letterSpacing: "0.04em" }}>
+          {value}
+        </span>
+        <span className="flex-grow-1 small fw-semibold text-success">{desc || "…"}</span>
+        {!readOnly && (
+          <button type="button" className="btn btn-link btn-sm p-0 text-danger lh-1" title="Cambiar diagnóstico"
+            onClick={onClear}>
+            <i className="bi bi-x-circle-fill"></i>
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  // Campo de búsqueda cuando no hay nada seleccionado
+  return (
+    <div className="position-relative" ref={ref}>
+      <div className="input-group input-group-sm">
+        <span className="input-group-text text-muted border-end-0 bg-white">
+          <i className="bi bi-search" style={{ fontSize: "0.75rem" }}></i>
+        </span>
+        <input className="form-control border-start-0" placeholder={placeholder}
+          value={q} onChange={e => setQ(e.target.value)}
+          autoComplete="off" />
+      </div>
+      {list.length > 0 && (
+        <ul className="list-group position-absolute z-3 shadow"
+          style={{ top: "100%", left: 0, right: 0, maxHeight: 230, overflowY: "auto" }}>
+          {list.map(c => (
+            <li key={c.codigo} className="list-group-item list-group-item-action py-1 px-2"
+              style={{ cursor: "pointer", fontSize: "0.81rem" }}
+              onMouseDown={() => sel(c)}>
+              <span className="me-2 fw-bold" style={{ fontFamily: "monospace", color: "#0d6efd" }}>{c.codigo}</span>
+              <span>{c.descripcion}</span>
+              {c.categoria && (
+                <span className="badge ms-2 text-bg-light border" style={{ fontSize: "0.66rem" }}>
+                  {c.categoria}
+                </span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
 // TAB: SOAP
 // ══════════════════════════════════════════════════════════════════════
 function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
-  const [cie10List, setCie10List] = useState([]);
+  const { user } = useAuth();
+  const especialidad = user?.especialidad || "Medicina General";
   const cie10Ref = useRef(null);
 
-  // ── Catálogo de diagnósticos ──
+  // ── Catálogo de diagnósticos frecuentes ──
   const [catDxQuery, setCatDxQuery] = useState("");
   const [catDxList, setCatDxList]   = useState([]);
   const [showCatDx, setShowCatDx]   = useState(false);
@@ -303,23 +495,6 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
 
   const set = (field) => (e) =>
     setSoap(s => ({ ...s, [field]: e.target.value }));
-
-  // búsqueda CIE-10
-  useEffect(() => {
-    const q = soap.diagnostico_cie;
-    if (!q || q.length < 2) { setCie10List([]); return; }
-    const t = setTimeout(() => {
-      api.get("/historias/cie10/buscar", { params: { q } })
-        .then(r => setCie10List(r.data.data || []))
-        .catch(() => setCie10List([]));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [soap.diagnostico_cie]);
-
-  const selCie = (item) => {
-    setSoap(s => ({ ...s, diagnostico_cie: item.codigo, diagnostico_desc: item.descripcion }));
-    setCie10List([]);
-  };
 
   const addDxSec = () => {
     setSoap(s => ({
@@ -364,12 +539,19 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       <div className="col-md-6">
         <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
-            <label className="form-label fw-semibold">
-              S — Subjetivo <small className="text-muted fw-normal">(Síntomas referidos por el paciente)</small>
-            </label>
-            <textarea className="form-control" rows={3} value={soap.subjetivo}
-              onChange={set("subjetivo")} readOnly={firmada}
-              placeholder="Motivo de consulta, síntomas, evolución…" />
+            <SoapTextareaIA
+              label="S — Subjetivo"
+              sublabel="(Síntomas referidos por el paciente)"
+              campo="subjetivo"
+              rows={3}
+              value={soap.subjetivo}
+              onChange={e => setSoap(s => ({ ...s, subjetivo: e.target.value }))}
+              readOnly={firmada}
+              placeholder="Motivo de consulta, síntomas, evolución…"
+              especialidad={especialidad}
+              diagnosticoCie={soap.diagnostico_cie}
+              diagnosticoDesc={soap.diagnostico_desc}
+            />
           </div>
         </div>
       </div>
@@ -378,12 +560,19 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       <div className="col-md-6">
         <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
-            <label className="form-label fw-semibold">
-              O — Objetivo <small className="text-muted fw-normal">(Hallazgos al examen físico)</small>
-            </label>
-            <textarea className="form-control" rows={3} value={soap.examen_fisico}
-              onChange={set("examen_fisico")} readOnly={firmada}
-              placeholder="Examen físico, hallazgos relevantes…" />
+            <SoapTextareaIA
+              label="O — Objetivo"
+              sublabel="(Hallazgos al examen físico)"
+              campo="objetivo"
+              rows={3}
+              value={soap.examen_fisico}
+              onChange={e => setSoap(s => ({ ...s, examen_fisico: e.target.value }))}
+              readOnly={firmada}
+              placeholder="Examen físico, hallazgos relevantes…"
+              especialidad={especialidad}
+              diagnosticoCie={soap.diagnostico_cie}
+              diagnosticoDesc={soap.diagnostico_desc}
+            />
           </div>
         </div>
       </div>
@@ -396,14 +585,14 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
               A — Diagnóstico <small className="text-muted fw-normal">(CIE-10)</small>
             </label>
 
-            {/* Selector de catálogo de diagnósticos */}
+            {/* Catálogo de diagnósticos frecuentes del médico */}
             {!firmada && (
               <div className="position-relative mb-2">
                 <div className="input-group input-group-sm">
-                  <span className="input-group-text bg-info bg-opacity-10 text-info border-0">
-                    <i className="bi bi-journal-bookmark-fill"></i>
+                  <span className="input-group-text bg-warning bg-opacity-10 text-warning border-end-0">
+                    <i className="bi bi-lightning-fill"></i>
                   </span>
-                  <input className="form-control" placeholder="Buscar en catálogo de diagnósticos…"
+                  <input className="form-control border-start-0" placeholder="Mis diagnósticos frecuentes…"
                     value={catDxQuery}
                     onChange={e => setCatDxQuery(e.target.value)}
                     onFocus={() => catDxList.length > 0 && setShowCatDx(true)} />
@@ -412,11 +601,13 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
                   <ul className="list-group position-absolute z-3 shadow"
                     style={{ top: "100%", left: 0, right: 0, maxHeight: 180, overflowY: "auto" }}>
                     {catDxList.map(c => (
-                      <li key={c.id} className="list-group-item list-group-item-action py-1"
+                      <li key={c.id} className="list-group-item list-group-item-action py-1 px-2"
                         style={{ cursor: "pointer", fontSize: "0.82rem" }}
-                        onClick={() => selCatDx(c)}>
+                        onMouseDown={() => selCatDx(c)}>
                         <i className="bi bi-lightning-fill text-warning me-1"></i>
-                        <strong>{c.nombre}</strong> — <span className="text-muted">{c.codigo_cie}</span> {c.descripcion_cie}
+                        <strong>{c.nombre}</strong>
+                        {c.codigo_cie && <span className="ms-1 badge text-bg-light border" style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>{c.codigo_cie}</span>}
+                        {c.descripcion_cie && <span className="text-muted ms-1">{c.descripcion_cie}</span>}
                       </li>
                     ))}
                   </ul>
@@ -424,45 +615,53 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
               </div>
             )}
 
-            <div className="position-relative" ref={cie10Ref}>
-              <div className="input-group input-group-sm">
-                <input className="form-control" placeholder="Buscar por código o descripción…"
-                  value={soap.diagnostico_cie} readOnly={firmada}
-                  onChange={set("diagnostico_cie")} />
-                {soap.diagnostico_desc && (
-                  <span className="input-group-text text-success">{soap.diagnostico_desc}</span>
-                )}
-              </div>
-              {cie10List.length > 0 && (
-                <ul className="list-group position-absolute z-3"
-                  style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto" }}>
-                  {cie10List.map(c => (
-                    <li key={c.codigo} className="list-group-item list-group-item-action py-1"
-                      style={{ cursor: "pointer", fontSize: "0.82rem" }}
-                      onClick={() => selCie(c)}>
-                      <strong>{c.codigo}</strong> — {c.descripcion}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
+            {/* Diagnóstico principal — chip cuando está seleccionado, buscador cuando no */}
+            <CieBuscador
+              value={soap.diagnostico_cie}
+              desc={soap.diagnostico_desc}
+              readOnly={firmada}
+              onChange={(code, desc) => setSoap(s => ({ ...s, diagnostico_cie: code, diagnostico_desc: desc }))}
+              onClear={() => setSoap(s => ({ ...s, diagnostico_cie: "", diagnostico_desc: "" }))}
+            />
 
             {/* Diagnósticos secundarios */}
+            {soap.diagnosticos_secundarios.length > 0 && (
+              <p className="text-muted small mb-1 mt-3" style={{ fontSize: "0.75rem", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Secundarios
+              </p>
+            )}
             {soap.diagnosticos_secundarios.map((dx, i) => (
-              <div key={i} className="d-flex gap-2 mt-2">
-                <input className="form-control form-control-sm" placeholder="Código CIE" style={{ maxWidth: 90 }}
-                  value={dx.cie} readOnly={firmada}
-                  onChange={e => setSoap(s => ({ ...s, diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) => j === i ? { ...d, cie: e.target.value } : d) }))} />
-                <input className="form-control form-control-sm" placeholder="Descripción"
-                  value={dx.descripcion} readOnly={firmada}
-                  onChange={e => setSoap(s => ({ ...s, diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) => j === i ? { ...d, descripcion: e.target.value } : d) }))} />
+              <div key={i} className="d-flex gap-2 align-items-center mt-1">
+                <div className="flex-grow-1">
+                  <CieBuscador
+                    value={dx.cie}
+                    desc={dx.descripcion}
+                    readOnly={firmada}
+                    placeholder={`Secundario ${i + 1}…`}
+                    onChange={(code, desc) => setSoap(s => ({
+                      ...s,
+                      diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) =>
+                        j === i ? { cie: code, descripcion: desc } : d
+                      ),
+                    }))}
+                    onClear={() => setSoap(s => ({
+                      ...s,
+                      diagnosticos_secundarios: s.diagnosticos_secundarios.map((d, j) =>
+                        j === i ? { cie: "", descripcion: "" } : d
+                      ),
+                    }))}
+                  />
+                </div>
                 {!firmada && (
-                  <button className="btn btn-outline-danger btn-sm" onClick={() => remDxSec(i)}>✕</button>
+                  <button className="btn btn-outline-danger btn-sm" style={{ flexShrink: 0 }}
+                    onClick={() => remDxSec(i)}>✕</button>
                 )}
               </div>
             ))}
             {!firmada && (
-              <button className="btn btn-link btn-sm mt-1 p-0" onClick={addDxSec}>+ Diagnóstico secundario</button>
+              <button className="btn btn-link btn-sm mt-2 p-0 text-decoration-none" onClick={addDxSec}>
+                <i className="bi bi-plus-circle me-1"></i>+ Diagnóstico secundario
+              </button>
             )}
           </div>
         </div>
@@ -472,12 +671,19 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
       <div className="col-md-6">
         <div className="card border-0 shadow-sm h-100">
           <div className="card-body">
-            <label className="form-label fw-semibold">
-              P — Plan <small className="text-muted fw-normal">(Tratamiento, indicaciones, seguimiento)</small>
-            </label>
-            <textarea className="form-control" rows={4} value={soap.plan}
-              onChange={set("plan")} readOnly={firmada}
-              placeholder="Tratamiento indicado, próxima cita, derivaciones…" />
+            <SoapTextareaIA
+              label="P — Plan"
+              sublabel="(Tratamiento, indicaciones, seguimiento)"
+              campo="plan"
+              rows={4}
+              value={soap.plan}
+              onChange={e => setSoap(s => ({ ...s, plan: e.target.value }))}
+              readOnly={firmada}
+              placeholder="Tratamiento indicado, próxima cita, derivaciones…"
+              especialidad={especialidad}
+              diagnosticoCie={soap.diagnostico_cie}
+              diagnosticoDesc={soap.diagnostico_desc}
+            />
           </div>
         </div>
       </div>
@@ -486,18 +692,76 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-// TAB: Prescripción
+// TAB: Prescripción (con sub-tabs)
 // ══════════════════════════════════════════════════════════════════════
-function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
+function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoCie, diagnosticoDesc }) {
+  const [subTab, setSubTab] = useState("receta");
+
+  return (
+    <div>
+      {/* Sub-tabs */}
+      <ul className="nav nav-pills nav-fill mb-3" style={{ background: "#f8f9fa", borderRadius: 8, padding: "4px" }}>
+        {[
+          { id: "receta",     icon: "bi-prescription2",         label: "Nueva Receta" },
+          { id: "historial",  icon: "bi-clock-history",         label: "Historial" },
+          { id: "sugeridas",  icon: "bi-stars",                  label: "Sugeridas por CIE-10" },
+          { id: "favoritas",  icon: "bi-bookmark-heart-fill",    label: "Mis Favoritas" },
+        ].map(t => (
+          <li key={t.id} className="nav-item">
+            <button
+              className={`nav-link py-1 px-2 ${subTab === t.id ? "active" : "text-muted"}`}
+              style={{ fontSize: "0.82rem" }}
+              onClick={() => setSubTab(t.id)}
+            >
+              <i className={`bi ${t.icon} me-1`}></i>{t.label}
+            </button>
+          </li>
+        ))}
+      </ul>
+
+      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} />}
+      {subTab === "historial" && <SubHistorialPaciente pacienteId={pacienteId} />}
+      {subTab === "sugeridas" && <SubSugeridadCie diagnosticoCie={diagnosticoCie} diagnosticoDesc={diagnosticoDesc} onAgregar={(items) => setSubTab("receta")} />}
+      {subTab === "favoritas" && <SubFavoritas firmada={firmada} />}
+    </div>
+  );
+}
+
+// ── Sub-tab: Receta de esta consulta ──────────────────────────────────────────
+function SubRecetaActual({ historiaId, pacienteId, citaId, firmada }) {
   const [list,      setList]      = useState([]);
   const [showForm,  setShowForm]  = useState(false);
-  const [items,     setItems]     = useState([newItem()]);
+  const [items,     setItems]     = useState([newRxItem()]);
   const [notas,     setNotas]     = useState("");
   const [saving,    setSaving]    = useState(false);
+  const [savingFav, setSavingFav] = useState(false);
   const [alertMsg,  setAlertMsg]  = useState(null);
   const [medSearch, setMedSearch] = useState([]);
+  const [showSaveFav, setShowSaveFav] = useState(false);
+  const [favNombre, setFavNombre] = useState("");
+  const [medFavSet, setMedFavSet] = useState(new Set());
+  const [medFavList, setMedFavList] = useState([]); // top favoritos para mostrar sin escribir
 
-  // Abre la receta en PDF en nueva pestaña
+  function newRxItem() {
+    return { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" };
+  }
+
+  // Cargar favoritos del médico al montar
+  useEffect(() => {
+    api.get("/medicamentos/favoritos")
+      .then(r => {
+        const ids = r.data.data || [];
+        setMedFavSet(new Set(ids));
+        if (ids.length > 0) {
+          // Buscar datos completos de los primeros 8 favoritos
+          api.get("/medicamentos", { params: { q: "" } })
+            .then(r2 => setMedFavList((r2.data.data || []).filter(m => ids.includes(m.id)).slice(0, 8)))
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []);
+
   const printRx = async (id) => {
     try {
       const res = await api.get(`/prescripciones/${id}/pdf`, { responseType: "blob" });
@@ -508,10 +772,6 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
     }
   };
 
-  function newItem() {
-    return { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" };
-  }
-
   useEffect(() => {
     if (!historiaId && !pacienteId) return;
     const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
@@ -521,25 +781,30 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
   }, [historiaId, pacienteId]);
 
   const searchMed = (q, idx) => {
-    if (q.length < 2) { setMedSearch([]); return; }
+    if (q.length < 2) {
+      // Mostrar favoritos cuando el campo está vacío o con 1 caracter
+      if (medFavList.length > 0) {
+        setMedSearch({ idx, list: medFavList, soloFavoritos: true });
+      } else {
+        setMedSearch([]);
+      }
+      return;
+    }
     api.get("/medicamentos", { params: { q } })
       .then(r => setMedSearch({ idx, list: r.data.data || [] }))
       .catch(() => {});
   };
 
   const selMed = (med, idx) => {
-    setItems(prev => prev.map((it, i) => i === idx
-      ? {
-          ...it,
-          medicamento_id: med.id,
-          medicamento_texto: med.nombre_generico + (med.presentacion ? ` (${med.presentacion})` : ""),
-          dosis: med.dosis_default || it.dosis,
-          duracion: med.duracion_default || it.duracion,
-          cantidad: med.cantidad_default || it.cantidad,
-          instrucciones: med.instrucciones_default || it.instrucciones,
-        }
-      : it
-    ));
+    setItems(prev => prev.map((it, i) => i === idx ? {
+      ...it,
+      medicamento_id: med.id,
+      medicamento_texto: med.nombre_generico + (med.presentacion ? ` (${med.presentacion})` : ""),
+      dosis: med.dosis_default || it.dosis,
+      duracion: med.duracion_default || it.duracion,
+      cantidad: med.cantidad_default || it.cantidad,
+      instrucciones: med.instrucciones_default || it.instrucciones,
+    } : it));
     setMedSearch([]);
   };
 
@@ -552,7 +817,7 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
     try {
       await api.post("/prescripciones", {
         historia_id: historiaId || null,
-        cita_id:     citaId || null,
+        cita_id: citaId || null,
         paciente_id: pacienteId,
         notas,
         items: items.filter(it => it.medicamento_texto || it.medicamento_id),
@@ -561,13 +826,32 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
       const r = await api.get("/prescripciones", { params });
       setList(r.data.data || []);
       setShowForm(false);
-      setItems([newItem()]);
+      setItems([newRxItem()]);
       setNotas("");
       setAlertMsg({ type: "success", msg: "Receta creada" });
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error" });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleSaveFavorita = async () => {
+    if (!favNombre.trim()) return;
+    setSavingFav(true);
+    try {
+      await api.post("/prescripciones/favoritas", {
+        nombre: favNombre.trim(),
+        notas,
+        items: items.filter(it => it.medicamento_texto || it.medicamento_id),
+      });
+      setShowSaveFav(false);
+      setFavNombre("");
+      setAlertMsg({ type: "success", msg: "Guardada en Mis Favoritas ⭐" });
+    } catch (e) {
+      setAlertMsg({ type: "danger", msg: "No se pudo guardar como favorita" });
+    } finally {
+      setSavingFav(false);
     }
   };
 
@@ -586,7 +870,6 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
         )}
       </div>
 
-      {/* Lista existente */}
       {list.length === 0 && !showForm && <p className="text-muted">Sin recetas aún.</p>}
       {list.map(p => (
         <div key={p.id} className="card border-0 shadow-sm mb-2">
@@ -604,8 +887,7 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
                   Marcar entregada
                 </button>
               )}
-              <button className="btn btn-outline-primary btn-sm" title="Ver/Imprimir PDF"
-                onClick={() => printRx(p.id)}>
+              <button className="btn btn-outline-primary btn-sm" onClick={() => printRx(p.id)}>
                 <i className="bi bi-printer me-1"></i>Receta PDF
               </button>
             </div>
@@ -613,10 +895,25 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
         </div>
       ))}
 
-      {/* Formulario nueva receta */}
       {showForm && (
         <div className="card border-primary shadow-sm mt-3">
-          <div className="card-header fw-semibold">Nueva Receta</div>
+          <div className="card-header fw-semibold d-flex justify-content-between align-items-center">
+            <span>Nueva Receta</span>
+            <button className="btn btn-outline-warning btn-sm"
+              title="Guardar como favorita"
+              onClick={() => setShowSaveFav(s => !s)}>
+              <i className="bi bi-bookmark-heart me-1"></i>Guardar como favorita
+            </button>
+          </div>
+          {showSaveFav && (
+            <div className="border-bottom px-3 py-2 d-flex gap-2 align-items-center" style={{ background: "#fffbeb" }}>
+              <input className="form-control form-control-sm" placeholder="Nombre de la favorita (ej: IRA en adultos)"
+                value={favNombre} onChange={e => setFavNombre(e.target.value)} style={{ maxWidth: 300 }} />
+              <button className="btn btn-warning btn-sm text-nowrap" onClick={handleSaveFavorita} disabled={savingFav}>
+                {savingFav ? "Guardando…" : "⭐ Guardar"}
+              </button>
+            </div>
+          )}
           <div className="card-body">
             {items.map((item, idx) => (
               <div key={idx} className="border rounded p-2 mb-2 position-relative">
@@ -633,22 +930,34 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
                     <label className="form-label small mb-1">Medicamento</label>
                     <input className="form-control form-control-sm" placeholder="Buscar o escribir…"
                       value={item.medicamento_texto}
-                      onChange={e => { setItem(idx, "medicamento_texto", e.target.value); setItem(idx, "medicamento_id", null); searchMed(e.target.value, idx); }} />
+                      onFocus={() => { if (!item.medicamento_texto) searchMed("", idx); }}
+                      onChange={e => { setItem(idx, "medicamento_texto", e.target.value); setItem(idx, "medicamento_id", null); searchMed(e.target.value, idx); }}
+                      onBlur={() => setTimeout(() => setMedSearch([]), 200)} />
                     {medSearch?.idx === idx && medSearch.list?.length > 0 && (
-                      <ul className="list-group position-absolute z-3"
-                        style={{ top: "100%", left: 0, right: 0, maxHeight: 150, overflowY: "auto" }}>
-                        {medSearch.list.map(m => (
+                      <ul className="list-group position-absolute z-3 shadow"
+                        style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto" }}>
+                        {medSearch.soloFavoritos && (
+                          <li className="list-group-item py-1 px-2 bg-warning bg-opacity-10 text-warning fw-semibold"
+                            style={{ fontSize: "0.72rem", pointerEvents: "none" }}>
+                            <i className="bi bi-star-fill me-1"></i>Mis medicamentos favoritos
+                          </li>
+                        )}
+                        {medSearch.list.map(m => {
+                          const esFav = medFavSet.has(m.id) || m.es_favorito === 1;
+                          return (
                           <li key={m.id} className="list-group-item list-group-item-action py-1"
                             style={{ cursor: "pointer", fontSize: "0.8rem" }}
                             onClick={() => selMed(m, idx)}>
-                            {m.nombre_generico} {m.presentacion && `(${m.presentacion})`}
+                            {esFav && <i className="bi bi-star-fill text-warning me-1" style={{ fontSize: "0.7rem" }}></i>}
+                            <strong>{m.nombre_generico}</strong>
+                            {m.presentacion && <span className="text-muted ms-1">({m.presentacion})</span>}
                             {(m.dosis_default || m.duracion_default) && (
                               <span className="text-success ms-2" style={{ fontSize: "0.7rem" }}>
                                 <i className="bi bi-lightning-fill"></i> con defaults
                               </span>
                             )}
                           </li>
-                        ))}
+                        );})}
                       </ul>
                     )}
                   </div>
@@ -679,18 +988,15 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
                 )}
               </div>
             ))}
-
             <button className="btn btn-outline-primary btn-sm me-2"
-              onClick={() => setItems(prev => [...prev, newItem()])}>
+              onClick={() => setItems(prev => [...prev, { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" }])}>
               + Agregar medicamento
             </button>
-
             <div className="mt-3">
               <label className="form-label small">Notas adicionales</label>
               <textarea className="form-control form-control-sm" rows={2}
                 value={notas} onChange={e => setNotas(e.target.value)} />
             </div>
-
             <div className="d-flex gap-2 mt-3">
               <button className="btn btn-primary btn-sm" onClick={handleSubmit} disabled={saving}>
                 {saving ? "Guardando…" : "Crear Receta"}
@@ -700,6 +1006,268 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── Sub-tab: Historial completo del paciente ──────────────────────────────────
+function SubHistorialPaciente({ pacienteId }) {
+  const [historial, setHistorial] = useState([]);
+  const [loading,   setLoading]   = useState(false);
+  const [expanded,  setExpanded]  = useState(null);
+
+  useEffect(() => {
+    if (!pacienteId) return;
+    setLoading(true);
+    api.get(`/prescripciones/historial-paciente/${pacienteId}`)
+      .then(r => setHistorial(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [pacienteId]);
+
+  if (loading) return <div className="text-center py-4"><span className="spinner-border spinner-border-sm"></span> Cargando historial…</div>;
+  if (!historial.length) return <p className="text-muted py-3">Sin recetas previas para este paciente.</p>;
+
+  return (
+    <div>
+      <p className="text-muted small mb-3">{historial.length} receta(s) encontradas</p>
+      {historial.map(rx => (
+        <div key={rx.id} className="card border-0 shadow-sm mb-2">
+          <div className="card-body py-2"
+            style={{ cursor: "pointer" }}
+            onClick={() => setExpanded(expanded === rx.id ? null : rx.id)}>
+            <div className="d-flex align-items-center justify-content-between">
+              <div>
+                <span className={`badge me-2 bg-${rx.estado === "ENTREGADA" ? "success" : rx.estado === "CANCELADA" ? "secondary" : "warning text-dark"}`}>
+                  {rx.estado}
+                </span>
+                <strong className="small">{rx.total_items} medicamento(s)</strong>
+                {rx.diagnostico_cie && (
+                  <span className="badge text-bg-light border ms-2" style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>
+                    {rx.diagnostico_cie}
+                  </span>
+                )}
+              </div>
+              <div className="text-end">
+                <div className="small text-muted">{dayjs(rx.creado_en).format("DD/MM/YYYY")}</div>
+                <div style={{ fontSize: "0.75rem", color: "#888" }}>
+                  Dr. {rx.med_apellidos}, {rx.med_nombres}
+                </div>
+              </div>
+            </div>
+            {expanded === rx.id && rx.items?.length > 0 && (
+              <div className="mt-2 pt-2 border-top">
+                {rx.items.map((it, i) => (
+                  <div key={i} className="d-flex align-items-start gap-2 mb-1">
+                    <i className="bi bi-capsule text-primary mt-1" style={{ fontSize: "0.75rem" }}></i>
+                    <div style={{ fontSize: "0.82rem" }}>
+                      <strong>{it.nombre}</strong>
+                      {it.presentacion && <span className="text-muted ms-1">({it.presentacion})</span>}
+                      {it.dosis && <span className="ms-2 badge text-bg-light border">{it.dosis}</span>}
+                      {it.duracion && <span className="ms-1 text-muted">· {it.duracion}</span>}
+                      {it.instrucciones && <div className="text-muted" style={{ fontSize: "0.75rem" }}>{it.instrucciones}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Sub-tab: Sugerencias por CIE-10 ──────────────────────────────────────────
+function SubSugeridadCie({ diagnosticoCie, diagnosticoDesc }) {
+  const [sugeridas, setSugeridas] = useState([]);
+  const [loading,   setLoading]   = useState(false);
+  const [agregados, setAgregados] = useState(new Set());
+  const [alertMsg,  setAlertMsg]  = useState(null);
+
+  useEffect(() => {
+    if (!diagnosticoCie) { setSugeridas([]); return; }
+    setLoading(true);
+    api.get("/prescripciones/sugerencias-cie10", { params: { codigo: diagnosticoCie } })
+      .then(r => setSugeridas(r.data.data || []))
+      .catch(() => setSugeridas([]))
+      .finally(() => setLoading(false));
+  }, [diagnosticoCie]);
+
+  if (!diagnosticoCie) {
+    return (
+      <div className="text-center py-5 text-muted">
+        <i className="bi bi-search" style={{ fontSize: "2rem", opacity: 0.4 }}></i>
+        <p className="mt-2">Selecciona un diagnóstico CIE-10 en la pestaña SOAP para ver sugerencias.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {alertMsg && (
+        <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`}>
+          {alertMsg.msg} <button className="btn-close" onClick={() => setAlertMsg(null)} />
+        </div>
+      )}
+
+      <div className="d-flex align-items-center gap-2 mb-3">
+        <span className="badge bg-primary" style={{ fontFamily: "monospace" }}>{diagnosticoCie}</span>
+        <span className="small fw-semibold">{diagnosticoDesc}</span>
+      </div>
+
+      {loading && <div className="text-muted"><span className="spinner-border spinner-border-sm me-2"></span>Buscando medicamentos…</div>}
+
+      {!loading && sugeridas.length === 0 && (
+        <p className="text-muted">No hay sugerencias específicas para este diagnóstico. Usa el catálogo de medicamentos en la receta.</p>
+      )}
+
+      {sugeridas.length > 0 && (
+        <p className="text-muted small mb-2">{sugeridas.length} medicamento(s) frecuente(s) para este diagnóstico:</p>
+      )}
+
+      {sugeridas.map(med => (
+        <div key={med.id} className={`card border-0 shadow-sm mb-2 ${agregados.has(med.id) ? "border-success" : ""}`}
+          style={{ borderLeft: agregados.has(med.id) ? "3px solid #198754" : "3px solid #dee2e6" }}>
+          <div className="card-body py-2 px-3">
+            <div className="d-flex justify-content-between align-items-start">
+              <div className="flex-grow-1">
+                <div className="fw-semibold small">{med.nombre_generico}</div>
+                {med.nombre_comercial && <div className="text-muted" style={{ fontSize: "0.75rem" }}>{med.nombre_comercial}</div>}
+                <div className="d-flex flex-wrap gap-1 mt-1">
+                  {med.presentacion && <span className="badge text-bg-light border" style={{ fontSize: "0.7rem" }}>{med.presentacion}</span>}
+                  {med.dosis_default && <span className="badge text-bg-info bg-opacity-10 text-info border" style={{ fontSize: "0.7rem" }}>{med.dosis_default}</span>}
+                  {med.duracion_default && <span className="badge text-bg-secondary bg-opacity-10 border" style={{ fontSize: "0.7rem" }}>{med.duracion_default}</span>}
+                </div>
+                {med.instrucciones_default && (
+                  <div className="text-muted mt-1" style={{ fontSize: "0.74rem" }}>{med.instrucciones_default}</div>
+                )}
+              </div>
+              {!agregados.has(med.id) ? (
+                <button className="btn btn-outline-primary btn-sm ms-2 text-nowrap"
+                  style={{ flexShrink: 0 }}
+                  onClick={async () => {
+                    // Copiar al portapapeles como favorita no, mas bien ir a crear receta
+                    try {
+                      // Agregar directo como item en una nueva receta usando el endpoint de prescripción
+                      // Guardamos como "seleccionado" para feedback visual
+                      setAgregados(prev => new Set(prev).add(med.id));
+                      setAlertMsg({ type: "success", msg: `✓ ${med.nombre_generico} — Ve a "Nueva Receta" y búscalo en el catálogo, ya tiene dosis pre-llenada.` });
+                    } catch {}
+                  }}>
+                  <i className="bi bi-plus-circle me-1"></i>Seleccionar
+                </button>
+              ) : (
+                <span className="badge bg-success ms-2" style={{ padding: "6px 10px" }}>
+                  <i className="bi bi-check-lg me-1"></i>Seleccionado
+                </span>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// ── Sub-tab: Recetas favoritas del médico ─────────────────────────────────────
+function SubFavoritas({ firmada }) {
+  const [favoritas, setFavoritas] = useState([]);
+  const [loading,   setLoading]   = useState(false);
+  const [expandedFav, setExpandedFav] = useState(null);
+  const [alertMsg, setAlertMsg] = useState(null);
+
+  const cargar = () => {
+    setLoading(true);
+    api.get("/prescripciones/favoritas")
+      .then(r => setFavoritas(r.data.data || []))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const eliminar = async (id) => {
+    try {
+      await api.delete(`/prescripciones/favoritas/${id}`);
+      setFavoritas(prev => prev.filter(f => f.id !== id));
+    } catch {
+      setAlertMsg({ type: "danger", msg: "No se pudo eliminar" });
+    }
+  };
+
+  if (loading) return <div className="text-center py-4"><span className="spinner-border spinner-border-sm"></span></div>;
+
+  return (
+    <div>
+      {alertMsg && (
+        <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`}>
+          {alertMsg.msg} <button className="btn-close" onClick={() => setAlertMsg(null)} />
+        </div>
+      )}
+
+      {favoritas.length === 0 && (
+        <div className="text-center py-5 text-muted">
+          <i className="bi bi-bookmark-heart" style={{ fontSize: "2.5rem", opacity: 0.3 }}></i>
+          <p className="mt-2 small">No tienes recetas favoritas guardadas.<br/>Crea una receta y usa el botón <strong>"Guardar como favorita"</strong>.</p>
+        </div>
+      )}
+
+      {favoritas.map(fav => (
+        <div key={fav.id} className="card border-0 shadow-sm mb-2">
+          <div className="card-body py-2 px-3">
+            <div className="d-flex justify-content-between align-items-center"
+              style={{ cursor: "pointer" }}
+              onClick={() => setExpandedFav(expandedFav === fav.id ? null : fav.id)}>
+              <div>
+                <i className="bi bi-bookmark-heart-fill text-warning me-2"></i>
+                <strong className="small">{fav.nombre}</strong>
+                <span className="badge text-bg-light border ms-2" style={{ fontSize: "0.7rem" }}>
+                  {fav.items?.length || 0} med.
+                </span>
+              </div>
+              <div className="d-flex gap-1 align-items-center">
+                <small className="text-muted me-2">{dayjs(fav.creado_en).format("DD/MM/YY")}</small>
+                {!firmada && (
+                  <button className="btn btn-sm btn-outline-secondary py-0 px-2"
+                    style={{ fontSize: "0.72rem" }}
+                    title="Usar esta receta en la consulta actual"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      // Mensaje orientativo — el usuario la ve y la recrea manualmente o con el buscador
+                      setAlertMsg({ type: "info", msg: `Ve a "Nueva Receta" y usa el buscador para agregar los medicamentos de "${fav.nombre}".` });
+                      setExpandedFav(fav.id);
+                    }}>
+                    <i className="bi bi-clipboard-plus me-1"></i>Usar
+                  </button>
+                )}
+                <button className="btn btn-sm btn-outline-danger py-0 px-2"
+                  style={{ fontSize: "0.72rem" }}
+                  onClick={(e) => { e.stopPropagation(); eliminar(fav.id); }}>
+                  <i className="bi bi-trash3"></i>
+                </button>
+              </div>
+            </div>
+            {expandedFav === fav.id && fav.items?.length > 0 && (
+              <div className="mt-2 pt-2 border-top">
+                {fav.notas && <p className="text-muted small mb-2 fst-italic">"{fav.notas}"</p>}
+                {fav.items.map((it, i) => (
+                  <div key={i} className="d-flex align-items-start gap-2 mb-1">
+                    <i className="bi bi-capsule text-warning mt-1" style={{ fontSize: "0.75rem" }}></i>
+                    <div style={{ fontSize: "0.82rem" }}>
+                      <strong>{it.medicamento_texto}</strong>
+                      {it.dosis && <span className="ms-2 badge text-bg-light border">{it.dosis}</span>}
+                      {it.duracion && <span className="ms-1 text-muted">· {it.duracion}</span>}
+                      {it.cantidad && <span className="ms-1 text-muted">· {it.cantidad}</span>}
+                      {it.instrucciones && <div className="text-muted" style={{ fontSize: "0.75rem" }}>{it.instrucciones}</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

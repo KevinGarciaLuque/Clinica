@@ -357,4 +357,148 @@ router.get("/:id/pdf", auth(), async (req, res) => {
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/prescripciones/sugerencias-cie10?codigo=J06.9
+// Devuelve medicamentos frecuentes para un diagnóstico CIE-10
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/sugerencias-cie10", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const { codigo } = req.query;
+    if (!codigo) return res.json({ ok: true, data: [] });
+
+    // 1. Medicamentos cuyo CIE sugerido coincide exactamente
+    const [exactos] = await pool.query(
+      `SELECT id, nombre_generico, nombre_comercial, presentacion, via_administracion,
+              dosis_default, duracion_default, cantidad_default, instrucciones_default
+       FROM medicamentos
+       WHERE codigo_cie_sugerido = ? AND activo = 1
+       LIMIT 10`,
+      [codigo]
+    );
+
+    // 2. Si no hay exactos, buscar por prefijo de 3 chars (J06 → J06.x)
+    let resultado = exactos;
+    if (exactos.length === 0 && codigo.length >= 3) {
+      const [parciales] = await pool.query(
+        `SELECT id, nombre_generico, nombre_comercial, presentacion, via_administracion,
+                dosis_default, duracion_default, cantidad_default, instrucciones_default
+         FROM medicamentos
+         WHERE codigo_cie_sugerido LIKE ? AND activo = 1
+         LIMIT 8`,
+        [codigo.substring(0, 3) + "%"]
+      );
+      resultado = parciales;
+    }
+
+    res.json({ ok: true, data: resultado });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/prescripciones/historial-paciente/:pacienteId
+// Historial completo de recetas de un paciente con items expandidos
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    const { pacienteId } = req.params;
+    const { page = 1 } = req.query;
+    const limit = 15, offset = (page - 1) * limit;
+
+    const condCid = cid ? " AND pr.clinica_id = ?" : "";
+    const paramsCid = cid ? [cid] : [];
+
+    const [recetas] = await pool.query(
+      `SELECT pr.id, pr.estado, pr.notas, pr.creado_en,
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+              hc.diagnostico_cie, hc.subjetivo,
+              (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
+       FROM prescripciones pr
+       JOIN usuarios u ON u.id = pr.medico_id
+       LEFT JOIN historias_clinicas hc ON hc.id = pr.historia_id
+       WHERE pr.paciente_id = ?${condCid}
+       ORDER BY pr.creado_en DESC
+       LIMIT ? OFFSET ?`,
+      [pacienteId, ...paramsCid, limit, offset]
+    );
+
+    // Cargar items de cada receta
+    for (const r of recetas) {
+      const [items] = await pool.query(
+        `SELECT pi.medicamento_texto, pi.dosis, pi.duracion, pi.cantidad, pi.instrucciones,
+                COALESCE(m.nombre_generico, pi.medicamento_texto) AS nombre,
+                m.presentacion
+         FROM prescripcion_items pi
+         LEFT JOIN medicamentos m ON m.id = pi.medicamento_id
+         WHERE pi.prescripcion_id = ?`,
+        [r.id]
+      );
+      r.items = items;
+    }
+
+    res.json({ ok: true, data: recetas });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
+// GET  /api/prescripciones/favoritas        — listar favoritas del médico
+// POST /api/prescripciones/favoritas        — crear favorita
+// DELETE /api/prescripciones/favoritas/:id  — eliminar favorita
+// ─────────────────────────────────────────────────────────────────────────────
+router.get("/favoritas", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const medicoId = req.user.id;
+    const cid = clinicaOf(req);
+    const [rows] = await pool.query(
+      `SELECT id, nombre, notas, items_json, creado_en
+       FROM recetas_favoritas
+       WHERE medico_id = ? AND clinica_id = ?
+       ORDER BY nombre`,
+      [medicoId, cid]
+    );
+    const data = rows.map(r => ({
+      ...r,
+      items: typeof r.items_json === "string" ? JSON.parse(r.items_json || "[]") : (r.items_json || []),
+    }));
+    res.json({ ok: true, data });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.post("/favoritas", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const medicoId = req.user.id;
+    const cid = clinicaOf(req);
+    const { nombre, notas, items } = req.body;
+    if (!nombre || !items?.length) return res.status(400).json({ ok: false, msg: "nombre e items requeridos" });
+
+    await pool.query(
+      `INSERT INTO recetas_favoritas (clinica_id, medico_id, nombre, notas, items_json)
+       VALUES (?, ?, ?, ?, ?)`,
+      [cid, medicoId, nombre.trim(), notas || "", JSON.stringify(items)]
+    );
+    res.json({ ok: true, msg: "Receta favorita guardada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.delete("/favoritas/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const medicoId = req.user.id;
+    await pool.query(
+      `DELETE FROM recetas_favoritas WHERE id = ? AND medico_id = ?`,
+      [req.params.id, medicoId]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 module.exports = router;

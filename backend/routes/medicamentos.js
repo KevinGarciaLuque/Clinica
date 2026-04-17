@@ -6,8 +6,53 @@ const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 
 /**
+ * GET /api/medicamentos/favoritos
+ * Lista los IDs de medicamentos favoritos del médico autenticado
+ */
+router.get("/favoritos", auth(), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      "SELECT medicamento_id FROM medicamentos_favoritos WHERE medico_id = ?",
+      [req.user.id]
+    );
+    res.json({ ok: true, data: rows.map(r => r.medicamento_id) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+/**
+ * POST /api/medicamentos/favoritos/:id
+ * Toggle favorito: si ya existe lo elimina, si no existe lo crea
+ */
+router.post("/favoritos/:id", auth(), async (req, res) => {
+  try {
+    const medId = req.params.id;
+    const [[existing]] = await pool.query(
+      "SELECT id FROM medicamentos_favoritos WHERE medico_id = ? AND medicamento_id = ?",
+      [req.user.id, medId]
+    );
+    if (existing) {
+      await pool.query(
+        "DELETE FROM medicamentos_favoritos WHERE medico_id = ? AND medicamento_id = ?",
+        [req.user.id, medId]
+      );
+      res.json({ ok: true, favorito: false });
+    } else {
+      await pool.query(
+        "INSERT INTO medicamentos_favoritos (medico_id, medicamento_id) VALUES (?, ?)",
+        [req.user.id, medId]
+      );
+      res.json({ ok: true, favorito: true });
+    }
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+/**
  * GET /api/medicamentos?q=&page=1
- * Búsqueda de medicamentos (autocompletar + listado)
+ * Búsqueda de medicamentos — los favoritos del médico aparecen primero
  */
 router.get("/", auth(), async (req, res) => {
   try {
@@ -15,15 +60,23 @@ router.get("/", auth(), async (req, res) => {
     const limit  = 30;
     const offset = (page - 1) * limit;
 
-    let sql    = "SELECT * FROM medicamentos WHERE activo = 1";
-    const params = [];
+    // Columna calculada: 1 si es favorito del médico, 0 si no
+    let sql = `
+      SELECT m.*,
+        CASE WHEN mf.id IS NOT NULL THEN 1 ELSE 0 END AS es_favorito
+      FROM medicamentos m
+      LEFT JOIN medicamentos_favoritos mf
+        ON mf.medicamento_id = m.id AND mf.medico_id = ?
+      WHERE m.activo = 1
+    `;
+    const params = [req.user.id];
 
     if (q.length >= 2) {
-      sql += " AND (nombre_generico LIKE ? OR nombre_comercial LIKE ?)";
+      sql += " AND (m.nombre_generico LIKE ? OR m.nombre_comercial LIKE ?)";
       params.push(`%${q}%`, `%${q}%`);
     }
 
-    sql += " ORDER BY nombre_generico ASC LIMIT ? OFFSET ?";
+    sql += " ORDER BY es_favorito DESC, m.nombre_generico ASC LIMIT ? OFFSET ?";
     params.push(limit, offset);
 
     const [rows] = await pool.query(sql, params);

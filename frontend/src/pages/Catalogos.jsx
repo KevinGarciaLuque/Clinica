@@ -54,6 +54,31 @@ function CatalogoMedicamentos() {
   const [saving, setSaving] = useState(false);
   const [alert, setAlert] = useState(null);
   const [page, setPage] = useState(1);
+  const [favSet, setFavSet] = useState(new Set());
+
+  // Cargar IDs favoritos del médico
+  useEffect(() => {
+    api.get("/medicamentos/favoritos")
+      .then(r => setFavSet(new Set(r.data.data || [])))
+      .catch(() => {});
+  }, []);
+
+  const toggleFav = async (med, e) => {
+    e.stopPropagation();
+    try {
+      const res = await api.post(`/medicamentos/favoritos/${med.id}`);
+      setFavSet(prev => {
+        const next = new Set(prev);
+        res.data.favorito ? next.add(med.id) : next.delete(med.id);
+        return next;
+      });
+      // Reordenar lista localmente
+      setList(prev => [...prev].sort((a, b) => {
+        const fa = res.data.favorito && b.id === med.id ? 0 : (favSet.has(b.id) ? 1 : -1);
+        return fa;
+      }));
+    } catch {}
+  };
 
   function emptyMed() {
     return {
@@ -225,28 +250,41 @@ function CatalogoMedicamentos() {
         <table className="table table-hover align-middle">
           <thead className="table-light">
             <tr>
+              <th style={{ width: 32 }}></th>
               <th>Medicamento</th>
               <th>Presentación</th>
               <th>Vía</th>
               <th>Dosis Default</th>
               <th>Duración</th>
-              <th>Cantidad</th>
               <th>Instrucciones</th>
-              <th style={{ width: 120 }}>Acciones</th>
+              <th style={{ width: 90 }}>Acciones</th>
             </tr>
           </thead>
           <tbody>
-            {list.map(m => (
-              <tr key={m.id}>
+            {list.map(m => {
+              const esFav = favSet.has(m.id);
+              return (
+              <tr key={m.id} className={esFav ? "table-warning" : ""}>
+                <td className="text-center">
+                  <button
+                    className="btn btn-sm border-0 p-0"
+                    title={esFav ? "Quitar de favoritos" : "Marcar como favorito"}
+                    onClick={(e) => toggleFav(m, e)}
+                    style={{ fontSize: "1.1rem", lineHeight: 1 }}>
+                    <i className={`bi bi-star${esFav ? "-fill text-warning" : " text-muted"}`}></i>
+                  </button>
+                </td>
                 <td>
-                  <div className="fw-semibold">{m.nombre_generico}</div>
+                  <div className="fw-semibold">
+                    {esFav && <i className="bi bi-star-fill text-warning me-1" style={{ fontSize: "0.65rem" }}></i>}
+                    {m.nombre_generico}
+                  </div>
                   {m.nombre_comercial && <small className="text-muted">{m.nombre_comercial}</small>}
                 </td>
                 <td><small>{m.presentacion || "—"}</small></td>
                 <td><small>{m.via_administracion || "—"}</small></td>
                 <td><small>{m.dosis_default || <span className="text-muted">—</span>}</small></td>
                 <td><small>{m.duracion_default || <span className="text-muted">—</span>}</small></td>
-                <td><small>{m.cantidad_default || <span className="text-muted">—</span>}</small></td>
                 <td><small>{m.instrucciones_default || <span className="text-muted">—</span>}</small></td>
                 <td>
                   <div className="d-flex gap-1">
@@ -261,7 +299,7 @@ function CatalogoMedicamentos() {
                   </div>
                 </td>
               </tr>
-            ))}
+            );})}
             {list.length === 0 && (
               <tr>
                 <td colSpan={8} className="text-center text-muted py-4">Sin medicamentos encontrados.</td>

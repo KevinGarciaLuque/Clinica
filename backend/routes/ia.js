@@ -14,6 +14,7 @@
 const router = require("express").Router();
 const pool   = require("../db");
 const OpenAI = require("openai");
+const auth   = require("../middlewares/auth");
 
 // Inicialización lazy — solo falla si se usa sin API key, no al cargar el módulo
 let _openai = null;
@@ -407,6 +408,213 @@ router.get("/historial", async (req, res) => {
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// Banco de frases SOAP por especialidad (fallback sin OpenAI)
+// ═══════════════════════════════════════════════════════════════════════════════
+const FRASES_SOAP = {
+  "Medicina General": {
+    subjetivo: [
+      "sin alergias medicamentosas conocidas.",
+      "con evolución de aproximadamente 3 días.",
+      "niega fiebre, náuseas o vómitos asociados.",
+      "refiere mejoría parcial con analgésicos de venta libre.",
+      "presenta los síntomas desde hace 48 horas sin factores desencadenantes claros.",
+    ],
+    objetivo: [
+      "Al examen: buen estado general, consciente y orientado en tiempo y espacio.",
+      "Tórax simétrico, sin tirajes. Murmullo vesicular conservado bilateralmente.",
+      "Abdomen blando, depresible, no doloroso a la palpación profunda. RHA presentes.",
+      "Faringe hiperémica sin exudados. Amígdalas sin hipertrofia.",
+      "Sin adenopatías cervicales palpables. Piel y mucosas bien hidratadas.",
+    ],
+    plan: [
+      "Control en 7 días o antes si presenta fiebre > 38.5°C o empeoramiento.",
+      "Hidratación adecuada, reposo relativo 48 horas.",
+      "Evitar automedicación. Acudir a urgencias si hay dificultad respiratoria.",
+      "Dieta blanda, abundantes líquidos. Seguimiento por consulta externa.",
+    ],
+  },
+  "Pediatría": {
+    subjetivo: [
+      "Madre refiere que el niño presenta los síntomas desde hace 2 días.",
+      "sin antecedentes patológicos de importancia hasta la fecha.",
+      "vacunas al día según esquema nacional de inmunizaciones.",
+      "niega alergias medicamentosas conocidas. Desarrollo psicomotor normal para la edad.",
+      "sin hospitalizaciones previas. Alimentación adecuada para la edad.",
+    ],
+    objetivo: [
+      "Paciente activo, reactivo, hidratado. Llanto fuerte. RCTD.",
+      "Otoscopia: membrana timpánica íntegra bilateralmente, sin signos inflamatorios.",
+      "Sin signos de dificultad respiratoria. SpO2 98% a aire ambiente.",
+      "Fontanela anterior normotensa, de dimensiones adecuadas para la edad.",
+      "Peso y talla en percentil adecuado para la edad.",
+    ],
+    plan: [
+      "Paracetamol 15 mg/kg/dosis cada 6 horas según fiebre.",
+      "Control en 48-72 horas o antes si persiste o se agrava la sintomatología.",
+      "Lactancia materna/fórmula a libre demanda. Hidratación oral abundante.",
+      "Signos de alarma explicados a los padres. Consultar si dificultad respiratoria.",
+    ],
+  },
+  "Endocrinología": {
+    subjetivo: [
+      "con glucemias en ayunas reportadas entre 180-250 mg/dL en controles domiciliarios.",
+      "refiere poliuria, polidipsia y pérdida de peso no intencional.",
+      "en control con metformina 850 mg cada 12 horas con buena tolerancia.",
+      "sin episodios de hipoglucemia en las últimas semanas.",
+      "cumple dieta y actividad física indicadas. HbA1c en objetivo.",
+    ],
+    objetivo: [
+      "Al examen: normopeso, PA controlada, sin alteraciones tiroideas palpables.",
+      "Sin retención de líquidos. Reflejos osteotendinosos conservados.",
+      "No presenta lesiones cutáneas sugestivas de complicaciones metabólicas.",
+    ],
+    plan: [
+      "Ajuste de dosis según glucometría de 7 puntos. Control HbA1c en 3 meses.",
+      "Dieta baja en carbohidratos refinados. Actividad física 30 min/día 5 veces/semana.",
+      "Control oftalmológico anual y podológico semestral.",
+      "Ecografía tiroidea solicitada. Control con resultados en 4 semanas.",
+    ],
+  },
+  "Ginecología": {
+    subjetivo: [
+      "con ciclos menstruales regulares de 28 días, sangrado de 4-5 días.",
+      "FUR hace ___ días. Niega dispareunia, leucorrea patológica ni sangrado intermenstrual.",
+      "en uso de anticonceptivos orales sin efectos adversos reportados.",
+      "G_P_A_. Último control ginecológico hace ___ años.",
+      "sin síntomas genitourinarios ni molestias pélvicas actualmente.",
+    ],
+    objetivo: [
+      "Genitales externos sin lesiones visibles. Especuloscopia: cuello sin lesiones aparentes.",
+      "Útero en AVF, de tamaño normal, móvil y no doloroso a la movilización.",
+      "Mamas simétricas, sin tumoraciones palpables, sin descarga por el pezón.",
+      "Anexos no palpables. Sin masas ni adenopatías inguinales.",
+    ],
+    plan: [
+      "Papanicolaou realizado hoy. Resultados disponibles en 2-3 semanas.",
+      "Control anual o antes si presenta sintomatología.",
+      "Ecografía pélvica transvaginal solicitada. Resultado en próxima consulta.",
+      "Anticoncepción actual mantenida. Consejería sobre salud sexual brindada.",
+    ],
+  },
+  "Cardiología": {
+    subjetivo: [
+      "con historia de hipertensión arterial en tratamiento farmacológico.",
+      "niega angina de reposo, ortopnea ni disnea paroxística nocturna.",
+      "en tratamiento con enalapril 10 mg/día y atorvastatina 40 mg/noche.",
+      "cumple dieta hiposódica y restricción de grasas saturadas.",
+      "automonitoreo de PA en domicilio con valores entre 120-140/80-90 mmHg.",
+    ],
+    objetivo: [
+      "Ruidos cardíacos rítmicos, normofonéticos, sin soplos audibles.",
+      "No ingurgitación yugular. Pulsos periféricos presentes y simétricos.",
+      "Sin edemas en miembros inferiores. ECG: ritmo sinusal sin alteraciones agudas.",
+      "PA controlada en este momento. FC dentro de límites normales.",
+    ],
+    plan: [
+      "Meta de PA < 130/80 mmHg. Autocontrol diario con registro.",
+      "Ecocardiograma transtorácico solicitado para evaluación de función ventricular.",
+      "Dieta DASH, restricción de sodio < 2 g/día. Actividad aeróbica moderada.",
+      "Control en 1 mes con exámenes de laboratorio: perfil lipídico, función renal.",
+    ],
+  },
+  "Traumatología": {
+    subjetivo: [
+      "refiere dolor de intensidad 7/10 que aumenta con la movilización.",
+      "mecanismo de lesión: trauma directo / caída / movimiento en falso.",
+      "sin pérdida de conocimiento posterior al traumatismo.",
+      "niega parestesias o déficit motor en el miembro afectado.",
+      "no ha recibido tratamiento analgésico previo a la consulta.",
+    ],
+    objetivo: [
+      "Zona afectada con edema moderado, eritema y aumento de temperatura local.",
+      "Rango de movimiento articular limitado por dolor. Sin crepitaciones palpables.",
+      "Pulsos distales conservados. Sensibilidad y motricidad íntegras.",
+      "Radiografía sin evidencia de fractura ósea. Partes blandas con edema.",
+    ],
+    plan: [
+      "RICE: reposo, hielo 15 min c/2h, compresión y elevación del miembro.",
+      "Antiinflamatorio + analgésico por 5-7 días. Protección articular con vendaje.",
+      "Control radiológico en 10 días. Fisioterapia después de la fase aguda.",
+      "Restricción de actividad física intensa por 3 semanas.",
+    ],
+  },
+};
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// POST /api/ia/soap-sugerencia
+// Predicción de texto para campos SOAP — usa GPT-4o-mini si hay API key,
+// si no, devuelve una frase del banco local según especialidad.
+// ═══════════════════════════════════════════════════════════════════════════════
+router.post("/soap-sugerencia", auth(), async (req, res) => {
+  try {
+    const {
+      campo = "",
+      texto = "",
+      especialidad = "Medicina General",
+      diagnostico_cie = "",
+      diagnostico_desc = "",
+    } = req.body;
+
+    if (!texto || texto.trim().length < 8) return res.json({ ok: true, sugerencia: "" });
+
+    // ── Con OpenAI ─────────────────────────────────────────────────────────────
+    if (process.env.OPENAI_API_KEY) {
+      const openai = getOpenAI();
+      const campoLabel = {
+        subjetivo: "Subjetivo (síntomas referidos por el paciente)",
+        objetivo:  "Objetivo (hallazgos al examen físico)",
+        plan:      "Plan (tratamiento, indicaciones y seguimiento)",
+      }[campo] || campo;
+
+      const dxContext = diagnostico_cie
+        ? `Diagnóstico activo: ${diagnostico_cie} — ${diagnostico_desc}.`
+        : "";
+
+      const completion = await openai.chat.completions.create({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: `Eres un asistente de documentación clínica para médicos de ${especialidad}.
+El médico está escribiendo la sección "${campoLabel}" de una nota SOAP. ${dxContext}
+Tu tarea: continúa el texto de forma natural, clínica y concisa.
+Reglas:
+- Devuelve SOLO la continuación (no repitas lo ya escrito).
+- Máximo 2-3 oraciones cortas.
+- En español, tono médico profesional.
+- Sin markdown, asteriscos ni numeraciones.`,
+          },
+          { role: "user", content: texto.trim() },
+        ],
+        max_tokens: 100,
+        temperature: 0.35,
+      });
+
+      const sugerencia = completion.choices[0]?.message?.content?.trim() || "";
+      return res.json({ ok: true, sugerencia });
+    }
+
+    // ── Sin OpenAI: banco de frases local ──────────────────────────────────────
+    const bancoPorEspecialidad = FRASES_SOAP[especialidad] || FRASES_SOAP["Medicina General"];
+    const opciones = bancoPorEspecialidad[campo] || [];
+    if (!opciones.length) return res.json({ ok: true, sugerencia: "" });
+
+    const textoLow = texto.toLowerCase();
+    const candidatas = opciones.filter(f =>
+      !textoLow.includes(f.toLowerCase().slice(0, 15))
+    );
+    if (!candidatas.length) return res.json({ ok: true, sugerencia: "" });
+
+    const sugerencia = candidatas[Math.floor(Math.random() * candidatas.length)];
+    return res.json({ ok: true, sugerencia });
+
+  } catch (e) {
+    // Nunca exponer errores al usuario — la sugerencia es opcional
+    return res.json({ ok: true, sugerencia: "" });
   }
 });
 

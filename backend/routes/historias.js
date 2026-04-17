@@ -363,10 +363,11 @@ router.get("/cie10/buscar", auth(), async (req, res) => {
     const { q = "" } = req.query;
     if (q.length < 2) return res.json({ ok: true, data: [] });
     const [rows] = await pool.query(
-      `SELECT codigo, descripcion FROM cie10
+      `SELECT codigo, descripcion, categoria FROM cie10
        WHERE codigo LIKE ? OR descripcion LIKE ?
-       LIMIT 15`,
-      [`${q}%`, `%${q}%`]
+       ORDER BY CASE WHEN codigo LIKE ? THEN 0 ELSE 1 END, codigo
+       LIMIT 20`,
+      [`${q}%`, `%${q}%`, `${q}%`]
     );
     res.json({ ok: true, data: rows });
   } catch (e) {
