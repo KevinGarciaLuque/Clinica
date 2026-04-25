@@ -128,14 +128,24 @@ router.post("/", async (req, res) => {
     const pacienteId = r.insertId;
 
     // ── Token + email de verificación ──────────────────
-    await crearYEnviarToken(pacienteId, clinica_id, email, nombres, apellidos, conn);
+    // El fallo de SMTP no debe impedir el registro del paciente
+    let emailEnviado = true;
+    try {
+      await crearYEnviarToken(pacienteId, clinica_id, email, nombres, apellidos, conn);
+    } catch (emailErr) {
+      emailEnviado = false;
+      console.error("[POST /registro] Error al enviar email de verificación:", emailErr.message);
+    }
 
     await conn.commit();
 
     res.status(201).json({
       ok:  true,
-      msg: "Registro exitoso. Revisa tu correo para verificar tu cuenta.",
+      msg: emailEnviado
+        ? "Registro exitoso. Revisa tu correo para verificar tu cuenta."
+        : "Registro exitoso. El email de verificación no pudo enviarse; el personal de la clínica activará tu cuenta.",
       id:  pacienteId,
+      email_enviado: emailEnviado,
     });
   } catch (e) {
     await conn.rollback();
@@ -174,13 +184,17 @@ router.get("/verificar/:token", async (req, res) => {
     await pool.query("UPDATE pacientes SET email_verificado=1 WHERE id=?",           [rv.paciente_id]);
     await pool.query("UPDATE verificaciones_email SET usado=1 WHERE id=?",           [rv.id]);
 
-    // Email de bienvenida
+    // Email de bienvenida (no crítico — no bloquea la verificación si falla)
     const [[clinica]] = await pool.query("SELECT nombre FROM clinicas WHERE id=?",   [rv.clinica_id]);
-    await enviarEmail({
-      to:      rv.email,
-      subject: "¡Cuenta activada!",
-      html:    templateBienvenida({ nombres: rv.nombres, clinicaNombre: clinica?.nombre }),
-    });
+    try {
+      await enviarEmail({
+        to:      rv.email,
+        subject: "¡Cuenta activada!",
+        html:    templateBienvenida({ nombres: rv.nombres, clinicaNombre: clinica?.nombre }),
+      });
+    } catch (emailErr) {
+      console.error("[GET /registro/verificar] Email bienvenida falló:", emailErr.message);
+    }
 
     res.json({ ok: true, msg: "Email verificado correctamente. ¡Bienvenido/a!", nombres: rv.nombres });
   } catch (e) {
@@ -213,7 +227,8 @@ router.post("/reenviar", async (req, res) => {
 
     res.json({ ok: true, msg: "Email de verificación reenviado" });
   } catch (e) {
-    res.status(500).json({ ok: false, msg: e.message });
+    console.error("[POST /registro/reenviar]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo enviar el email. Verifica la configuración SMTP." });
   } finally {
     conn.release();
   }
