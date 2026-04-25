@@ -8,53 +8,108 @@ export default function Catalogos() {
   const [tab, setTab] = useState("medicamentos");
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
-      {/* ═══ HEADER ═══ */}
-      <div style={{
-        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
-        padding: "16px 24px 0",
-        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
-      }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{
-            width: 38, height: 38, borderRadius: 10,
-            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-          }}>
-            <i className="bi bi-journal-bookmark-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
-          </div>
-          <div>
-            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Catálogos</div>
-            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Medicamentos, Diagnósticos y Estudios</div>
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 4 }}>
-          {[
-            { key: "medicamentos", label: "💊 Medicamentos" },
-            { key: "diagnosticos", label: "🩺 Diagnósticos" },
-            { key: "estudios",     label: "🧪 Estudios" },
-          ].map(t => (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              style={{
-                padding: "7px 20px", fontSize: "0.82rem", fontWeight: 600,
-                borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer",
-                background: tab === t.key ? "#fff" : "rgba(255,255,255,.1)",
-                color: tab === t.key ? "#1a2744" : "rgba(255,255,255,.75)",
-                transition: "background .15s",
-              }}
-            >{t.label}</button>
-          ))}
-        </div>
-      </div>
+    <>
+      <style>{`
+        .cat-root {
+          background: #f0f2f5;
+          min-height: 100vh;
+          margin: -1.5rem;
+          width: calc(100% + 3rem);
+          display: flex;
+          flex-direction: column;
+        }
+        .cat-header {
+          background: linear-gradient(135deg, #1a2744 0%, #243b72 100%);
+          padding: 16px 24px 0;
+          box-shadow: 0 2px 12px rgba(0,0,0,.18);
+          flex-shrink: 0;
+        }
+        .cat-tabs-row {
+          display: flex;
+          gap: 4px;
+        }
+        .cat-tab-btn {
+          flex: 1;
+          min-width: 0;
+          padding: 7px 16px;
+          font-size: 0.82rem;
+          font-weight: 600;
+          border-radius: 8px 8px 0 0;
+          border: none;
+          cursor: pointer;
+          transition: background .15s;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          text-align: center;
+        }
+        @media (max-width: 600px) {
+          .cat-tab-btn {
+            font-size: 0.72rem;
+            padding: 6px 6px;
+          }
+          .cat-tab-label-full { display: none; }
+          .cat-tab-label-short { display: inline; }
+        }
+        @media (min-width: 601px) {
+          .cat-tab-label-short { display: none; }
+          .cat-tab-label-full { display: inline; }
+        }
+        .cat-content {
+          flex: 1;
+          padding: 20px 24px;
+          overflow-y: auto;
+        }
+        @media (max-width: 768px) {
+          .cat-content { padding: 12px 12px; }
+        }
+      `}</style>
 
-      <div style={{ padding: "20px 24px" }}>
-        {tab === "medicamentos" && <CatalogoMedicamentos />}
-        {tab === "diagnosticos" && <CatalogoDiagnosticos />}
-        {tab === "estudios" && <CatalogoEstudios />}
+      <div className="cat-root">
+        {/* ═══ HEADER ═══ */}
+        <div className="cat-header">
+          <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
+            <div style={{
+              width: 38, height: 38, borderRadius: 10,
+              background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <i className="bi bi-journal-bookmark-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }}></i>
+            </div>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Catálogos</div>
+              <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Medicamentos, Diagnósticos y Estudios</div>
+            </div>
+          </div>
+          <div className="cat-tabs-row">
+            {[
+              { key: "medicamentos", label: "💊 Medicamentos", short: "💊" },
+              { key: "diagnosticos", label: "🩺 Diagnósticos",  short: "🩺" },
+              { key: "estudios",     label: "🧪 Estudios",      short: "🧪" },
+            ].map(t => (
+              <button
+                key={t.key}
+                className="cat-tab-btn"
+                onClick={() => setTab(t.key)}
+                style={{
+                  background: tab === t.key ? "#fff" : "rgba(255,255,255,.1)",
+                  color: tab === t.key ? "#1a2744" : "rgba(255,255,255,.75)",
+                }}
+              >
+                <span className="cat-tab-label-full">{t.label}</span>
+                <span className="cat-tab-label-short">{t.short}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="cat-content">
+          {tab === "medicamentos" && <CatalogoMedicamentos />}
+          {tab === "diagnosticos" && <CatalogoDiagnosticos />}
+          {tab === "estudios" && <CatalogoEstudios />}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
 
@@ -894,14 +949,16 @@ function CatalogoEstudios() {
 
       {/* Table */}
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 280px)" }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ background: "#f8fafc" }}>
+            <tr style={{ background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 }}>
               {["Nombre del Estudio", "Categoría", "Descripción", "Acciones"].map(h => (
                 <th key={h} style={{
                   padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
                   color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
                   borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                  background: "#f8fafc",
                 }}>{h}</th>
               ))}
             </tr>
@@ -945,6 +1002,7 @@ function CatalogoEstudios() {
             )}
           </tbody>
         </table>
+        </div>{/* fin scroll */}
       </div>
     </div>
   );
