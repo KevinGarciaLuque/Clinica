@@ -3,6 +3,7 @@ const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const argon2 = require("argon2");
 const { uploadClinicas } = require("../middlewares/upload");
+const { seedPacienteDemo } = require("../utils/seedPacienteDemo");
 
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/tipos  → catálogo de tipos de clínica
@@ -401,15 +402,24 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
     const clinicaId = r.insertId;
 
     // Crear admin de la clínica si viene en el body
+    let adminId = null;
     if (admin_email && admin_password) {
       const hash = await argon2.hash(admin_password);
-      await pool.query(
+      const [uRes] = await pool.query(
         `INSERT INTO usuarios (clinica_id, nombres, apellidos, email, password_hash, tipo)
          VALUES (?,?,?,?,?,?)`,
         [clinicaId, admin_nombres||"Admin", admin_apellidos||"Clínica",
          admin_email, hash, "ADMIN"]
       );
+      adminId = uRes.insertId;
     }
+
+    // Paciente demo (fire-and-forget, no bloquea la respuesta)
+    const medicoIdParaDemo = adminId || req.user.id;
+    setImmediate(() => {
+      seedPacienteDemo(pool, clinicaId, medicoIdParaDemo, es_pediatrica ? true : false)
+        .catch(err => console.error("[seedPacienteDemo] Error inesperado:", err.message));
+    });
 
     res.status(201).json({ ok: true, id: clinicaId });
   } catch (e) {

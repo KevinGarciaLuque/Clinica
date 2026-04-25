@@ -16,7 +16,7 @@ router.get("/", auth(), async (req, res) => {
     const cid = clinicaOf(req);
     const { q = "", categoria } = req.query;
 
-    let sql = "SELECT * FROM catalogos_estudios WHERE activo = 1 AND clinica_id = ?";
+    let sql = "SELECT * FROM catalogos_estudios WHERE activo = 1 AND (clinica_id = ? OR clinica_id IS NULL)";
     const params = [cid];
 
     if (q.length >= 2) {

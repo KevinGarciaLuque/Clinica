@@ -6,22 +6,27 @@ const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 
 /**
- * GET /api/catalogos-diagnostico?q=
+ * GET /api/catalogos-diagnostico?q=&especialidad=
  */
 router.get("/", auth(), async (req, res) => {
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
-    const { q = "" } = req.query;
+    const { q = "", especialidad = "" } = req.query;
 
     let sql = `SELECT * FROM catalogos_diagnostico WHERE activo = 1 AND (clinica_id = ? OR clinica_id IS NULL)`;
     const params = [clinicaId];
+
+    if (especialidad) {
+      sql += " AND especialidad = ?";
+      params.push(especialidad);
+    }
 
     if (q.length >= 2) {
       sql += " AND (nombre LIKE ? OR codigo_cie LIKE ? OR descripcion_cie LIKE ?)";
       params.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 
-    sql += " ORDER BY nombre ASC LIMIT 100";
+    sql += " ORDER BY especialidad ASC, nombre ASC LIMIT 200";
     const [rows] = await pool.query(sql, params);
     res.json({ ok: true, data: rows });
   } catch (e) {

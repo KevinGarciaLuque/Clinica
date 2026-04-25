@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import api from "../api/api";
 
 // ═════════════════════════════════════════════════════════════════════
@@ -105,12 +105,12 @@ function CatalogoMedicamentos() {
   }
 
   const cargar = () => {
-    api.get("/medicamentos", { params: { q, page } })
+    api.get("/medicamentos", { params: { q, page: 1, limit: 500 } })
       .then(r => setList(r.data.data || []))
       .catch(() => {});
   };
 
-  useEffect(() => { cargar(); }, [q, page]);
+  useEffect(() => { cargar(); }, [q]);
 
   const abrirNuevo = () => {
     setForm(emptyMed());
@@ -287,15 +287,17 @@ function CatalogoMedicamentos() {
 
       {/* Table */}
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <div style={{ overflowY: "auto", maxHeight: 520 }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ background: "#f8fafc" }}>
-              <th style={{ width: 32, padding: "10px 8px", borderBottom: "2px solid #e5e7eb" }}></th>
+            <tr style={{ background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 }}>
+              <th style={{ width: 32, padding: "10px 8px", borderBottom: "2px solid #e5e7eb", background: "#f8fafc" }}></th>
               {["Medicamento", "Presentación", "Vía", "Dosis Default", "Duración", "Instrucciones", "Acciones"].map(h => (
                 <th key={h} style={{
                   padding: "10px 12px", fontSize: "0.73rem", fontWeight: 700,
                   color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
                   borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                  background: "#f8fafc",
                 }}>{h}</th>
               ))}
             </tr>
@@ -351,15 +353,7 @@ function CatalogoMedicamentos() {
             )}
           </tbody>
         </table>
-      </div>
-
-      <div style={{ display: "flex", gap: 8, marginTop: 16 }}>
-        {page > 1 && (
-          <button onClick={() => setPage(p => p - 1)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 14px", fontSize: "0.82rem", color: "#374151", cursor: "pointer", fontWeight: 600 }}>← Anterior</button>
-        )}
-        {list.length === 30 && (
-          <button onClick={() => setPage(p => p + 1)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "6px 14px", fontSize: "0.82rem", color: "#374151", cursor: "pointer", fontWeight: 600 }}>Siguiente →</button>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -368,9 +362,42 @@ function CatalogoMedicamentos() {
 // ═════════════════════════════════════════════════════════════════════
 // Tab: Catálogo de Diagnósticos
 // ═════════════════════════════════════════════════════════════════════
+// Colores y etiquetas por especialidad
+const ESP_META = {
+  PEDIATRIA:            { label: "Pediatría",            color: "#9C27B0", bg: "rgba(156,39,176,.12)",  border: "rgba(156,39,176,.3)"  },
+  MEDICINA_GENERAL:     { label: "Medicina General",    color: "#2196f3", bg: "rgba(33,150,243,.12)",  border: "rgba(33,150,243,.3)"  },
+  CARDIOLOGIA:          { label: "Cardiología",          color: "#f44336", bg: "rgba(244,67,54,.12)",   border: "rgba(244,67,54,.3)"   },
+  NEUROLOGIA:           { label: "Neurología",           color: "#AB47BC", bg: "rgba(171,71,188,.12)",  border: "rgba(171,71,188,.3)"  },
+  GINECOLOGIA:          { label: "Ginecología",          color: "#e91e63", bg: "rgba(233,30,99,.12)",   border: "rgba(233,30,99,.3)"   },
+  DERMATOLOGIA:         { label: "Dermatología",         color: "#FF5722", bg: "rgba(255,87,34,.12)",   border: "rgba(255,87,34,.3)"   },
+  OFTALMOLOGIA:         { label: "Oftalmología",         color: "#00BCD4", bg: "rgba(0,188,212,.12)",   border: "rgba(0,188,212,.3)"   },
+  TRAUMATOLOGIA:        { label: "Traumatología",        color: "#607D8B", bg: "rgba(96,125,139,.12)",  border: "rgba(96,125,139,.3)"  },
+  NUTRICION:            { label: "Nutrición",            color: "#4CAF50", bg: "rgba(76,175,80,.12)",   border: "rgba(76,175,80,.3)"   },
+  PSICOLOGIA:           { label: "Psicología",           color: "#673AB7", bg: "rgba(103,58,183,.12)",  border: "rgba(103,58,183,.3)"  },
+  ENDOCRINOLOGIA:       { label: "Endocrinología",       color: "#FF7043", bg: "rgba(255,112,67,.12)",  border: "rgba(255,112,67,.3)"  },
+  GASTROENTEROLOGIA:    { label: "Gastroenterología",    color: "#8D6E63", bg: "rgba(141,110,99,.12)",  border: "rgba(141,110,99,.3)"  },
+  INMUNOLOGIA:          { label: "Inmunología",          color: "#26C6DA", bg: "rgba(38,198,218,.12)",  border: "rgba(38,198,218,.3)"  },
+  NEFROLOGIA:           { label: "Nefrología",           color: "#42A5F5", bg: "rgba(66,165,245,.12)",  border: "rgba(66,165,245,.3)"  },
+  OTORRINOLARINGOLOGIA: { label: "Otorrinolaringología", color: "#26A69A", bg: "rgba(38,166,154,.12)",  border: "rgba(38,166,154,.3)"  },
+  ODONTOLOGIA:          { label: "Odontología",          color: "#FF9800", bg: "rgba(255,152,0,.12)",   border: "rgba(255,152,0,.3)"   },
+  FISIOTERAPIA:         { label: "Fisioterapia",         color: "#FF8F00", bg: "rgba(255,143,0,.12)",   border: "rgba(255,143,0,.3)"   },
+};
+const ESP_LABEL = (e) => ESP_META[e]?.label || e || "—";
+const ESP_CHIP  = (e) => {
+  const m = ESP_META[e];
+  if (!m) return null;
+  return (
+    <span style={{
+      background: m.bg, border: `1px solid ${m.border}`, color: m.color,
+      borderRadius: 20, padding: "2px 9px", fontSize: "0.72rem", fontWeight: 700, whiteSpace: "nowrap",
+    }}>{m.label}</span>
+  );
+};
+
 function CatalogoDiagnosticos() {
   const [list, setList] = useState([]);
   const [q, setQ] = useState("");
+  const [espFiltro, setEspFiltro] = useState("");
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState(null);
   const [form, setForm] = useState(emptyDx());
@@ -381,17 +408,19 @@ function CatalogoDiagnosticos() {
 
   function emptyDx() {
     return {
-      nombre: "", codigo_cie: "", descripcion_cie: "", diagnosticos_secundarios: [],
+      nombre: "", especialidad: "", codigo_cie: "", descripcion_cie: "", diagnosticos_secundarios: [],
     };
   }
 
-  const cargar = () => {
-    api.get("/catalogos-diagnostico", { params: { q } })
+  const cargar = useCallback(() => {
+    const params = { q };
+    if (espFiltro) params.especialidad = espFiltro;
+    api.get("/catalogos-diagnostico", { params })
       .then(r => setList(r.data.data || []))
       .catch(() => {});
-  };
+  }, [q, espFiltro]);
 
-  useEffect(() => { cargar(); }, [q]);
+  useEffect(() => { cargar(); }, [cargar]);
 
   // Búsqueda CIE-10
   useEffect(() => {
@@ -424,6 +453,7 @@ function CatalogoDiagnosticos() {
     }
     setForm({
       nombre: d.nombre || "",
+      especialidad: d.especialidad || "",
       codigo_cie: d.codigo_cie || "",
       descripcion_cie: d.descripcion_cie || "",
       diagnosticos_secundarios: secArr || [],
@@ -492,9 +522,9 @@ function CatalogoDiagnosticos() {
       )}
 
       {/* Toolbar */}
-      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center", flexWrap: "wrap" }}>
         <div style={{
-          flex: 1, maxWidth: 350, background: "#fff", borderRadius: 10, padding: "7px 12px",
+          flex: 1, maxWidth: 320, background: "#fff", borderRadius: 10, padding: "7px 12px",
           display: "flex", alignItems: "center", gap: 8,
           boxShadow: "0 1px 4px rgba(0,0,0,.06)", border: "1px solid #e5e7eb",
         }}>
@@ -502,6 +532,17 @@ function CatalogoDiagnosticos() {
           <input value={q} onChange={e => setQ(e.target.value)} placeholder="Buscar diagnóstico…"
             style={{ border: "none", outline: "none", flex: 1, fontSize: "0.88rem", background: "transparent" }} />
         </div>
+        {/* Filtro por especialidad */}
+        <select value={espFiltro} onChange={e => setEspFiltro(e.target.value)} style={{
+          background: "#fff", border: "1px solid #e5e7eb", borderRadius: 10,
+          padding: "7px 12px", fontSize: "0.83rem", color: "#374151", cursor: "pointer",
+          boxShadow: "0 1px 4px rgba(0,0,0,.06)", outline: "none",
+        }}>
+          <option value="">Todas las especialidades</option>
+          {Object.entries(ESP_META).map(([k, v]) => (
+            <option key={k} value={k}>{v.label}</option>
+          ))}
+        </select>
         <button onClick={abrirNuevo} style={{
           marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: 8,
           color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
@@ -528,13 +569,23 @@ function CatalogoDiagnosticos() {
             <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
           </div>
           <div className="row g-2" style={{ padding: "16px 20px" }}>
-            <div className="col-md-6">
+            <div className="col-md-4">
               <label className="form-label small fw-semibold">Nombre del catálogo *</label>
               <input className="form-control form-control-sm" placeholder="Ej: Faringitis aguda"
                 value={form.nombre}
                 onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
             </div>
-            <div className="col-md-6 position-relative" ref={searchRef}>
+            <div className="col-md-4">
+              <label className="form-label small fw-semibold">Especialidad</label>
+              <select className="form-select form-select-sm" value={form.especialidad}
+                onChange={e => setForm(f => ({ ...f, especialidad: e.target.value }))}>
+                <option value="">— Sin categoría —</option>
+                {Object.entries(ESP_META).map(([k, v]) => (
+                  <option key={k} value={k}>{v.label}</option>
+                ))}
+              </select>
+            </div>
+            <div className="col-md-4 position-relative" ref={searchRef}>
               <label className="form-label small fw-semibold">Código CIE-10 *</label>
               <div className="input-group input-group-sm">
                 <input className="form-control" placeholder="Buscar código o descripción…"
@@ -605,14 +656,16 @@ function CatalogoDiagnosticos() {
 
       {/* Table */}
       <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <div style={{ overflowY: "auto", maxHeight: 520 }}>
         <table style={{ width: "100%", borderCollapse: "collapse" }}>
           <thead>
-            <tr style={{ background: "#f8fafc" }}>
-              {["Nombre", "CIE-10", "Descripción", "Dx Secundarios", "Acciones"].map(h => (
+            <tr style={{ background: "#f8fafc", position: "sticky", top: 0, zIndex: 1 }}>
+              {["Nombre", "Especialidad", "CIE-10", "Descripción", "Dx Secundarios", "Acciones"].map(h => (
                 <th key={h} style={{
                   padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
                   color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
                   borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                  background: "#f8fafc",
                 }}>{h}</th>
               ))}
             </tr>
@@ -626,6 +679,7 @@ function CatalogoDiagnosticos() {
                   onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                   onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
                   <td style={{ padding: "11px 14px", fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>{d.nombre}</td>
+                  <td style={{ padding: "11px 14px" }}>{ESP_CHIP(d.especialidad)}</td>
                   <td style={{ padding: "11px 14px" }}>
                     <span style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 20, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 700 }}>{d.codigo_cie}</span>
                   </td>
@@ -657,7 +711,7 @@ function CatalogoDiagnosticos() {
             })}
             {list.length === 0 && (
               <tr>
-                <td colSpan={5} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                <td colSpan={6} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
                   <i className="bi bi-clipboard2" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
                   Sin diagnósticos en catálogo.
                 </td>
@@ -665,6 +719,7 @@ function CatalogoDiagnosticos() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
     </div>
   );
