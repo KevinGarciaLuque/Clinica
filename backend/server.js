@@ -167,6 +167,25 @@ const pool = require("./db");
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
     console.log("✅ [auto-migrate] verificaciones_email OK");
+
+    // Columna especialidad en catalogos_diagnostico (ADD solo si no existe)
+    const [colEsp] = await pool.query(`
+      SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'catalogos_diagnostico'
+        AND COLUMN_NAME  = 'especialidad'
+    `);
+    if (colEsp[0].n === 0) {
+      await pool.query(`
+        ALTER TABLE catalogos_diagnostico
+          ADD COLUMN especialidad VARCHAR(60) NULL
+          COMMENT 'PEDIATRIA, MEDICINA_GENERAL, CARDIOLOGIA, etc. NULL = todas'
+          AFTER nombre
+      `);
+      console.log("✅ [auto-migrate] catalogos_diagnostico.especialidad agregada");
+    } else {
+      console.log("✅ [auto-migrate] catalogos_diagnostico.especialidad OK");
+    }
   } catch (e) {
     console.warn("⚠️  [auto-migrate] verificaciones_email:", e.message);
   }

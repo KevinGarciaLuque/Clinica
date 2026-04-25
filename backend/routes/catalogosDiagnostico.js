@@ -53,7 +53,7 @@ router.get("/:id", auth(), async (req, res) => {
 router.post("/", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
-    const { nombre, codigo_cie, descripcion_cie, diagnosticos_secundarios } = req.body;
+    const { nombre, especialidad, codigo_cie, descripcion_cie, diagnosticos_secundarios } = req.body;
 
     if (!nombre || !codigo_cie) {
       return res.status(400).json({ ok: false, msg: "nombre y codigo_cie son requeridos" });
@@ -61,9 +61,9 @@ router.post("/", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO catalogos_diagnostico
-         (clinica_id, medico_id, nombre, codigo_cie, descripcion_cie, diagnosticos_secundarios)
-       VALUES (?,?,?,?,?,?)`,
-      [clinicaId, req.user.id, nombre, codigo_cie, descripcion_cie,
+         (clinica_id, medico_id, nombre, especialidad, codigo_cie, descripcion_cie, diagnosticos_secundarios)
+       VALUES (?,?,?,?,?,?,?)`,
+      [clinicaId, req.user.id, nombre, especialidad || null, codigo_cie, descripcion_cie,
        diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null]
     );
     res.json({ ok: true, id: r.insertId });
@@ -77,13 +77,13 @@ router.post("/", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
  */
 router.put("/:id", auth("ADMIN","SUPER_ADMIN","MEDICO"), async (req, res) => {
   try {
-    const { nombre, codigo_cie, descripcion_cie, diagnosticos_secundarios } = req.body;
+    const { nombre, especialidad, codigo_cie, descripcion_cie, diagnosticos_secundarios } = req.body;
 
     await pool.query(
       `UPDATE catalogos_diagnostico
-       SET nombre=?, codigo_cie=?, descripcion_cie=?, diagnosticos_secundarios=?
+       SET nombre=?, especialidad=?, codigo_cie=?, descripcion_cie=?, diagnosticos_secundarios=?
        WHERE id=?`,
-      [nombre, codigo_cie, descripcion_cie,
+      [nombre, especialidad || null, codigo_cie, descripcion_cie,
        diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
        req.params.id]
     );
