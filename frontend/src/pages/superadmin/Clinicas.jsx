@@ -555,27 +555,36 @@ export default function Clinicas() {
                         <i className="bi bi-link-45deg" style={{ fontSize: 12, color: C.muted }} />
                         <span style={{ fontSize: 12, color: C.muted, fontFamily: "monospace" }}>{c.slug}</span>
                       </div>
-                      {c.tipo_nombre && (
-                        <div style={{
-                          display: "inline-flex", alignItems: "center", gap: 5,
-                          background: `${c.tipo_color}22`,
-                          border: `1px solid ${c.tipo_color}55`,
-                          borderRadius: 6, padding: "2px 8px",
-                        }}>
-                          <i className={`bi ${c.tipo_icono}`} style={{ fontSize: 11, color: c.tipo_color }} />
-                          <span style={{ fontSize: 11, color: c.tipo_color, fontWeight: 600 }}>{c.tipo_nombre}</span>
-                        </div>
-                      )}
-                      {c.es_pediatrica ? (
-                        <div style={{
-                          display: "inline-flex", alignItems: "center", gap: 5,
-                          background: "rgba(156,39,176,.12)", border: "1px solid rgba(156,39,176,.3)",
-                          borderRadius: 6, padding: "2px 8px",
-                        }}>
-                          <i className="bi bi-balloon-heart-fill" style={{ fontSize: 11, color: "#9C27B0" }} />
-                          <span style={{ fontSize: 11, color: "#9C27B0", fontWeight: 600 }}>Pediátrica</span>
-                        </div>
-                      ) : null}
+                      {(() => {
+                        const esPed = !!c.es_pediatrica;
+                        if (c.tipo_nombre) {
+                          const label = esPed ? `${c.tipo_nombre} Pediátrica` : c.tipo_nombre;
+                          const icon  = esPed ? "bi-balloon-heart-fill" : c.tipo_icono;
+                          const color = esPed ? "#9C27B0" : c.tipo_color;
+                          return (
+                            <div style={{
+                              display: "inline-flex", alignItems: "center", gap: 5,
+                              background: `${color}22`,
+                              border: `1px solid ${color}55`,
+                              borderRadius: 6, padding: "2px 8px",
+                            }}>
+                              <i className={`bi ${icon}`} style={{ fontSize: 11, color }} />
+                              <span style={{ fontSize: 11, color, fontWeight: 600 }}>{label}</span>
+                            </div>
+                          );
+                        }
+                        if (esPed) return (
+                          <div style={{
+                            display: "inline-flex", alignItems: "center", gap: 5,
+                            background: "rgba(156,39,176,.12)", border: "1px solid rgba(156,39,176,.3)",
+                            borderRadius: 6, padding: "2px 8px",
+                          }}>
+                            <i className="bi bi-balloon-heart-fill" style={{ fontSize: 11, color: "#9C27B0" }} />
+                            <span style={{ fontSize: 11, color: "#9C27B0", fontWeight: 600 }}>Pediátrica</span>
+                          </div>
+                        );
+                        return null;
+                      })()}
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>

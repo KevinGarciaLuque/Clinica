@@ -171,6 +171,10 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
     if (clinicaId && rows[0].clinica_id !== clinicaId) {
       return res.status(403).json({ ok: false, msg: "No tienes acceso a este usuario" });
     }
+    // Proteger SUPER_ADMIN: nadie puede modificar su tipo ni desactivarlo
+    if (rows[0].tipo === "SUPER_ADMIN" && String(rows[0].id) !== String(req.user.uid)) {
+      return res.status(403).json({ ok: false, msg: "No se puede modificar un SUPER_ADMIN" });
+    }
 
     const { nombres, apellidos, email, password, tipo,
             especialidad_id, telefono, numero_colegiatura, firma_url, activo } = req.body;
@@ -218,6 +222,10 @@ router.delete("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
     // Evitar que se elimine a sí mismo
     if (rows[0].id === req.user.id) {
       return res.status(400).json({ ok: false, msg: "No puedes eliminarte a ti mismo" });
+    }
+    // Proteger SUPER_ADMIN: nunca se puede eliminar
+    if (rows[0].tipo === "SUPER_ADMIN") {
+      return res.status(403).json({ ok: false, msg: "No se puede eliminar un SUPER_ADMIN" });
     }
 
     await pool.query("DELETE FROM usuarios WHERE id=?", [req.params.id]);

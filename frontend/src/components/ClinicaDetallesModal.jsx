@@ -290,6 +290,40 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
 
               {/* ── Info de actividad y sugerencia ── */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
+                {/* Especialidad */}
+                {(data.clinica.tipo_nombre || data.clinica.es_pediatrica) && (() => {
+                  const esPed  = !!data.clinica.es_pediatrica;
+                  const label  = data.clinica.tipo_nombre
+                    ? (esPed ? `${data.clinica.tipo_nombre} Pediátrica` : data.clinica.tipo_nombre)
+                    : "Pediátrica";
+                  const color  = esPed ? "#9C27B0" : (data.clinica.tipo_color || C.accent);
+                  const icon   = esPed ? "bi-balloon-heart-fill" : (data.clinica.tipo_icono || "bi-building-fill");
+                  return (
+                    <div style={{
+                      gridColumn: "1/-1",
+                      background: `${color}12`,
+                      border: `1px solid ${color}35`,
+                      borderRadius: 12, padding: "14px 18px",
+                      display: "flex", alignItems: "center", gap: 12,
+                    }}>
+                      <div style={{
+                        width: 36, height: 36, borderRadius: 9, flexShrink: 0,
+                        background: `${color}22`,
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                      }}>
+                        <i className={`bi ${icon}`} style={{ fontSize: 16, color }} />
+                      </div>
+                      <div>
+                        <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase",
+                                       letterSpacing: ".05em", fontWeight: 600, marginBottom: 2 }}>
+                          Especialidad
+                        </div>
+                        <div style={{ fontSize: 15, fontWeight: 700, color }}>{label}</div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
                 {/* Última cita */}
                 <div style={{
                   background: C.card, border: `1px solid ${C.border}`,

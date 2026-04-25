@@ -38,7 +38,7 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
 
     // Para usuarios de clínica: módulos según el tipo de su clínica + categoría
     const [rows] = await pool.query(`
-      SELECT ms.clave, ms.nombre, ms.icono, ms.ruta
+      SELECT ms.clave, ms.nombre, ms.icono, ms.ruta, ms.orden
       FROM modulos_sistema ms
       INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id
       INNER JOIN clinicas c ON c.tipo_id = tcm.tipo_id
@@ -46,18 +46,31 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
       ORDER BY ms.orden
     `, [req.user.clinica_id]);
 
+    // helper: garantiza curva_crecimiento en clínicas pediátricas
+    // (por si el tipo fue creado después de la migración 015 y no tiene el módulo asignado)
+    const agregarCurvaSiPed = async (lista) => {
+      if (!esPed || lista.some(r => r.clave === "curva_crecimiento")) return lista;
+      const [[curva]] = await pool.query(
+        "SELECT clave, nombre, icono, ruta, orden FROM modulos_sistema WHERE clave='curva_crecimiento' AND disponible=1 LIMIT 1"
+      );
+      if (!curva) return lista;
+      const resultado = [...lista, curva];
+      resultado.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+      return resultado;
+    };
+
     // Si la clínica no tiene tipo asignado, devolver módulos base filtrados
     if (!rows.length) {
       const [base] = await pool.query(
-        `SELECT clave, nombre, icono, ruta FROM modulos_sistema
+        `SELECT clave, nombre, icono, ruta, orden FROM modulos_sistema
          WHERE clave IN (?,?,?,?,?,?,?) AND disponible=1 AND ${catFilter}
          ORDER BY orden`,
         ["dashboard","pacientes","citas","consulta","historia_clinica","chat_ia","estudios"]
       );
-      return res.json({ ok: true, data: base });
+      return res.json({ ok: true, data: await agregarCurvaSiPed(base) });
     }
 
-    res.json({ ok: true, data: rows });
+    res.json({ ok: true, data: await agregarCurvaSiPed(rows) });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -203,7 +216,7 @@ router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
     // ── Info base de la clínica ──────────────────────────────
     const [[clinica]] = await pool.query(
       `SELECT c.id, c.nombre, c.slug, c.creado_en, c.activo, c.plan_tipo,
-              c.licencia_inicio, c.licencia_fin,
+              c.licencia_inicio, c.licencia_fin, c.es_pediatrica,
               t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
        FROM clinicas c LEFT JOIN tipos_clinica t ON t.id = c.tipo_id
        WHERE c.id = ? LIMIT 1`,
