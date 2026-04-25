@@ -20,6 +20,15 @@ const uploadFoto = multer({
   },
 });
 
+// ── helper: registrar acceso en bitácora (fire & forget) ─────────────────────
+function registrarAcceso(pool, { usuario_id, clinica_id, nombres, apellidos, email, tipo, ip, user_agent, exito }) {
+  pool.query(
+    `INSERT INTO bitacora_accesos (usuario_id, clinica_id, nombres, apellidos, email, tipo, ip, user_agent, exito)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [usuario_id, clinica_id || null, nombres, apellidos, email, tipo, ip || null, user_agent || null, exito ? 1 : 0]
+  ).catch(() => {}); // no bloquear el flujo si falla
+}
+
 // POST /api/auth/login
 router.post("/login", async (req, res) => {
   try {
@@ -72,12 +81,19 @@ router.post("/login", async (req, res) => {
     }
 
     // Validaciones comunes
+    const ipAddr      = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || null;
+    const uaStr       = req.headers["user-agent"] || null;
+
     if (!user.activo) {
+      registrarAcceso(pool, { usuario_id: user.id, clinica_id: user.clinica_id, nombres: user.nombres,
+        apellidos: user.apellidos, email: user.email, tipo: user.tipo, ip: ipAddr, user_agent: uaStr, exito: false });
       return res.status(403).json({ ok: false, msg: "Usuario inactivo" });
     }
 
     const valid = await argon2.verify(user.password_hash, password);
     if (!valid) {
+      registrarAcceso(pool, { usuario_id: user.id, clinica_id: user.clinica_id, nombres: user.nombres,
+        apellidos: user.apellidos, email: user.email, tipo: user.tipo, ip: ipAddr, user_agent: uaStr, exito: false });
       return res.status(401).json({ ok: false, msg: "Credenciales inválidas" });
     }
 
@@ -117,6 +133,10 @@ router.post("/login", async (req, res) => {
       process.env.JWT_SECRET,
       { expiresIn: process.env.JWT_EXPIRES || "8h" },
     );
+
+    // Registrar en bitácora
+    registrarAcceso(pool, { usuario_id: user.id, clinica_id: user.clinica_id, nombres: user.nombres,
+      apellidos: user.apellidos, email: user.email, tipo: user.tipo, ip: ipAddr, user_agent: uaStr, exito: true });
 
     // Obtener foto_url del usuario
     const [fotoRows] = await pool.query(

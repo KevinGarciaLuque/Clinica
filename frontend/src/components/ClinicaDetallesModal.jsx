@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../api/api";
+import BitacoraModal from "./BitacoraModal";
 
 const C = {
   bg:      "#0d1b2e",
@@ -85,6 +86,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
   const [data, setData]       = useState(null);
   const [cargando, setCargando] = useState(true);
   const [error, setError]     = useState("");
+  const [showBitacora, setShowBitacora] = useState(false);
 
   useEffect(() => {
     if (!clinicaId) return;
@@ -402,9 +404,24 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
         {/* ── Footer ── */}
         <div style={{
           padding: "14px 28px", borderTop: `1px solid ${C.border}`,
-          display: "flex", justifyContent: "flex-end",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
           flexShrink: 0,
         }}>
+          <button
+            onClick={() => setShowBitacora(true)}
+            style={{
+              background: "linear-gradient(135deg, #8b5cf620, #6d28d920)",
+              border: "1px solid #8b5cf640",
+              borderRadius: 10, padding: "8px 20px",
+              color: "#a78bfa", fontWeight: 600, fontSize: 14, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 8,
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.background = "linear-gradient(135deg, #8b5cf630, #6d28d930)"}
+            onMouseLeave={(e) => e.currentTarget.style.background = "linear-gradient(135deg, #8b5cf620, #6d28d920)"}
+          >
+            <i className="bi bi-journal-text" />
+            Bitácora
+          </button>
           <button
             onClick={onClose}
             style={{
@@ -418,6 +435,15 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
             Cerrar
           </button>
         </div>
+
+      {/* ── Modal Bitácora ── */}
+      {showBitacora && (
+        <BitacoraModal
+          clinicaId={clinicaId}
+          clinicaNombre={clinicaNombre}
+          onClose={() => setShowBitacora(false)}
+        />
+      )}
       </div>
     </div>
   );

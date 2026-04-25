@@ -698,5 +698,56 @@ router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO"), uploadClin
   }
 });
 
+// ──────────────────────────────────────────────
+//  GET /api/clinicas/:id/bitacora  → accesos registrados (solo SUPER_ADMIN)
+//  Query params: pagina (default 1), limite (default 50), tipo, exito, busqueda
+// ──────────────────────────────────────────────
+router.get("/:id/bitacora", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId = req.params.id;
+    const pagina    = Math.max(1, parseInt(req.query.pagina)  || 1);
+    const limite    = Math.min(100, parseInt(req.query.limite) || 50);
+    const offset    = (pagina - 1) * limite;
+    const { tipo, exito, busqueda } = req.query;
+
+    const condiciones = ["clinica_id = ?"];
+    const params      = [clinicaId];
+
+    if (tipo)     { condiciones.push("tipo = ?");    params.push(tipo); }
+    if (exito !== undefined && exito !== "") {
+      condiciones.push("exito = ?");
+      params.push(exito === "1" || exito === "true" ? 1 : 0);
+    }
+    if (busqueda) {
+      condiciones.push("(nombres LIKE ? OR apellidos LIKE ? OR email LIKE ?)");
+      const like = `%${busqueda}%`;
+      params.push(like, like, like);
+    }
+
+    const where = "WHERE " + condiciones.join(" AND ");
+
+    const [[{ total }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM bitacora_accesos ${where}`,
+      params
+    );
+
+    const [rows] = await pool.query(
+      `SELECT id, usuario_id, nombres, apellidos, email, tipo, ip, user_agent, exito, creado_en
+       FROM bitacora_accesos ${where}
+       ORDER BY creado_en DESC
+       LIMIT ? OFFSET ?`,
+      [...params, limite, offset]
+    );
+
+    res.json({
+      ok: true,
+      data: rows,
+      paginacion: { total, pagina, limite, paginas: Math.ceil(total / limite) },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 module.exports = router;
 
