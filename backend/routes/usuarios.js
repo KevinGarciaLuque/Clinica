@@ -28,7 +28,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","RECEPCIONISTA"), async (req, res) =>
                       u.creado_en
                FROM usuarios u
                LEFT JOIN especialidades e ON e.id = u.especialidad_id
-               WHERE u.clinica_id = ? AND u.activo = 1`;
+               WHERE u.clinica_id = ?`;
     const params = [clinicaId];
 
     if (tipo) { sql += " AND u.tipo = ?"; params.push(tipo); }
