@@ -146,6 +146,32 @@ app.use((err, req, res, next) => {
 });
 
 const PORT = process.env.PORT || 5000;
+
+// ── Auto-migración de tablas que pueden faltar en producción ──────────
+const pool = require("./db");
+(async () => {
+  try {
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS verificaciones_email (
+        id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        paciente_id  INT UNSIGNED NOT NULL,
+        clinica_id   INT UNSIGNED NOT NULL,
+        token        VARCHAR(100) NOT NULL UNIQUE,
+        expires_at   DATETIME     NOT NULL,
+        usado        TINYINT(1)   DEFAULT 0,
+        creado_en    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ve_token    (token),
+        INDEX idx_ve_paciente (paciente_id),
+        FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
+        FOREIGN KEY (clinica_id)  REFERENCES clinicas(id)  ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] verificaciones_email OK");
+  } catch (e) {
+    console.warn("⚠️  [auto-migrate] verificaciones_email:", e.message);
+  }
+})();
+
 app.listen(PORT, () => {
   console.log("✅ Servidor corriendo en puerto", PORT);
 });
