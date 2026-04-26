@@ -118,6 +118,7 @@ app.use("/api/setup",     require("./routes/setup"));
 app.use("/api/reportes",  require("./routes/reportes"));
 app.use("/api/vacunas",   require("./routes/vacunas"));
 app.use("/api/soporte",   require("./routes/soporte"));
+app.use("/rx",            require("./routes/rx"));
 
 // ===== 404 =====
 app.use((req, res) => {

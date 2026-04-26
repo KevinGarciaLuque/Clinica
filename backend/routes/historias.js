@@ -385,7 +385,7 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","ENFERMERA","
       SELECT h.id, h.creado_en, h.diagnostico_cie, h.diagnosticos_secundarios,
              h.plan, h.subjetivo, h.examen_fisico,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
-             COALESCE(e.nombre, u.especialidad) AS especialidad
+             e.nombre AS especialidad
       FROM historias_clinicas h
       JOIN usuarios u ON u.id = h.medico_id
       LEFT JOIN especialidades e ON e.id = u.especialidad_id

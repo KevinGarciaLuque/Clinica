@@ -15,6 +15,7 @@ import Estudios        from "./pages/Estudios";
 // Páginas públicas (sin auth)
 import RegistroPaciente from "./pages/RegistroPaciente";
 import VerificarEmail   from "./pages/VerificarEmail";
+import RecetaPublica    from "./pages/RecetaPublica";
 
 // Admin
 import Usuarios    from "./pages/admin/Usuarios";
@@ -59,6 +60,7 @@ export default function App() {
       <Route path="/login"           element={<Login />} />
       <Route path="/registro"        element={<RegistroPaciente />} />
       <Route path="/verificar-email" element={<VerificarEmail />} />
+      <Route path="/rx/:codigo"       element={<RecetaPublica />} />
 
       <Route
         element={

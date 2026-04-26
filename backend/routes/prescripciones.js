@@ -358,8 +358,11 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       [pr.id]
     );
 
-    // 2. Generar imagen QR como buffer PNG
-    const qrBuffer = await QRCode.toBuffer(pr.codigo_qr, {
+    // 2. Generar imagen QR como buffer PNG (URL completa para verificación)
+    const qrCode = pr.codigo_qr || `RX-${String(pr.id).padStart(8, "0")}`;
+    const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const qrText  = `${baseUrl}/rx/${qrCode}`;
+    const qrBuffer = await QRCode.toBuffer(qrText, {
       type:  "png",
       width: 120,
       margin: 1,
@@ -483,7 +486,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     doc.rect(50, doc.page.height - 50, pageW, 24).fill("#e8eef8");
     doc.fillColor(GRAY).fontSize(7.5).font("Helvetica")
        .text(
-         `Receta N° ${String(pr.id).padStart(6, "0")}  ·  ${pr.clinica_nombre}  ·  Válida 30 días desde emisión  ·  Cód. verificación: ${pr.codigo_qr}`,
+         `Receta N° ${String(pr.id).padStart(6, "0")}  ·  ${pr.clinica_nombre}  ·  Válida 30 días desde emisión  ·  Cód. verificación: ${qrCode}`,
          55, doc.page.height - 43, { width: pageW - 10, align: "center" }
        );
 
