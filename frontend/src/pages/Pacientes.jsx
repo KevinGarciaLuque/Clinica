@@ -53,6 +53,8 @@ export default function Pacientes() {
       setShowForm(true);
       setEditandoId(null);
       setForm(FORM_VACIO);
+    } else {
+      setShowForm(false);
     }
   }, [searchParams]);
 

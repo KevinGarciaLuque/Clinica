@@ -355,6 +355,94 @@ router.delete("/alergia/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, 
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// RESUMEN DEL PACIENTE — Nuevo vs. Subsecuente
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * GET /api/historias/paciente/:paciente_id/resumen?exclude_id=
+ * Devuelve si el paciente es nuevo o subsecuente, total de consultas
+ * firmadas previas y el detalle de la última consulta.
+ * exclude_id: historia_id actualmente abierta para no contarla como previa.
+ */
+router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    const { paciente_id } = req.params;
+    const { exclude_id } = req.query;
+
+    let countSql = "SELECT COUNT(*) AS total FROM historias_clinicas WHERE paciente_id=? AND clinica_id=? AND estado='FIRMADA'";
+    const countParams = [paciente_id, cid];
+    if (exclude_id) { countSql += " AND id != ?"; countParams.push(exclude_id); }
+
+    const [[{ total }]] = await pool.query(countSql, countParams);
+
+    if (total === 0) {
+      return res.json({ ok: true, data: { es_nuevo: true, total_consultas: 0, ultima_consulta: null } });
+    }
+
+    // Última consulta firmada (excluyendo la actual si se indicó)
+    let ultSql = `
+      SELECT h.id, h.creado_en, h.diagnostico_cie, h.diagnosticos_secundarios,
+             h.plan, h.subjetivo, h.examen_fisico,
+             u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+             COALESCE(e.nombre, u.especialidad) AS especialidad
+      FROM historias_clinicas h
+      JOIN usuarios u ON u.id = h.medico_id
+      LEFT JOIN especialidades e ON e.id = u.especialidad_id
+      WHERE h.paciente_id=? AND h.clinica_id=? AND h.estado='FIRMADA'`;
+    const ultParams = [paciente_id, cid];
+    if (exclude_id) { ultSql += " AND h.id != ?"; ultParams.push(exclude_id); }
+    ultSql += " ORDER BY h.creado_en DESC LIMIT 1";
+
+    const [[ult]] = await pool.query(ultSql, ultParams);
+    if (!ult) return res.json({ ok: true, data: { es_nuevo: true, total_consultas: 0, ultima_consulta: null } });
+
+    // Descripción del CIE-10 principal
+    let dxDesc = "";
+    if (ult.diagnostico_cie) {
+      const [[cie]] = await pool.query(
+        "SELECT descripcion FROM cie10 WHERE codigo=? LIMIT 1",
+        [ult.diagnostico_cie]
+      );
+      dxDesc = cie?.descripcion || "";
+    }
+
+    // Medicamentos de esa consulta
+    const [meds] = await pool.query(
+      `SELECT COALESCE(m.nombre_generico, pi.medicamento_texto) AS nombre,
+              pi.dosis, pi.duracion
+       FROM prescripcion_items pi
+       JOIN prescripciones pr ON pr.id = pi.prescripcion_id
+       LEFT JOIN medicamentos m ON m.id = pi.medicamento_id
+       WHERE pr.historia_id=? AND pr.clinica_id=?
+       LIMIT 8`,
+      [ult.id, cid]
+    );
+
+    res.json({
+      ok: true,
+      data: {
+        es_nuevo: false,
+        total_consultas: total,
+        ultima_consulta: {
+          id:          ult.id,
+          fecha:       ult.creado_en,
+          medico:      `${ult.med_nombres} ${ult.med_apellidos}`,
+          especialidad: ult.especialidad || "",
+          diagnostico_cie:  ult.diagnostico_cie || "",
+          diagnostico_desc: dxDesc,
+          plan:        ult.plan || "",
+          subjetivo:   ult.subjetivo || "",
+          medicamentos: meds,
+        },
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // CIE-10 búsqueda rápida (autocompletar diagnóstico)
 // ═══════════════════════════════════════════════════════════════════════════════
 

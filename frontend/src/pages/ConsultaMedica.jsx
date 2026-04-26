@@ -43,6 +43,7 @@ export default function Consulta() {
   const [alertMsg,  setAlertMsg]  = useState(null);   // { type, msg }
   const [showConsultaModal,  setShowConsultaModal]  = useState(false);
   const [consultaPaciente,   setConsultaPaciente]   = useState(null);
+  const [resumenPac, setResumenPac] = useState(null); // nuevo vs. subsecuente
 
   // SOAP fields
   const [soap, setSoap] = useState({
@@ -101,6 +102,15 @@ export default function Consulta() {
   useEffect(() => {
     setVitals(v => ({ ...v, imc: calcIMC(v.peso, v.talla) }));
   }, [vitals.peso, vitals.talla]);
+
+  // ── resumen nuevo / subsecuente ──────────────────────────────────────────────
+  useEffect(() => {
+    const pid = paciente?.id || pacId;
+    if (!pid) return;
+    api.get(`/historias/paciente/${pid}/resumen`, { params: hid ? { exclude_id: hid } : {} })
+      .then(r => setResumenPac(r.data.data))
+      .catch(() => {});
+  }, [paciente?.id, pacId, hid]);
 
   // ── guardar borrador ─────────────────────────────────────────────────────────
   const handleSave = useCallback(async (sign = false) => {
@@ -276,6 +286,11 @@ export default function Consulta() {
           </div>
         )}
 
+        {/* ── Tarjeta nuevo / subsecuente ── */}
+        {resumenPac && (
+          <PacienteResumenCard resumen={resumenPac} />
+        )}
+
         {alertMsg && (
           <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
             {alertMsg.msg}
@@ -379,6 +394,230 @@ export default function Consulta() {
             setConsultaPaciente(null);
           }}
         />
+      )}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Tarjeta: Paciente Nuevo vs. Consulta Subsecuente
+// ══════════════════════════════════════════════════════════════════════
+function PacienteResumenCard({ resumen }) {
+  const [expandido, setExpandido] = useState(false);
+  if (!resumen) return null;
+
+  const { es_nuevo, total_consultas, ultima_consulta: ult } = resumen;
+
+  if (es_nuevo) {
+    return (
+      <div style={{
+        background: "linear-gradient(135deg, #f0fdf4, #dcfce7)",
+        border: "1px solid #86efac",
+        borderRadius: 10,
+        padding: "10px 16px",
+        marginBottom: 12,
+        display: "flex",
+        alignItems: "center",
+        gap: 10,
+        boxShadow: "0 1px 4px rgba(34,197,94,.12)",
+      }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: "50%",
+          background: "#22c55e", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, fontSize: "0.9rem",
+        }}>
+          <i className="bi bi-stars"></i>
+        </div>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#15803d" }}>
+            PACIENTE NUEVO
+          </div>
+          <div style={{ fontSize: "0.75rem", color: "#16a34a", marginTop: 1 }}>
+            Primera consulta registrada en esta clínica
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      background: expandido ? "#f8faff" : "#fff",
+      border: "1px solid #bfdbfe",
+      borderRadius: 10,
+      marginBottom: 12,
+      overflow: "hidden",
+      boxShadow: "0 1px 4px rgba(59,130,246,.1)",
+      transition: "background .2s",
+    }}>
+      {/* Cabecera siempre visible */}
+      <div
+        onClick={() => setExpandido(e => !e)}
+        style={{
+          display: "flex", alignItems: "center", gap: 10,
+          padding: "10px 16px", cursor: "pointer",
+        }}>
+        <div style={{
+          width: 32, height: 32, borderRadius: "50%",
+          background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          flexShrink: 0, fontSize: "0.85rem",
+        }}>
+          <i className="bi bi-arrow-repeat"></i>
+        </div>
+        <div style={{ flex: 1 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1d4ed8" }}>
+              CONSULTA SUBSECUENTE
+            </span>
+            <span style={{
+              background: "#dbeafe", color: "#1e40af",
+              borderRadius: 20, padding: "1px 9px",
+              fontSize: "0.7rem", fontWeight: 700,
+            }}>
+              {total_consultas} {total_consultas === 1 ? "visita previa" : "visitas previas"}
+            </span>
+          </div>
+          {ult && (
+            <div style={{ fontSize: "0.73rem", color: "#6b7280", marginTop: 2 }}>
+              Última visita: {dayjs(ult.fecha).format("DD/MM/YYYY")}
+              {ult.diagnostico_cie && (
+                <span style={{ marginLeft: 6, color: "#3b82f6" }}>
+                  · {ult.diagnostico_cie}{ult.diagnostico_desc ? ` – ${ult.diagnostico_desc}` : ""}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+        <div style={{ color: "#9ca3af", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontSize: "0.72rem" }}>{expandido ? "Cerrar" : "Ver última consulta"}</span>
+          <i className={`bi bi-chevron-${expandido ? "up" : "down"}`} style={{ fontSize: "0.72rem" }}></i>
+        </div>
+      </div>
+
+      {/* Detalle expandible */}
+      {expandido && ult && (
+        <div style={{
+          borderTop: "1px solid #dbeafe",
+          padding: "14px 16px",
+          background: "#f8faff",
+        }}>
+          {/* Médico y fecha */}
+          <div style={{
+            display: "flex", flexWrap: "wrap", gap: 16,
+            marginBottom: 12, fontSize: "0.8rem",
+          }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-calendar3" style={{ color: "#3b82f6" }}></i>
+              <span style={{ color: "#374151" }}>
+                <strong>Fecha:</strong> {dayjs(ult.fecha).format("DD [de] MMMM [de] YYYY")}
+              </span>
+            </div>
+            {ult.medico && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <i className="bi bi-person-badge" style={{ color: "#3b82f6" }}></i>
+                <span style={{ color: "#374151" }}>
+                  <strong>Médico:</strong> Dr. {ult.medico}
+                  {ult.especialidad && <span style={{ color: "#9ca3af" }}> · {ult.especialidad}</span>}
+                </span>
+              </div>
+            )}
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            {/* Motivo / Subjetivo */}
+            {ult.subjetivo && (
+              <div style={{
+                background: "#fff", borderRadius: 8, padding: "10px 12px",
+                border: "1px solid #e5e7eb",
+              }}>
+                <div style={{
+                  fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
+                  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
+                }}>
+                  <i className="bi bi-chat-square-text me-1 text-primary"></i>Motivo / Subjetivo
+                </div>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "#374151", lineHeight: 1.5 }}>
+                  {ult.subjetivo}
+                </p>
+              </div>
+            )}
+
+            {/* Diagnóstico */}
+            {ult.diagnostico_cie && (
+              <div style={{
+                background: "#fff", borderRadius: 8, padding: "10px 12px",
+                border: "1px solid #e5e7eb",
+              }}>
+                <div style={{
+                  fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
+                  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
+                }}>
+                  <i className="bi bi-clipboard2-pulse me-1 text-danger"></i>Diagnóstico
+                </div>
+                <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
+                  <span style={{
+                    background: "#fee2e2", color: "#dc2626",
+                    borderRadius: 6, padding: "1px 7px", fontSize: "0.72rem",
+                    fontWeight: 700, fontFamily: "monospace", flexShrink: 0,
+                  }}>
+                    {ult.diagnostico_cie}
+                  </span>
+                  {ult.diagnostico_desc && (
+                    <span style={{ fontSize: "0.82rem", color: "#374151", lineHeight: 1.4 }}>
+                      {ult.diagnostico_desc}
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Plan */}
+            {ult.plan && (
+              <div style={{
+                background: "#fff", borderRadius: 8, padding: "10px 12px",
+                border: "1px solid #e5e7eb",
+                gridColumn: ult.subjetivo && ult.diagnostico_cie ? "1 / -1" : undefined,
+              }}>
+                <div style={{
+                  fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
+                  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
+                }}>
+                  <i className="bi bi-list-check me-1 text-success"></i>Plan de tratamiento
+                </div>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "#374151", lineHeight: 1.5 }}>
+                  {ult.plan}
+                </p>
+              </div>
+            )}
+          </div>
+
+          {/* Medicamentos */}
+          {ult.medicamentos?.length > 0 && (
+            <div style={{ marginTop: 12 }}>
+              <div style={{
+                fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
+                textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6,
+              }}>
+                <i className="bi bi-capsule me-1 text-warning"></i>Medicamentos recetados
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {ult.medicamentos.map((m, i) => (
+                  <div key={i} style={{
+                    background: "#fffbeb", border: "1px solid #fde68a",
+                    borderRadius: 8, padding: "5px 10px", fontSize: "0.78rem",
+                    color: "#92400e",
+                  }}>
+                    <strong>{m.nombre}</strong>
+                    {m.dosis && <span style={{ color: "#b45309" }}> · {m.dosis}</span>}
+                    {m.duracion && <span style={{ color: "#b45309" }}> · {m.duracion}</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
