@@ -17,12 +17,55 @@
 const router  = require("express").Router();
 const pool    = require("../db");
 const { v4: uuidv4 } = require("uuid");
+const jwt     = require("jsonwebtoken");
+const rateLimit = require("express-rate-limit");
 const { enviarEmail, templateVerificacion, templateBienvenida } = require("../utils/mailer");
 const upload  = require("../middlewares/upload");
 const cloudinary  = require("../utils/cloudinary");
 const streamifier = require("streamifier");
 const fs      = require("fs");
 const path    = require("path");
+
+// ── Rate limiters ─────────────────────────────────────────
+const limiterStrict = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutos
+  max: 20,
+  standardHeaders: true, legacyHeaders: false,
+  message: { ok: false, msg: "Demasiadas solicitudes. Intenta en 15 minutos." },
+});
+const limiterModerate = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 60,
+  standardHeaders: true, legacyHeaders: false,
+  message: { ok: false, msg: "Demasiadas solicitudes. Intenta en 15 minutos." },
+});
+
+// ── Helper: genera session token para el paciente ────────
+const SESSION_SECRET = process.env.JWT_SECRET || "clinica_session_fallback";
+function generarSessionToken(pacienteId, clinicaId) {
+  return jwt.sign(
+    { paciente_id: pacienteId, clinica_id: clinicaId, tipo: "registro_session" },
+    SESSION_SECRET,
+    { expiresIn: "2h" }
+  );
+}
+
+// ── Helper: valida session token ─────────────────────────
+function validarSessionToken(req, res) {
+  const token = req.headers["x-session-token"] || req.query.session_token || req.body?.session_token;
+  if (!token) {
+    res.status(401).json({ ok: false, msg: "Token de sesión requerido" });
+    return null;
+  }
+  try {
+    const payload = jwt.verify(token, SESSION_SECRET);
+    if (payload.tipo !== "registro_session") throw new Error("tipo inválido");
+    return payload;
+  } catch {
+    res.status(401).json({ ok: false, msg: "Sesión inválida o expirada. Por favor vuelve a verificar tu identidad." });
+    return null;
+  }
+}
 
 // ── Helper: crea token y envía email ──────────────────────
 async function crearYEnviarToken(pacienteId, clinicaId, email, nombres, apellidos, conn) {
@@ -71,8 +114,11 @@ router.post("/", async (req, res) => {
     const {
       nombres, apellidos, dni, fecha_nacimiento, sexo,
       telefono, email, direccion, ciudad,
-      pais = "Perú", grupo_sanguineo, clinica_id,
+      departamento, municipio,
+      pais = "Honduras", grupo_sanguineo, clinica_id,
     } = req.body;
+
+    const ciudadFinal = municipio?.trim() || ciudad?.trim() || null;
 
     // ── Validaciones básicas ────────────────────────────
     if (!nombres?.trim() || !apellidos?.trim())
@@ -119,7 +165,7 @@ router.post("/", async (req, res) => {
         telefono?.trim() || null,
         email.trim().toLowerCase(),
         direccion?.trim() || null,
-        ciudad?.trim()    || null,
+        ciudadFinal,
         pais,
         grupo_sanguineo   || null,
       ]
@@ -139,12 +185,15 @@ router.post("/", async (req, res) => {
 
     await conn.commit();
 
+    const sessionToken = generarSessionToken(pacienteId, clinica_id);
+
     res.status(201).json({
       ok:  true,
       msg: emailEnviado
         ? "Registro exitoso. Revisa tu correo para verificar tu cuenta."
         : "Registro exitoso. El email de verificación no pudo enviarse; el personal de la clínica activará tu cuenta.",
       id:  pacienteId,
+      session_token: sessionToken,
       email_enviado: emailEnviado,
     });
   } catch (e) {
@@ -206,7 +255,7 @@ router.get("/verificar/:token", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // POST /api/registro/reenviar  — Reenvía verificación
 // ══════════════════════════════════════════════════════════
-router.post("/reenviar", async (req, res) => {
+router.post("/reenviar", limiterStrict, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const { email, clinica_id } = req.body;
@@ -237,7 +286,7 @@ router.post("/reenviar", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 // POST /api/registro/:id/foto  — Foto de perfil durante registro (sin auth)
 // ══════════════════════════════════════════════════════════
-router.post("/:id/foto", upload.single("foto"), async (req, res) => {
+router.post("/:id/foto", limiterModerate, upload.single("foto"), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
 
@@ -245,6 +294,12 @@ router.post("/:id/foto", upload.single("foto"), async (req, res) => {
     const { clinica_id } = req.body;
     if (!clinica_id)
       return res.status(400).json({ ok: false, msg: "clinica_id requerido" });
+
+    // Validar session token — el paciente_id del token debe coincidir con :id
+    const session = validarSessionToken(req, res);
+    if (!session) return;
+    if (String(session.paciente_id) !== String(id) || String(session.clinica_id) !== String(clinica_id))
+      return res.status(403).json({ ok: false, msg: "No autorizado" });
 
     const [[p]] = await pool.query(
       "SELECT id, foto_cloudinary_id FROM pacientes WHERE id=? AND clinica_id=?",
@@ -272,6 +327,244 @@ router.post("/:id/foto", upload.single("foto"), async (req, res) => {
     );
 
     res.json({ ok: true, foto_perfil: uploadResult.secure_url });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/registro/info?clinica_id=X  — Público
+// ══════════════════════════════════════════════════════════
+router.get("/info", async (req, res) => {
+  try {
+    const { clinica_id } = req.query;
+    if (!clinica_id)
+      return res.status(400).json({ ok: false, msg: "clinica_id es requerido" });
+
+    const [[clinica]] = await pool.query(
+      "SELECT nombre, telefono, direccion FROM clinicas WHERE id=? LIMIT 1",
+      [clinica_id]
+    );
+    if (!clinica)
+      return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    // Médico principal: primer MEDICO activo (o ADMIN si no hay médico)
+    const [[medico]] = await pool.query(
+      `SELECT nombres, apellidos, e.nombre AS especialidad
+       FROM usuarios u
+       LEFT JOIN especialidades e ON e.id = u.especialidad_id
+       WHERE u.clinica_id=? AND u.activo=1 AND u.tipo IN ('MEDICO','ADMIN','SUPER_ADMIN')
+       ORDER BY FIELD(u.tipo,'MEDICO','ADMIN','SUPER_ADMIN'), u.id ASC
+       LIMIT 1`,
+      [clinica_id]
+    );
+
+    res.json({
+      ok: true,
+      nombre: clinica.nombre,
+      telefono: clinica.telefono || null,
+      medico: medico ? { nombres: medico.nombres, apellidos: medico.apellidos, especialidad: medico.especialidad } : null,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/registro/buscar-dni?dni=XXX&clinica_id=X  — Público
+// ══════════════════════════════════════════════════════════
+router.get("/buscar-dni", limiterStrict, async (req, res) => {
+  try {
+    const { dni, clinica_id } = req.query;
+    if (!dni || !clinica_id)
+      return res.status(400).json({ ok: false, msg: "dni y clinica_id son requeridos" });
+
+    const [[p]] = await pool.query(
+      "SELECT id, nombres, apellidos, email FROM pacientes WHERE dni=? AND clinica_id=? AND activo=1 LIMIT 1",
+      [dni.trim(), clinica_id]
+    );
+    if (!p)
+      return res.status(404).json({ ok: false, encontrado: false, msg: "No se encontró paciente con ese DNI en esta clínica" });
+
+    // Enmascarar email: ana***@gmail.com
+    const emailMasked = p.email
+      ? p.email.replace(/^(..)(.*?)(@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 3)) + c)
+      : null;
+
+    const sessionToken = generarSessionToken(p.id, clinica_id);
+
+    res.json({
+      ok: true,
+      encontrado: true,
+      session_token: sessionToken,
+      paciente: { id: p.id, nombres: p.nombres, apellidos: p.apellidos, email: emailMasked },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/registro/doctores?clinica_id=X  — Público
+// ══════════════════════════════════════════════════════════
+router.get("/doctores", async (req, res) => {
+  try {
+    const { clinica_id } = req.query;
+    if (!clinica_id)
+      return res.status(400).json({ ok: false, msg: "clinica_id es requerido" });
+
+    const [rows] = await pool.query(
+      `SELECT u.id, u.nombres, u.apellidos,
+              e.nombre AS especialidad
+       FROM usuarios u
+       LEFT JOIN especialidades e ON e.id = u.especialidad_id
+       WHERE u.clinica_id=? AND u.activo=1 AND u.tipo = 'MEDICO'
+       ORDER BY u.apellidos, u.nombres`,
+      [clinica_id]
+    );
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/registro/slots?medico_id=X&fecha=YYYY-MM-DD&clinica_id=X  — Público
+// ══════════════════════════════════════════════════════════
+router.get("/slots", async (req, res) => {
+  try {
+    const { medico_id, fecha, clinica_id } = req.query;
+    if (!medico_id || !fecha || !clinica_id)
+      return res.status(400).json({ ok: false, msg: "medico_id, fecha y clinica_id son obligatorios" });
+
+    const [[tzRow]] = await pool.query(
+      "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='zona_horaria'",
+      [clinica_id]
+    );
+    const tz = tzRow?.valor || "America/Tegucigalpa";
+
+    const nombreDia = new Intl.DateTimeFormat("en-US", { timeZone: tz, weekday: "short" })
+      .format(new Date(fecha + "T12:00:00Z"));
+    const WD_MAP = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const diaJS    = WD_MAP[nombreDia];
+    const diaLunes = diaJS === 0 ? 6 : diaJS - 1; // 0=Lun … 6=Dom
+
+    const [horarios] = await pool.query(
+      "SELECT hora_inicio, hora_fin, slot_minutos FROM horarios_medico WHERE medico_id=? AND clinica_id=? AND dia_semana=? AND activo=1",
+      [medico_id, clinica_id, diaLunes]
+    );
+    if (!horarios.length) return res.json({ ok: true, data: [] });
+
+    const [ocupadas] = await pool.query(
+      `SELECT inicio, fin FROM citas
+       WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
+         AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
+      [clinica_id, medico_id, fecha]
+    );
+
+    const pad = n => String(n).padStart(2, "0");
+    const toLocalISO = d =>
+      `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+
+    const slots = [];
+    for (const h of horarios) {
+      let cursor = new Date(`${fecha}T${h.hora_inicio}`);
+      const fin  = new Date(`${fecha}T${h.hora_fin}`);
+      while (cursor < fin) {
+        const slotFin = new Date(cursor.getTime() + h.slot_minutos * 60000);
+        const ocup = ocupadas.some(
+          c => new Date(c.inicio) < slotFin && new Date(c.fin) > cursor
+        );
+        if (!ocup) {
+          slots.push({
+            inicio: toLocalISO(cursor),
+            fin:    toLocalISO(slotFin),
+            label:  cursor.toTimeString().slice(0, 5) + " - " + slotFin.toTimeString().slice(0, 5),
+          });
+        }
+        cursor = slotFin;
+      }
+    }
+    res.json({ ok: true, data: slots });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/registro/cita  — Crear cita (público, sin auth)
+// ══════════════════════════════════════════════════════════
+router.post("/cita", limiterModerate, async (req, res) => {
+  try {
+    const { paciente_id, medico_id, inicio, fin, motivo, clinica_id } = req.body;
+    if (!paciente_id || !medico_id || !inicio || !fin || !clinica_id)
+      return res.status(400).json({ ok: false, msg: "paciente_id, medico_id, inicio, fin, clinica_id son obligatorios" });
+
+    // Validar session token — el paciente_id del token debe coincidir con el del body
+    const session = validarSessionToken(req, res);
+    if (!session) return;
+    if (String(session.paciente_id) !== String(paciente_id) || String(session.clinica_id) !== String(clinica_id))
+      return res.status(403).json({ ok: false, msg: "No autorizado" });
+
+    // Verificar que paciente y médico pertenecen a la clínica
+    const [[p]] = await pool.query(
+      "SELECT id FROM pacientes WHERE id=? AND clinica_id=? AND activo=1",
+      [paciente_id, clinica_id]
+    );
+    if (!p) return res.status(403).json({ ok: false, msg: "Paciente no pertenece a esta clínica" });
+
+    const [[m]] = await pool.query(
+      "SELECT id FROM usuarios WHERE id=? AND clinica_id=? AND activo=1",
+      [medico_id, clinica_id]
+    );
+    if (!m) return res.status(403).json({ ok: false, msg: "Médico no pertenece a esta clínica" });
+
+    // Verificar solapamiento
+    const [solap] = await pool.query(
+      `SELECT id FROM citas
+       WHERE clinica_id=? AND medico_id=?
+         AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')
+         AND NOT (fin <= ? OR inicio >= ?)
+       LIMIT 1`,
+      [clinica_id, medico_id, inicio, fin]
+    );
+    if (solap.length > 0)
+      return res.status(409).json({ ok: false, msg: "Ese horario ya no está disponible. Por favor elige otro." });
+
+    const [r] = await pool.query(
+      `INSERT INTO citas (clinica_id, paciente_id, medico_id, inicio, fin, tipo_consulta, motivo, canal)
+       VALUES (?,?,?,?,?,?,?,?)`,
+      [clinica_id, paciente_id, medico_id, inicio, fin, "CONTROL", motivo || null, "PORTAL"]
+    );
+    res.json({ ok: true, id: r.insertId, msg: "Cita agendada exitosamente" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// GET /api/registro/estudios-pendientes — Protegido con session token
+// ══════════════════════════════════════════════════════════
+router.get("/estudios-pendientes", limiterModerate, async (req, res) => {
+  try {
+    // Validar session token — extraer paciente_id y clinica_id del token, no de la query
+    const session = validarSessionToken(req, res);
+    if (!session) return;
+    const paciente_id = session.paciente_id;
+    const clinica_id  = session.clinica_id;
+
+    const [rows] = await pool.query(
+      `SELECT es.id, es.tipo, es.descripcion, es.urgente, es.creado_en,
+              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos
+       FROM estudios_solicitudes es
+       JOIN usuarios u ON u.id = es.medico_id
+       WHERE es.paciente_id = ? AND es.clinica_id = ?
+         AND es.estado IN ('SOLICITADO','EN_PROCESO')
+       ORDER BY es.creado_en DESC`,
+      [paciente_id, clinica_id]
+    );
+
+    res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
