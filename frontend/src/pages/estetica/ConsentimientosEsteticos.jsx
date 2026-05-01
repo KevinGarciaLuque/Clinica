@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import api from "../../api/api";
 
 const C = {
-  bg: "#0d1b2e", surface: "#112240", card: "#162a45",
-  border: "rgba(255,255,255,0.07)", accent: "#e91e8c",
-  accentD: "#c2185b", text: "#e2e8f0", muted: "#94a3b8", inputBg: "#0d1b2e",
+  bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
+  border: "#e5e7eb", accent: "#e91e8c", accentD: "#c2185b",
+  text: "#111827", textSub: "#374151", muted: "#6b7280",
+  mutedLt: "#9ca3af", inputBg: "#ffffff", success: "#10b981",
 };
 
 const inputSt = {
@@ -92,25 +93,25 @@ export default function ConsentimientosEsteticos() {
   };
 
   return (
-    <div style={{ color: C.text, minHeight: "100vh" }}>
-      {/* Banner */}
+    <div style={{ background: C.bg, minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
+      {/* Header */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.surface} 0%, #2d0a1f 100%)`,
-        borderRadius: 16, padding: "24px 28px", marginBottom: 24,
-        border: `1px solid ${C.border}`, boxShadow: "0 4px 24px rgba(0,0,0,.3)",
+        background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+        padding: "20px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 14,
+            width: 46, height: 46, borderRadius: 12,
             background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
             display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
           }}>
-            <i className="bi bi-file-earmark-check-fill" style={{ fontSize: 22, color: "#fff" }} />
+            <i className="bi bi-file-earmark-check-fill" style={{ fontSize: 20, color: "#fff" }} />
           </div>
           <div>
-            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 22, color: C.text }}>Consentimientos Estéticos</h4>
-            <span style={{ color: C.muted, fontSize: 13 }}>
+            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: "#fff" }}>Consentimientos Estéticos</h4>
+            <span style={{ color: "rgba(255,255,255,.5)", fontSize: 13 }}>
               Consentimientos informados por procedimiento — {PLANTILLAS.length} plantillas disponibles
             </span>
           </div>
@@ -119,14 +120,16 @@ export default function ConsentimientosEsteticos() {
           onClick={() => { setShowModal(true); setPlantillaSelec(null); setForm({ paciente_id: "", plantilla_id: "", notas: "" }); }}
           style={{
             background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-            border: "none", borderRadius: 10, padding: "10px 20px",
+            border: "none", borderRadius: 10, padding: "9px 18px",
             color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 8,
             boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
-          }}>
+          }}
+        >
           <i className="bi bi-plus-lg" /> Nuevo consentimiento
         </button>
       </div>
+      <div style={{ padding: "20px 24px" }}>
 
       {/* Plantillas disponibles */}
       <div style={{ marginBottom: 28 }}>
@@ -140,7 +143,7 @@ export default function ConsentimientosEsteticos() {
               display: "flex", alignItems: "center", gap: 8,
             }}>
               <i className="bi bi-file-earmark-text" style={{ color: C.accent, fontSize: 14 }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#113152" }}>{p.procedimiento}</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: C.textSub }}>{p.procedimiento}</span>
             </div>
           ))}
         </div>
@@ -156,7 +159,7 @@ export default function ConsentimientosEsteticos() {
         <div style={{ textAlign: "center", padding: "60px 0" }}>
           <div style={{
             width: 68, height: 68, borderRadius: 18, margin: "0 auto 16px",
-            background: "rgba(233,30,140,.07)", border: "1px solid rgba(233,30,140,.15)",
+            background: `${C.accent}08`, border: `1px solid ${C.accent}20`,
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
             <i className="bi bi-file-earmark-check" style={{ fontSize: 28, color: C.accent }} />
@@ -170,6 +173,7 @@ export default function ConsentimientosEsteticos() {
               background: C.card, border: `1px solid ${c.firmado ? "rgba(16,185,129,.3)" : C.border}`,
               borderRadius: 12, padding: "16px 20px",
               display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+              boxShadow: "0 1px 4px rgba(0,0,0,.06)",
             }}>
               <div style={{
                 width: 42, height: 42, borderRadius: 10, flexShrink: 0,
@@ -220,28 +224,38 @@ export default function ConsentimientosEsteticos() {
         </div>
       )}
 
+      </div>{/* fin padding */}
+
       {/* Modal nuevo consentimiento */}
       {showModal && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 1050,
-          background: "rgba(0,0,0,.7)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-        }}>
+        <>
           <div style={{
-            background: C.surface, borderRadius: 18, width: "100%", maxWidth: 660,
-            maxHeight: "90vh", overflowY: "auto", border: `1px solid ${C.border}`,
-            boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+            position: "fixed", inset: 0, zIndex: 1049,
+            background: "rgba(0,0,0,.45)", backdropFilter: "blur(4px)",
+          }} onClick={() => setShowModal(false)} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%",
+            transform: "translate(-50%,-50%)",
+            zIndex: 1050,
+            background: C.card, borderRadius: 16, width: "calc(100% - 32px)", maxWidth: 660,
+            maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 20px 60px rgba(0,0,0,.2)",
+            border: `1px solid ${C.border}`,
           }}>
             <div style={{
-              padding: "20px 24px", borderBottom: `1px solid ${C.border}`,
+              background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+              padding: "18px 22px",
               display: "flex", alignItems: "center", justifyContent: "space-between",
+              borderRadius: "16px 16px 0 0",
             }}>
-              <h5 style={{ margin: 0, fontWeight: 700, color: C.text }}>
-                <i className="bi bi-file-earmark-check-fill me-2" style={{ color: C.accent }} />
+              <h5 style={{ margin: 0, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 10 }}>
+                <i className="bi bi-file-earmark-check-fill" style={{ color: "#f9a8d4", fontSize: 18 }} />
                 Nuevo Consentimiento Informado
               </h5>
               <button onClick={() => setShowModal(false)}
-                style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18 }}>
+                style={{ background: "rgba(239,68,68,.2)", border: "none", borderRadius: 8,
+                           width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center",
+                           color: "#fca5a5", cursor: "pointer", fontSize: 16 }}>
                 <i className="bi bi-x-lg" />
               </button>
             </div>
@@ -274,9 +288,9 @@ export default function ConsentimientosEsteticos() {
                     Texto del consentimiento
                   </label>
                   <div style={{
-                    background: "rgba(233,30,140,.07)", border: `1px solid ${C.accent}25`,
+                    background: `${C.accent}08`, border: `1px solid ${C.accent}25`,
                     borderRadius: 10, padding: "14px 16px", fontSize: 13,
-                    color: "#cbd5e1", lineHeight: 1.7, marginBottom: 12,
+                    color: C.textSub, lineHeight: 1.7, marginBottom: 12,
                   }}>
                     {plantillaSelec.contenido}
                   </div>
@@ -286,7 +300,7 @@ export default function ConsentimientosEsteticos() {
                     </div>
                     <ul style={{ margin: 0, paddingLeft: 18 }}>
                       {plantillaSelec.riesgos.map((r, i) => (
-                        <li key={i} style={{ fontSize: 13, color: "#94a3b8", marginBottom: 3 }}>{r}</li>
+                        <li key={i} style={{ fontSize: 13, color: C.muted, marginBottom: 3 }}>{r}</li>
                       ))}
                     </ul>
                   </div>
@@ -305,21 +319,21 @@ export default function ConsentimientosEsteticos() {
 
               <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
                 <button type="button" onClick={() => setShowModal(false)}
-                  style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9,
-                             padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600 }}>
+                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 9,
+                             padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
                   Cancelar
                 </button>
                 <button type="submit"
                   style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
                              border: "none", borderRadius: 9, padding: "10px 26px",
-                             color: "#fff", fontWeight: 700, cursor: "pointer",
-                             boxShadow: `0 4px 14px rgba(233,30,140,.4)` }}>
+                             color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 14,
+                             boxShadow: `0 4px 14px rgba(233,30,140,.35)` }}>
                   <i className="bi bi-check-lg me-1" /> Emitir consentimiento
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

@@ -2,14 +2,28 @@ import { useEffect, useState } from "react";
 import api from "../../api/api";
 
 const C = {
-  bg: "#0d1b2e", surface: "#112240", card: "#162a45",
-  border: "rgba(255,255,255,0.07)", accent: "#e91e8c",
-  accentD: "#c2185b", text: "#e2e8f0", muted: "#94a3b8", inputBg: "#0d1b2e",
+  bg:      "#f0f2f5",
+  surface: "#f8fafc",
+  card:    "#ffffff",
+  border:  "#e5e7eb",
+  accent:  "#e91e8c",
+  accentD: "#c2185b",
+  text:    "#111827",
+  textSub: "#374151",
+  muted:   "#6b7280",
+  mutedLt: "#9ca3af",
+  inputBg: "#ffffff",
 };
 
 const inputSt = {
-  background: C.inputBg, border: `1px solid ${C.border}`, borderRadius: 8,
-  color: C.text, padding: "8px 12px", width: "100%", fontSize: 14, outline: "none",
+  background: C.inputBg,
+  border: `1px solid ${C.border}`,
+  borderRadius: 8,
+  color: C.text,
+  padding: "9px 12px",
+  width: "100%",
+  fontSize: 14,
+  outline: "none",
 };
 
 const FOTOTIPOS = [
@@ -178,57 +192,74 @@ export default function FichaEstetica() {
   };
 
   return (
-    <div style={{ color: C.text, minHeight: "100vh" }}>
-      {/* Banner */}
+    <div style={{ background: C.bg, minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
+
+      {/* ── Barra superior ── */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.surface} 0%, #2d0a1f 100%)`,
-        borderRadius: 16, padding: "24px 28px", marginBottom: 24,
-        border: `1px solid ${C.border}`, boxShadow: "0 4px 24px rgba(0,0,0,.3)",
-        display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
+        background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+        padding: "16px 24px",
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        boxShadow: "0 2px 12px rgba(0,0,0,.2)",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 14,
-            background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+            width: 38, height: 38, borderRadius: 10,
+            background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <i className="bi bi-person-vcard-fill" style={{ fontSize: 22, color: "#fff" }} />
+            <i className="bi bi-person-vcard-fill" style={{ color: "#f9a8d4", fontSize: "1rem" }} />
           </div>
           <div>
-            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 22, color: C.text }}>Ficha Estética del Paciente</h4>
-            <span style={{ color: C.muted, fontSize: 13 }}>
-              Fototipo, procedimientos previos, zonas de interés y expectativas
-            </span>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Ficha Estética</div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
+              Fototipo · procedimientos previos · zonas de interés · expectativas
+            </div>
           </div>
         </div>
         {ficha && !editando && (
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={abrir}
-              style={{
-                background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-                border: "none", borderRadius: 10, padding: "10px 20px",
-                color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 8,
-              }}>
+            <button onClick={abrir} style={{
+              background: C.accent, border: "none", borderRadius: 8,
+              color: "#fff", padding: "7px 16px", fontSize: "0.82rem",
+              cursor: "pointer", fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
               <i className="bi bi-pencil-square" /> Editar ficha
             </button>
-            <button onClick={eliminarFicha}
-              style={{
-                background: "rgba(239,68,68,.15)",
-                border: "1px solid rgba(239,68,68,.3)",
-                borderRadius: 10, padding: "10px 20px",
-                color: "#ef4444", fontWeight: 600, fontSize: 14, cursor: "pointer",
-                display: "flex", alignItems: "center", gap: 8,
-              }}>
-              <i className="bi bi-trash" /> Eliminar ficha
+            <button onClick={eliminarFicha} style={{
+              background: "rgba(239,68,68,.18)", border: "1px solid rgba(239,68,68,.4)",
+              borderRadius: 8, color: "#fca5a5", padding: "7px 16px", fontSize: "0.82rem",
+              cursor: "pointer", fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+              <i className="bi bi-trash" /> Eliminar
             </button>
           </div>
         )}
       </div>
 
-      {/* Buscador de paciente */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
-        <div style={{ flex: "1 1 260px", position: "relative" }}>
+      {/* ── Contenido ── */}
+      <div style={{ padding: "20px 24px" }}>
+
+      {/* Toast guardado */}
+      {guardado && (
+        <div style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
+          background: "#10b981", borderRadius: 12, padding: "12px 20px",
+          color: "#fff", fontWeight: 600, fontSize: 14,
+          display: "flex", alignItems: "center", gap: 8,
+          boxShadow: "0 8px 24px rgba(0,0,0,.25)",
+        }}>
+          <i className="bi bi-check-circle-fill" /> Ficha estética guardada correctamente
+        </div>
+      )}
+
+      {/* ── Buscador ── */}
+      <div style={{
+        background: C.card, borderRadius: 12, padding: "18px 20px", marginBottom: 16,
+        boxShadow: "0 1px 4px rgba(0,0,0,.06)", border: `1px solid ${C.border}`,
+      }}>
+      <div style={{ position: "relative", maxWidth: 480 }}>
           <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
                           letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
             Buscar Paciente
@@ -283,7 +314,7 @@ export default function FichaEstetica() {
                 position: "absolute", top: "100%", left: 0, right: 0,
                 marginTop: 6, background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 10, maxHeight: 280, overflowY: "auto",
-                boxShadow: "0 8px 24px rgba(0,0,0,.4)", zIndex: 20,
+                boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 20,
               }}>
                 {pacientesFiltrados.map(p => (
                   <div
@@ -342,7 +373,7 @@ export default function FichaEstetica() {
                 position: "absolute", top: "100%", left: 0, right: 0,
                 marginTop: 6, background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 10, padding: "20px 14px", textAlign: "center",
-                boxShadow: "0 8px 24px rgba(0,0,0,.4)", zIndex: 20,
+                boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 20,
               }}>
                 <i className="bi bi-search" style={{ fontSize: 24, color: C.muted, marginBottom: 8, display: "block" }} />
                 <div style={{ color: C.muted, fontSize: 13 }}>
@@ -351,18 +382,18 @@ export default function FichaEstetica() {
               </div>
             </>
           )}
-        </div>
+      </div>
       </div>
 
       {/* Card del paciente seleccionado */}
       {pacSeleccionado && (
         <div style={{
-          background: `${C.accent}12`, border: `1px solid ${C.accent}33`,
-          borderRadius: 12, padding: "12px 18px", marginBottom: 20,
-          display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+          background: `${C.accent}08`, border: `1px solid ${C.accent}30`,
+          borderRadius: 12, padding: "12px 18px", marginBottom: 16,
+          display: "flex", alignItems: "center", gap: 14,
         }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 10,
+            width: 38, height: 38, borderRadius: 9,
             background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
             display: "flex", alignItems: "center", justifyContent: "center",
             fontWeight: 700, color: "#fff", flexShrink: 0,
@@ -370,12 +401,12 @@ export default function FichaEstetica() {
             {(pacSeleccionado.nombres?.[0] || "?").toUpperCase()}
           </div>
           <div style={{ flex: 1 }}>
-            <div style={{ fontWeight: 700, color: C.text }}>
+            <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}>
               {pacSeleccionado.nombres} {pacSeleccionado.apellidos}
             </div>
             <div style={{ fontSize: 12, color: C.muted }}>
               {pacSeleccionado.dni && `DNI: ${pacSeleccionado.dni}`}
-              {pacSeleccionado.dni && pacSeleccionado.fecha_nacimiento && " • "}
+              {pacSeleccionado.dni && pacSeleccionado.fecha_nacimiento && " · "}
               {pacSeleccionado.fecha_nacimiento &&
                 `${new Date().getFullYear() - new Date(pacSeleccionado.fecha_nacimiento).getFullYear()} años`}
             </div>
@@ -383,224 +414,71 @@ export default function FichaEstetica() {
         </div>
       )}
 
-      {/* Toast guardado */}
-      {guardado && (
-        <div style={{
-          position: "fixed", bottom: 24, right: 24, zIndex: 9999,
-          background: "rgba(16,185,129,.9)", borderRadius: 12, padding: "12px 20px",
-          color: "#fff", fontWeight: 600, fontSize: 14,
-          display: "flex", alignItems: "center", gap: 8,
-          boxShadow: "0 8px 24px rgba(0,0,0,.3)",
-        }}>
-          <i className="bi bi-check-circle-fill" /> Ficha estética guardada correctamente
-        </div>
-      )}
-
       {!pacId ? (
         pacientesConFicha.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "72px 0" }}>
+          /* Estado vacío */
+          <div style={{
+            background: C.card, borderRadius: 12, padding: "72px 24px",
+            textAlign: "center", boxShadow: "0 1px 4px rgba(0,0,0,.06)",
+            border: `1px solid ${C.border}`,
+          }}>
             <div style={{
-              width: 72, height: 72, borderRadius: 20, margin: "0 auto 18px",
-              background: "rgba(233,30,140,.07)", border: "1px solid rgba(233,30,140,.15)",
+              width: 64, height: 64, borderRadius: 18, margin: "0 auto 18px",
+              background: `${C.accent}10`, border: `1px solid ${C.accent}25`,
               display: "flex", alignItems: "center", justifyContent: "center",
             }}>
-              <i className="bi bi-person-vcard" style={{ fontSize: 30, color: C.accent }} />
+              <i className="bi bi-person-vcard" style={{ fontSize: 28, color: C.accent }} />
             </div>
-            <p style={{ color: C.muted, fontSize: 15, fontWeight: 600, margin: 0 }}>Sin fichas estéticas registradas</p>
+            <p style={{ color: C.text, fontSize: 15, fontWeight: 600, margin: 0 }}>Sin fichas estéticas registradas</p>
             <p style={{ color: C.muted, fontSize: 13, margin: "8px 0 0" }}>Busca un paciente arriba para crear su ficha estética</p>
           </div>
         ) : (
+          /* Tabla de pacientes con ficha */
           <div style={{
             background: C.card, border: `1px solid ${C.border}`,
             borderRadius: 12, overflow: "hidden",
+            boxShadow: "0 1px 4px rgba(0,0,0,.06)",
           }}>
             <div style={{
               padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
-              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: "#f8fafc",
             }}>
-              <div>
-                <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 16 }}>
-                  <i className="bi bi-people-fill me-2" style={{ color: C.accent }} />
-                  Pacientes con Ficha Estética
-                </h5>
-                <span style={{ fontSize: 12, color: C.muted, marginTop: 4, display: "block" }}>
-                  {pacientesConFicha.length} paciente{pacientesConFicha.length !== 1 ? "s" : ""} con ficha registrada
-                </span>
-              </div>
+              <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 15 }}>
+                <i className="bi bi-people-fill me-2" style={{ color: C.accent }} />
+                Pacientes con Ficha Estética
+              </h5>
+              <span style={{ fontSize: 12, color: C.muted, marginTop: 3, display: "block" }}>
+                {pacientesConFicha.length} paciente{pacientesConFicha.length !== 1 ? "s" : ""} con ficha registrada
+              </span>
             </div>
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
-                  <tr style={{ background: `${C.accent}08`, borderBottom: `1px solid ${C.border}` }}>
-                    <th style={{
-                      padding: "12px 18px", textAlign: "left", fontSize: 12,
-                      fontWeight: 700, color: C.muted, textTransform: "uppercase",
-                      letterSpacing: ".05em",
-                    }}>
-                      Paciente
-                    </th>
-                    <th style={{
-                      padding: "12px 18px", textAlign: "left", fontSize: 12,
-                      fontWeight: 700, color: C.muted, textTransform: "uppercase",
-                      letterSpacing: ".05em",
-                    }}>
-                      DNI
-                    </th>
-                    <th style={{
-                      padding: "12px 18px", textAlign: "left", fontSize: 12,
-                      fontWeight: 700, color: C.muted, textTransform: "uppercase",
-                      letterSpacing: ".05em",
-                    }}>
-                      Última Actualización
-                    </th>
-                    <th style={{
-                      padding: "12px 18px", textAlign: "center", fontSize: 12,
-                      fontWeight: 700, color: C.muted, textTransform: "uppercase",
-                      letterSpacing: ".05em", width: 140,
-                    }}>
-                      Acciones
-                    </th>
+                  <tr style={{ background: "#f8fafc" }}>
+                    {["Paciente", "DNI", "Última Actualización", "Acciones"].map(h => (
+                      <th key={h} style={{
+                        padding: "10px 18px",
+                        textAlign: h === "Acciones" ? "center" : "left",
+                        fontSize: "0.73rem", fontWeight: 700, color: C.muted,
+                        textTransform: "uppercase", letterSpacing: ".05em",
+                        borderBottom: `2px solid ${C.border}`, whiteSpace: "nowrap",
+                      }}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
                   {pacientesConFicha.map(pac => (
-                    <tr
+                    <FilaFicha
                       key={pac.id}
-                      style={{
-                        borderBottom: `1px solid ${C.border}`,
-                        cursor: "pointer",
-                        transition: "background .2s",
+                      pac={pac}
+                      onVer={() => abrirModalVer(pac)}
+                      onEditar={() => { seleccionarPaciente(pac); setTimeout(() => setEditando(true), 0); }}
+                      onEliminar={() => {
+                        if (!window.confirm(`¿Eliminar la ficha de ${pac.nombres} ${pac.apellidos}?`)) return;
+                        localStorage.removeItem(`ficha_estetica_${pac.id}`);
+                        cargarPacientesConFicha(pacientes);
                       }}
-                      onMouseEnter={e => e.currentTarget.style.background = `${C.accent}08`}
-                      onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                      onClick={() => abrirModalVer(pac)}
-                    >
-                      <td style={{ padding: "14px 18px" }}>
-                        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                          <div style={{
-                            width: 36, height: 36, borderRadius: 8,
-                            background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            fontWeight: 700, color: "#fff", fontSize: 14, flexShrink: 0,
-                          }}>
-                            {(pac.nombres?.[0] || "?").toUpperCase()}
-                          </div>
-                          <div>
-                            <div style={{ fontWeight: 600, color: C.text, fontSize: 14 }}>
-                              {pac.nombres} {pac.apellidos}
-                            </div>
-                            {pac.fecha_nacimiento && (
-                              <div style={{ fontSize: 12, color: C.muted }}>
-                                {new Date().getFullYear() - new Date(pac.fecha_nacimiento).getFullYear()} años
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ padding: "14px 18px" }}>
-                        <div style={{ fontSize: 13, color: C.muted }}>
-                          {pac.dni || "N/A"}
-                        </div>
-                      </td>
-                      <td style={{ padding: "14px 18px" }}>
-                        <div style={{ fontSize: 13, color: C.muted }}>
-                          <i className="bi bi-calendar2 me-2" />
-                          {new Date(pac.ultima_actualizacion).toLocaleDateString("es-PE", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric",
-                          })}
-                        </div>
-                      </td>
-                      <td style={{ padding: "14px 18px", textAlign: "center" }}>
-                        <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              abrirModalVer(pac);
-                            }}
-                            style={{
-                              width: 34, height: 34, borderRadius: 8,
-                              background: `${C.accent}15`,
-                              border: `1px solid ${C.accent}33`,
-                              color: C.accent,
-                              cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              transition: "all .2s",
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = `${C.accent}33`;
-                              e.currentTarget.style.transform = "scale(1.1)";
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = `${C.accent}15`;
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
-                            title="Ver ficha"
-                          >
-                            <i className="bi bi-eye" style={{ fontSize: 16 }} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setPacId(pac.id);
-                              setBusqueda(`${pac.nombres} ${pac.apellidos}`);
-                              // Esperar a que se cargue la ficha
-                              setTimeout(() => abrir(), 100);
-                            }}
-                            style={{
-                              width: 34, height: 34, borderRadius: 8,
-                              background: "rgba(59,130,246,.15)",
-                              border: "1px solid rgba(59,130,246,.33)",
-                              color: "#3b82f6",
-                              cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              transition: "all .2s",
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = "rgba(59,130,246,.33)";
-                              e.currentTarget.style.transform = "scale(1.1)";
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = "rgba(59,130,246,.15)";
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
-                            title="Editar ficha"
-                          >
-                            <i className="bi bi-pencil" style={{ fontSize: 15 }} />
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (window.confirm('¿Eliminar la ficha estética de este paciente? Esta acción no se puede deshacer.')) {
-                                localStorage.removeItem(`ficha_estetica_${pac.id}`);
-                                cargarPacientesConFicha(pacientes);
-                              }
-                            }}
-                            style={{
-                              width: 34, height: 34, borderRadius: 8,
-                              background: "rgba(239,68,68,.15)",
-                              border: "1px solid rgba(239,68,68,.33)",
-                              color: "#ef4444",
-                              cursor: "pointer",
-                              display: "flex", alignItems: "center", justifyContent: "center",
-                              transition: "all .2s",
-                            }}
-                            onMouseEnter={e => {
-                              e.currentTarget.style.background = "rgba(239,68,68,.33)";
-                              e.currentTarget.style.transform = "scale(1.1)";
-                            }}
-                            onMouseLeave={e => {
-                              e.currentTarget.style.background = "rgba(239,68,68,.15)";
-                              e.currentTarget.style.transform = "scale(1)";
-                            }}
-                            title="Eliminar ficha"
-                          >
-                            <i className="bi bi-trash" style={{ fontSize: 15 }} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                    />
                   ))}
                 </tbody>
               </table>
@@ -609,16 +487,15 @@ export default function FichaEstetica() {
         )
       ) : ficha && !editando ? (
         /* Vista de ficha guardada */
-        <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-          {/* Datos básicos */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           <SeccionCard titulo="Piel y tipo de paciente" icono="bi-person-fill">
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(200px,1fr))", gap: 14 }}>
               <ItemFicha label="Fototipo Fitzpatrick" value={ficha.fototipo ? `Tipo ${ficha.fototipo}` : "—"} />
-              <ItemFicha label="Tipo de piel" value={ficha.piel_tipo} />
-              <ItemFicha label="Cicatrización" value={ficha.cicatrizacion} />
-              <ItemFicha label="Fumador/a" value={ficha.fumador ? "Sí" : "No"} />
-              <ItemFicha label="Consumo alcohol" value={ficha.alcoholismo} />
-              <ItemFicha label="Alergia al látex" value={ficha.alergias_latex ? "Sí" : "No"} />
+              <ItemFicha label="Tipo de piel"         value={ficha.piel_tipo} />
+              <ItemFicha label="Cicatrización"        value={ficha.cicatrizacion} />
+              <ItemFicha label="Fumador/a"            value={ficha.fumador ? "Sí" : "No"} />
+              <ItemFicha label="Consumo alcohol"      value={ficha.alcoholismo} />
+              <ItemFicha label="Alergia al látex"     value={ficha.alergias_latex ? "Sí" : "No"} />
             </div>
           </SeccionCard>
           <SeccionCard titulo="Procedimientos previos" icono="bi-scissors">
@@ -626,9 +503,9 @@ export default function FichaEstetica() {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {ficha.procedimientos_previos.map(p => (
                   <span key={p} style={{
-                    background: `${C.accent}15`, border: `1px solid ${C.accent}30`,
+                    background: `${C.accent}10`, border: `1px solid ${C.accent}30`,
                     borderRadius: 8, padding: "4px 12px", fontSize: 13,
-                    color: C.text, fontWeight: 500,
+                    color: C.accentD, fontWeight: 600,
                   }}>{p}</span>
                 ))}
               </div>
@@ -639,8 +516,8 @@ export default function FichaEstetica() {
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                 {ficha.zonas_interes.map(z => (
                   <span key={z} style={{
-                    background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
-                    borderRadius: 8, padding: "4px 12px", fontSize: 13, color: C.text,
+                    background: C.surface, border: `1px solid ${C.border}`,
+                    borderRadius: 8, padding: "4px 12px", fontSize: 13, color: C.textSub,
                   }}>{z}</span>
                 ))}
               </div>
@@ -648,8 +525,8 @@ export default function FichaEstetica() {
           </SeccionCard>
           {(ficha.motivacion || ficha.expectativas) && (
             <SeccionCard titulo="Motivaciones y expectativas" icono="bi-star-fill">
-              {ficha.motivacion && <ItemFicha label="Motivación del paciente" value={ficha.motivacion} />}
-              {ficha.expectativas && <ItemFicha label="Expectativas" value={ficha.expectativas} />}
+              {ficha.motivacion   && <ItemFicha label="Motivación del paciente" value={ficha.motivacion} />}
+              {ficha.expectativas && <ItemFicha label="Expectativas"            value={ficha.expectativas} />}
             </SeccionCard>
           )}
           {ficha.notas_medico && (
@@ -711,16 +588,16 @@ export default function FichaEstetica() {
                     key={ft.id}
                     onClick={() => setFormFicha(f => ({ ...f, fototipo: sel ? "" : ft.id }))}
                     style={{
-                      background: sel ? `${C.accent}18` : "rgba(255,255,255,.03)",
+                      background: sel ? `${C.accent}10` : C.surface,
                       border: `2px solid ${sel ? C.accent : C.border}`,
                       borderRadius: 10, padding: "10px 12px", cursor: "pointer",
                       display: "flex", alignItems: "center", gap: 10, transition: "all .18s",
                     }}
                   >
                     <div style={{
-                      width: 28, height: 28, borderRadius: "50%",
+                      width: 26, height: 26, borderRadius: "50%",
                       background: ft.color, flexShrink: 0,
-                      border: "2px solid rgba(255,255,255,.2)",
+                      border: "2px solid #e5e7eb",
                     }} />
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 13, color: sel ? C.accent : C.text }}>Tipo {ft.id}</div>
@@ -741,10 +618,10 @@ export default function FichaEstetica() {
                 return (
                   <button type="button" key={p} onClick={() => toggleProc(p)}
                     style={{
-                      background: sel ? `${C.accent}20` : "rgba(255,255,255,.04)",
+                      background: sel ? `${C.accent}12` : C.surface,
                       border: `1px solid ${sel ? C.accent : C.border}`,
                       borderRadius: 8, padding: "6px 14px", cursor: "pointer",
-                      color: sel ? C.accent : C.muted, fontSize: 13, fontWeight: sel ? 600 : 400,
+                      color: sel ? C.accentD : C.muted, fontSize: 13, fontWeight: sel ? 600 : 400,
                       transition: "all .15s",
                     }}>
                     {sel && <i className="bi bi-check me-1" />}{p}
@@ -762,10 +639,10 @@ export default function FichaEstetica() {
                 return (
                   <button type="button" key={z} onClick={() => toggleZona(z)}
                     style={{
-                      background: sel ? "rgba(255,255,255,.1)" : "rgba(255,255,255,.03)",
-                      border: `1px solid ${sel ? "rgba(255,255,255,.25)" : C.border}`,
+                      background: sel ? "#eff6ff" : C.surface,
+                      border: `1px solid ${sel ? "#3b82f6" : C.border}`,
                       borderRadius: 8, padding: "6px 14px", cursor: "pointer",
-                      color: sel ? C.text : C.muted, fontSize: 13, fontWeight: sel ? 600 : 400,
+                      color: sel ? "#1d4ed8" : C.muted, fontSize: 13, fontWeight: sel ? 600 : 400,
                       transition: "all .15s",
                     }}>
                     {sel && <i className="bi bi-check me-1" />}{z}
@@ -804,16 +681,16 @@ export default function FichaEstetica() {
             {ficha && (
               <button type="button" onClick={() => setEditando(false)}
                 style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9,
-                           padding: "11px 24px", color: C.muted, cursor: "pointer", fontWeight: 600 }}>
+                           padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
                 Cancelar
               </button>
             )}
             <button type="submit"
               style={{
                 background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-                border: "none", borderRadius: 9, padding: "11px 28px",
-                color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 15,
-                boxShadow: `0 4px 16px rgba(233,30,140,.4)`,
+                border: "none", borderRadius: 9, padding: "10px 26px",
+                color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 14,
+                boxShadow: `0 4px 14px rgba(233,30,140,.35)`,
                 display: "flex", alignItems: "center", gap: 8,
               }}>
               <i className="bi bi-check-lg" /> Guardar ficha estética
@@ -821,17 +698,16 @@ export default function FichaEstetica() {
           </div>
         </form>
       ) : null}
+      </div>{/* fin padding */}
 
-      {/* Modal para ver ficha */}
+      {/* ── Modal ver ficha ── */}
       {modalVer && fichaModal && pacModal && (
         <>
           <div
             style={{
               position: "fixed", inset: 0, zIndex: 9998,
-              background: "rgba(0,0,0,0.7)",
+              background: "rgba(0,0,0,.45)",
               backdropFilter: "blur(4px)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              padding: 20,
             }}
             onClick={cerrarModal}
           />
@@ -843,37 +719,37 @@ export default function FichaEstetica() {
               background: C.card,
               border: `1px solid ${C.border}`,
               borderRadius: 16,
-              boxShadow: "0 20px 60px rgba(0,0,0,0.5)",
+              boxShadow: "0 20px 60px rgba(0,0,0,.2)",
               width: "90%",
-              maxWidth: 900,
+              maxWidth: 860,
               maxHeight: "90vh",
               overflowY: "auto",
             }}
           >
-            {/* Header del modal */}
+            {/* Header modal */}
             <div style={{
-              background: `linear-gradient(135deg, ${C.surface} 0%, #2d0a1f 100%)`,
-              padding: "20px 24px",
+              background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+              padding: "18px 22px",
               borderBottom: `1px solid ${C.border}`,
               display: "flex", alignItems: "center", justifyContent: "space-between",
               position: "sticky", top: 0, zIndex: 10,
               borderRadius: "16px 16px 0 0",
             }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                 <div style={{
-                  width: 48, height: 48, borderRadius: 12,
+                  width: 44, height: 44, borderRadius: 11,
                   background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  fontWeight: 700, color: "#fff", fontSize: 18,
+                  fontWeight: 700, color: "#fff", fontSize: 17,
                 }}>
                   {(pacModal.nombres?.[0] || "?").toUpperCase()}
                 </div>
                 <div>
-                  <h3 style={{ margin: 0, fontWeight: 700, fontSize: 18, color: C.text }}>
+                  <h3 style={{ margin: 0, fontWeight: 700, fontSize: 17, color: "#fff" }}>
                     {pacModal.nombres} {pacModal.apellidos}
                   </h3>
-                  <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                    DNI: {pacModal.dni || "N/A"} • {pacModal.fecha_nacimiento &&
+                  <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)", marginTop: 2 }}>
+                    DNI: {pacModal.dni || "N/A"} · {pacModal.fecha_nacimiento &&
                       `${new Date().getFullYear() - new Date(pacModal.fecha_nacimiento).getFullYear()} años`}
                   </div>
                 </div>
@@ -881,199 +757,127 @@ export default function FichaEstetica() {
               <button
                 onClick={cerrarModal}
                 style={{
-                  width: 32, height: 32, borderRadius: 8,
-                  background: "rgba(239,68,68,.15)",
-                  border: "1px solid rgba(239,68,68,.3)",
-                  color: "#ef4444",
+                  width: 30, height: 30, borderRadius: 7,
+                  background: "rgba(239,68,68,.2)",
+                  border: "1px solid rgba(239,68,68,.4)",
+                  color: "#fca5a5",
                   cursor: "pointer",
                   display: "flex", alignItems: "center", justifyContent: "center",
-                  transition: "all .2s",
                 }}
-                onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,.25)"}
-                onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,.15)"}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(239,68,68,.3)"}
+                onMouseLeave={e => e.currentTarget.style.background = "rgba(239,68,68,.2)"}
               >
-                <i className="bi bi-x-lg" style={{ fontSize: 16 }} />
+                <i className="bi bi-x-lg" style={{ fontSize: 14 }} />
               </button>
             </div>
 
-            {/* Contenido del modal */}
-            <div style={{ padding: "24px" }}>
-              {/* Características de la piel - Grid compacto */}
-              <div style={{
-                background: `${C.accent}08`,
-                border: `1px solid ${C.border}`,
-                borderRadius: 12,
-                padding: "16px 20px",
-                marginBottom: 16,
-              }}>
-                <h5 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                  <i className="bi bi-person-fill me-2" style={{ color: C.accent }} />
-                  Características de la Piel
+            {/* Contenido modal */}
+            <div style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 12 }}>
+              {/* Piel */}
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 18px" }}>
+                <h5 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                  <i className="bi bi-person-fill me-2" style={{ color: C.accent }} />Características de la Piel
                 </h5>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))", gap: "12px 16px" }}>
-                  <ItemCompacto label="Fototipo" value={fichaModal.fototipo ? `Tipo ${fichaModal.fototipo}` : "—"} />
-                  <ItemCompacto label="Tipo de piel" value={fichaModal.piel_tipo} />
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(120px,1fr))", gap: "10px 16px" }}>
+                  <ItemCompacto label="Fototipo"      value={fichaModal.fototipo ? `Tipo ${fichaModal.fototipo}` : "—"} />
+                  <ItemCompacto label="Tipo de piel"  value={fichaModal.piel_tipo} />
                   <ItemCompacto label="Cicatrización" value={fichaModal.cicatrizacion} />
-                  <ItemCompacto label="Fumador/a" value={fichaModal.fumador ? "Sí" : "No"} />
-                  <ItemCompacto label="Alcohol" value={fichaModal.alcoholismo} />
+                  <ItemCompacto label="Fumador/a"     value={fichaModal.fumador ? "Sí" : "No"} />
+                  <ItemCompacto label="Alcohol"       value={fichaModal.alcoholismo} />
                   <ItemCompacto label="Alergia látex" value={fichaModal.alergias_latex ? "Sí" : "No"} />
                 </div>
               </div>
 
-              {/* Procedimientos previos */}
               {fichaModal.procedimientos_previos?.length > 0 && (
-                <div style={{
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 12,
-                  padding: "16px 20px",
-                  marginBottom: 16,
-                }}>
-                  <h5 style={{ margin: "0 0 10px 0", fontSize: 14, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    <i className="bi bi-scissors me-2" style={{ color: C.accent }} />
-                    Procedimientos Previos
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 18px" }}>
+                  <h5 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    <i className="bi bi-scissors me-2" style={{ color: C.accent }} />Procedimientos Previos
                   </h5>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {fichaModal.procedimientos_previos.map(p => (
                       <span key={p} style={{
-                        background: `${C.accent}20`,
-                        border: `1px solid ${C.accent}40`,
-                        borderRadius: 6,
-                        padding: "3px 10px",
-                        fontSize: 12,
-                        color: C.text,
-                        fontWeight: 500,
+                        background: `${C.accent}10`, border: `1px solid ${C.accent}30`,
+                        borderRadius: 6, padding: "3px 10px", fontSize: 12, color: C.accentD, fontWeight: 600,
                       }}>{p}</span>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Zonas de interés */}
               {fichaModal.zonas_interes?.length > 0 && (
-                <div style={{
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 12,
-                  padding: "16px 20px",
-                  marginBottom: 16,
-                }}>
-                  <h5 style={{ margin: "0 0 10px 0", fontSize: 14, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    <i className="bi bi-geo-alt-fill me-2" style={{ color: C.accent }} />
-                    Zonas de Interés
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 18px" }}>
+                  <h5 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    <i className="bi bi-geo-alt-fill me-2" style={{ color: C.accent }} />Zonas de Interés
                   </h5>
                   <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                     {fichaModal.zonas_interes.map(z => (
                       <span key={z} style={{
-                        background: "rgba(255,255,255,.05)",
-                        border: `1px solid ${C.border}`,
-                        borderRadius: 6,
-                        padding: "3px 10px",
-                        fontSize: 12,
-                        color: C.muted,
+                        background: C.card, border: `1px solid ${C.border}`,
+                        borderRadius: 6, padding: "3px 10px", fontSize: 12, color: C.muted,
                       }}>{z}</span>
                     ))}
                   </div>
                 </div>
               )}
 
-              {/* Motivaciones y expectativas */}
               {(fichaModal.motivacion || fichaModal.expectativas) && (
-                <div style={{
-                  background: C.surface,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 12,
-                  padding: "16px 20px",
-                  marginBottom: 16,
-                }}>
-                  <h5 style={{ margin: "0 0 12px 0", fontSize: 14, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    <i className="bi bi-star-fill me-2" style={{ color: C.accent }} />
-                    Motivaciones y Expectativas
+                <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: "14px 18px" }}>
+                  <h5 style={{ margin: "0 0 12px", fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    <i className="bi bi-star-fill me-2" style={{ color: C.accent }} />Motivaciones y Expectativas
                   </h5>
-                  <div style={{ display: "grid", gap: 12 }}>
+                  <div style={{ display: "grid", gap: 10 }}>
                     {fichaModal.motivacion && (
                       <div>
-                        <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>Motivación</div>
-                        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{fichaModal.motivacion}</div>
+                        <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".05em" }}>Motivación</div>
+                        <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.5 }}>{fichaModal.motivacion}</div>
                       </div>
                     )}
                     {fichaModal.expectativas && (
                       <div>
-                        <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 4, textTransform: "uppercase", letterSpacing: ".05em" }}>Expectativas</div>
-                        <div style={{ fontSize: 13, color: C.text, lineHeight: 1.5 }}>{fichaModal.expectativas}</div>
+                        <div style={{ fontSize: 11, color: C.muted, fontWeight: 600, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".05em" }}>Expectativas</div>
+                        <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.5 }}>{fichaModal.expectativas}</div>
                       </div>
                     )}
                   </div>
                 </div>
               )}
 
-              {/* Notas del médico */}
               {fichaModal.notas_medico && (
-                <div style={{
-                  background: `${C.accent}08`,
-                  border: `1px solid ${C.accent}30`,
-                  borderRadius: 12,
-                  padding: "16px 20px",
-                }}>
-                  <h5 style={{ margin: "0 0 10px 0", fontSize: 14, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    <i className="bi bi-journal-medical me-2" style={{ color: C.accent }} />
-                    Notas del Médico
+                <div style={{ background: `${C.accent}06`, border: `1px solid ${C.accent}20`, borderRadius: 10, padding: "14px 18px" }}>
+                  <h5 style={{ margin: "0 0 10px", fontSize: 13, fontWeight: 700, color: C.text, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    <i className="bi bi-journal-medical me-2" style={{ color: C.accent }} />Notas del Médico
                   </h5>
-                  <div style={{ fontSize: 13, color: C.text, lineHeight: 1.6 }}>{fichaModal.notas_medico}</div>
+                  <div style={{ fontSize: 13, color: C.textSub, lineHeight: 1.6 }}>{fichaModal.notas_medico}</div>
                 </div>
               )}
             </div>
 
-            {/* Footer del modal */}
+            {/* Footer modal */}
             <div style={{
-              padding: "16px 24px",
-              borderTop: `1px solid ${C.border}`,
-              display: "flex",
-              gap: 10,
-              justifyContent: "flex-end",
-              position: "sticky",
-              bottom: 0,
-              background: C.card,
+              padding: "14px 22px", borderTop: `1px solid ${C.border}`,
+              display: "flex", gap: 10, justifyContent: "flex-end",
+              position: "sticky", bottom: 0, background: C.card,
               borderRadius: "0 0 16px 16px",
             }}>
               <button
-                onClick={() => {
-                  cerrarModal();
-                  seleccionarPaciente(pacModal);
-                  setEditando(true);
-                }}
+                onClick={() => { cerrarModal(); seleccionarPaciente(pacModal); setEditando(true); }}
                 style={{
                   background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-                  border: "none",
-                  borderRadius: 8,
-                  padding: "10px 20px",
-                  color: "#fff",
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 8,
-                  transition: "all .2s",
+                  border: "none", borderRadius: 8, padding: "9px 18px",
+                  color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer",
+                  display: "flex", alignItems: "center", gap: 7,
+                  boxShadow: `0 3px 10px rgba(233,30,140,.3)`,
                 }}
                 onMouseEnter={e => e.currentTarget.style.transform = "translateY(-1px)"}
                 onMouseLeave={e => e.currentTarget.style.transform = "translateY(0)"}
               >
                 <i className="bi bi-pencil" /> Editar Ficha
               </button>
-              <button
-                onClick={cerrarModal}
-                style={{
-                  background: "transparent",
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  padding: "10px 20px",
-                  color: C.muted,
-                  fontWeight: 600,
-                  fontSize: 13,
-                  cursor: "pointer",
-                }}
-              >
+              <button onClick={cerrarModal} style={{
+                background: "transparent", border: `1px solid ${C.border}`,
+                borderRadius: 8, padding: "9px 18px",
+                color: C.muted, fontWeight: 600, fontSize: 13, cursor: "pointer",
+              }}>
                 Cerrar
               </button>
             </div>
@@ -1084,13 +888,74 @@ export default function FichaEstetica() {
   );
 }
 
+// ── Componentes auxiliares ────────────────────────────────────────────────────
+
+function FilaFicha({ pac, onVer, onEditar, onEliminar }) {
+  const [hover, setHover] = useState(false);
+  return (
+    <tr
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      onClick={onVer}
+      style={{
+        borderBottom: `1px solid ${C.border}`,
+        background: hover ? "#f9fafb" : "#fff",
+        transition: "background .12s",
+        cursor: "pointer",
+      }}
+    >
+      <td style={{ padding: "13px 18px" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{
+            width: 34, height: 34, borderRadius: 8,
+            background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontWeight: 700, color: "#fff", fontSize: 13, flexShrink: 0,
+          }}>
+            {(pac.nombres?.[0] || "?").toUpperCase()}
+          </div>
+          <div>
+            <div style={{ fontWeight: 600, color: C.text, fontSize: 14 }}>{pac.nombres} {pac.apellidos}</div>
+            {pac.fecha_nacimiento && (
+              <div style={{ fontSize: 12, color: C.mutedLt }}>
+                {new Date().getFullYear() - new Date(pac.fecha_nacimiento).getFullYear()} años
+              </div>
+            )}
+          </div>
+        </div>
+      </td>
+      <td style={{ padding: "13px 18px", fontSize: 13, color: C.muted }}>{pac.dni || "N/A"}</td>
+      <td style={{ padding: "13px 18px", fontSize: 13, color: C.muted }}>
+        <i className="bi bi-calendar2 me-1" />
+        {new Date(pac.ultima_actualizacion).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" })}
+      </td>
+      <td style={{ padding: "13px 18px", textAlign: "center" }}>
+        <div style={{ display: "flex", gap: 6, justifyContent: "center" }}>
+          <button onClick={e => { e.stopPropagation(); onVer(); }} title="Ver ficha"
+            style={{ width: 32, height: 32, borderRadius: 7, background: `${C.accent}12`, border: `1px solid ${C.accent}28`, color: C.accent, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-eye" style={{ fontSize: 15 }} />
+          </button>
+          <button onClick={e => { e.stopPropagation(); onEditar(); }} title="Editar ficha"
+            style={{ width: 32, height: 32, borderRadius: 7, background: "rgba(59,130,246,.1)", border: "1px solid rgba(59,130,246,.28)", color: "#3b82f6", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-pencil" style={{ fontSize: 14 }} />
+          </button>
+          <button onClick={e => { e.stopPropagation(); onEliminar(); }} title="Eliminar ficha"
+            style={{ width: 32, height: 32, borderRadius: 7, background: "rgba(239,68,68,.1)", border: "1px solid rgba(239,68,68,.28)", color: "#ef4444", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-trash" style={{ fontSize: 14 }} />
+          </button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
 function ItemCompacto({ label, value }) {
   return (
     <div>
-      <div style={{ fontSize: 10, color: C.muted, fontWeight: 600, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".05em" }}>
+      <div style={{ fontSize: 10, color: C.mutedLt, fontWeight: 600, marginBottom: 3, textTransform: "uppercase", letterSpacing: ".05em" }}>
         {label}
       </div>
-      <div style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>
+      <div style={{ fontSize: 13, color: C.textSub, fontWeight: 500 }}>
         {value || "—"}
       </div>
     </div>
@@ -1100,18 +965,19 @@ function ItemCompacto({ label, value }) {
 function SeccionCard({ titulo, icono, children }) {
   return (
     <div style={{
-      background: "#162a45", border: "rgba(255,255,255,0.07) solid 1px",
-      borderRadius: 14, overflow: "hidden",
+      background: C.card, border: `1px solid ${C.border}`,
+      borderRadius: 12, overflow: "hidden",
+      boxShadow: "0 1px 3px rgba(0,0,0,.05)",
     }}>
       <div style={{
-        padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)",
-        display: "flex", alignItems: "center", gap: 10,
-        background: "rgba(0,0,0,.15)",
+        padding: "12px 18px", borderBottom: `1px solid ${C.border}`,
+        display: "flex", alignItems: "center", gap: 9,
+        background: "#f8fafc",
       }}>
-        <i className={`bi ${icono}`} style={{ color: "#e91e8c", fontSize: 14 }} />
-        <span style={{ fontWeight: 700, fontSize: 13, color: "#e2e8f0" }}>{titulo}</span>
+        <i className={`bi ${icono}`} style={{ color: C.accent, fontSize: 14 }} />
+        <span style={{ fontWeight: 700, fontSize: 13, color: C.textSub }}>{titulo}</span>
       </div>
-      <div style={{ padding: "16px 20px" }}>{children}</div>
+      <div style={{ padding: "16px 18px" }}>{children}</div>
     </div>
   );
 }
@@ -1119,16 +985,16 @@ function SeccionCard({ titulo, icono, children }) {
 function ItemFicha({ label, value }) {
   return (
     <div>
-      <div style={{ fontSize: 11, color: "#64748b", fontWeight: 600, textTransform: "uppercase",
+      <div style={{ fontSize: 11, color: C.mutedLt, fontWeight: 600, textTransform: "uppercase",
                      letterSpacing: ".05em", marginBottom: 3 }}>{label}</div>
-      <div style={{ fontSize: 14, color: "#e2e8f0", fontWeight: 500 }}>{value || "—"}</div>
+      <div style={{ fontSize: 14, color: C.text, fontWeight: 500 }}>{value || "—"}</div>
     </div>
   );
 }
 
 function Lbl({ children }) {
   return (
-    <label style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase",
+    <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
                      letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
       {children}
     </label>

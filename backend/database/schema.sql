@@ -537,6 +537,45 @@ CREATE TABLE IF NOT EXISTS ia_conversaciones (
 ) ENGINE=InnoDB;
 
 
+-- ============================================================
+-- MÓDULO: TIPOS DE CLÍNICA Y MÓDULOS DEL SISTEMA
+-- (definición completa con todas las columnas para evitar
+--  dependencia de ALTER TABLE en migraciones posteriores)
+-- ============================================================
+
+CREATE TABLE IF NOT EXISTS tipos_clinica (
+  id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  clave       VARCHAR(50)  NOT NULL UNIQUE,
+  nombre      VARCHAR(120) NOT NULL,
+  icono       VARCHAR(60)  NOT NULL DEFAULT 'bi-building-fill',
+  color       VARCHAR(7)   NOT NULL DEFAULT '#2196f3',
+  descripcion VARCHAR(255),
+  activo      TINYINT(1)   DEFAULT 1,
+  creado_en   DATETIME     DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS modulos_sistema (
+  id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  clave         VARCHAR(60)  NOT NULL UNIQUE,
+  nombre        VARCHAR(120) NOT NULL,
+  icono         VARCHAR(60)  NOT NULL DEFAULT 'bi-grid',
+  ruta          VARCHAR(150) NOT NULL,
+  orden         INT UNSIGNED NOT NULL DEFAULT 999,
+  descripcion   VARCHAR(255),
+  disponible    TINYINT(1)   NOT NULL DEFAULT 1,
+  para_normal   TINYINT(1)   NOT NULL DEFAULT 1 COMMENT 'Visible en clínicas normales (adultos)',
+  para_pediatrica TINYINT(1) NOT NULL DEFAULT 1 COMMENT 'Visible en clínicas pediátricas'
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS tipo_clinica_modulos (
+  tipo_id    INT UNSIGNED NOT NULL,
+  modulo_id  INT UNSIGNED NOT NULL,
+  PRIMARY KEY (tipo_id, modulo_id),
+  FOREIGN KEY (tipo_id)   REFERENCES tipos_clinica(id)   ON DELETE CASCADE,
+  FOREIGN KEY (modulo_id) REFERENCES modulos_sistema(id) ON DELETE CASCADE
+) ENGINE=InnoDB;
+
+
 SET FOREIGN_KEY_CHECKS = 1;
 
 -- ============================================================

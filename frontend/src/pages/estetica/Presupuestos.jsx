@@ -2,10 +2,10 @@ import { useEffect, useState } from "react";
 import api from "../../api/api";
 
 const C = {
-  bg: "#0d1b2e", surface: "#112240", card: "#162a45",
-  border: "rgba(255,255,255,0.07)", accent: "#e91e8c",
-  accentD: "#c2185b", text: "#e2e8f0", muted: "#94a3b8",
-  inputBg: "#0d1b2e", success: "#10b981",
+  bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
+  border: "#e5e7eb", accent: "#e91e8c", accentD: "#c2185b",
+  text: "#111827", textSub: "#374151", muted: "#6b7280",
+  mutedLt: "#9ca3af", inputBg: "#ffffff", success: "#10b981",
 };
 
 const inputSt = {
@@ -94,33 +94,32 @@ export default function Presupuestos() {
   const filtrados = filtroEst ? presupuestos.filter(p => p.estado === filtroEst) : presupuestos;
 
   return (
-    <div style={{ color: C.text, minHeight: "100vh" }}>
-      {/* Banner */}
+    <div style={{ background: C.bg, minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
+      {/* Header */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.surface} 0%, #2d0a1f 100%)`,
-        borderRadius: 16, padding: "24px 28px", marginBottom: 24,
-        border: `1px solid ${C.border}`, boxShadow: "0 4px 24px rgba(0,0,0,.3)",
+        background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+        padding: "20px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
           <div style={{
-            width: 52, height: 52, borderRadius: 14,
+            width: 46, height: 46, borderRadius: 12,
             background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
             display: "flex", alignItems: "center", justifyContent: "center",
-            boxShadow: `0 4px 16px rgba(233,30,140,.4)`,
+            boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
           }}>
-            <i className="bi bi-receipt-cutoff" style={{ fontSize: 22, color: "#fff" }} />
+            <i className="bi bi-receipt-cutoff" style={{ fontSize: 20, color: "#fff" }} />
           </div>
           <div>
-            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 22, color: C.text }}>Presupuestos Estéticos</h4>
-            <span style={{ color: C.muted, fontSize: 13 }}>Cotizaciones y planes de tratamiento</span>
+            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: "#fff" }}>Presupuestos Estéticos</h4>
+            <span style={{ color: "rgba(255,255,255,.5)", fontSize: 13 }}>Cotizaciones y planes de tratamiento</span>
           </div>
         </div>
         <button
           onClick={() => { setForm(initForm()); setShowModal(true); }}
           style={{
             background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-            border: "none", borderRadius: 10, padding: "10px 20px",
+            border: "none", borderRadius: 10, padding: "9px 18px",
             color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 8,
             boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
@@ -129,6 +128,7 @@ export default function Presupuestos() {
           <i className="bi bi-plus-lg" /> Nuevo presupuesto
         </button>
       </div>
+      <div style={{ padding: "20px 24px" }}>
 
       {/* Filtro estado */}
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
@@ -137,10 +137,11 @@ export default function Presupuestos() {
             key={est}
             onClick={() => setFiltroEst(est)}
             style={{
-              background: filtroEst === est ? `${C.accent}22` : "rgba(255,255,255,.04)",
+              background: filtroEst === est ? `${C.accent}10` : C.card,
               border: `1px solid ${filtroEst === est ? C.accent : C.border}`,
-              borderRadius: 8, padding: "6px 14px", color: filtroEst === est ? C.accent : C.muted,
+              borderRadius: 8, padding: "6px 14px", color: filtroEst === est ? C.accentD : C.muted,
               fontSize: 13, fontWeight: 600, cursor: "pointer",
+              boxShadow: "0 1px 3px rgba(0,0,0,.05)",
             }}
           >
             {est || "Todos"} {est && `(${presupuestos.filter(p => p.estado === est).length})`}
@@ -158,7 +159,7 @@ export default function Presupuestos() {
             return (
               <div key={p.id} style={{
                 background: C.card, border: `1px solid ${C.border}`, borderRadius: 14,
-                overflow: "hidden",
+                overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.06)",
               }}>
                 <div style={{
                   padding: "14px 20px", display: "flex", alignItems: "center",
@@ -166,8 +167,8 @@ export default function Presupuestos() {
                 }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                     <div style={{
-                      width: 44, height: 44, borderRadius: 11, background: `${C.accent}18`,
-                      border: `1px solid ${C.accent}33`, display: "flex", alignItems: "center",
+                      width: 44, height: 44, borderRadius: 11, background: `${C.accent}10`,
+                      border: `1px solid ${C.accent}25`, display: "flex", alignItems: "center",
                       justifyContent: "center", flexShrink: 0,
                     }}>
                       <i className="bi bi-receipt-cutoff" style={{ fontSize: 18, color: C.accent }} />
@@ -203,12 +204,12 @@ export default function Presupuestos() {
                 {/* Acciones */}
                 <div style={{
                   padding: "10px 20px", borderTop: `1px solid ${C.border}`,
-                  background: "rgba(0,0,0,.1)", display: "flex", gap: 8, flexWrap: "wrap",
+                  background: C.surface, display: "flex", gap: 8, flexWrap: "wrap",
                 }}>
                   {ESTADOS.filter(e => e !== p.estado).map(e => (
                     <button key={e} onClick={() => cambiarEstado(p.id, e)}
                       style={{
-                        background: "rgba(255,255,255,.04)", border: `1px solid ${C.border}`,
+                        background: C.card, border: `1px solid ${C.border}`,
                         borderRadius: 7, padding: "5px 12px", color: C.muted,
                         fontSize: 12, fontWeight: 600, cursor: "pointer",
                       }}>
@@ -230,32 +231,45 @@ export default function Presupuestos() {
         </div>
       )}
 
+      </div>{/* fin padding */}
+
       {/* Modal nuevo presupuesto */}
       {showModal && (
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 1050,
-          background: "rgba(0,0,0,.7)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-        }}>
+        <>
           <div style={{
-            background: C.surface, borderRadius: 18, width: "100%", maxWidth: 640,
-            maxHeight: "90vh", overflowY: "auto", boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+            position: "fixed", inset: 0, zIndex: 1049,
+            background: "rgba(0,0,0,.45)", backdropFilter: "blur(4px)",
+          }} onClick={() => setShowModal(false)} />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%",
+            transform: "translate(-50%,-50%)",
+            zIndex: 1050,
+            background: C.card, borderRadius: 16, width: "calc(100% - 32px)", maxWidth: 640,
+            maxHeight: "90vh", overflowY: "auto",
+            boxShadow: "0 20px 60px rgba(0,0,0,.2)",
             border: `1px solid ${C.border}`,
           }}>
             <div style={{
-              padding: "20px 24px", borderBottom: `1px solid ${C.border}`,
+              background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+              padding: "18px 22px", borderBottom: `1px solid ${C.border}`,
               display: "flex", alignItems: "center", justifyContent: "space-between",
+              borderRadius: "16px 16px 0 0",
             }}>
-              <h5 style={{ margin: 0, fontWeight: 700, color: C.text }}>
-                <i className="bi bi-receipt-cutoff me-2" style={{ color: C.accent }} />
+              <h5 style={{ margin: 0, fontWeight: 700, color: "#fff", fontSize: 16 }}>
+                <i className="bi bi-receipt-cutoff me-2" style={{ color: "#f9a8d4" }} />
                 Nuevo Presupuesto Estético
               </h5>
               <button onClick={() => setShowModal(false)}
-                style={{ background: "none", border: "none", color: C.muted, cursor: "pointer", fontSize: 18 }}>
-                <i className="bi bi-x-lg" />
+                style={{
+                  width: 30, height: 30, borderRadius: 7,
+                  background: "rgba(239,68,68,.2)", border: "1px solid rgba(239,68,68,.4)",
+                  color: "#fca5a5", cursor: "pointer",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                <i className="bi bi-x-lg" style={{ fontSize: 14 }} />
               </button>
             </div>
-            <form onSubmit={guardar} style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: 18 }}>
+            <form onSubmit={guardar} style={{ padding: "20px 22px", display: "flex", flexDirection: "column", gap: 16 }}>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <div>
                   <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
@@ -296,8 +310,8 @@ export default function Presupuestos() {
                   </div>
                 ))}
                 <button type="button" onClick={addProc}
-                  style={{ background: `${C.accent}15`, border: `1px dashed ${C.accent}44`,
-                             borderRadius: 8, padding: "7px 14px", color: C.accent,
+                  style={{ background: `${C.accent}08`, border: `1px dashed ${C.accent}40`,
+                             borderRadius: 8, padding: "7px 14px", color: C.accentD,
                              fontSize: 13, cursor: "pointer", width: "100%" }}>
                   <i className="bi bi-plus me-1" /> Agregar procedimiento
                 </button>
@@ -331,23 +345,23 @@ export default function Presupuestos() {
                   onChange={e => setForm(f => ({ ...f, observaciones: e.target.value }))} />
               </div>
 
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10 }}>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, paddingTop: 4 }}>
                 <button type="button" onClick={() => setShowModal(false)}
-                  style={{ background: "none", border: `1px solid ${C.border}`, borderRadius: 9,
-                             padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600 }}>
+                  style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: 9,
+                             padding: "10px 22px", color: C.muted, cursor: "pointer", fontWeight: 600, fontSize: 14 }}>
                   Cancelar
                 </button>
                 <button type="submit"
                   style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
                              border: "none", borderRadius: 9, padding: "10px 26px",
-                             color: "#fff", fontWeight: 700, cursor: "pointer",
-                             boxShadow: `0 4px 14px rgba(233,30,140,.4)` }}>
+                             color: "#fff", fontWeight: 700, cursor: "pointer", fontSize: 14,
+                             boxShadow: `0 4px 14px rgba(233,30,140,.35)` }}>
                   <i className="bi bi-check-lg me-1" /> Guardar presupuesto
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </>
       )}
     </div>
   );
@@ -358,13 +372,13 @@ function EmptyState({ icon, titulo, desc }) {
     <div style={{ textAlign: "center", padding: "72px 0" }}>
       <div style={{
         width: 72, height: 72, borderRadius: 20, margin: "0 auto 18px",
-        background: "rgba(233,30,140,.07)", border: "1px solid rgba(233,30,140,.15)",
+        background: `${C.accent}08`, border: `1px solid ${C.accent}20`,
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
-        <i className={`bi ${icon}`} style={{ fontSize: 30, color: "#e91e8c" }} />
+        <i className={`bi ${icon}`} style={{ fontSize: 30, color: C.accent }} />
       </div>
-      <p style={{ color: "#94a3b8", fontSize: 15, fontWeight: 600, margin: "0 0 6px" }}>{titulo}</p>
-      <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>{desc}</p>
+      <p style={{ color: C.muted, fontSize: 15, fontWeight: 600, margin: "0 0 6px" }}>{titulo}</p>
+      <p style={{ color: C.mutedLt, fontSize: 13, margin: 0 }}>{desc}</p>
     </div>
   );
 }

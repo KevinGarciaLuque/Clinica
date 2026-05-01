@@ -3,10 +3,10 @@ import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 
 const C = {
-  bg: "#0d1b2e", surface: "#112240", card: "#162a45",
-  border: "rgba(255,255,255,0.07)", accent: "#e91e8c",
-  accentD: "#c2185b", text: "#e2e8f0", muted: "#94a3b8",
-  inputBg: "#0d1b2e", success: "#10b981",
+  bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
+  border: "#e5e7eb", accent: "#e91e8c", accentD: "#c2185b",
+  text: "#111827", textSub: "#374151", muted: "#6b7280",
+  mutedLt: "#9ca3af", inputBg: "#ffffff", success: "#10b981",
 };
 
 const inputSt = {
@@ -186,35 +186,36 @@ export default function GaleriaEstetica() {
   };
 
   return (
-    <div style={{ color: C.text, minHeight: "100vh" }}>
+    <div style={{ background: C.bg, minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
 
-      {/* Banner */}
+      {/* Header */}
       <div style={{
-        background: `linear-gradient(135deg, ${C.surface} 0%, #2d0a1f 100%)`,
-        borderRadius: 16, padding: "24px 28px", marginBottom: 24,
-        border: `1px solid ${C.border}`, boxShadow: "0 4px 24px rgba(0,0,0,.3)",
-        display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap",
+        background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+        padding: "20px 24px",
+        display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
       }}>
         <div style={{
-          width: 52, height: 52, borderRadius: 14,
+          width: 46, height: 46, borderRadius: 12,
           background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: `0 4px 16px rgba(233,30,140,.4)`,
+          boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
         }}>
-          <i className="bi bi-camera2" style={{ fontSize: 22, color: "#fff" }} />
+          <i className="bi bi-camera2" style={{ fontSize: 20, color: "#fff" }} />
         </div>
         <div style={{ flex: 1 }}>
-          <h4 style={{ margin: 0, fontWeight: 700, fontSize: 22, color: C.text }}>
+          <h4 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: "#fff" }}>
             Galería Antes / Después
           </h4>
-          <span style={{ color: C.muted, fontSize: 13 }}>
-            6 poses de rostro • Antes y Después del procedimiento
+          <span style={{ color: "rgba(255,255,255,.5)", fontSize: 13 }}>
+            6 poses de rostro · Antes y Después del procedimiento
           </span>
         </div>
       </div>
+      <div style={{ padding: "20px 24px" }}>
 
       {/* Buscador de paciente */}
-      <div style={{ display: "flex", gap: 12, marginBottom: 20, flexWrap: "wrap" }}>
+      <div style={{ background: C.card, borderRadius: 12, padding: "16px 18px", marginBottom: 20, boxShadow: "0 1px 4px rgba(0,0,0,.06)" }}>
+      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", position: "relative" }}>
         <div style={{ flex: "1 1 260px", position: "relative" }}>
           <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
                           letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
@@ -270,7 +271,7 @@ export default function GaleriaEstetica() {
                 position: "absolute", top: "100%", left: 0, right: 0,
                 marginTop: 6, background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 10, maxHeight: 280, overflowY: "auto",
-                boxShadow: "0 8px 24px rgba(0,0,0,.4)", zIndex: 20,
+                boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 20,
               }}>
                 {pacientesFiltrados.map(p => (
                   <div
@@ -329,7 +330,7 @@ export default function GaleriaEstetica() {
                 position: "absolute", top: "100%", left: 0, right: 0,
                 marginTop: 6, background: C.card, border: `1px solid ${C.border}`,
                 borderRadius: 10, padding: "20px 14px", textAlign: "center",
-                boxShadow: "0 8px 24px rgba(0,0,0,.4)", zIndex: 20,
+                boxShadow: "0 8px 24px rgba(0,0,0,.1)", zIndex: 20,
               }}>
                 <i className="bi bi-search" style={{ fontSize: 24, color: C.muted, marginBottom: 8, display: "block" }} />
                 <div style={{ color: C.muted, fontSize: 13 }}>
@@ -340,8 +341,8 @@ export default function GaleriaEstetica() {
           )}
         </div>
       </div>
+      </div>{/* fin buscador card */}
 
-      {/* Card del paciente */}
       {pacSeleccionado && (
         <div style={{
           background: `${C.accent}12`, border: `1px solid ${C.accent}33`,
@@ -522,7 +523,7 @@ export default function GaleriaEstetica() {
                           <button
                             onClick={() => setEditando(null)}
                             style={{
-                              background: "rgba(255,255,255,.06)", border: `1px solid ${C.border}`,
+                              background: "transparent", border: `1px solid ${C.border}`,
                               borderRadius: 7, padding: "6px 12px",
                               color: C.muted, fontSize: 12, cursor: "pointer",
                             }}
@@ -673,7 +674,7 @@ export default function GaleriaEstetica() {
               <button
                 onClick={() => setTab("ver")}
                 style={{
-                  background: "rgba(255,255,255,.06)", border: `1px solid ${C.border}`,
+                  background: "transparent", border: `1px solid ${C.border}`,
                   borderRadius: 8, padding: "9px 16px", color: C.muted,
                   cursor: "pointer", fontSize: 14,
                 }}
@@ -846,6 +847,7 @@ export default function GaleriaEstetica() {
       ) : sesionActual && tab === "ver" ? (
         <SesionFotos sesion={sesionActual} pacId={pacId} onCerrar={() => setSesionActual(null)} />
       ) : null}
+      </div>{/* fin padding */}
     </div>
   );
 }
@@ -976,7 +978,7 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
         <button
           onClick={onCerrar}
           style={{
-            background: "rgba(255,255,255,.06)", border: `1px solid ${C.border}`,
+            background: "transparent", border: `1px solid ${C.border}`,
             borderRadius: 10, padding: "8px 12px", color: C.text,
             cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
             fontSize: 13, fontWeight: 600, flexShrink: 0,
@@ -1356,14 +1358,14 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
           }}
         >
           <div onClick={e => e.stopPropagation()} style={{
-            background: C.surface, borderRadius: 16,
+            background: "#1a1a2e", borderRadius: 16,
             maxWidth: fotos[`antes_${modalImg.pose}`] && fotos[`despues_${modalImg.pose}`] && !isMobile ? 1100 : 680,
             width: "100%", overflow: "hidden", boxShadow: "0 30px 80px rgba(0,0,0,.7)",
           }}>
             {/* Si hay ambas fotos y es PC, mostrar comparación lado a lado */}
             {fotos[`antes_${modalImg.pose}`] && fotos[`despues_${modalImg.pose}`] && !isMobile ? (
               <div style={{ display: "flex" }}>
-                <div style={{ flex: 1, position: "relative", borderRight: `1px solid ${C.border}` }}>
+                <div style={{ flex: 1, position: "relative", borderRight: "1px solid rgba(255,255,255,.08)" }}>
                   <img
                     src={fotos[`antes_${modalImg.pose}`].archivo_url}
                     alt="Antes"
@@ -1403,21 +1405,21 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
                 }}>{modalImg.momento}</div>
               </div>
             )}
-            <div style={{ padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ padding: "12px 18px", background: "#1a1a2e", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                 <i className={`bi ${POSES.find(p => p.id === modalImg.pose)?.icon}`} style={{ color: C.accent, fontSize: 16 }} />
-                <span style={{ color: C.text, fontSize: 14, fontWeight: 600 }}>
+                <span style={{ color: "#e2e8f0", fontSize: 14, fontWeight: 600 }}>
                   {POSES.find(p => p.id === modalImg.pose)?.label}
                 </span>
                 {fotos[`antes_${modalImg.pose}`] && fotos[`despues_${modalImg.pose}`] && !isMobile && (
-                  <span style={{ color: C.muted, fontSize: 12, marginLeft: 4 }}>— Comparación</span>
+                  <span style={{ color: "#94a3b8", fontSize: 12, marginLeft: 4 }}>— Comparación</span>
                 )}
               </div>
               <button
                 onClick={() => setModalImg(null)}
                 style={{
-                  background: "rgba(255,255,255,.07)", border: `1px solid ${C.border}`, borderRadius: 8,
-                  padding: "7px 14px", color: C.text, cursor: "pointer", fontSize: 13,
+                  background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 8,
+                  padding: "7px 14px", color: "#e2e8f0", cursor: "pointer", fontSize: 13,
                   display: "flex", alignItems: "center", gap: 6,
                 }}
               >
@@ -1445,7 +1447,7 @@ function TarjetaPose({ pose, foto, subiendo, color, onSubir, onEliminar, onVerMo
   return (
     <div style={{
       background: C.card, borderRadius: 12, overflow: "hidden",
-      border: `1px solid ${foto ? `${color}44` : C.border}`,
+      border: `1px solid ${foto ? `${color}33` : C.border}`,
       transition: "border-color .2s",
       height: "100%",
     }}>
@@ -1520,7 +1522,7 @@ function TarjetaPose({ pose, foto, subiendo, color, onSubir, onEliminar, onVerMo
           <div style={{
             height: imgHeight, display: "flex", flexDirection: "column",
             alignItems: "center", justifyContent: "center", gap: 10,
-            background: `${color}08`,
+            background: `${color}08`, border: `1px solid ${color}20`,
           }}>
             {subiendo ? (
               <>
@@ -1574,7 +1576,7 @@ function Spin() {
   return (
     <div style={{ textAlign: "center", padding: "60px 0" }}>
       <div style={{
-        width: 40, height: 40, border: "3px solid rgba(255,255,255,.08)",
+        width: 40, height: 40, border: "3px solid #e5e7eb",
         borderTopColor: C.accent, borderRadius: "50%",
         animation: "spin .8s linear infinite", margin: "0 auto",
       }} />
@@ -1588,13 +1590,13 @@ function EmptyState({ icon, titulo, desc }) {
     <div style={{ textAlign: "center", padding: "72px 0" }}>
       <div style={{
         width: 72, height: 72, borderRadius: 20, margin: "0 auto 18px",
-        background: "rgba(233,30,140,.07)", border: "1px solid rgba(233,30,140,.15)",
+        background: `${C.accent}08`, border: `1px solid ${C.accent}20`,
         display: "flex", alignItems: "center", justifyContent: "center",
       }}>
         <i className={`bi ${icon}`} style={{ fontSize: 30, color: C.accent }} />
       </div>
-      <p style={{ color: "#94a3b8", fontSize: 15, fontWeight: 600, margin: "0 0 6px" }}>{titulo}</p>
-      <p style={{ color: "#64748b", fontSize: 13, margin: 0 }}>{desc}</p>
+      <p style={{ color: C.muted, fontSize: 15, fontWeight: 600, margin: "0 0 6px" }}>{titulo}</p>
+      <p style={{ color: C.mutedLt, fontSize: 13, margin: 0 }}>{desc}</p>
     </div>
   );
 }

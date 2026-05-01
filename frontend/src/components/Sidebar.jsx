@@ -75,6 +75,129 @@ function getMenuSections(tipo, modulos) {
   return                              { super: [],          main: mainItems, admin: [] };
 }
 
+/* ─── Rutas estéticas que se anidan bajo Consulta ───────────────── */
+const ESTETICA_ROUTES = [
+  "/estetica/ficha",
+  "/estetica/galeria",
+  "/estetica/presupuestos",
+  "/estetica/consentimientos",
+  "/estetica/seguimiento",
+];
+
+/* ─── Sub-menú expandible para Consulta (clínicas estética/derm.) ── */
+function ConsultaExpandable({ collapsed, onNavigate, esteticaItems }) {
+  const location = useLocation();
+  const isActive =
+    location.pathname === "/consulta" ||
+    location.pathname.startsWith("/estetica/");
+  const [open, setOpen] = useState(isActive);
+
+  useEffect(() => { if (isActive) setOpen(true); }, [isActive]);
+
+  const showSub = open && isActive && !collapsed;
+
+  return (
+    <li>
+      <NavLink
+        to="/consulta"
+        end
+        onClick={(e) => {
+          if (isActive) { e.preventDefault(); setOpen(o => !o); }
+        }}
+        title={collapsed ? "Consulta" : undefined}
+        className={`nav-link d-flex align-items-center gap-2 sidebar-link ${
+          isActive && !showSub ? "active" : isActive && showSub ? "sidebar-link-open" : ""
+        }`}
+        style={{
+          fontSize: "0.84rem",
+          padding: collapsed ? "9px 0" : "7px 11px",
+          justifyContent: collapsed ? "center" : "flex-start",
+          whiteSpace: "nowrap",
+          overflow: "hidden",
+          borderRadius: 8,
+          transition: "background 0.18s, color 0.18s, box-shadow 0.18s",
+        }}
+      >
+        <i
+          className="bi bi-clipboard2-pulse-fill"
+          style={{ fontSize: "1.05rem", flexShrink: 0, width: collapsed ? "auto" : 18, textAlign: "center" }}
+        />
+        {!collapsed && (
+          <>
+            <span style={{ fontWeight: 500, flex: 1 }}>Consulta</span>
+            {isActive && (
+              <i
+                className={`bi bi-chevron-${open ? "down" : "right"}`}
+                style={{ fontSize: "0.65rem", opacity: 0.6 }}
+              />
+            )}
+          </>
+        )}
+      </NavLink>
+
+      {showSub && (
+        <ul className="nav flex-column sidebar-submenu" style={{ padding: "2px 8px 4px 30px", gap: 1 }}>
+          {/* Ítem fijo: Consulta Médica */}
+          {(() => {
+            const subIsActive = location.pathname === "/consulta";
+            return (
+              <li key="/consulta-item">
+                <NavLink
+                  to="/consulta"
+                  onClick={onNavigate}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 7,
+                    padding: "5px 10px", fontSize: "0.79rem", borderRadius: 6,
+                    textDecoration: "none",
+                    fontWeight: subIsActive ? 600 : 400,
+                    color: subIsActive ? "#fff" : "rgba(148,163,184,0.85)",
+                    background: subIsActive ? "rgba(33,150,243,0.18)" : "transparent",
+                    transition: "background 0.15s, color 0.15s",
+                  }}
+                >
+                  <i
+                    className="bi bi-clipboard2-pulse"
+                    style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#2196f3" : "inherit" }}
+                  />
+                  Consulta Médica
+                </NavLink>
+              </li>
+            );
+          })()}
+          {/* Separador */}
+          <li><div style={{ margin: "4px 10px", borderTop: "1px solid rgba(255,255,255,0.07)" }} /></li>
+          {esteticaItems.map(sub => {
+            const subIsActive = location.pathname === sub.to;
+            return (
+              <li key={sub.to}>
+                <NavLink
+                  to={sub.to}
+                  onClick={onNavigate}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 7,
+                    padding: "5px 10px", fontSize: "0.79rem", borderRadius: 6,
+                    textDecoration: "none",
+                    fontWeight: subIsActive ? 600 : 400,
+                    color: subIsActive ? "#fff" : "rgba(148,163,184,0.85)",
+                    background: subIsActive ? "rgba(233,30,140,0.18)" : "transparent",
+                    transition: "background 0.15s, color 0.15s",
+                  }}
+                >
+                  <i
+                    className={`bi ${sub.icon}`}
+                    style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#e91e8c" : "inherit" }}
+                  />
+                  {sub.label}
+                </NavLink>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </li>
+  );
+}
+
 /* ─── Sub-menú expandible para Citas ────────────────────────────── */
 function CitasExpandable({ collapsed, onNavigate }) {
   const location = useLocation();
@@ -243,6 +366,10 @@ function PacientesExpandable({ collapsed, onNavigate }) {
 /* ─── Sección de menú ────────────────────────────────────────────── */
 function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
   if (!items.length) return null;
+
+  // Items estéticos se mostrarán como sub-menú de Consulta, no como top-level
+  const esteticaItems = items.filter(item => ESTETICA_ROUTES.includes(item.to));
+
   return (
     <div>
       {showDivider && (
@@ -263,11 +390,19 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
       )}
 
       <ul className="nav flex-column" style={{ padding: "0 8px", gap: 1 }}>
-        {items.filter(item => item.to !== "/historia" && item.to !== "/estudios").map((item) => (
+        {items
+          .filter(item =>
+            item.to !== "/historia" &&
+            item.to !== "/estudios" &&
+            !ESTETICA_ROUTES.includes(item.to)
+          )
+          .map((item) => (
           item.to === "/citas"
             ? <CitasExpandable key="/citas" collapsed={collapsed} onNavigate={onNavigate} />
             : item.to === "/pacientes"
             ? <PacientesExpandable key="/pacientes" collapsed={collapsed} onNavigate={onNavigate} />
+            : item.to === "/consulta" && esteticaItems.length > 0
+            ? <ConsultaExpandable key="/consulta" collapsed={collapsed} onNavigate={onNavigate} esteticaItems={esteticaItems} />
             : (
           <li key={item.to}>
             <NavLink

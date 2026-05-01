@@ -35,7 +35,8 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
     // Obtener flag pediátrica de la clínica
     const [clinRow] = await pool.query("SELECT es_pediatrica FROM clinicas WHERE id=?", [req.user.clinica_id]);
     const esPed = clinRow.length ? clinRow[0].es_pediatrica : 0;
-    const catFilter = esPed ? "ms.para_pediatrica = 1" : "ms.para_normal = 1";
+    const catFilter     = esPed ? "ms.para_pediatrica = 1" : "ms.para_normal = 1";
+    const catFilterBase = esPed ? "para_pediatrica = 1"    : "para_normal = 1";
 
     // Para usuarios de clínica: módulos según el tipo de su clínica + categoría
     const [rows] = await pool.query(`
@@ -64,7 +65,7 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
     if (!rows.length) {
       const [base] = await pool.query(
         `SELECT clave, nombre, icono, ruta, orden FROM modulos_sistema
-         WHERE clave IN (?,?,?,?,?,?,?) AND disponible=1 AND ${catFilter}
+         WHERE clave IN (?,?,?,?,?,?,?) AND disponible=1 AND ${catFilterBase}
          ORDER BY orden`,
         ["dashboard","pacientes","citas","consulta","historia_clinica","chat_ia","estudios"]
       );

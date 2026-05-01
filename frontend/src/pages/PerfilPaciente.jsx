@@ -10,6 +10,7 @@ import { useEffect, useState, useRef } from "react";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
 
 const API_BASE_PP = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE_PP = { BORRADOR: "warning text-dark", FIRMADA: "success" };
@@ -35,6 +36,9 @@ export default function PerfilPaciente() {
   const fileRef = useRef();
   const fotoInputRef = useRef();
   const fotoCameraRef = useRef();
+
+  const { modulos } = useAuth();
+  const tieneModulo = (clave) => modulos.some(m => m.clave === clave);
 
   // Estados principales
   const [paciente, setPaciente] = useState(null);
@@ -503,22 +507,26 @@ export default function PerfilPaciente() {
             )}
           </button>
         </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "crecimiento" ? "active" : ""}`}
-            onClick={() => setTab("crecimiento")}
-          >
-            <i className="bi bi-graph-up-arrow me-2" />Curvas de Crecimiento
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "vacunas" ? "active" : ""}`}
-            onClick={() => setTab("vacunas")}
-          >
-            <i className="bi bi-syringe me-2" />Vacunas
-          </button>
-        </li>
+        {tieneModulo("curva_crecimiento") && (
+          <li className="nav-item">
+            <button
+              className={`nav-link ${tab === "crecimiento" ? "active" : ""}`}
+              onClick={() => setTab("crecimiento")}
+            >
+              <i className="bi bi-graph-up-arrow me-2" />Curvas de Crecimiento
+            </button>
+          </li>
+        )}
+        {tieneModulo("vacunas") && (
+          <li className="nav-item">
+            <button
+              className={`nav-link ${tab === "vacunas" ? "active" : ""}`}
+              onClick={() => setTab("vacunas")}
+            >
+              <i className="bi bi-syringe me-2" />Vacunas
+            </button>
+          </li>
+        )}
         <li className="nav-item">
           <button
             className={`nav-link text-danger ${tab === "eliminar" ? "active" : ""}`}
@@ -1422,7 +1430,7 @@ export default function PerfilPaciente() {
       {/* ─────────────────────────────────────────────────────── */}
       {/* TAB 4: CURVAS DE CRECIMIENTO OMS */}
       {/* ─────────────────────────────────────────────────────── */}
-      {tab === "crecimiento" && (
+      {tab === "crecimiento" && tieneModulo("curva_crecimiento") && (
         <div className="card shadow-sm">
           <div className="card-header" style={{ background: "linear-gradient(135deg, #214a87 0%, #176DC8 100%)" }}>
             <h5 className="mb-0 text-white">
@@ -1442,7 +1450,7 @@ export default function PerfilPaciente() {
       {/* ─────────────────────────────────────────────────────── */}
       {/* TAB: VACUNAS */}
       {/* ─────────────────────────────────────────────────────── */}
-      {tab === "vacunas" && (
+      {tab === "vacunas" && tieneModulo("vacunas") && (
         <VacunasCarnet paciente={paciente} pacienteId={id} />
       )}
 

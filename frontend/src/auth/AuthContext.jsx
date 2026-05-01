@@ -36,9 +36,10 @@ export function AuthProvider({ children }) {
     }
   };
 
-  // Si hay token al montar (refresh de página), recargar módulos
+  // Si hay token al montar (refresh de página), siempre recargar módulos del servidor
+  // para que cambios en BD (nuevos módulos asignados) se reflejen sin necesidad de re-login
   useEffect(() => {
-    if (user && !modulos.length) {
+    if (user) {
       cargarModulos();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps

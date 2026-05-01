@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Outlet } from "react-router-dom";
+import { useState, useRef, useEffect } from "react";
+import { Outlet, useLocation } from "react-router-dom";
 import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
 import LicenciaVencidaModal from "./LicenciaVencidaModal";
@@ -7,6 +7,12 @@ import LicenciaVencidaModal from "./LicenciaVencidaModal";
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed,  setCollapsed]  = useState(false);
+  const mainRef = useRef(null);
+  const { pathname } = useLocation();
+
+  useEffect(() => {
+    if (mainRef.current) mainRef.current.scrollTop = 0;
+  }, [pathname]);
 
   const W = collapsed ? 64 : 240;
 
@@ -131,6 +137,7 @@ export default function AppLayout() {
 
         {/* ── Contenido principal ── */}
         <main
+          ref={mainRef}
           className="flex-grow-1 p-3 p-md-4"
           style={{ overflowY: "auto", background: "#f1f5f9", minWidth: 0, height: "100%" }}
         >
