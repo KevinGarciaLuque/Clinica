@@ -7,35 +7,32 @@ async function check() {
     port: Number(process.env.DB_PORT || 3306),
   });
 
-  const [clinicas] = await conn.query(
-    "SELECT id, nombre, slug, tipo_id, es_pediatrica FROM clinicas WHERE id IN (15,17) OR slug LIKE '%gina%'"
-  );
-  console.log('\nCLINICAS:'); console.table(clinicas);
+  // Simular exactamente el endpoint GET /clinicas/modulos para Gina (clinica_id=15)
+  const clinica_id = 15;
+  const [clinRow] = await conn.query('SELECT es_pediatrica FROM clinicas WHERE id=?', [clinica_id]);
+  const esPed = clinRow[0].es_pediatrica;
+  const catFilter = esPed ? 'ms.para_pediatrica = 1' : 'ms.para_normal = 1';
 
-  const [tipos] = await conn.query(
-    "SELECT id, clave, nombre FROM tipos_clinica WHERE clave IN ('estetica','dermatologia')"
-  );
-  console.log('\nTIPOS ESTETICA/DERMATOLOGIA:'); console.table(tipos);
+  console.log('es_pediatrica:', esPed, '| filtro:', catFilter);
 
-  const [tcm] = await conn.query(
-    `SELECT t.clave AS tipo, m.clave AS modulo, m.para_normal
-     FROM tipo_clinica_modulos tcm
-     JOIN tipos_clinica t ON t.id = tcm.tipo_id
-     JOIN modulos_sistema m ON m.id = tcm.modulo_id
-     WHERE t.clave IN ('estetica','dermatologia')
-       AND m.clave IN ('ficha_estetica','galeria_estetica','presupuestos','consentimientos_esteticos','seguimiento_postop')
-     ORDER BY t.clave, m.clave`
+  const [rows] = await conn.query(
+    'SELECT ms.clave, ms.nombre, ms.ruta, ms.orden' +
+    ' FROM modulos_sistema ms' +
+    ' INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id' +
+    ' INNER JOIN clinicas c ON c.tipo_id = tcm.tipo_id' +
+    ' WHERE c.id = ? AND ms.disponible = 1 AND ms.para_normal = 1' +
+    ' ORDER BY ms.orden',
+    [clinica_id]
   );
-  console.log('\nMODULOS ESTETICOS ASIGNADOS A TIPOS:'); console.table(tcm);
 
-  // Rutas de todos los módulos (incluyendo estéticos)
-  const [rutas] = await conn.query(
-    `SELECT id, clave, nombre, ruta, icono, para_normal, orden
-     FROM modulos_sistema
-     WHERE clave IN ('ficha_estetica','galeria_estetica','presupuestos','consentimientos_esteticos','seguimiento_postop','consulta','dashboard','pacientes','citas')
-     ORDER BY orden`
-  );
-  console.log('\nRUTAS EN BD (modulos_sistema):'); console.table(rutas);
+  console.log('\nMODULOS QUE DEVUELVE EL ENDPOINT PARA GINA (' + rows.length + '):');
+  console.table(rows);
+
+  if (rows.length === 0) {
+    console.log('\n[FALLBACK] No hay tipo asignado, revisa tipo_id:');
+    const [c] = await conn.query('SELECT id, tipo_id FROM clinicas WHERE id=?', [clinica_id]);
+    console.table(c);
+  }
 
   await conn.end();
 }
