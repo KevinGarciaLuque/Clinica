@@ -821,10 +821,6 @@ export default function RegistroPaciente() {
                       <label className="form-label fw-semibold">Correo electrónico <span className="text-danger">*</span></label>
                       <input className="form-control" type="email" name="email" value={form.email} onChange={cambioForm} required placeholder="tu@email.com" />
                     </div>
-                    <div className="col-12">
-                      <label className="form-label fw-semibold">Dirección</label>
-                      <input className="form-control" name="direccion" value={form.direccion} onChange={cambioForm} placeholder="Calle, número, referencia" />
-                    </div>
                     <div className="col-sm-6">
                       <label className="form-label fw-semibold">Departamento</label>
                       <select className="form-select" name="departamento" value={form.departamento}
@@ -839,6 +835,10 @@ export default function RegistroPaciente() {
                         <option value="">— Seleccionar —</option>
                         {(HONDURAS_DATA[form.departamento] || []).map(m => <option key={m} value={m}>{m}</option>)}
                       </select>
+                    </div>
+                    <div className="col-12">
+                      <label className="form-label fw-semibold">Dirección</label>
+                      <input className="form-control" name="direccion" value={form.direccion} onChange={cambioForm} placeholder="Calle, número, referencia" />
                     </div>
                   </div>
                   <div className="d-flex justify-content-end mt-4">
