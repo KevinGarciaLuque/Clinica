@@ -1,51 +1,53 @@
 import { Routes, Route, Navigate } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import PrivateRoute from "./auth/PrivateRoute";
 import AppLayout from "./components/AppLayout";
 
-import Login           from "./pages/Login";
-import Dashboard       from "./pages/Dashboard";
-import Pacientes       from "./pages/Pacientes";
-import Citas           from "./pages/Citas";
-import ChatIA          from "./pages/ChatIA";
-import Consulta        from "./pages/Consulta";
-import ConsultaMedica  from "./pages/ConsultaMedica";
-import HistoriaClinica from "./pages/HistoriaClinica";
-import PerfilPaciente  from "./pages/PerfilPaciente";
-import Estudios        from "./pages/Estudios";
+import Login from "./pages/Login";
+
+const Dashboard       = lazy(() => import("./pages/Dashboard"));
+const Pacientes       = lazy(() => import("./pages/Pacientes"));
+const Citas           = lazy(() => import("./pages/Citas"));
+const ChatIA          = lazy(() => import("./pages/ChatIA"));
+const Consulta        = lazy(() => import("./pages/Consulta"));
+const ConsultaMedica  = lazy(() => import("./pages/ConsultaMedica"));
+const HistoriaClinica = lazy(() => import("./pages/HistoriaClinica"));
+const PerfilPaciente  = lazy(() => import("./pages/PerfilPaciente"));
+const Estudios        = lazy(() => import("./pages/Estudios"));
 // Páginas públicas (sin auth)
-import RegistroPaciente from "./pages/RegistroPaciente";
-import VerificarEmail   from "./pages/VerificarEmail";
-import RecetaPublica    from "./pages/RecetaPublica";
+const RegistroPaciente = lazy(() => import("./pages/RegistroPaciente"));
+const VerificarEmail   = lazy(() => import("./pages/VerificarEmail"));
+const RecetaPublica    = lazy(() => import("./pages/RecetaPublica"));
 
 // Admin
-import Usuarios    from "./pages/admin/Usuarios";
-import Servicios   from "./pages/admin/Servicios";
-import Horarios    from "./pages/admin/Horarios";
-import ConfigClinica from "./pages/admin/ConfigClinica";
-import Plantillas    from "./pages/admin/Plantillas";
+const Usuarios     = lazy(() => import("./pages/admin/Usuarios"));
+const Servicios    = lazy(() => import("./pages/admin/Servicios"));
+const Horarios     = lazy(() => import("./pages/admin/Horarios"));
+const ConfigClinica = lazy(() => import("./pages/admin/ConfigClinica"));
+const Plantillas    = lazy(() => import("./pages/admin/Plantillas"));
 
 // Super Admin
-import Clinicas          from "./pages/superadmin/Clinicas";
-import Database          from "./pages/superadmin/Database";
-import Reportes          from "./pages/superadmin/Reportes";
-import SoporteHistorial  from "./pages/superadmin/SoporteHistorial";
+const Clinicas         = lazy(() => import("./pages/superadmin/Clinicas"));
+const Database         = lazy(() => import("./pages/superadmin/Database"));
+const Reportes         = lazy(() => import("./pages/superadmin/Reportes"));
+const SoporteHistorial = lazy(() => import("./pages/superadmin/SoporteHistorial"));
 
 // Módulos de Cirugía Estética
-import GaleriaEstetica         from "./pages/estetica/GaleriaEstetica";
-import Presupuestos            from "./pages/estetica/Presupuestos";
-import ConsentimientosEsteticos from "./pages/estetica/ConsentimientosEsteticos";
-import SeguimientoPostOp       from "./pages/estetica/SeguimientoPostOp";
-import FichaEstetica           from "./pages/estetica/FichaEstetica";
-import BiopsiaPatologia        from "./pages/estetica/BiopsiaPatologia";
+const GaleriaEstetica          = lazy(() => import("./pages/estetica/GaleriaEstetica"));
+const Presupuestos             = lazy(() => import("./pages/estetica/Presupuestos"));
+const ConsentimientosEsteticos = lazy(() => import("./pages/estetica/ConsentimientosEsteticos"));
+const SeguimientoPostOp        = lazy(() => import("./pages/estetica/SeguimientoPostOp"));
+const FichaEstetica            = lazy(() => import("./pages/estetica/FichaEstetica"));
+const BiopsiaPatologia         = lazy(() => import("./pages/estetica/BiopsiaPatologia"));
 
 // Módulos adicionales
-import Recordatorios   from "./pages/Recordatorios";
-import PerfilUsuario   from "./pages/PerfilUsuario";
-import Catalogos       from "./pages/Catalogos";
-import CrecimientoPage from "./pages/CrecimientoPage";
-import VacunasPage     from "./pages/VacunasPage";
-import Cumpleaneros    from "./pages/Cumpleaneros";
-import Inventario      from "./pages/Inventario";
+const Recordatorios   = lazy(() => import("./pages/Recordatorios"));
+const PerfilUsuario   = lazy(() => import("./pages/PerfilUsuario"));
+const Catalogos       = lazy(() => import("./pages/Catalogos"));
+const CrecimientoPage = lazy(() => import("./pages/CrecimientoPage"));
+const VacunasPage     = lazy(() => import("./pages/VacunasPage"));
+const Cumpleaneros    = lazy(() => import("./pages/Cumpleaneros"));
+const Inventario      = lazy(() => import("./pages/Inventario"));
 
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
@@ -59,6 +61,7 @@ function RolRoute({ children, roles }) {
 
 export default function App() {
   return (
+    <Suspense fallback={<div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100vh",color:"#6c757d"}}>Cargando...</div>}>
     <Routes>
       {/* Rutas públicas */}
       <Route path="/login"           element={<Login />} />
@@ -158,6 +161,7 @@ export default function App() {
 
       <Route path="*" element={<Navigate to="/" />} />
     </Routes>
+    </Suspense>
   );
 }
 
