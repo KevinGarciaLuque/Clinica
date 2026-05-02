@@ -82,7 +82,10 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
 
     const { desde, hasta, medico_id, paciente_id, estado } = req.query;
-    let sql = `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
+    let sql = `SELECT c.id,
+                      DATE_FORMAT(c.inicio, '%Y-%m-%dT%H:%i:%s') AS inicio,
+                      DATE_FORMAT(c.fin,    '%Y-%m-%dT%H:%i:%s') AS fin,
+                      c.estado, c.tipo_consulta, c.motivo, c.canal,
                       c.paciente_id, c.medico_id,
                       p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
                       p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
