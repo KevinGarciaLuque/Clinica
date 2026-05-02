@@ -2,6 +2,43 @@
 -- EJECUTAR ESTOS SQL UNO POR UNO EN RAILWAY
 -- ============================================================
 
+-- ============================================================
+-- FIX MÓDULOS VACUNAS + RECORDATORIOS + INVENTARIO (Mayo 2026)
+-- Ejecutar en Railway para que aparezcan en todas las clínicas
+-- ============================================================
+
+-- 1. Vacunas: activar para_normal (migración 022 lo dejó en 0)
+UPDATE modulos_sistema SET para_normal=1, para_pediatrica=1, disponible=1 WHERE clave='vacunas';
+
+-- 2. Recordatorios: asegurar que existe, visible y con orden correcto
+INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, descripcion, disponible, para_normal, para_pediatrica, orden)
+VALUES ('recordatorios','Recordatorios','bi-bell-fill','/recordatorios','Gestión de recordatorios automáticos',1,1,1,97);
+UPDATE modulos_sistema SET para_normal=1, para_pediatrica=1, disponible=1, orden=97 WHERE clave='recordatorios';
+INSERT IGNORE INTO tipo_clinica_modulos (tipo_id, modulo_id)
+SELECT t.id, m.id FROM tipos_clinica t CROSS JOIN modulos_sistema m WHERE m.clave='recordatorios';
+
+-- 3. Inventario: asegurar que existe, visible y con orden correcto
+INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, descripcion, disponible, para_normal, para_pediatrica, orden)
+VALUES ('inventario','Inventario','bi-boxes','/inventario','Control de stock de insumos y materiales',1,1,1,98);
+UPDATE modulos_sistema SET para_normal=1, para_pediatrica=1, disponible=1, orden=98 WHERE clave='inventario';
+INSERT IGNORE INTO tipo_clinica_modulos (tipo_id, modulo_id)
+SELECT t.id, m.id FROM tipos_clinica t CROSS JOIN modulos_sistema m WHERE m.clave='inventario';
+
+-- 4. Biopsias/Patología: asegurar que existe y está asignado
+INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, descripcion, disponible, para_normal, para_pediatrica, orden)
+VALUES ('biopsias_patologia','Biopsias / Patología','bi-eyedropper','/ estetica/biopsias','Registro de biopsias y resultados de patología',1,1,0,85);
+UPDATE modulos_sistema SET disponible=1, para_normal=1 WHERE clave='biopsias_patologia';
+INSERT IGNORE INTO tipo_clinica_modulos (tipo_id, modulo_id)
+SELECT t.id, m.id FROM tipos_clinica t CROSS JOIN modulos_sistema m WHERE m.clave='biopsias_patologia';
+
+-- 5. Verificar resultado final
+SELECT id, clave, nombre, disponible, para_normal, para_pediatrica, orden
+FROM modulos_sistema
+WHERE clave IN ('vacunas','recordatorios','inventario','biopsias_patologia')
+ORDER BY orden;
+
+-- ============================================================
+
 -- PASO 1: Ejecuta primero este (copia solo esta línea):
 INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, orden, descripcion, disponible) VALUES ('consulta', 'Consulta', 'bi-clipboard2-pulse-fill', '/consulta', 35, 'Vista de citas del día y sala de espera', 1);
 
