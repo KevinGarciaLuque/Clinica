@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -8,6 +8,12 @@ import { useAuth } from "../auth/AuthContext";
 dayjs.locale("es");
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
+
+const fotoUrl = (foto) => {
+  if (!foto) return null;
+  if (foto.startsWith("http")) return foto;
+  return `${API_BASE}/uploads/${foto.replace(/^\/?uploads\//, "")}`;
+};
 
 // ── Departamentos y municipios de Honduras ────────────
 const HONDURAS_DATA = {
@@ -46,8 +52,10 @@ const FORM_VACIO = {
   nombres: "", apellidos: "", dni: "",
   fecha_nacimiento: "", sexo: "",
   telefono: "", email: "",
-  direccion: "", departamento: "", municipio: "",
+  direccion: "", departamento: "", ciudad: "", pais: "Honduras",
   grupo_sanguineo: "",
+  estado_civil: "", ocupacion: "", escolaridad: "",
+  religion: "", nacionalidad: "Hondureña",
   foto_perfil: null,
 };
 
@@ -68,6 +76,10 @@ export default function Pacientes() {
   const [showConsultaModal, setShowConsultaModal] = useState(false);
   const [consultaPaciente, setConsultaPaciente] = useState(null);
   const [checkingCita, setCheckingCita] = useState(false);
+  const [showWebcam, setShowWebcam] = useState(false);
+  const [webcamFacing, setWebcamFacing] = useState("user");
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   // Sincronizar con cambios de URL (ej: click en "Registrar" del sidebar)
   useEffect(() => {
@@ -135,18 +147,25 @@ export default function Pacientes() {
       telefono: p.telefono || "",
       email: p.email || "",
       direccion: p.direccion || "",
-      departamento: p.departamento || "",
-      municipio: p.municipio || "",
+      departamento: "",
+      ciudad: p.ciudad || "",
+      pais: p.pais || "Honduras",
       grupo_sanguineo: p.grupo_sanguineo || "",
+      estado_civil: p.estado_civil || "",
+      ocupacion: p.ocupacion || "",
+      escolaridad: p.escolaridad || "",
+      religion: p.religion || "",
+      nacionalidad: p.nacionalidad || "Hondureña",
     });
     setEditandoId(p.id);
     setFotoFile(null);
     if (p.foto_perfil) {
-      setFotoPreview(p.foto_perfil?.startsWith('http') ? p.foto_perfil : `${API_BASE}/uploads/${p.foto_perfil}`);
+      setFotoPreview(fotoUrl(p.foto_perfil));
     } else {
       setFotoPreview(null);
     }
     setShowForm(true);
+    setTimeout(() => window.scrollTo({ top: 0, behavior: "smooth" }), 50);
   };
 
   // ── Consulta: verificar si el paciente tiene cita hoy ─────────────────────
@@ -195,6 +214,48 @@ export default function Pacientes() {
   };
 
   const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+
+  // ── Webcam ────────────────────────────────────────────────────────────────
+  useEffect(() => {
+    if (!showWebcam) return;
+    let active = true;
+    navigator.mediaDevices.getUserMedia({
+      video: { facingMode: webcamFacing, width: { ideal: 1280 }, height: { ideal: 720 } },
+    }).then(stream => {
+      if (!active) { stream.getTracks().forEach(t => t.stop()); return; }
+      streamRef.current = stream;
+      if (videoRef.current) videoRef.current.srcObject = stream;
+    }).catch(() => {
+      if (active) { alert("No se pudo acceder a la cámara. Verifica los permisos del navegador."); setShowWebcam(false); }
+    });
+    return () => {
+      active = false;
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    };
+  }, [showWebcam, webcamFacing]);
+
+  const cerrarWebcam = () => {
+    if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+    setShowWebcam(false);
+  };
+
+  const capturarFoto = () => {
+    const video = videoRef.current;
+    if (!video || !video.videoWidth) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (webcamFacing === "user") { ctx.translate(canvas.width, 0); ctx.scale(-1, 1); }
+    ctx.drawImage(video, 0, 0);
+    const dataUrl = canvas.toDataURL("image/jpeg", 0.92);
+    canvas.toBlob(blob => {
+      if (!blob) return;
+      setFotoFile(new File([blob], "foto-camara.jpg", { type: "image/jpeg" }));
+      setFotoPreview(dataUrl);
+      cerrarWebcam();
+    }, "image/jpeg", 0.92);
+  };
 
   return (
     <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
@@ -299,34 +360,52 @@ export default function Pacientes() {
             </h6>
           </div>
           <form onSubmit={guardarPaciente}>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 14 }}>
+            {/* Helper para etiquetas de sección */}
+            {/* ── Identificación ── */}
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-person-badge" style={{ color: "#2563eb" }} /> Identificación
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
                   Nombres <span style={{ color: "#dc3545" }}>*</span>
                 </label>
                 <input style={inputSt} name="nombres" value={form.nombres} onChange={cambioForm} required />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
                   Apellidos <span style={{ color: "#dc3545" }}>*</span>
                 </label>
                 <input style={inputSt} name="apellidos" value={form.apellidos} onChange={cambioForm} required />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>DNI</label>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>DNI</label>
                 <input style={inputSt} name="dni" value={form.dni} onChange={cambioForm} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Fecha de nacimiento</label>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Fecha de nacimiento</label>
                 <input style={inputSt} type="date" name="fecha_nacimiento" value={form.fecha_nacimiento} onChange={cambioForm} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Sexo</label>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
+                  Edad <span style={{ fontSize: 10, fontWeight: 400, textTransform: "none", color: "#9ca3af" }}>(auto)</span>
+                </label>
+                <div style={{ ...inputSt, background: "#f8fafc", color: form.fecha_nacimiento ? C.text : C.muted, display: "flex", alignItems: "center", gap: 6, userSelect: "none" }}>
+                  {form.fecha_nacimiento ? (() => {
+                    const hoy  = dayjs();
+                    const nac  = dayjs(form.fecha_nacimiento);
+                    const años = hoy.diff(nac, "year");
+                    const meses = hoy.diff(nac.add(años, "year"), "month");
+                    if (años < 0) return "—";
+                    if (años === 0) return `${meses} mes${meses !== 1 ? "es" : ""}`;
+                    if (años < 2)  return `${años} año, ${meses} mes${meses !== 1 ? "es" : ""}`;
+                    return `${años} años`;
+                  })() : "—"}
+                  <i className="bi bi-cake2" style={{ marginLeft: "auto", color: "#c084fc", fontSize: 14 }} />
+                </div>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Sexo</label>
                 <select style={inputSt} name="sexo" value={form.sexo} onChange={cambioForm}>
                   <option value="">—</option>
                   <option value="M">Masculino</option>
@@ -334,82 +413,143 @@ export default function Pacientes() {
                   <option value="O">Otro</option>
                 </select>
               </div>
+            </div>
+
+            {/* ── Datos personales ── */}
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-person-lines-fill" style={{ color: "#2563eb" }} /> Datos personales
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Grupo sanguíneo</label>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Grupo sanguíneo</label>
                 <select style={inputSt} name="grupo_sanguineo" value={form.grupo_sanguineo} onChange={cambioForm}>
                   <option value="">—</option>
                   {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g}>{g}</option>)}
                 </select>
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Teléfono</label>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Estado Civil</label>
+                <select style={inputSt} name="estado_civil" value={form.estado_civil} onChange={cambioForm}>
+                  <option value="">—</option>
+                  {["Soltero(a)","Casado(a)","Unión Libre","Divorciado(a)","Viudo(a)"].map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Escolaridad</label>
+                <select style={inputSt} name="escolaridad" value={form.escolaridad} onChange={cambioForm}>
+                  <option value="">—</option>
+                  {["Ninguna","Primaria","Secundaria","Preparatoria","Técnico","Universidad","Posgrado"].map(e => <option key={e} value={e}>{e}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Ocupación</label>
+                <select style={inputSt} name="ocupacion" value={form.ocupacion} onChange={cambioForm}>
+                  <option value="">—</option>
+                  {["Médico(a)","Enfermero(a)","Maestro(a)","Ingeniero(a)","Abogado(a)","Contador(a)","Agricultor(a)","Comerciante","Ama de casa","Estudiante","Policía / Militar","Conductor","Obrero(a)","Técnico(a)","Desempleado(a)","Jubilado(a)","Otro"].map(o => <option key={o} value={o}>{o}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Religión</label>
+                <select style={inputSt} name="religion" value={form.religion} onChange={cambioForm}>
+                  <option value="">—</option>
+                  {["Católica","Evangélica / Protestante","Testigo de Jehová","Adventista","Mormón","Musulmana","Judía","Sin religión","Otra"].map(r => <option key={r} value={r}>{r}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Nacionalidad</label>
+                <input style={inputSt} name="nacionalidad" value={form.nacionalidad} onChange={cambioForm} />
+              </div>
+            </div>
+
+            {/* ── Contacto ── */}
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-telephone" style={{ color: "#2563eb" }} /> Contacto
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Teléfono</label>
                 <input style={inputSt} name="telefono" value={form.telefono} onChange={cambioForm} />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Email</label>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Email</label>
                 <input style={inputSt} type="email" name="email" value={form.email} onChange={cambioForm} />
               </div>
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Dirección</label>
+            </div>
+
+            {/* ── Ubicación ── */}
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-geo-alt" style={{ color: "#2563eb" }} /> Ubicación
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 14, marginBottom: 20 }}>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>País</label>
+                <input style={inputSt} name="pais" value={form.pais} onChange={cambioForm} />
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Departamento</label>
+                <select style={inputSt} name="departamento" value={form.departamento}
+                  onChange={(e) => setForm(f => ({ ...f, departamento: e.target.value, ciudad: "" }))}>
+                  <option value="">—</option>
+                  {Object.keys(HONDURAS_DATA).sort().map(d => <option key={d} value={d}>{d}</option>)}
+                </select>
+              </div>
+              <div>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Municipio / Ciudad</label>
+                {form.departamento ? (
+                  <select style={inputSt} name="ciudad" value={form.ciudad} onChange={cambioForm}>
+                    <option value="">—</option>
+                    {(HONDURAS_DATA[form.departamento] || []).map(m => <option key={m} value={m}>{m}</option>)}
+                  </select>
+                ) : (
+                  <input style={inputSt} name="ciudad" value={form.ciudad} onChange={cambioForm} placeholder="Ingrese ciudad" />
+                )}
+              </div>
+              <div style={{ gridColumn: "span 3" }}>
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Dirección</label>
                 <input style={inputSt} name="direccion" value={form.direccion} onChange={cambioForm} />
               </div>
-              <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Departamento</label>
-                <select style={inputSt} name="departamento" value={form.departamento}
-                  onChange={(e) => setForm(f => ({ ...f, departamento: e.target.value, municipio: "" }))}>
-                  <option value="">—</option>
-                  {Object.keys(HONDURAS_DATA).sort().map(d => (
-                    <option key={d} value={d}>{d}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Municipio</label>
-                <select style={inputSt} name="municipio" value={form.municipio}
-                  onChange={cambioForm} disabled={!form.departamento}>
-                  <option value="">—</option>
-                  {(HONDURAS_DATA[form.departamento] || []).map(m => (
-                    <option key={m} value={m}>{m}</option>
-                  ))}
-                </select>
-              </div>
-              
-              {/* Foto de perfil */}
-              <div style={{ gridColumn: "span 2" }}>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase",
-                               letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Foto de perfil</label>
-                <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                  {fotoPreview && (
-                    <div style={{ position: "relative" }}>
-                      <img src={fotoPreview} alt="Preview" style={{
-                        width: 80, height: 80, borderRadius: 12, objectFit: "cover",
-                        border: `2px solid ${C.border}`
-                      }} />
-                      <button type="button" onClick={eliminarFotoPreview}
-                        style={{
-                          position: "absolute", top: -6, right: -6,
-                          background: "#dc3545", border: "none", borderRadius: "50%",
-                          width: 24, height: 24, color: "#fff", cursor: "pointer",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                          fontSize: 12,
-                        }}>
-                        <i className="bi bi-x" />
-                      </button>
-                    </div>
-                  )}
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFotoChange}
-                    style={{ ...inputSt, flex: 1 }}
-                  />
+            </div>
+
+            {/* ── Foto de perfil ── */}
+            <div style={{ fontSize: 11, color: "#6b7280", fontWeight: 700, textTransform: "uppercase", letterSpacing: ".07em", marginBottom: 4, display: "flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-camera" style={{ color: "#2563eb" }} /> Foto de perfil
+            </div>
+            <p style={{ margin: "0 0 12px", fontSize: 12, color: "#9ca3af" }}>
+              Puedes tomar una foto con la webcam, desde el celular o subir un archivo desde la computadora.
+            </p>
+            <div style={{ marginBottom: 20, display: "flex", gap: 16, alignItems: "flex-start", flexWrap: "wrap" }}>
+              {/* Vista previa */}
+              {fotoPreview ? (
+                <div style={{ position: "relative", flexShrink: 0 }}>
+                  <img src={fotoPreview} alt="Preview" style={{ width: 96, height: 96, borderRadius: 14, objectFit: "cover", border: "2px solid #d1d5db", display: "block" }} />
+                  <button type="button" onClick={eliminarFotoPreview}
+                    style={{ position: "absolute", top: -7, right: -7, background: "#dc3545", border: "none", borderRadius: "50%", width: 24, height: 24, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>
+                    <i className="bi bi-x" />
+                  </button>
                 </div>
+              ) : (
+                <div style={{ width: 96, height: 96, borderRadius: 14, background: "#f8fafc", border: "2px dashed #d1d5db", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 4, flexShrink: 0 }}>
+                  <i className="bi bi-person-bounding-box" style={{ fontSize: 30, color: "#c0c8d4" }} />
+                  <span style={{ fontSize: 10, color: "#9ca3af", fontWeight: 600 }}>Sin foto</span>
+                </div>
+              )}
+              {/* Opciones */}
+              <div style={{ display: "flex", flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#f8fafc", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151", userSelect: "none", whiteSpace: "nowrap" }}>
+                  <i className="bi bi-upload" style={{ color: "#2563eb", fontSize: 14 }} />
+                  Subir archivo
+                  <input type="file" accept="image/*" onChange={handleFotoChange} style={{ display: "none" }} />
+                </label>
+                <button type="button" onClick={() => setShowWebcam(true)}
+                  style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#f8fafc", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151", whiteSpace: "nowrap" }}>
+                  <i className="bi bi-webcam" style={{ color: "#2563eb", fontSize: 14 }} />
+                  Webcam
+                </button>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#f8fafc", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151", userSelect: "none", whiteSpace: "nowrap" }}>
+                  <i className="bi bi-phone" style={{ color: "#2563eb", fontSize: 14 }} />
+                  Cámara celular
+                  <input type="file" accept="image/*" capture="environment" onChange={handleFotoChange} style={{ display: "none" }} />
+                </label>
               </div>
             </div>
             <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 20, gap: 10 }}>
@@ -503,7 +643,7 @@ export default function Pacientes() {
                           onClick={(e) => {
                             e.stopPropagation();
                             if (p.foto_perfil) {
-                              setModalFoto(p.foto_perfil?.startsWith('http') ? p.foto_perfil : `${API_BASE}/uploads/${p.foto_perfil}`);
+                              setModalFoto(fotoUrl(p.foto_perfil));
                             } else {
                               navigate(`/pacientes/${p.id}/perfil`);
                             }
@@ -526,7 +666,7 @@ export default function Pacientes() {
                           style={{
                           width: 38, height: 38, borderRadius: "50%",
                           background: p.foto_perfil ? "transparent" : "rgba(13,110,253,0.1)",
-                          backgroundImage: p.foto_perfil ? `url(${p.foto_perfil?.startsWith('http') ? p.foto_perfil : `${API_BASE}/uploads/${p.foto_perfil}`})` : "none",
+                          backgroundImage: p.foto_perfil ? `url(${fotoUrl(p.foto_perfil)})` : "none",
                           backgroundSize: "cover",
                           backgroundPosition: "center",
                           display: "flex", alignItems: "center", justifyContent: "center",
@@ -662,6 +802,47 @@ export default function Pacientes() {
             setConsultaPaciente(null);
           }}
         />
+      )}
+
+      {/* Modal Webcam */}
+      {showWebcam && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", width: "100%", maxWidth: 540, boxShadow: "0 24px 64px rgba(0,0,0,0.55)" }}>
+            {/* Header */}
+            <div style={{ background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)", padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontWeight: 700, fontSize: "0.92rem" }}>
+                <i className="bi bi-webcam-fill" style={{ color: "#7dd3fc" }} /> Tomar foto
+              </div>
+              <button type="button" onClick={cerrarWebcam} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 6, width: 30, height: 30, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                <i className="bi bi-x" />
+              </button>
+            </div>
+            {/* Video feed */}
+            <div style={{ background: "#000", position: "relative", aspectRatio: "4/3", overflow: "hidden" }}>
+              <video ref={videoRef} autoPlay playsInline muted
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block",
+                  transform: webcamFacing === "user" ? "scaleX(-1)" : "none" }} />
+            </div>
+            {/* Controls */}
+            <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid #e5e7eb" }}>
+              <button type="button"
+                onClick={() => setWebcamFacing(f => f === "user" ? "environment" : "user")}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                <i className="bi bi-arrow-repeat" /> Girar cámara
+              </button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={cerrarWebcam}
+                  style={{ background: "#f1f5f9", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                  Cancelar
+                </button>
+                <button type="button" onClick={capturarFoto}
+                  style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 22px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
+                  <i className="bi bi-camera-fill" /> Capturar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal para ver foto ampliada */}
@@ -802,7 +983,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
             {/* Info del paciente */}
             <div className="alert alert-warning py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.apellidos}, {paciente.nombres}</strong> no tiene consulta agendada para hoy.
+              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene consulta agendada para hoy.
             </div>
 
             {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}

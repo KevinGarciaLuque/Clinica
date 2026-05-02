@@ -63,7 +63,8 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
     const { id } = req.params;
 
     const [[hist]] = await pool.query(
-      `SELECT h.*, p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
+      `SELECT h.*, h.datos_derma,
+              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.sexo, p.telefono AS pac_tel, p.email AS pac_email,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
        FROM historias_clinicas h
@@ -135,6 +136,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       subjetivo, objetivo, examen_fisico,
       diagnostico_cie, diagnosticos_secundarios, plan,
       estado = "BORRADOR",
+      datos_derma,
     } = req.body;
 
     if (!paciente_id) return res.status(400).json({ ok: false, msg: "paciente_id requerido" });
@@ -143,8 +145,8 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       `INSERT INTO historias_clinicas
          (clinica_id, paciente_id, medico_id, cita_id,
           subjetivo, objetivo, examen_fisico,
-          diagnostico_cie, diagnosticos_secundarios, plan, estado)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+          diagnostico_cie, diagnosticos_secundarios, plan, estado, datos_derma)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         cid, paciente_id, req.user.id, cita_id || null,
         subjetivo || null,
@@ -154,6 +156,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
         diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
         plan || null,
         estado,
+        datos_derma ? JSON.stringify(datos_derma) : null,
       ]
     );
 
@@ -193,12 +196,14 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     const {
       subjetivo, objetivo, examen_fisico,
       diagnostico_cie, diagnosticos_secundarios, plan,
+      datos_derma,
     } = req.body;
 
     await pool.query(
       `UPDATE historias_clinicas
        SET subjetivo=?, objetivo=?, examen_fisico=?,
-           diagnostico_cie=?, diagnosticos_secundarios=?, plan=?
+           diagnostico_cie=?, diagnosticos_secundarios=?, plan=?,
+           datos_derma=?
        WHERE id=? AND clinica_id=?`,
       [
         subjetivo || null,
@@ -207,6 +212,7 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
         diagnostico_cie || null,
         diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
         plan || null,
+        datos_derma ? JSON.stringify(datos_derma) : null,
         id, cid,
       ]
     );
@@ -231,7 +237,7 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
       [id, cid]
     );
     if (!h) return res.status(404).json({ ok: false, msg: "No encontrado" });
-    if (h.estado === "FIRMADA") return res.status(400).json({ ok: false, msg: "Ya firmada" });
+    if (h.estado === "FIRMADA") return res.json({ ok: true, msg: "Ya firmada" });
 
     await pool.query(
       "UPDATE historias_clinicas SET estado='FIRMADA' WHERE id=? AND clinica_id=?",

@@ -109,15 +109,20 @@ app.use("/api/estudios", require("./routes/estudios"));
 app.use("/api/medicamentos", require("./routes/medicamentos"));
 app.use("/api/catalogos-diagnostico", require("./routes/catalogosDiagnostico"));
 app.use("/api/catalogos-estudios", require("./routes/catalogosEstudios"));
+app.use("/api/catalogos-tipos-cita", require("./routes/catalogosTiposCita"));
+app.use("/api/catalogos-procedimientos", require("./routes/catalogosProcedimientos"));
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
+app.use("/api/biopsias",        require("./routes/biopsias"));
+app.use("/api/inventario",      require("./routes/inventario"));
 app.use("/api/recordatorios", require("./routes/recordatorios"));
 app.use("/api/crecimiento", require("./routes/crecimiento"));
 app.use("/api/setup",     require("./routes/setup"));
 app.use("/api/reportes",  require("./routes/reportes"));
-app.use("/api/vacunas",   require("./routes/vacunas"));
-app.use("/api/soporte",   require("./routes/soporte"));
+app.use("/api/vacunas",    require("./routes/vacunas"));
+app.use("/api/soporte",    require("./routes/soporte"));
+app.use("/api/cumpleanos", require("./routes/cumpleanos"));
 app.use("/rx",            require("./routes/rx"));
 
 // ===== 404 =====
@@ -168,6 +173,159 @@ const pool = require("./db");
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
     console.log("✅ [auto-migrate] verificaciones_email OK");
+
+    // Tabla catálogo de tipos de cita por clínica
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS catalogos_tipos_cita (
+        id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        clinica_id  INT UNSIGNED NOT NULL,
+        nombre      VARCHAR(120) NOT NULL,
+        descripcion VARCHAR(300) NULL,
+        orden       TINYINT UNSIGNED DEFAULT 0,
+        activo      TINYINT(1)   DEFAULT 1,
+        creado_en   DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_ctc_clinica (clinica_id),
+        FOREIGN KEY (clinica_id) REFERENCES clinicas(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] catalogos_tipos_cita OK");
+
+    // Tabla catálogo de procedimientos dermatológicos/estéticos
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS catalogos_procedimientos (
+        id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        clinica_id   INT UNSIGNED NOT NULL,
+        nombre       VARCHAR(200) NOT NULL,
+        categoria    ENUM('dermatologico','estetico') NOT NULL DEFAULT 'dermatologico',
+        descripcion  VARCHAR(500) NULL,
+        precio_ref   DECIMAL(10,2) NULL,
+        duracion_min SMALLINT UNSIGNED NULL,
+        orden        TINYINT UNSIGNED DEFAULT 0,
+        activo       TINYINT(1)   DEFAULT 1,
+        creado_en    DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_cp_clinica (clinica_id),
+        FOREIGN KEY (clinica_id) REFERENCES clinicas(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] catalogos_procedimientos OK");
+
+    // Columna datos_derma en historias_clinicas (JSON con campos dermatológicos específicos)
+    const [colDerma] = await pool.query(`
+      SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'historias_clinicas'
+        AND COLUMN_NAME  = 'datos_derma'
+    `);
+    if (colDerma[0].n === 0) {
+      await pool.query(`
+        ALTER TABLE historias_clinicas
+          ADD COLUMN datos_derma JSON NULL
+          COMMENT 'Campos específicos de dermatología: fototipo, localización, antec. derma, etc.'
+      `);
+      console.log("✅ [auto-migrate] historias_clinicas.datos_derma agregada");
+    } else {
+      console.log("✅ [auto-migrate] historias_clinicas.datos_derma OK");
+    }
+
+    // Tabla biopsias (módulo Biopsias y Patología)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS biopsias (
+        id                       INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        clinica_id               INT UNSIGNED NOT NULL,
+        paciente_id              INT UNSIGNED NOT NULL,
+        medico_id                INT UNSIGNED NOT NULL,
+        historia_id              INT UNSIGNED NULL,
+        tipo_biopsia             ENUM('incisional','excisional','shave','punch','aspirado','curetaje') NOT NULL,
+        sitio_anatomico          VARCHAR(200) NOT NULL,
+        sospecha_clinica         VARCHAR(500) NULL,
+        diagnosticos_diferenciales TEXT NULL,
+        fecha_toma               DATE NULL,
+        laboratorio              VARCHAR(200) NULL,
+        observaciones            TEXT NULL,
+        resultado_texto          TEXT NULL,
+        resultado_patologico     ENUM('benigno','maligno','atipia_leve','atipia_moderada','atipia_severa','pendiente','no_concluyente') NULL DEFAULT 'pendiente',
+        margenes                 ENUM('libres','comprometidos','no_evaluables','no_aplica') NULL DEFAULT 'no_aplica',
+        conducta_posterior       TEXT NULL,
+        fecha_resultado          DATETIME NULL,
+        estado                   ENUM('PENDIENTE','RESULTADO_RECIBIDO','CERRADO') NOT NULL DEFAULT 'PENDIENTE',
+        creado_en                DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_biop_clinica   (clinica_id),
+        INDEX idx_biop_paciente  (paciente_id),
+        INDEX idx_biop_estado    (estado),
+        FOREIGN KEY (clinica_id)   REFERENCES clinicas(id)  ON DELETE CASCADE,
+        FOREIGN KEY (paciente_id)  REFERENCES pacientes(id) ON DELETE CASCADE,
+        FOREIGN KEY (medico_id)    REFERENCES usuarios(id)  ON DELETE RESTRICT
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] biopsias OK");
+
+    // Cambiar tipo_consulta de ENUM a VARCHAR(150) para soportar tipos personalizados
+    const [colTipo] = await pool.query(`
+      SELECT DATA_TYPE, CHARACTER_MAXIMUM_LENGTH
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'citas'
+        AND COLUMN_NAME  = 'tipo_consulta'
+    `);
+    if (colTipo.length && colTipo[0].DATA_TYPE === 'enum') {
+      await pool.query(`
+        ALTER TABLE citas
+          MODIFY COLUMN tipo_consulta VARCHAR(150) NULL DEFAULT 'PRIMERA_VEZ'
+      `);
+      console.log("✅ [auto-migrate] citas.tipo_consulta → VARCHAR(150) OK");
+    } else {
+      console.log("✅ [auto-migrate] citas.tipo_consulta OK");
+    }
+
+    // Cambiar canal de ENUM a VARCHAR(50) para soportar APP, WEB, etc.
+    const [colCanal] = await pool.query(`
+      SELECT DATA_TYPE
+      FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'citas'
+        AND COLUMN_NAME  = 'canal'
+    `);
+    if (colCanal.length && colCanal[0].DATA_TYPE === 'enum') {
+      await pool.query(`
+        ALTER TABLE citas
+          MODIFY COLUMN canal VARCHAR(50) NULL DEFAULT 'RECEPCION'
+      `);
+      console.log("✅ [auto-migrate] citas.canal → VARCHAR(50) OK");
+    } else {
+      console.log("✅ [auto-migrate] citas.canal OK");
+    }
+
+    // Seed tipos de cita para la clínica de Gina Valladares (clinica_id = 17)
+    {
+      const gCid = 17;
+      const [existentes] = await pool.query(
+        `SELECT COUNT(*) AS n FROM catalogos_tipos_cita WHERE clinica_id = ? AND activo = 1`, [gCid]
+      );
+      if (existentes[0].n === 0) {
+        const tiposGina = [
+          "Consulta dermatológica primera vez",
+          "Consulta dermatológica control",
+          "Consulta estética",
+          "Consulta pediátrica dermatológica",
+          "Consulta de urgencia dermatológica",
+          "Consulta online",
+          "Revisión postprocedimiento",
+          "Retiro de puntos",
+          "Curación postquirúrgica",
+          "Evaluación preláser",
+          "Evaluación postláser",
+        ];
+        for (let i = 0; i < tiposGina.length; i++) {
+          await pool.query(
+            `INSERT INTO catalogos_tipos_cita (clinica_id, nombre, orden) VALUES (?, ?, ?)`,
+            [gCid, tiposGina[i], i + 1]
+          );
+        }
+        console.log(`✅ [seed] ${tiposGina.length} tipos de cita insertados para clínica ${gCid} (Gina Valladares)`);
+      } else {
+        console.log(`✅ [seed] tipos de cita clínica ${gCid} ya existen, se omite`);
+      }
+    }
 
     // Columna especialidad en catalogos_diagnostico (ADD solo si no existe)
     const [colEsp] = await pool.query(`
@@ -268,6 +426,52 @@ const pool = require("./db");
     } else {
       console.log("✅ [auto-migrate] seed diagnósticos ya existen, omitido");
     }
+    // Tablas inventario (módulo Inventario)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS inventario_items (
+        id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        clinica_id     INT UNSIGNED NOT NULL,
+        nombre         VARCHAR(200) NOT NULL,
+        descripcion    VARCHAR(500) NULL,
+        categoria      VARCHAR(100) NULL,
+        unidad_medida  VARCHAR(50)  NOT NULL DEFAULT 'unidad',
+        stock_actual   DECIMAL(10,2) NOT NULL DEFAULT 0,
+        stock_minimo   DECIMAL(10,2) NOT NULL DEFAULT 0,
+        precio_costo   DECIMAL(10,2) NULL,
+        proveedor      VARCHAR(200) NULL,
+        codigo         VARCHAR(80)  NULL,
+        activo         TINYINT(1)   DEFAULT 1,
+        creado_en      DATETIME     DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_inv_clinica   (clinica_id),
+        INDEX idx_inv_categoria (clinica_id, categoria),
+        FOREIGN KEY (clinica_id) REFERENCES clinicas(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] inventario_items OK");
+
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS inventario_movimientos (
+        id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        clinica_id    INT UNSIGNED NOT NULL,
+        item_id       INT UNSIGNED NOT NULL,
+        usuario_id    INT UNSIGNED NOT NULL,
+        tipo          ENUM('ENTRADA','SALIDA','AJUSTE') NOT NULL,
+        cantidad      DECIMAL(10,2) NOT NULL,
+        stock_antes   DECIMAL(10,2) NOT NULL,
+        stock_despues DECIMAL(10,2) NOT NULL,
+        motivo        VARCHAR(300) NULL,
+        referencia    VARCHAR(150) NULL,
+        creado_en     DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_imov_clinica (clinica_id),
+        INDEX idx_imov_item    (item_id),
+        INDEX idx_imov_fecha   (creado_en),
+        FOREIGN KEY (clinica_id)  REFERENCES clinicas(id)    ON DELETE CASCADE,
+        FOREIGN KEY (item_id)     REFERENCES inventario_items(id) ON DELETE CASCADE,
+        FOREIGN KEY (usuario_id)  REFERENCES usuarios(id)    ON DELETE RESTRICT
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] inventario_movimientos OK");
+
   } catch (e) {
     console.warn("⚠️  [auto-migrate] verificaciones_email:", e.message);
   }

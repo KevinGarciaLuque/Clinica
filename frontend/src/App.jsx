@@ -22,6 +22,7 @@ import Usuarios    from "./pages/admin/Usuarios";
 import Servicios   from "./pages/admin/Servicios";
 import Horarios    from "./pages/admin/Horarios";
 import ConfigClinica from "./pages/admin/ConfigClinica";
+import Plantillas    from "./pages/admin/Plantillas";
 
 // Super Admin
 import Clinicas          from "./pages/superadmin/Clinicas";
@@ -35,6 +36,7 @@ import Presupuestos            from "./pages/estetica/Presupuestos";
 import ConsentimientosEsteticos from "./pages/estetica/ConsentimientosEsteticos";
 import SeguimientoPostOp       from "./pages/estetica/SeguimientoPostOp";
 import FichaEstetica           from "./pages/estetica/FichaEstetica";
+import BiopsiaPatologia        from "./pages/estetica/BiopsiaPatologia";
 
 // Módulos adicionales
 import Recordatorios   from "./pages/Recordatorios";
@@ -42,6 +44,8 @@ import PerfilUsuario   from "./pages/PerfilUsuario";
 import Catalogos       from "./pages/Catalogos";
 import CrecimientoPage from "./pages/CrecimientoPage";
 import VacunasPage     from "./pages/VacunasPage";
+import Cumpleaneros    from "./pages/Cumpleaneros";
+import Inventario      from "./pages/Inventario";
 
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
@@ -84,6 +88,8 @@ export default function App() {
         <Route path="/catalogos"              element={<Catalogos />} />
         <Route path="/crecimiento"            element={<CrecimientoPage />} />
         <Route path="/vacunas"                element={<VacunasPage />} />
+        <Route path="/cumpleaneros"           element={<Cumpleaneros />} />
+        <Route path="/inventario"             element={<Inventario />} />
 
         {/* Rutas de administración (ADMIN + SUPER_ADMIN) */}
         <Route path="/admin/usuarios" element={
@@ -104,6 +110,11 @@ export default function App() {
         <Route path="/admin/config" element={
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <ConfigClinica />
+          </RolRoute>
+        } />
+        <Route path="/admin/plantillas" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
+            <Plantillas />
           </RolRoute>
         } />
 
@@ -142,6 +153,7 @@ export default function App() {
         <Route path="/estetica/consentimientos"  element={<ConsentimientosEsteticos />} />
         <Route path="/estetica/seguimiento"      element={<SeguimientoPostOp />} />
         <Route path="/estetica/ficha"            element={<FichaEstetica />} />
+        <Route path="/estetica/biopsias"          element={<BiopsiaPatologia />} />
       </Route>
 
       <Route path="*" element={<Navigate to="/" />} />

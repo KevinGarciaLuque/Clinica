@@ -27,18 +27,20 @@ const BASE_FALLBACK = [
 ];
 
 const adminItems = [
-  { to: "/admin/usuarios",  label: "Usuarios",         icon: "bi-person-badge-fill" },
-  { to: "/admin/horarios",  label: "Horarios médicos",  icon: "bi-clock-fill" },
-  { to: "/admin/servicios", label: "Servicios",         icon: "bi-tag-fill" },
-  { to: "/catalogos",       label: "Catálogos",         icon: "bi-journal-bookmark-fill" },
-  { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
+  { to: "/admin/usuarios",   label: "Usuarios",          icon: "bi-person-badge-fill" },
+  { to: "/admin/horarios",   label: "Horarios médicos",   icon: "bi-clock-fill" },
+  { to: "/admin/servicios",  label: "Servicios",          icon: "bi-tag-fill" },
+  { to: "/admin/plantillas", label: "Plantillas",         icon: "bi-file-earmark-text-fill" },
+  { to: "/catalogos",        label: "Catálogos",          icon: "bi-journal-bookmark-fill" },
+  { to: "/admin/config",     label: "Configuración",      icon: "bi-gear-fill" },
 ];
 
 const medicoItems = [
-  { to: "/admin/horarios",  label: "Horarios médicos",  icon: "bi-clock-fill" },
-  { to: "/admin/servicios", label: "Servicios",         icon: "bi-tag-fill" },
-  { to: "/catalogos",       label: "Catálogos",         icon: "bi-journal-bookmark-fill" },
-  { to: "/admin/config",    label: "Configuración",     icon: "bi-gear-fill" },
+  { to: "/admin/horarios",   label: "Horarios médicos",   icon: "bi-clock-fill" },
+  { to: "/admin/servicios",  label: "Servicios",          icon: "bi-tag-fill" },
+  { to: "/admin/plantillas", label: "Plantillas",         icon: "bi-file-earmark-text-fill" },
+  { to: "/catalogos",        label: "Catálogos",          icon: "bi-journal-bookmark-fill" },
+  { to: "/admin/config",     label: "Configuración",      icon: "bi-gear-fill" },
 ];
 
 const superItems = [
@@ -69,6 +71,21 @@ function getMenuSections(tipo, modulos) {
       : [...mainItems, consulta];
   }
 
+  // Cumpleañeros — siempre visible para todos los roles (después de Vacunas)
+  if (!mainItems.some(m => m.to === "/cumpleaneros")) {
+    const cumple = { to: "/cumpleaneros", label: "Cumpleañeros", icon: "bi-cake2-fill" };
+    const vacIdx = mainItems.findIndex(m => m.to === "/vacunas");
+    if (vacIdx >= 0) {
+      mainItems = [...mainItems.slice(0, vacIdx + 1), cumple, ...mainItems.slice(vacIdx + 1)];
+    } else {
+      // Si no hay vacunas, ponerlo después de pacientes
+      const pacIdx = mainItems.findIndex(m => m.to === "/pacientes");
+      mainItems = pacIdx >= 0
+        ? [...mainItems.slice(0, pacIdx + 1), cumple, ...mainItems.slice(pacIdx + 1)]
+        : [...mainItems, cumple];
+    }
+  }
+
   if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: adminItems };
   if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: adminItems };
   if (tipo === "MEDICO")      return { super: [],          main: mainItems, admin: medicoItems };
@@ -82,6 +99,7 @@ const ESTETICA_ROUTES = [
   "/estetica/presupuestos",
   "/estetica/consentimientos",
   "/estetica/seguimiento",
+  "/estetica/biopsias",
 ];
 
 /* ─── Sub-menú expandible para Consulta (clínicas estética/derm.) ── */

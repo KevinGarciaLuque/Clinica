@@ -382,7 +382,7 @@ export default function HistoriaClinica() {
                         key={p.id} 
                         onClick={() => { 
                           setSelPacId(p.id); 
-                          setSearch(`${p.apellidos}, ${p.nombres}`); 
+                          setSearch(`${p.nombres} ${p.apellidos}`); 
                         }}
                         onMouseEnter={() => setHoveredRow(p.id)}
                         onMouseLeave={() => setHoveredRow(null)}
@@ -544,7 +544,7 @@ export default function HistoriaClinica() {
             </div>
             <div>
               <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 4 }}>
-                {paciente.apellidos}, {paciente.nombres}
+                {paciente.nombres} {paciente.apellidos}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "10px 20px", color: "#6b7280", fontSize: "0.82rem" }}>
                 {paciente.dni && <span>DNI: {paciente.dni}</span>}
@@ -925,7 +925,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
           <div className="modal-body">
             <div className="alert alert-warning py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.apellidos}, {paciente.nombres}</strong> no tiene consulta agendada para hoy.
+              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene consulta agendada para hoy.
             </div>
             {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}
 

@@ -495,7 +495,7 @@ export default function Dashboard() {
                                 </td>
                                 <td style={{ padding: isMobile ? "12px 8px" : "16px 12px" }}>
                                   <div style={{ fontWeight: "600", fontSize: isMobile ? "12px" : "14px", color: "#1a1a1a" }}>
-                                    {c.paciente_apellidos}, {c.paciente_nombres}
+                                    {c.paciente_nombres} {c.paciente_apellidos}
                                   </div>
                                   <div style={{ fontSize: isMobile ? "10px" : "12px", color: "#999" }}>{c.paciente_tel}</div>
                                 </td>
@@ -628,7 +628,7 @@ export default function Dashboard() {
                                 fontWeight: "600",
                                 color: "#1a1a1a"
                               }}>
-                                {p.apellidos}, {p.nombres}
+                                {p.nombres} {p.apellidos}
                               </div>
                               <div style={{ 
                                 fontSize: isMobile ? "10px" : "12px", 

@@ -148,7 +148,7 @@ export default function Estudios() {
               </div>
               <div style={{ flex: 1 }}>
                 <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b", marginBottom: 4 }}>
-                  {selectedEstudio.paciente_apellidos}, {selectedEstudio.paciente_nombres}
+                  {selectedEstudio.paciente_nombres} {selectedEstudio.paciente_apellidos}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", color: "#6b7280", fontSize: "0.82rem" }}>
                   <span>Médico: Dr. {selectedEstudio.medico_apellidos}{selectedEstudio.medico_nombres ? `, ${selectedEstudio.medico_nombres}` : ""}</span>
@@ -367,7 +367,7 @@ export default function Estudios() {
                               {estudio.paciente_nombres?.[0]}{estudio.paciente_apellidos?.[0]}
                             </div>
                             <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>
-                              {estudio.paciente_apellidos}, {estudio.paciente_nombres}
+                              {estudio.paciente_nombres} {estudio.paciente_apellidos}
                             </div>
                           </div>
                         </td>

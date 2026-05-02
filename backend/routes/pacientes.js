@@ -20,7 +20,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 
     const q = (req.query.q || "").trim();
     let sql =
-      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, foto_perfil, activo, creado_en, clinica_id FROM pacientes ";
+      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id FROM pacientes ";
     const params = [];
 
     // Filtrar por clínica si no es SUPER_ADMIN
@@ -90,20 +90,33 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
       fechaFormateada = fecha_nacimiento.split('T')[0];
     }
 
+    const {
+      ciudad, departamento, pais, grupo_sanguineo, notas,
+      estado_civil, ocupacion, escolaridad, religion, lugar_nacimiento, nacionalidad,
+    } = req.body;
+
     const [r] = await pool.query(
       `INSERT INTO pacientes
          (clinica_id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, sexo,
-          direccion, ciudad, pais, grupo_sanguineo, notas)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+          direccion, ciudad, departamento, pais, grupo_sanguineo, notas,
+          estado_civil, ocupacion, escolaridad, religion, lugar_nacimiento, nacionalidad)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         clinicaId, nombres, apellidos,
         dni || null, telefono || null, email || null,
         fechaFormateada || null, sexo || null,
         direccion || null,
-        req.body.ciudad || null,
-        req.body.pais   || null,
-        req.body.grupo_sanguineo || null,
-        req.body.notas  || null,
+        ciudad || null,
+        departamento || null,
+        pais   || null,
+        grupo_sanguineo || null,
+        notas  || null,
+        estado_civil || null,
+        ocupacion || null,
+        escolaridad || null,
+        religion || null,
+        lugar_nacimiento || null,
+        nacionalidad || null,
       ]
     );
 
@@ -122,7 +135,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 
     const {
       nombres, apellidos, dni, telefono, email,
-      fecha_nacimiento, sexo, direccion, ciudad, pais,
+      fecha_nacimiento, sexo, direccion, ciudad, departamento, pais,
       grupo_sanguineo, notas, activo,
       // Responsable / tutor
       responsable_nombre, responsable_parentesco, responsable_telefono,
@@ -170,7 +183,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
          nombres=?,        apellidos=?,
          dni=?,            telefono=?,     email=?,
          fecha_nacimiento=?,              sexo=?,
-         direccion=?,      ciudad=?,       pais=?,
+         direccion=?,      ciudad=?,       departamento=?,  pais=?,
          grupo_sanguineo=?,               notas=?,
          responsable_nombre=?,            responsable_parentesco=?,
          responsable_telefono=?,          responsable_email=?,
@@ -185,7 +198,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
         nombres||null, apellidos||null,
         v(dni), v(telefono), v(email),
         fechaFormateada||null, v(sexo),
-        v(direccion), v(ciudad), v(pais),
+        v(direccion), v(ciudad), v(departamento), v(pais),
         v(grupo_sanguineo), v(notas),
         v(responsable_nombre), v(responsable_parentesco),
         v(responsable_telefono), v(responsable_email),
@@ -233,26 +246,51 @@ router.post(
 
       const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
 
-      // Eliminar foto anterior de Cloudinary si existe
-      if (p.foto_cloudinary_id) {
-        try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
+      const isCloudinaryConfigured = !!(process.env.CLOUDINARY_URL || process.env.CLOUDINARY_CLOUD_NAME);
+
+      if (isCloudinaryConfigured) {
+        // Eliminar foto anterior de Cloudinary si existe
+        if (p.foto_cloudinary_id) {
+          try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
+        }
+
+        // Subir nueva foto a Cloudinary desde el buffer en memoria
+        const uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            { folder: `clinica/pacientes/${clinicaIdFinal}/perfil`, resource_type: "image" },
+            (err, result) => (err ? reject(err) : resolve(result))
+          );
+          streamifier.createReadStream(req.file.buffer).pipe(stream);
+        });
+
+        await pool.query(
+          "UPDATE pacientes SET foto_perfil=?, foto_cloudinary_id=? WHERE id=? AND clinica_id=?",
+          [uploadResult.secure_url, uploadResult.public_id, id, clinicaIdFinal]
+        );
+
+        return res.json({ ok: true, foto_perfil: uploadResult.secure_url });
       }
 
-      // Subir nueva foto a Cloudinary desde el buffer en memoria
-      const uploadResult = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          { folder: `clinica/pacientes/${clinicaIdFinal}/perfil`, resource_type: "image" },
-          (err, result) => (err ? reject(err) : resolve(result))
-        );
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
+      // ── Fallback: guardar en disco local ──────────────────────────────────
+      const ext      = path.extname(req.file.originalname).toLowerCase() || ".jpg";
+      const filename = `paciente-${id}-${Date.now()}${ext}`;
+      const uploadsDir = path.join(__dirname, "../uploads/pacientes");
+      if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+      fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
+      const urlPath = `pacientes/${filename}`;
+
+      // Eliminar foto local anterior si existe
+      if (p.foto_perfil && !p.foto_perfil.startsWith("http")) {
+        const oldFile = path.join(__dirname, "../uploads", p.foto_perfil);
+        if (fs.existsSync(oldFile)) try { fs.unlinkSync(oldFile); } catch { /* ignorar */ }
+      }
 
       await pool.query(
-        "UPDATE pacientes SET foto_perfil=?, foto_cloudinary_id=? WHERE id=? AND clinica_id=?",
-        [uploadResult.secure_url, uploadResult.public_id, id, clinicaIdFinal]
+        "UPDATE pacientes SET foto_perfil=?, foto_cloudinary_id=NULL WHERE id=? AND clinica_id=?",
+        [urlPath, id, clinicaIdFinal]
       );
 
-      res.json({ ok: true, foto_perfil: uploadResult.secure_url });
+      res.json({ ok: true, foto_perfil: urlPath });
     } catch (e) {
       res.status(500).json({ ok: false, msg: e.message });
     }

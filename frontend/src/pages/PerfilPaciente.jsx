@@ -20,6 +20,34 @@ import VacunasCarnet from "../components/VacunasCarnet";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
+const fotoUrl = (foto) => {
+  if (!foto) return null;
+  if (foto.startsWith("http")) return foto;
+  return `${API_BASE}/uploads/${foto.replace(/^\/?uploads\//, "")}`;
+};
+
+// ── Departamentos y municipios de Honduras ──────────────────────────────────
+const HONDURAS_DATA = {
+  "Atlántida":         ["Arizona","El Porvenir","Esparta","Jutiapa","La Ceiba","La Masica","San Francisco","Tela"],
+  "Choluteca":         ["Apacilagua","Choluteca","Concepción de María","Duyure","El Corpus","El Triunfo","Marcovia","Morolica","Namasigüe","Orocuina","Pespire","San Antonio de Flores","San Isidro","San José","San Marcos de Colón","Santa Ana de Yusguare"],
+  "Colón":             ["Balfate","Bonito Oriental","Iriona","Limón","Sabá","Santa Rosa de Aguán","Sonaguera","Tocoa","Trujillo"],
+  "Comayagua":         ["Ajuterique","Comayagua","El Rosario","Esquías","Humuya","La Libertad","La Trinidad","Lamaní","Las Lajas","Lejamaní","Minas de Oro","Ojos de Agua","San Jerónimo","San José de Comayagua","San José del Potrero","San Luis","San Sebastián","Siguatepeque","Taulabé","Villa de San Antonio"],
+  "Copán":             ["Cabañas","Concepción","Copán Ruinas","Corquín","Cucuyagua","Dolores","Dulce Nombre","El Paraíso","Florida","La Jigua","La Unión","Nueva Arcadia","San Agustín","San Antonio","San Jerónimo","San José","San Juan de Opoa","San Nicolás","San Pedro","Santa Rita","Santa Rosa de Copán","Trinidad de Copán","Veracruz"],
+  "Cortés":            ["Choloma","La Lima","Omoa","Pimienta","Potrerillos","Puerto Cortés","San Antonio de Cortés","San Francisco de Yojoa","San Manuel","San Pedro Sula","Santa Cruz de Yojoa","Villanueva"],
+  "El Paraíso":        ["Alauca","Danlí","El Paraíso","Güinope","Jacaleapa","Liure","Morocelí","Oropolí","Potrerillos","San Antonio de Flores","San Lucas","San Matías","Soledad","Teupasenti","Texiguat","Trojes","Vado Ancho","Yauyupe","Yuscarán"],
+  "Francisco Morazán": ["Alubarén","Cedros","Curarén","El Porvenir","Guaimaca","La Libertad","La Venta","Lepaterique","Maraita","Marale","Nueva Armenia","Ojojona","Reitoca","Sabanagrande","San Antonio de Oriente","San Buenaventura","San Ignacio","San Juan de Flores","San Miguelito","Santa Ana","Santa Lucía","Talanga","Tatumbla","Tegucigalpa","Valle de Ángeles","Vallecillo","Villa de San Francisco"],
+  "Gracias a Dios":    ["Ahuas","Brus Laguna","Juan Francisco Bulnes","Puerto Lempira","Villeda Morales","Wampusirpe"],
+  "Intibucá":          ["Camasca","Colomoncagua","Concepción","Dolores","Intibucá","Jesús de Otoro","La Esperanza","Magdalena","Masaguara","San Antonio","San Francisco de Opalaca","San Isidro","San Juan","San Marcos de Sierra","San Miguel Guancapla","Santa Lucía","Yamaranguila"],
+  "Islas de la Bahía": ["Guanaja","José Santos Guardiola","Roatán","Utila"],
+  "La Paz":            ["Aguanqueterique","Cabañas","Cane","Chinacla","Guajiquiro","La Paz","Lauterique","Marcala","Mercedes de Oriente","Opatoro","San Antonio del Norte","San Juan","San Pedro de Tutule","Santa Ana","Santa Elena","Santa María","Santiago de Puringla","Yarula"],
+  "Lempira":           ["Belén","Candelaria","Cololaca","Erandique","Gracias","Gualcince","Guarita","La Campa","La Iguala","La Unión","La Virtud","Las Flores","Lepaera","Mapulaca","Piraera","San Andrés","San Francisco","San Juan de Guarita","San Manuel Colohete","San Marcos de Caiquín","San Rafael","San Sebastián","Santa Cruz","Talgua","Tambla","Tomalá","Valladolid","Virginia"],
+  "Ocotepeque":        ["Belén Gualcho","Concepción","Dolores Merendón","Fraternidad","La Encarnación","La Labor","Lucerna","Mercedes","Ocotepeque","San Fernando","San Francisco del Valle","San Jorge","San Marcos","Santa Fe","Sensenti","Sinuapa"],
+  "Olancho":           ["Campamento","Catacamas","Concordia","Dulce Nombre de Culmí","El Rosario","Esquipulas del Norte","Gualaco","Guarizama","Guata","Jano","Juticalpa","La Unión","Mangulile","Manto","Patuca","Salama","San Esteban","San Francisco de Becerra","San Francisco de La Paz","Santa María del Real","Silca","Yocón"],
+  "Santa Bárbara":     ["Arada","Atima","Azagualpa","Ceguaca","Chinda","Concepción del Norte","Concepción del Sur","El Níspero","Gualala","Ilama","Las Vegas","Macuelizo","Naranjito","Nuevo Celilac","Petoa","Protección","Quimistán","San Francisco de Ojuera","San José de Colinas","San Luis","San Marcos","San Nicolás","San Pedro Zacapa","San Vicente Centenario","Santa Bárbara","Santa Rita","Trinidad"],
+  "Valle":             ["Alianza","Amapala","Aramecina","Caridad","Goascorán","Langue","Nacaome","San Francisco de Coray","San Lorenzo"],
+  "Yoro":              ["Arenal","El Negrito","El Progreso","Jocón","Morazán","Olanchito","Santa Rita","Sulaco","Victoria","Yorito","Yoro"],
+};
+
 const TIPOS_DOC = [
   { value: "laboratorio",   label: "Laboratorio", icon: "bi-file-earmark-medical" },
   { value: "imagen",        label: "Imagen médica", icon: "bi-file-image" },
@@ -36,6 +64,8 @@ export default function PerfilPaciente() {
   const fileRef = useRef();
   const fotoInputRef = useRef();
   const fotoCameraRef = useRef();
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
 
   const { modulos } = useAuth();
   const tieneModulo = (clave) => modulos.some(m => m.clave === clave);
@@ -63,6 +93,8 @@ export default function PerfilPaciente() {
   // Foto perfil
   const [fotoFile, setFotoFile] = useState(null);
   const [fotoPreview, setFotoPreview] = useState(null);
+  const [showWebcam, setShowWebcam] = useState(false);
+  const [webcamFacing, setWebcamFacing] = useState("user");
   
   // Eliminación con doble confirmación
   const [confirmarEliminar, setConfirmarEliminar] = useState(false);
@@ -196,7 +228,7 @@ export default function PerfilPaciente() {
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <title>Consulta — ${det.pac_apellidos}, ${det.pac_nombres} — ${dayjs(det.creado_en).format("DD/MM/YYYY")}</title>
+  <title>Consulta — ${det.pac_nombres} ${det.pac_apellidos} — ${dayjs(det.creado_en).format("DD/MM/YYYY")}</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 24px 32px; }
@@ -235,7 +267,7 @@ export default function PerfilPaciente() {
     </div>
   </div>
   <div class="paciente">
-    <h2>${det.pac_apellidos}, ${det.pac_nombres}</h2>
+    <h2>${det.pac_nombres} ${det.pac_apellidos}</h2>
     <div class="datos">
       ${det.fecha_nacimiento ? `<span>Nacimiento: ${dayjs(det.fecha_nacimiento).format("DD/MM/YYYY")}</span>` : ""}
       ${det.sexo ? `<span>Sexo: ${det.sexo}</span>` : ""}
@@ -310,6 +342,48 @@ export default function PerfilPaciente() {
       setFotoFile(file);
       setFotoPreview(URL.createObjectURL(file));
     }
+  };
+
+  // Webcam
+  useEffect(() => {
+    if (!showWebcam) return;
+    let stopped = false;
+    navigator.mediaDevices.getUserMedia({ video: { facingMode: webcamFacing } })
+      .then(stream => {
+        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+      })
+      .catch(() => { setShowWebcam(false); alert("No se pudo acceder a la cámara."); });
+    return () => {
+      stopped = true;
+      streamRef.current?.getTracks().forEach(t => t.stop());
+    };
+  }, [showWebcam, webcamFacing]);
+
+  const cerrarWebcam = () => {
+    streamRef.current?.getTracks().forEach(t => t.stop());
+    setShowWebcam(false);
+  };
+
+  const capturarFoto = () => {
+    const video = videoRef.current;
+    if (!video) return;
+    const canvas = document.createElement("canvas");
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    const ctx = canvas.getContext("2d");
+    if (webcamFacing === "user") {
+      ctx.translate(canvas.width, 0);
+      ctx.scale(-1, 1);
+    }
+    ctx.drawImage(video, 0, 0);
+    canvas.toBlob(blob => {
+      const file = new File([blob], "webcam-foto.jpg", { type: "image/jpeg" });
+      setFotoFile(file);
+      setFotoPreview(URL.createObjectURL(blob));
+      cerrarWebcam();
+    }, "image/jpeg", 0.92);
   };
 
   // ══════════════════════════════════════════════════════════
@@ -391,151 +465,175 @@ export default function PerfilPaciente() {
 
   const nombreCompleto = `${paciente.nombres} ${paciente.apellidos}`;
 
+  /* ── Pestañas disponibles (dinámicas según módulos) ── */
+  const TABS_PERFIL = [
+    { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
+    { key: "historial",   label: "Historial Clínico",    short: "Historial", icon: "bi-journal-medical",
+      badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" },
+    { key: "examenes",    label: "Exámenes",             short: "Exáms.",   icon: "bi-files",
+      badge: documentos.length > 0 ? documentos.length : null, badgeColor: "#0891b2" },
+    ...(tieneModulo("curva_crecimiento")
+      ? [{ key: "crecimiento", label: "Curvas de Crecimiento", short: "Curvas", icon: "bi-graph-up-arrow" }]
+      : []),
+    ...(tieneModulo("vacunas")
+      ? [{ key: "vacunas", label: "Vacunas", short: "Vacunas", icon: "bi-syringe" }]
+      : []),
+    { key: "eliminar",    label: "Eliminar Paciente",    short: "Eliminar", icon: "bi-trash", danger: true },
+  ];
+
   return (
-    <div className="container-fluid py-3" style={{ maxWidth: 1200 }}>
-      {/* Breadcrumb */}
-      <nav aria-label="breadcrumb" className="mb-3">
-        <ol className="breadcrumb mb-0">
-          <li className="breadcrumb-item"><Link to="/pacientes">Pacientes</Link></li>
-          <li className="breadcrumb-item active">{nombreCompleto}</li>
-        </ol>
-      </nav>
+    <div style={{ margin: "-1.5rem", width: "calc(100% + 3rem)", minHeight: "100vh", background: "#f0f2f5", display: "flex", flexDirection: "column" }}>
 
-      {/* Mensaje */}
-      {msg.texto && (
-        <div className={`alert alert-${msg.tipo} alert-dismissible fade show`} role="alert">
-          <i className={`bi ${msg.tipo === "success" ? "bi-check-circle" : "bi-exclamation-triangle"} me-2`} />
-          {msg.texto}
-          <button type="button" className="btn-close" onClick={() => setMsg({ tipo: "", texto: "" })} />
-        </div>
-      )}
+      {/* ══ HEADER estilo Catálogos ══════════════════════════════════════ */}
+      <div style={{
+        background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
+        padding: "16px 24px 0",
+        boxShadow: "0 2px 12px rgba(0,0,0,.18)",
+        flexShrink: 0,
+      }}>
+        {/* Breadcrumb */}
+        <nav style={{ marginBottom: 12 }}>
+          <ol className="breadcrumb mb-0" style={{ fontSize: "0.78rem" }}>
+            <li className="breadcrumb-item">
+              <Link to="/pacientes" style={{ color: "rgba(255,255,255,.6)", textDecoration: "none" }}>
+                <i className="bi bi-people me-1" />Pacientes
+              </Link>
+            </li>
+            <li className="breadcrumb-item active" style={{ color: "rgba(255,255,255,.9)" }}>
+              {nombreCompleto}
+            </li>
+          </ol>
+        </nav>
 
-      {/* Header del paciente */}
-      <div className="card shadow-sm mb-4">
-        <div className="card-body p-4">
+        {/* Info del paciente */}
+        <div className="d-flex align-items-center justify-content-between flex-wrap gap-3" style={{ marginBottom: 14 }}>
           <div className="d-flex align-items-center gap-3">
             {/* Avatar */}
-            <div style={{ width: 80, height: 80 }}>
-              {paciente.foto_perfil ? (
-                <img
-                  src={paciente.foto_perfil?.startsWith('http') ? paciente.foto_perfil : `${API_BASE}/uploads/${paciente.foto_perfil}`}
-                  alt="Foto"
-                  className="rounded-circle border border-3 border-primary"
-                  style={{ width: 80, height: 80, objectFit: "cover" }}
-                />
-              ) : (
-                <div
-                  className="rounded-circle bg-primary text-white d-flex align-items-center justify-content-center fw-bold"
-                  style={{ width: 80, height: 80, fontSize: "1.8rem" }}
-                >
-                  {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
-                </div>
-              )}
-            </div>
-
-            {/* Info principal */}
-            <div className="flex-grow-1">
-              <h4 className="mb-1 fw-bold">{nombreCompleto}</h4>
-              <div className="d-flex flex-wrap gap-2">
+            {paciente.foto_perfil ? (
+              <img
+                src={fotoUrl(paciente.foto_perfil)}
+                alt="Foto"
+                style={{ width: 56, height: 56, borderRadius: "50%", objectFit: "cover", border: "2px solid rgba(255,255,255,.4)" }}
+              />
+            ) : (
+              <div style={{
+                width: 56, height: 56, borderRadius: "50%", flexShrink: 0,
+                background: "rgba(33,150,243,.5)", border: "2px solid rgba(255,255,255,.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontWeight: 700, fontSize: "1.3rem", color: "#fff",
+              }}>
+                {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
+              </div>
+            )}
+            <div>
+              <h5 style={{ color: "#fff", fontWeight: 700, margin: 0 }}>{nombreCompleto}</h5>
+              <div className="d-flex flex-wrap gap-2 mt-1">
                 {paciente.dni && (
-                  <span className="badge bg-light text-dark border">
+                  <span style={{ background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.85)", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem" }}>
                     <i className="bi bi-credit-card me-1" />{paciente.dni}
                   </span>
                 )}
                 {paciente.edad && (
-                  <span className="badge bg-light text-dark border">
+                  <span style={{ background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.85)", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem" }}>
                     <i className="bi bi-calendar3 me-1" />{paciente.edad} años
                   </span>
                 )}
                 {paciente.grupo_sanguineo && (
-                  <span className="badge bg-danger">
+                  <span style={{ background: "rgba(239,68,68,.4)", color: "#fff", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem", fontWeight: 600 }}>
                     <i className="bi bi-droplet-fill me-1" />{paciente.grupo_sanguineo}
                   </span>
                 )}
                 {paciente.telefono && (
-                  <span className="badge bg-light text-dark border">
+                  <span style={{ background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.85)", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem" }}>
                     <i className="bi bi-telephone me-1" />{paciente.telefono}
                   </span>
                 )}
               </div>
             </div>
-
-            {/* Botones rápidos */}
-            <div className="d-flex gap-2">
-              <button
-                className="btn btn-success"
-                onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
-              >
-                <i className="bi bi-plus-circle me-1" />Nueva Consulta
-              </button>
-            </div>
           </div>
+
+          {/* Botón Nueva Consulta */}
+          <button
+            className="btn btn-sm"
+            style={{ background: "#22c55e", color: "#fff", fontWeight: 600, border: "none", borderRadius: 8, padding: "7px 16px" }}
+            onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
+          >
+            <i className="bi bi-plus-circle me-1" />Nueva Consulta
+          </button>
+        </div>
+
+        {/* Mensaje inline bajo el header */}
+        {msg.texto && (
+          <div style={{
+            margin: "0 0 8px",
+            padding: "8px 14px",
+            borderRadius: 8,
+            fontSize: "0.84rem",
+            background: msg.tipo === "success" ? "rgba(34,197,94,.2)" : "rgba(239,68,68,.2)",
+            color: msg.tipo === "success" ? "#86efac" : "#fca5a5",
+            border: `1px solid ${msg.tipo === "success" ? "rgba(34,197,94,.4)" : "rgba(239,68,68,.4)"}`,
+          }}>
+            <i className={`bi ${msg.tipo === "success" ? "bi-check-circle" : "bi-exclamation-triangle"} me-2`} />
+            {msg.texto}
+            <button
+              onClick={() => setMsg({ tipo: "", texto: "" })}
+              style={{ float: "right", background: "none", border: "none", cursor: "pointer", color: "inherit", fontSize: "1rem", lineHeight: 1 }}
+            >×</button>
+          </div>
+        )}
+
+        {/* ── Pestañas ── */}
+        <div style={{ display: "flex", gap: 3, overflowX: "auto" }}>
+          {TABS_PERFIL.map(t => {
+            const isActive = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                style={{
+                  flexShrink: 0,
+                  padding: "7px 16px",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  borderRadius: "8px 8px 0 0",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background .15s",
+                  background: isActive ? "#fff" : "rgba(255,255,255,.1)",
+                  color: isActive
+                    ? (t.danger ? "#dc2626" : "#1a2744")
+                    : (t.danger ? "rgba(252,165,165,.9)" : "rgba(255,255,255,.75)"),
+                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <i className={`bi ${t.icon}`} />
+                <span className="d-none d-sm-inline">{t.label}</span>
+                <span className="d-sm-none">{t.short}</span>
+                {t.badge && (
+                  <span style={{
+                    background: isActive ? t.badgeColor : "rgba(255,255,255,.3)",
+                    color: "#fff",
+                    borderRadius: 20,
+                    padding: "0 6px",
+                    fontSize: "0.7rem",
+                    fontWeight: 700,
+                    lineHeight: "18px",
+                  }}>{t.badge}</span>
+                )}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* ══════════════════════════════════════════════════════ */}
-      {/* PESTAÑAS */}
-      {/* ══════════════════════════════════════════════════════ */}
-      <ul className="nav nav-tabs mb-4">
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "datos" ? "active" : ""}`}
-            onClick={() => setTab("datos")}
-          >
-            <i className="bi bi-person-lines-fill me-2" />Datos Generales
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "historial" ? "active" : ""}`}
-            onClick={() => setTab("historial")}
-          >
-            <i className="bi bi-journal-medical me-2" />Historial Clínico
-            {historias.length > 0 && (
-              <span className="badge bg-primary ms-2">{historias.length}</span>
-            )}
-          </button>
-        </li>
-        <li className="nav-item">
-          <button
-            className={`nav-link ${tab === "examenes" ? "active" : ""}`}
-            onClick={() => setTab("examenes")}
-          >
-            <i className="bi bi-files me-2" />Exámenes
-            {documentos.length > 0 && (
-              <span className="badge bg-info ms-2">{documentos.length}</span>
-            )}
-          </button>
-        </li>
-        {tieneModulo("curva_crecimiento") && (
-          <li className="nav-item">
-            <button
-              className={`nav-link ${tab === "crecimiento" ? "active" : ""}`}
-              onClick={() => setTab("crecimiento")}
-            >
-              <i className="bi bi-graph-up-arrow me-2" />Curvas de Crecimiento
-            </button>
-          </li>
-        )}
-        {tieneModulo("vacunas") && (
-          <li className="nav-item">
-            <button
-              className={`nav-link ${tab === "vacunas" ? "active" : ""}`}
-              onClick={() => setTab("vacunas")}
-            >
-              <i className="bi bi-syringe me-2" />Vacunas
-            </button>
-          </li>
-        )}
-        <li className="nav-item">
-          <button
-            className={`nav-link text-danger ${tab === "eliminar" ? "active" : ""}`}
-            onClick={() => setTab("eliminar")}
-          >
-            <i className="bi bi-trash me-2" />Eliminar Paciente
-          </button>
-        </li>
-      </ul>
+      {/* ══ CONTENIDO ════════════════════════════════════════════════════ */}
+      <div style={{ flex: 1, padding: "20px 24px" }}>
+      <style>{`
+        @media (max-width: 600px) { .pp-content { padding: 12px !important; } }
+      `}</style>
 
       {/* ══════════════════════════════════════════════════════ */}
       {/* CONTENIDO DE LAS PESTAÑAS */}
@@ -598,13 +696,14 @@ export default function PerfilPaciente() {
                 {/* ── Sub-tab: Datos Personales ── */}
                 {subTabDatos === "paciente" && (
                   <div className="row g-3">
-                    {/* Foto de perfil */}
+
+                    {/* Foto */}
                     <div className="col-12">
                       <label className="form-label fw-semibold">Foto de perfil</label>
                       <div className="d-flex align-items-center gap-3">
                         {(fotoPreview || paciente.foto_perfil) && (
                           <img
-                            src={fotoPreview || (paciente.foto_perfil?.startsWith('http') ? paciente.foto_perfil : `${API_BASE}/uploads/${paciente.foto_perfil}`)}
+                            src={fotoPreview || fotoUrl(paciente.foto_perfil)}
                             alt="Preview"
                             style={{ width: 100, height: 100, objectFit: "cover", borderRadius: 12 }}
                           />
@@ -613,18 +712,28 @@ export default function PerfilPaciente() {
                           <input type="file" ref={fotoInputRef} accept="image/*" onChange={handleFotoChange} style={{ display: "none" }} />
                           <input type="file" ref={fotoCameraRef} accept="image/*" capture="environment" onChange={handleFotoChange} style={{ display: "none" }} />
                           <div className="d-flex gap-2 flex-wrap">
-                            <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => fotoCameraRef.current?.click()}>
-                              <i className="bi bi-camera me-1" />Tomar foto
+                            <button type="button" className="btn btn-outline-primary btn-sm" onClick={() => setShowWebcam(true)}>
+                              <i className="bi bi-webcam me-1" />Webcam
+                            </button>
+                            <button type="button" className="btn btn-outline-info btn-sm" onClick={() => fotoCameraRef.current?.click()}>
+                              <i className="bi bi-phone me-1" />Cámara celular
                             </button>
                             <button type="button" className="btn btn-outline-secondary btn-sm" onClick={() => fotoInputRef.current?.click()}>
-                              <i className="bi bi-image me-1" />{fotoPreview ? "Cambiar foto" : "Subir desde galería"}
+                              <i className="bi bi-upload me-1" />{fotoPreview ? "Cambiar foto" : "Subir archivo"}
                             </button>
                           </div>
-                          <small className="d-block text-muted mt-1">Puedes tomar una foto desde el celular o subir un archivo</small>
+                          <small className="d-block text-muted mt-1">Puedes tomar una foto con webcam, desde el celular o subir un archivo</small>
                         </div>
                       </div>
                     </div>
 
+                    {/* ── Identificación ── */}
+                    <div className="col-12 mt-2">
+                      <p className="text-uppercase fw-bold mb-0" style={{ fontSize: "0.72rem", letterSpacing: ".07em", color: "#6b7280" }}>
+                        <i className="bi bi-person-badge me-1" />Identificación
+                      </p>
+                      <hr className="mt-1 mb-0" />
+                    </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">Nombres *</label>
                       <input className="form-control" name="nombres" value={form.nombres || ""} onChange={cambioForm} required />
@@ -650,42 +759,60 @@ export default function PerfilPaciente() {
                         <option value="OTRO">Otro</option>
                       </select>
                     </div>
-                    <div className="col-md-4">
+
+                    {/* ── Datos personales ── */}
+                    <div className="col-12 mt-2">
+                      <p className="text-uppercase fw-bold mb-0" style={{ fontSize: "0.72rem", letterSpacing: ".07em", color: "#6b7280" }}>
+                        <i className="bi bi-person-lines-fill me-1" />Datos personales
+                      </p>
+                      <hr className="mt-1 mb-0" />
+                    </div>
+                    <div className="col-md-3">
                       <label className="form-label fw-semibold">Grupo sanguíneo</label>
                       <select className="form-select" name="grupo_sanguineo" value={form.grupo_sanguineo || ""} onChange={cambioForm}>
                         <option value="">Seleccionar</option>
                         {["A+","A-","B+","B-","AB+","AB-","O+","O-"].map(g => <option key={g} value={g}>{g}</option>)}
                       </select>
                     </div>
-                    <div className="col-md-4">
+                    <div className="col-md-3">
                       <label className="form-label fw-semibold">Estado Civil</label>
                       <select className="form-select" name="estado_civil" value={form.estado_civil || ""} onChange={cambioForm}>
                         <option value="">Seleccionar</option>
                         {["Soltero(a)","Casado(a)","Unión Libre","Divorciado(a)","Viudo(a)"].map(e => <option key={e} value={e}>{e}</option>)}
                       </select>
                     </div>
-                    <div className="col-md-4">
-                      <label className="form-label fw-semibold">Ocupación</label>
-                      <input className="form-control" name="ocupacion" value={form.ocupacion || ""} onChange={cambioForm} />
-                    </div>
-                    <div className="col-md-4">
+                    <div className="col-md-3">
                       <label className="form-label fw-semibold">Escolaridad</label>
                       <select className="form-select" name="escolaridad" value={form.escolaridad || ""} onChange={cambioForm}>
                         <option value="">Seleccionar</option>
                         {["Ninguna","Primaria","Secundaria","Preparatoria","Técnico","Universidad","Posgrado"].map(e => <option key={e} value={e}>{e}</option>)}
                       </select>
                     </div>
+                    <div className="col-md-3">
+                      <label className="form-label fw-semibold">Ocupación</label>
+                      <select className="form-select" name="ocupacion" value={form.ocupacion || ""} onChange={cambioForm}>
+                        <option value="">Seleccionar</option>
+                        {["Médico(a)","Enfermero(a)","Maestro(a)","Ingeniero(a)","Abogado(a)","Contador(a)","Agricultor(a)","Comerciante","Ama de casa","Estudiante","Policía / Militar","Conductor","Obrero(a)","Técnico(a)","Desempleado(a)","Jubilado(a)","Otro"].map(o => <option key={o} value={o}>{o}</option>)}
+                      </select>
+                    </div>
                     <div className="col-md-4">
                       <label className="form-label fw-semibold">Religión</label>
-                      <input className="form-control" name="religion" value={form.religion || ""} onChange={cambioForm} />
+                      <select className="form-select" name="religion" value={form.religion || ""} onChange={cambioForm}>
+                        <option value="">Seleccionar</option>
+                        {["Católica","Evangélica / Protestante","Testigo de Jehová","Adventista","Mormón","Musulmana","Judía","Sin religión","Otra"].map(r => <option key={r} value={r}>{r}</option>)}
+                      </select>
                     </div>
                     <div className="col-md-4">
                       <label className="form-label fw-semibold">Nacionalidad</label>
                       <input className="form-control" name="nacionalidad" value={form.nacionalidad || ""} onChange={cambioForm} />
                     </div>
-                    <div className="col-md-4">
-                      <label className="form-label fw-semibold">Lugar de nacimiento</label>
-                      <input className="form-control" name="lugar_nacimiento" value={form.lugar_nacimiento || ""} onChange={cambioForm} />
+
+                    {/* ── Contacto ── */}
+                    <div className="col-12 mt-2">
+                      <p className="text-uppercase fw-bold mb-0" style={{ fontSize: "0.72rem", letterSpacing: ".07em", color: "#6b7280" }}>
+                        <i className="bi bi-telephone me-1" />Contacto
+                      </p>
+                      <hr className="mt-1 mb-0" />
                     </div>
                     <div className="col-md-6">
                       <label className="form-label fw-semibold">Teléfono</label>
@@ -695,18 +822,60 @@ export default function PerfilPaciente() {
                       <label className="form-label fw-semibold">Email</label>
                       <input className="form-control" type="email" name="email" value={form.email || ""} onChange={cambioForm} />
                     </div>
+
+                    {/* ── Ubicación ── */}
+                    <div className="col-12 mt-2">
+                      <p className="text-uppercase fw-bold mb-0" style={{ fontSize: "0.72rem", letterSpacing: ".07em", color: "#6b7280" }}>
+                        <i className="bi bi-geo-alt me-1" />Ubicación
+                      </p>
+                      <hr className="mt-1 mb-0" />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">País</label>
+                      <input className="form-control" name="pais" value={form.pais || ""} onChange={cambioForm} />
+                    </div>
+                    <div className="col-md-4">
+                      <label className="form-label fw-semibold">Departamento</label>
+                      <select
+                        className="form-select"
+                        name="departamento"
+                        value={form.departamento || ""}
+                        onChange={e => setForm(f => ({ ...f, departamento: e.target.value, ciudad: "" }))}
+                      >
+                        <option value="">— Seleccionar —</option>
+                        {Object.keys(HONDURAS_DATA).sort().map(d => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div className="col-md-4">
+                      {form.departamento ? (
+                        <>
+                          <label className="form-label fw-semibold">Municipio</label>
+                          <select
+                            className="form-select"
+                            name="ciudad"
+                            value={form.ciudad || ""}
+                            onChange={cambioForm}
+                          >
+                            <option value="">— Seleccionar —</option>
+                            {(HONDURAS_DATA[form.departamento] || []).map(m => (
+                              <option key={m} value={m}>{m}</option>
+                            ))}
+                          </select>
+                        </>
+                      ) : (
+                        <>
+                          <label className="form-label fw-semibold">Municipio / Ciudad</label>
+                          <input className="form-control" name="ciudad" value={form.ciudad || ""} onChange={cambioForm} placeholder="Selecciona un departamento primero" />
+                        </>
+                      )}
+                    </div>
                     <div className="col-12">
                       <label className="form-label fw-semibold">Dirección</label>
                       <input className="form-control" name="direccion" value={form.direccion || ""} onChange={cambioForm} />
                     </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold">Ciudad</label>
-                      <input className="form-control" name="ciudad" value={form.ciudad || ""} onChange={cambioForm} />
-                    </div>
-                    <div className="col-md-6">
-                      <label className="form-label fw-semibold">País</label>
-                      <input className="form-control" name="pais" value={form.pais || ""} onChange={cambioForm} />
-                    </div>
+
                   </div>
                 )}
 
@@ -873,10 +1042,6 @@ export default function PerfilPaciente() {
                       <label className="text-muted small">Nacionalidad</label>
                       <p className="fw-semibold mb-0">{paciente.nacionalidad || "—"}</p>
                     </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Lugar de nacimiento</label>
-                      <p className="fw-semibold mb-0">{paciente.lugar_nacimiento || "—"}</p>
-                    </div>
                     <div className="col-md-6">
                       <label className="text-muted small">Teléfono</label>
                       <p className="fw-semibold mb-0">{paciente.telefono || "—"}</p>
@@ -889,11 +1054,15 @@ export default function PerfilPaciente() {
                       <label className="text-muted small">Dirección</label>
                       <p className="fw-semibold mb-0">{paciente.direccion || "—"}</p>
                     </div>
-                    <div className="col-md-6">
-                      <label className="text-muted small">Ciudad</label>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Departamento</label>
+                      <p className="fw-semibold mb-0">{paciente.departamento || "—"}</p>
+                    </div>
+                    <div className="col-md-4">
+                      <label className="text-muted small">Municipio / Ciudad</label>
                       <p className="fw-semibold mb-0">{paciente.ciudad || "—"}</p>
                     </div>
-                    <div className="col-md-6">
+                    <div className="col-md-4">
                       <label className="text-muted small">País</label>
                       <p className="fw-semibold mb-0">{paciente.pais || "—"}</p>
                     </div>
@@ -1639,6 +1808,45 @@ export default function PerfilPaciente() {
           }}
         />
       )}
+
+      {/* ── Modal Webcam ──────────────────────────────────── */}
+      {showWebcam && (
+        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+          <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", width: "100%", maxWidth: 540, boxShadow: "0 24px 64px rgba(0,0,0,0.55)" }}>
+            <div style={{ background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)", padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8, color: "#fff", fontWeight: 700, fontSize: "0.92rem" }}>
+                <i className="bi bi-webcam-fill" style={{ color: "#7dd3fc" }} /> Tomar foto
+              </div>
+              <button type="button" onClick={cerrarWebcam} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 6, width: 30, height: 30, color: "#fff", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+                <i className="bi bi-x" />
+              </button>
+            </div>
+            <div style={{ background: "#000", position: "relative", aspectRatio: "4/3", overflow: "hidden" }}>
+              <video ref={videoRef} autoPlay playsInline muted
+                style={{ width: "100%", height: "100%", objectFit: "cover", display: "block",
+                  transform: webcamFacing === "user" ? "scaleX(-1)" : "none" }} />
+            </div>
+            <div style={{ padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, borderTop: "1px solid #e5e7eb" }}>
+              <button type="button"
+                onClick={() => setWebcamFacing(f => f === "user" ? "environment" : "user")}
+                style={{ display: "flex", alignItems: "center", gap: 6, background: "#f1f5f9", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 14px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                <i className="bi bi-arrow-repeat" /> Girar cámara
+              </button>
+              <div style={{ display: "flex", gap: 10 }}>
+                <button type="button" onClick={cerrarWebcam}
+                  style={{ background: "#f1f5f9", border: "1px solid #d1d5db", borderRadius: 8, padding: "8px 18px", cursor: "pointer", fontSize: 13, fontWeight: 600, color: "#374151" }}>
+                  Cancelar
+                </button>
+                <button type="button" onClick={capturarFoto}
+                  style={{ background: "#2563eb", border: "none", borderRadius: 8, padding: "8px 22px", cursor: "pointer", fontSize: 13, fontWeight: 700, color: "#fff", display: "flex", alignItems: "center", gap: 7 }}>
+                  <i className="bi bi-camera-fill" /> Capturar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
     </div>
   );
 }
@@ -1733,7 +1941,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
           <div className="modal-body">
             <div className="alert alert-warning py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.apellidos}, {paciente.nombres}</strong> no tiene consulta agendada para hoy.
+              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene consulta agendada para hoy.
             </div>
             {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}
 

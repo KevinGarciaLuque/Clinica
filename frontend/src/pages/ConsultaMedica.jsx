@@ -27,9 +27,18 @@ function calcIMC(peso, talla) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// ─── helper datos_derma ─────────────────────────────────────────────────────
+function parseDerma(raw) {
+  if (!raw) return {};
+  try { return typeof raw === "string" ? JSON.parse(raw) : raw; }
+  catch { return {}; }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 export default function Consulta() {
   const [params]   = useSearchParams();
   const navigate   = useNavigate();
+  const { modulos } = useAuth();
   const pacId      = params.get("paciente_id");
   const citaId     = params.get("cita_id");
   const historiaId = params.get("historia_id");
@@ -52,6 +61,9 @@ export default function Consulta() {
     diagnosticos_secundarios: [],
   });
   const [vitals, setVitals] = useState({});
+
+  // Campos específicos dermatología
+  const [datosDerma, setDatosDerma] = useState({});
 
   // ── carga inicial ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -86,6 +98,8 @@ export default function Consulta() {
                 if (found) setSoap(s => ({ ...s, diagnostico_desc: found.descripcion }));
               }).catch(() => {});
           }
+          // cargar datos dermatológicos
+          setDatosDerma(parseDerma(h.datos_derma));
         })
         .catch(() => setAlertMsg({ type: "danger", msg: "No se pudo cargar la historia" }));
     }
@@ -127,6 +141,7 @@ export default function Consulta() {
         diagnosticos_secundarios: soap.diagnosticos_secundarios,
         plan:        soap.plan,
         estado:      sign ? "FIRMADA" : "BORRADOR",
+        datos_derma: Object.keys(datosDerma).length ? datosDerma : null,
       };
 
       if (hid) {
@@ -161,11 +176,14 @@ export default function Consulta() {
     ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") + " años"
     : "";
 
+  const esDerma = modulos.some(m => m.ruta?.startsWith("/estetica/"));
+
   const TAB_LIST = [
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
     { id: "rx",           icon: "bi-capsule",          label: "Prescripción" },
     { id: "estudios",     icon: "bi-eyedropper",       label: "Estudios" },
     { id: "antecedentes", icon: "bi-folder2-open",     label: "Antecedentes" },
+    ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
   ];
 
   return (
@@ -264,7 +282,7 @@ export default function Consulta() {
             </div>
             <div style={{ flex: 1 }}>
               <div style={{ fontWeight: 700, fontSize: "0.97rem", color: "#111827" }}>
-                {paciente.apellidos}, {paciente.nombres}
+                {paciente.nombres} {paciente.apellidos}
               </div>
               <div style={{ color: "#6b7280", fontSize: "0.78rem", marginTop: 2 }}>
                 {edad && <span>{edad}</span>}
@@ -377,6 +395,15 @@ export default function Consulta() {
           {tab === "antecedentes" && (
             <AntecedentesTab
               pacienteId={paciente?.id || pacId}
+              firmada={firmada}
+            />
+          )}
+
+          {/* ── Dermatología ── */}
+          {tab === "derma" && (
+            <DermaTab
+              datosDerma={datosDerma}
+              setDatosDerma={setDatosDerma}
               firmada={firmada}
             />
           )}
@@ -2069,6 +2096,213 @@ function AntecedentesTab({ pacienteId, firmada }) {
   );
 }
 
+// ══════════════════════════════════════════════════════════════════════
+// TAB: Dermatología — campos específicos de la especialidad
+// ══════════════════════════════════════════════════════════════════════
+const FOTOTIPOS_FITZPATRICK = [
+  { val: "I",   label: "I — Siempre quema, nunca broncea (piel muy clara)" },
+  { val: "II",  label: "II — Generalmente quema, poco broncea" },
+  { val: "III", label: "III — A veces quema, broncea gradualmente" },
+  { val: "IV",  label: "IV — Rara vez quema, broncea fácilmente (piel morena)" },
+  { val: "V",   label: "V — Muy rara vez quema, broncea intensamente" },
+  { val: "VI",  label: "VI — Nunca quema, pigmentación intensa" },
+];
+
+const EXPOSICION_SOLAR_OPTS = ["Mínima", "Moderada (1–2 h/día)", "Alta (>2 h/día)", "Ocupacional"];
+
+function DermaFieldGroup({ title, icon, children }) {
+  return (
+    <div style={{ marginBottom: 20 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid #e5e7eb" }}>
+        <i className={`bi ${icon}`} style={{ color: "#8b5cf6", fontSize: "1rem" }}></i>
+        <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em" }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function DermaField({ label, children }) {
+  return (
+    <div className="mb-3">
+      <label className="form-label small mb-1" style={{ fontWeight: 600, color: "#374151" }}>{label}</label>
+      {children}
+    </div>
+  );
+}
+
+function DermaTab({ datosDerma, setDatosDerma, firmada }) {
+  const set = (key, val) => setDatosDerma(prev => ({ ...prev, [key]: val }));
+  const d = datosDerma;
+
+  const inputStyle = { borderRadius: 7, fontSize: "0.85rem" };
+  const textareaStyle = { borderRadius: 7, fontSize: "0.85rem", resize: "vertical" };
+
+  return (
+    <div>
+      {/* Banner informativo */}
+      <div style={{ background: "linear-gradient(135deg, #f5f3ff, #ede9fe)", border: "1px solid #ddd6fe", borderRadius: 10, padding: "10px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+        <i className="bi bi-bandaid-fill" style={{ color: "#7c3aed", fontSize: "1.2rem" }}></i>
+        <div>
+          <span style={{ fontWeight: 700, color: "#5b21b6", fontSize: "0.9rem" }}>Historia Clínica Dermatológica</span>
+          <div style={{ fontSize: "0.75rem", color: "#7c3aed", marginTop: 1 }}>Campos específicos para consultas de dermatología y estética. Se guardan junto con la historia SOAP al presionar Borrador o Firmar.</div>
+        </div>
+      </div>
+
+      <div className="row g-0">
+        <div className="col-md-6 pe-md-3">
+
+          <DermaFieldGroup title="Datos clínicos" icon="bi-clipboard2-pulse">
+            <DermaField label="Tiempo de evolución">
+              <input className="form-control form-control-sm" style={inputStyle}
+                placeholder="Ej: 3 semanas, 2 meses…"
+                disabled={firmada}
+                value={d.tiempo_evolucion || ""}
+                onChange={e => set("tiempo_evolucion", e.target.value)} />
+            </DermaField>
+            <DermaField label="Localización anatómica">
+              <input className="form-control form-control-sm" style={inputStyle}
+                placeholder="Ej: cara, espalda, extremidades inferiores…"
+                disabled={firmada}
+                value={d.localizacion_anatomica || ""}
+                onChange={e => set("localizacion_anatomica", e.target.value)} />
+            </DermaField>
+            <DermaField label="Tratamientos previos para este padecimiento">
+              <textarea className="form-control form-control-sm" rows={2} style={textareaStyle}
+                placeholder="Medicamentos, procedimientos, cremas utilizadas…"
+                disabled={firmada}
+                value={d.tratamientos_previos || ""}
+                onChange={e => set("tratamientos_previos", e.target.value)} />
+            </DermaField>
+          </DermaFieldGroup>
+
+          <DermaFieldGroup title="Antecedentes dermatológicos" icon="bi-person-lines-fill">
+            <DermaField label="Antecedentes dermatológicos personales">
+              <textarea className="form-control form-control-sm" rows={2} style={textareaStyle}
+                placeholder="Enfermedades de piel previas, psoriasis, eczema, acné severo…"
+                disabled={firmada}
+                value={d.antecedentes_derma_personales || ""}
+                onChange={e => set("antecedentes_derma_personales", e.target.value)} />
+            </DermaField>
+            <div className="mb-3">
+              <div className="d-flex align-items-center gap-2 mb-1">
+                <label className="form-label small mb-0" style={{ fontWeight: 600, color: "#374151" }}>
+                  Antecedentes familiares de cáncer de piel
+                </label>
+                <div className="d-flex gap-2">
+                  {["Sí", "No", "Desconoce"].map(op => (
+                    <label key={op} className="d-flex align-items-center gap-1" style={{ cursor: "pointer", fontSize: "0.82rem" }}>
+                      <input type="radio" name="antecedentes_fam_cancer"
+                        disabled={firmada}
+                        checked={d.antecedentes_fam_cancer_piel === op}
+                        onChange={() => set("antecedentes_fam_cancer_piel", op)} />
+                      {op}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {d.antecedentes_fam_cancer_piel === "Sí" && (
+                <input className="form-control form-control-sm mt-1" style={inputStyle}
+                  placeholder="Especificar tipo y parentesco…"
+                  disabled={firmada}
+                  value={d.antecedentes_fam_cancer_detalle || ""}
+                  onChange={e => set("antecedentes_fam_cancer_detalle", e.target.value)} />
+              )}
+            </div>
+          </DermaFieldGroup>
+
+        </div>
+        <div className="col-md-6 ps-md-3">
+
+          <DermaFieldGroup title="Características del paciente" icon="bi-person-badge">
+            <DermaField label="Fototipo de Fitzpatrick">
+              <select className="form-select form-select-sm" style={inputStyle}
+                disabled={firmada}
+                value={d.fototipo_fitzpatrick || ""}
+                onChange={e => set("fototipo_fitzpatrick", e.target.value)}>
+                <option value="">— Seleccionar —</option>
+                {FOTOTIPOS_FITZPATRICK.map(f => (
+                  <option key={f.val} value={f.val}>{f.label}</option>
+                ))}
+              </select>
+            </DermaField>
+            <DermaField label="Exposición solar habitual">
+              <select className="form-select form-select-sm" style={inputStyle}
+                disabled={firmada}
+                value={d.exposicion_solar || ""}
+                onChange={e => set("exposicion_solar", e.target.value)}>
+                <option value="">— Seleccionar —</option>
+                {EXPOSICION_SOLAR_OPTS.map(o => <option key={o}>{o}</option>)}
+              </select>
+            </DermaField>
+            <div className="mb-3">
+              <div className="d-flex align-items-center gap-2 mb-1">
+                <label className="form-label small mb-0" style={{ fontWeight: 600, color: "#374151" }}>Usa protector solar</label>
+                <div className="d-flex gap-2">
+                  {["Sí", "No", "A veces"].map(op => (
+                    <label key={op} className="d-flex align-items-center gap-1" style={{ cursor: "pointer", fontSize: "0.82rem" }}>
+                      <input type="radio" name="usa_protector_solar"
+                        disabled={firmada}
+                        checked={d.usa_protector_solar === op}
+                        onChange={() => set("usa_protector_solar", op)} />
+                      {op}
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {d.usa_protector_solar === "Sí" && (
+                <input className="form-control form-control-sm mt-1" style={inputStyle}
+                  placeholder="FPS / frecuencia de aplicación…"
+                  disabled={firmada}
+                  value={d.protector_solar_detalle || ""}
+                  onChange={e => set("protector_solar_detalle", e.target.value)} />
+              )}
+            </div>
+            <DermaField label="Ocupación">
+              <input className="form-control form-control-sm" style={inputStyle}
+                placeholder="Ej: agricultora, maestra, oficinista…"
+                disabled={firmada}
+                value={d.ocupacion || ""}
+                onChange={e => set("ocupacion", e.target.value)} />
+            </DermaField>
+          </DermaFieldGroup>
+
+          <DermaFieldGroup title="Clínica y plan" icon="bi-journal-medical">
+            <DermaField label="Diagnósticos diferenciales">
+              <textarea className="form-control form-control-sm" rows={2} style={textareaStyle}
+                placeholder="Listado de diagnósticos a descartar…"
+                disabled={firmada}
+                value={d.diagnosticos_diferenciales || ""}
+                onChange={e => set("diagnosticos_diferenciales", e.target.value)} />
+            </DermaField>
+            <DermaField label="Indicaciones médicas / postprocedimiento">
+              <textarea className="form-control form-control-sm" rows={3} style={textareaStyle}
+                placeholder="Cuidados en casa, restricciones, signos de alarma…"
+                disabled={firmada}
+                value={d.indicaciones_medicas || ""}
+                onChange={e => set("indicaciones_medicas", e.target.value)} />
+            </DermaField>
+            <DermaField label="Próxima cita sugerida">
+              <input type="date" className="form-control form-control-sm" style={inputStyle}
+                disabled={firmada}
+                value={d.proxima_cita || ""}
+                onChange={e => set("proxima_cita", e.target.value)} />
+            </DermaField>
+          </DermaFieldGroup>
+
+        </div>
+      </div>
+
+      {!firmada && (
+        <div style={{ marginTop: 4, padding: "10px 14px", background: "#f0fdf4", borderRadius: 8, border: "1px solid #bbf7d0", fontSize: "0.78rem", color: "#15803d", display: "flex", alignItems: "center", gap: 8 }}>
+          <i className="bi bi-info-circle-fill"></i>
+          Los campos de esta pestaña se guardan automáticamente junto con el SOAP al presionar <strong>Borrador</strong> o <strong>Firmar y Cerrar</strong>.
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Modal Nueva Consulta Sin Cita ────────────────────────────────────────────
 function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
   const [modo, setModo] = useState(null);
@@ -2159,7 +2393,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
           <div className="modal-body">
             <div className="alert alert-warning py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.apellidos}, {paciente.nombres}</strong> no tiene consulta agendada para hoy.
+              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene consulta agendada para hoy.
             </div>
             {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}
 

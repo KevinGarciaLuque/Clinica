@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
+import { useAuth } from "../auth/AuthContext";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -11,6 +12,56 @@ import api from "../api/api";
 dayjs.locale("es");
 const localizer = dayjsLocalizer(dayjs);
 const DnDCalendar = withDragAndDrop(Calendar);
+
+// ─── Helper edad ─────────────────────────────────────────────────────────────
+function calcEdad(fechaNac) {
+  if (!fechaNac) return null;
+  const nac = dayjs(fechaNac);
+  const años = dayjs().diff(nac, "year");
+  if (años < 0) return null;
+  if (años === 0) {
+    const meses = dayjs().diff(nac, "month");
+    return `${meses}m`;
+  }
+  return `${años}a`;
+}
+
+// ─── Chip de paciente con edad y ciudad ──────────────────────────────────────
+function ChipPacienteCita({ apellidos, nombres, ciudad, departamento, fechaNac, tel, size = "md" }) {
+  const edad = calcEdad(fechaNac);
+  const isSm = size === "sm";
+  const ubicacion = [departamento, ciudad].filter(Boolean).join(" · ");
+  return (
+    <div>
+      <div style={{ fontWeight: 700, fontSize: isSm ? "0.82rem" : "0.9rem", color: "#111827", lineHeight: 1.2 }}>
+        {nombres} {apellidos}
+      </div>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 4, marginTop: 3 }}>
+        {edad && (
+          <span style={{
+            background: "rgba(124,58,237,.1)", color: "#6d28d9",
+            borderRadius: 5, padding: "1px 6px", fontSize: "0.68rem", fontWeight: 700,
+            display: "inline-flex", alignItems: "center", gap: 3,
+          }}>
+            <i className="bi bi-person" style={{ fontSize: 9 }} />{edad}
+          </span>
+        )}
+        {ubicacion && (
+          <span style={{
+            background: "rgba(14,165,233,.1)", color: "#0369a1",
+            borderRadius: 5, padding: "1px 6px", fontSize: "0.68rem", fontWeight: 700,
+            display: "inline-flex", alignItems: "center", gap: 3,
+          }}>
+            <i className="bi bi-geo-alt" style={{ fontSize: 9 }} />{ubicacion}
+          </span>
+        )}
+        {tel && !ubicacion && !edad && (
+          <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>{tel}</span>
+        )}
+      </div>
+    </div>
+  );
+}
 
 // ─── colores por estado ───────────────────────────────────────────────────────
 const ESTADO_COLOR = {
@@ -24,6 +75,29 @@ const ESTADO_COLOR = {
 };
 
 const ESTADOS = Object.keys(ESTADO_COLOR);
+
+// ─── Tipos de consulta por tipo de clínica ───────────────────────────────────
+const TIPOS_CONSULTA_BASE = ["PRIMERA_VEZ", "CONTROL", "EMERGENCIA", "TELECONSULTA"];
+
+const TIPOS_CONSULTA_ESTETICA = [
+  "Consulta dermatológica primera vez",
+  "Consulta dermatológica control",
+  "Consulta estética",
+  "Consulta pediátrica dermatológica",
+  "Consulta de urgencia dermatológica",
+  "Consulta online",
+  "Revisión postprocedimiento",
+  "Retiro de puntos",
+  "Curación postquirúrgica",
+  "Evaluación preláser",
+  "Evaluación postláser",
+];
+
+function getTiposConsulta(tipoClave) {
+  return (tipoClave === "estetica" || tipoClave === "dermatologia")
+    ? TIPOS_CONSULTA_ESTETICA
+    : TIPOS_CONSULTA_BASE;
+}
 
 const MESSAGES = {
   today: "Hoy", previous: "Anterior", next: "Siguiente",
@@ -45,7 +119,7 @@ const FORMATS = {
 function buildEvents(citas) {
   return citas.map(c => ({
     id: c.id,
-    title: `${c.paciente_apellidos}, ${c.paciente_nombres}`,
+    title: `${c.paciente_nombres} ${c.paciente_apellidos}`,
     start: new Date(c.inicio),
     end:   new Date(c.fin),
     resource: c,
@@ -69,11 +143,32 @@ function AgendaEventoPendientes({ event }) {
 
   const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff" };
   const hayPendientes = pendientes && (pendientes.plan || pendientes.estudios?.length > 0);
+  const r = event.resource || {};
+  const edad = calcEdad(r.paciente_fecha_nac);
 
   return (
     <div style={{ lineHeight: 1.4 }}>
-      <div className="d-flex align-items-center gap-2">
+      <div className="d-flex align-items-center gap-2 flex-wrap">
         <span className="fw-semibold">{event.title}</span>
+        {edad && (
+          <span style={{
+            background: "rgba(124,58,237,.1)", color: "#6d28d9",
+            borderRadius: 5, padding: "1px 7px", fontSize: "0.7rem", fontWeight: 700,
+            display: "inline-flex", alignItems: "center", gap: 3,
+          }}>
+            <i className="bi bi-person" style={{ fontSize: 9 }} />{edad}
+          </span>
+        )}
+        {(r.paciente_departamento || r.paciente_ciudad) && (
+          <span style={{
+            background: "rgba(14,165,233,.1)", color: "#0369a1",
+            borderRadius: 5, padding: "1px 7px", fontSize: "0.7rem", fontWeight: 700,
+            display: "inline-flex", alignItems: "center", gap: 3,
+          }}>
+            <i className="bi bi-geo-alt" style={{ fontSize: 9 }} />
+            {[r.paciente_departamento, r.paciente_ciudad].filter(Boolean).join(" · ")}
+          </span>
+        )}
         {!cargando && hayPendientes && (
           <span className="badge" style={{ background: "#e65c00", fontSize: "0.68rem", padding: "2px 6px" }}>
             <i className="bi bi-exclamation-circle me-1" />
@@ -166,6 +261,9 @@ function eventPropGetter(event) {
 // ─── componente principal ─────────────────────────────────────────────────────
 export default function Citas() {
   const [searchParams] = useSearchParams();
+  const { user } = useAuth();
+  const [tipoClinica, setTipoClinica] = useState("");
+  const [tiposCita, setTiposCita] = useState([]);
   const [activeTab, setActiveTab]   = useState(searchParams.get("tab") || "calendario");
   const [events,    setEvents]      = useState([]);
   const [medicos,   setMedicos]     = useState([]);
@@ -198,6 +296,20 @@ export default function Citas() {
       .then(r => setMedicos(r.data.data || []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api.get("/clinicas")
+      .then(r => {
+        const lista = r.data.data || [];
+        const clinica = Array.isArray(lista) ? lista[0] : null;
+        setTipoClinica(clinica?.tipo_clave || "");
+      })
+      .catch(() => {});
+    // Cargar catálogo de tipos de cita de esta clínica
+    api.get("/catalogos-tipos-cita")
+      .then(r => setTiposCita(r.data.data || []))
+      .catch(() => {});
+  }, [user?.clinica_id]);
 
   const loadCitas = useCallback(({ start, end } = {}) => {
     setLoading(true);
@@ -497,6 +609,8 @@ export default function Citas() {
         <ModalNuevaCita
           slotInfo={slotInfo}
           medicos={medicos}
+          tipoClinica={tipoClinica}
+          tiposCita={tiposCita}
           onClose={() => setShowNew(false)}
           onCreated={() => { 
             setShowNew(false); 
@@ -521,6 +635,8 @@ export default function Citas() {
         <ModalEditarCita
           event={selEvent}
           medicos={medicos}
+          tipoClinica={tipoClinica}
+          tiposCita={tiposCita}
           onClose={() => setShowEdit(false)}
           onSaved={() => { setShowEdit(false); loadCitas(); loadSalaEspera(); }}
         />
@@ -530,7 +646,7 @@ export default function Citas() {
         <ModalConfirmDelete
           onConfirm={eliminarPermanente}
           onCancel={() => setShowConfirmDelete(false)}
-          pacienteNombre={`${selEvent.resource.paciente_apellidos}, ${selEvent.resource.paciente_nombres}`}
+          pacienteNombre={`${selEvent.resource.paciente_nombres} ${selEvent.resource.paciente_apellidos}`}
           fecha={dayjs(selEvent.resource.inicio).format("DD/MM/YYYY h:mm A")}
         />
       )}
@@ -632,10 +748,14 @@ function FilaSala({ c, i, flujo, onEstadoChange }) {
       }}>
       <td style={{ padding: "12px 14px", color: "#9ca3af", fontWeight: 700, fontSize: "0.82rem" }}>{i + 1}</td>
       <td style={{ padding: "12px 14px" }}>
-        <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#111827" }}>
-          {c.paciente_apellidos}, {c.paciente_nombres}
-        </div>
-        <div style={{ fontSize: "0.74rem", color: "#9ca3af", marginTop: 2 }}>{c.paciente_tel}</div>
+        <ChipPacienteCita
+          apellidos={c.paciente_apellidos}
+          nombres={c.paciente_nombres}
+          ciudad={c.paciente_ciudad}
+          fechaNac={c.paciente_fecha_nac}
+          tel={c.paciente_tel}
+          size="sm"
+        />
       </td>
       <td style={{ padding: "12px 14px" }}>
         <div style={{ fontSize: "0.85rem", color: "#374151", fontWeight: 600 }}>Dr. {c.medico_apellidos}</div>
@@ -701,10 +821,11 @@ function TimePicker12h({ value, onChange, label, required }) {
 }
 
 // ─── Modal Nueva Cita ─────────────────────────────────────────────────────────
-function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
+function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClose, onCreated }) {
+  const tiposConsulta = tiposCita.length > 0 ? tiposCita.map(t => t.nombre) : getTiposConsulta(tipoClinica);
   const [form, setForm] = useState({
     paciente_id: "", medico_id: "", inicio: "", fin: "",
-    tipo_consulta: "PRIMERA_VEZ", motivo: "", canal: "RECEPCION",
+    tipo_consulta: tiposConsulta[0], motivo: "", canal: "RECEPCION",
   });
   const [pacBusq,  setPacBusq]  = useState("");
   const [pacList,  setPacList]  = useState([]);
@@ -761,7 +882,7 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
 
   const selPaciente = (p) => {
     setPacSel(p);
-    setPacBusq(`${p.apellidos}, ${p.nombres}`);
+    setPacBusq(`${p.nombres} ${p.apellidos}`);
     setPacList([]);
     setForm(f => ({ ...f, paciente_id: p.id }));
   };
@@ -831,16 +952,51 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
                     onChange={e => { setPacBusq(e.target.value); setPacSel(null); setForm(f => ({ ...f, paciente_id: "" })); }} />
                   {pacList.length > 0 && (
                     <ul className="list-group position-absolute z-3 shadow-sm" style={{ top: "100%", left: 0, right: 0, maxHeight: 160, overflowY: "auto", fontSize: "0.8rem" }}>
-                      {pacList.map(p => (
-                        <li key={p.id} className="list-group-item list-group-item-action py-1 px-2" style={{ cursor: "pointer" }}
-                          onClick={() => selPaciente(p)}>
-                          <strong>{p.apellidos}, {p.nombres}</strong>
-                          <span className="text-muted ms-1">DNI {p.dni}</span>
-                        </li>
-                      ))}
+                      {pacList.map(p => {
+                        const edad = calcEdad(p.fecha_nacimiento);
+                        return (
+                          <li key={p.id} className="list-group-item list-group-item-action py-2 px-2" style={{ cursor: "pointer" }}
+                            onClick={() => selPaciente(p)}>
+                            <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#111827" }}>
+                              {p.nombres} {p.apellidos}
+                            </div>
+                            <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+                              {p.dni && <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>DNI {p.dni}</span>}
+                              {edad && (
+                                <span style={{
+                                  background: "rgba(124,58,237,.1)", color: "#6d28d9",
+                                  borderRadius: 4, padding: "0 5px", fontSize: "0.68rem", fontWeight: 700,
+                                }}>{edad}</span>
+                              )}
+                              {p.ciudad && (
+                                <span style={{
+                                  background: "rgba(14,165,233,.1)", color: "#0369a1",
+                                  borderRadius: 4, padding: "0 5px", fontSize: "0.68rem", fontWeight: 700,
+                                }}>
+                                  <i className="bi bi-geo-alt" style={{ fontSize: 9 }} /> {p.ciudad}
+                                </span>
+                              )}
+                            </div>
+                          </li>
+                        );
+                      })}
                     </ul>
                   )}
-                  {pacSel && <div className="text-success mt-1" style={{ fontSize: "0.78rem" }}>✓ {pacSel.nombres} {pacSel.apellidos}</div>}
+                  {pacSel && (
+                    <div style={{
+                      marginTop: 6, padding: "6px 10px", borderRadius: 8,
+                      background: "rgba(34,197,94,.07)", border: "1px solid rgba(34,197,94,.25)",
+                    }}>
+                      <ChipPacienteCita
+                        apellidos={pacSel.apellidos}
+                        nombres={pacSel.nombres}
+                        ciudad={pacSel.ciudad}
+                        fechaNac={pacSel.fecha_nacimiento}
+                        tel={pacSel.telefono}
+                        size="sm"
+                      />
+                    </div>
+                  )}
                 </div>
 
                 {/* Médico + Fecha */}
@@ -896,7 +1052,7 @@ function ModalNuevaCita({ slotInfo, medicos, onClose, onCreated }) {
                   <label className="form-label mb-1">Tipo</label>
                   <select className="form-select form-select-sm" value={form.tipo_consulta}
                     onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
-                    {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
+                    {tiposConsulta.map(t => (
                       <option key={t}>{t}</option>
                     ))}
                   </select>
@@ -958,7 +1114,19 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
           <div className="modal-body">
             <table className="table table-sm table-borderless">
               <tbody>
-                <tr><th>Paciente</th><td>{c.paciente_apellidos}, {c.paciente_nombres}</td></tr>
+                <tr>
+                  <th style={{ whiteSpace: "nowrap" }}>Paciente</th>
+                  <td>
+                    <ChipPacienteCita
+                      apellidos={c.paciente_apellidos}
+                      nombres={c.paciente_nombres}
+                      ciudad={c.paciente_ciudad}
+                      departamento={c.paciente_departamento}
+                      fechaNac={c.paciente_fecha_nac}
+                      tel={c.paciente_tel}
+                    />
+                  </td>
+                </tr>
                 <tr><th>Médico</th><td>Dr. {c.medico_apellidos} {c.medico_nombres}</td></tr>
                 <tr><th>Inicio</th><td>{dayjs(c.inicio).format("DD/MM/YYYY h:mm A")}</td></tr>
                 <tr><th>Fin</th><td>{dayjs(c.fin).format("h:mm A")}</td></tr>
@@ -1011,7 +1179,8 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
 }
 
 // ─── Modal Editar Cita ────────────────────────────────────────────────────────
-function ModalEditarCita({ event, medicos, onClose, onSaved }) {
+function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose, onSaved }) {
+  const tiposConsulta = tiposCita.length > 0 ? tiposCita.map(t => t.nombre) : getTiposConsulta(tipoClinica);
   const c = event.resource;
   const [form, setForm] = useState({
     medico_id:     String(c.medico_id),
@@ -1064,7 +1233,16 @@ function ModalEditarCita({ event, medicos, onClose, onSaved }) {
 
               <div className="col-12">
                 <label className="form-label fw-semibold">Paciente</label>
-                <input className="form-control" value={`${c.paciente_apellidos}, ${c.paciente_nombres}`} disabled />
+                <div className="form-control" style={{ background: "#f8fafc", cursor: "default", minHeight: 60 }}>
+                  <ChipPacienteCita
+                    apellidos={c.paciente_apellidos}
+                    nombres={c.paciente_nombres}
+                    ciudad={c.paciente_ciudad}
+                    departamento={c.paciente_departamento}
+                    fechaNac={c.paciente_fecha_nac}
+                    tel={c.paciente_tel}
+                  />
+                </div>
               </div>
 
               <div className="col-md-6">
@@ -1096,7 +1274,7 @@ function ModalEditarCita({ event, medicos, onClose, onSaved }) {
                 <label className="form-label fw-semibold">Tipo</label>
                 <select className="form-select" value={form.tipo_consulta}
                   onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
-                  {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
+                  {tiposConsulta.map(t => (
                     <option key={t}>{t}</option>
                   ))}
                 </select>

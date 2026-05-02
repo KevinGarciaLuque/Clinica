@@ -53,6 +53,9 @@ async function runMigrations() {
       '033_verificaciones_email.sql',
       '034_estetica_modulos_dermatologia.sql',
       '035_fix_columnas_modulos_y_dermatologia.sql',
+      '036_add_departamento_pacientes.sql',
+      '037_modulo_biopsias_patologia.sql',
+      '038_modulo_inventario.sql',
     ];
 
     for (const migration of migrations) {

@@ -675,7 +675,7 @@ function imprimirCarnet(paciente, registros, vitaminaRegistros) {
   const w = window.open("", "_blank");
   w.document.write(`<!DOCTYPE html><html lang="es"><head>
 <meta charset="UTF-8">
-<title>Carnet de Vacunación — ${paciente?.apellidos || ""}, ${paciente?.nombres || ""}</title>
+<title>Carnet de Vacunación — ${paciente?.nombres || ""} ${paciente?.apellidos || ""}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 16px; }

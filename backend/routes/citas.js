@@ -84,7 +84,11 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     const { desde, hasta, medico_id, paciente_id, estado } = req.query;
     let sql = `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
                       c.paciente_id, c.medico_id,
-                      p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos, p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
+                      p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
+                      p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
+                      p.fecha_nacimiento AS paciente_fecha_nac,
+                      p.ciudad AS paciente_ciudad,
+                      p.departamento AS paciente_departamento,
                       u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
                       e.nombre AS especialidad
                FROM citas c

@@ -78,7 +78,7 @@ export default function Catalogos() {
             </div>
             <div>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Catálogos</div>
-              <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Medicamentos, Diagnósticos y Estudios</div>
+              <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Medicamentos, Diagnósticos, Estudios y Procedimientos</div>
             </div>
           </div>
           <div className="cat-tabs-row">
@@ -86,6 +86,8 @@ export default function Catalogos() {
               { key: "medicamentos", label: "💊 Medicamentos", short: "💊" },
               { key: "diagnosticos", label: "🩺 Diagnósticos",  short: "🩺" },
               { key: "estudios",     label: "🧪 Estudios",      short: "🧪" },
+              { key: "tipos_cita",      label: "📅 Tipos de Cita",    short: "📅" },
+              { key: "procedimientos",   label: "🔬 Procedimientos",    short: "🔬" },
             ].map(t => (
               <button
                 key={t.key}
@@ -107,6 +109,8 @@ export default function Catalogos() {
           {tab === "medicamentos" && <CatalogoMedicamentos />}
           {tab === "diagnosticos" && <CatalogoDiagnosticos />}
           {tab === "estudios" && <CatalogoEstudios />}
+          {tab === "tipos_cita" && <CatalogoTiposCita />}
+          {tab === "procedimientos" && <CatalogoProcedimientos />}
         </div>
       </div>
     </>
@@ -1003,6 +1007,597 @@ function CatalogoEstudios() {
           </tbody>
         </table>
         </div>{/* fin scroll */}
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Tab: Catálogo de Tipos de Cita
+// ═════════════════════════════════════════════════════════════════════
+function CatalogoTiposCita() {
+  const [list, setList] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(emptyTipo());
+  const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState(null);
+
+  function emptyTipo() {
+    return { nombre: "", descripcion: "" };
+  }
+
+  const cargar = () => {
+    api.get("/catalogos-tipos-cita")
+      .then(r => setList(r.data.data || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo = () => {
+    setForm(emptyTipo());
+    setEditId(null);
+    setShowForm(true);
+    setAlert(null);
+  };
+
+  const abrirEditar = (t) => {
+    setForm({ nombre: t.nombre || "", descripcion: t.descripcion || "" });
+    setEditId(t.id);
+    setShowForm(true);
+    setAlert(null);
+  };
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { setAlert({ t: "danger", m: "El nombre es obligatorio" }); return; }
+    setSaving(true);
+    try {
+      if (editId) {
+        await api.put(`/catalogos-tipos-cita/${editId}`, form);
+        setAlert({ t: "success", m: "Tipo de cita actualizado" });
+      } else {
+        await api.post("/catalogos-tipos-cita", form);
+        setAlert({ t: "success", m: "Tipo de cita creado" });
+      }
+      setShowForm(false);
+      cargar();
+    } catch (e) {
+      setAlert({ t: "danger", m: e.response?.data?.msg || "Error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const eliminar = async (id) => {
+    await api.delete(`/catalogos-tipos-cita/${id}`);
+    cargar();
+  };
+
+  const mover = async (id, direccion) => {
+    try {
+      await api.put(`/catalogos-tipos-cita/${id}/mover`, { direccion });
+      cargar();
+    } catch {}
+  };
+
+  return (
+    <div>
+      {alert && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: alert.t === "success" ? "#dcfce7" : "#fee2e2",
+          color: alert.t === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${alert.t === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span>{alert.m}</span>
+          <button onClick={() => setAlert(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
+        </div>
+      )}
+
+      {/* Info banner */}
+      <div style={{
+        background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10,
+        padding: "10px 16px", marginBottom: 16, fontSize: "0.82rem", color: "#1e40af",
+        display: "flex", alignItems: "flex-start", gap: 8,
+      }}>
+        <i className="bi bi-info-circle-fill" style={{ fontSize: "1rem", flexShrink: 0, marginTop: 1 }}></i>
+        <span>
+          Define los <strong>tipos de cita</strong> disponibles en tu clínica. Al crear una cita,
+          el desplegable mostrará los tipos que configures aquí. Usa los botones ↑↓ para cambiar el orden.
+        </span>
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+        <button onClick={abrirNuevo} style={{
+          marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: 8,
+          color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <i className="bi bi-plus-circle"></i> Nuevo Tipo de Cita
+        </button>
+      </div>
+
+      {/* Inline form */}
+      {showForm && (
+        <div style={{
+          background: "#fff", border: "1px solid #bfdbfe", borderRadius: 12,
+          marginBottom: 20, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.07)",
+        }}>
+          <div style={{
+            background: "#eff6ff", padding: "12px 20px", borderBottom: "1px solid #bfdbfe",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e40af" }}>
+              <i className="bi bi-calendar-event me-2"></i>
+              {editId ? "Editar Tipo de Cita" : "Nuevo Tipo de Cita"}
+            </span>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
+          </div>
+          <div className="row g-2" style={{ padding: "16px 20px" }}>
+            <div className="col-md-5">
+              <label className="form-label small fw-semibold">Nombre del tipo *</label>
+              <input className="form-control form-control-sm"
+                placeholder="Ej: Consulta dermatológica primera vez"
+                value={form.nombre}
+                onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+            </div>
+            <div className="col-md-7">
+              <label className="form-label small fw-semibold">Descripción (opcional)</label>
+              <input className="form-control form-control-sm"
+                placeholder="Descripción corta o nota interna"
+                value={form.descripcion}
+                onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
+            </div>
+            <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={guardar} disabled={saving} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
+                {saving ? "Guardando…" : editId ? "Actualizar" : "Crear"}
+              </button>
+              <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", color: "#374151", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lista */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 320px)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["#", "Nombre del tipo de cita", "Descripción", "Acciones"].map(h => (
+                  <th key={h} style={{
+                    padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                    color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                    borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                    background: "#f8fafc",
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((t, idx) => (
+                <tr key={t.id} style={{ borderBottom: "1px solid #f3f4f6" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "11px 14px", width: 48 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+                      <button onClick={() => mover(t.id, "arriba")} disabled={idx === 0} title="Subir"
+                        style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#d1d5db" : "#6b7280", padding: "1px 4px", lineHeight: 1, fontSize: "0.78rem" }}>▲</button>
+                      <span style={{ fontWeight: 700, fontSize: "0.78rem", color: "#9ca3af" }}>{idx + 1}</span>
+                      <button onClick={() => mover(t.id, "abajo")} disabled={idx === list.length - 1} title="Bajar"
+                        style={{ background: "none", border: "none", cursor: idx === list.length - 1 ? "default" : "pointer", color: idx === list.length - 1 ? "#d1d5db" : "#6b7280", padding: "1px 4px", lineHeight: 1, fontSize: "0.78rem" }}>▼</button>
+                    </div>
+                  </td>
+                  <td style={{ padding: "11px 14px", fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>
+                    {t.nombre}
+                  </td>
+                  <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: t.descripcion ? "#374151" : "#d1d5db" }}>
+                    {t.descripcion || "—"}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => abrirEditar(t)} title="Editar"
+                        style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, color: "#2563eb", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-pencil" style={{ fontSize: "0.82rem" }}></i>
+                      </button>
+                      <button onClick={() => eliminar(t.id)} title="Eliminar"
+                        style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 7, color: "#e11d48", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-trash3" style={{ fontSize: "0.82rem" }}></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {list.length === 0 && (
+                <tr>
+                  <td colSpan={4} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                    <i className="bi bi-calendar-x" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                    No hay tipos de cita configurados.<br />
+                    <span style={{ fontSize: "0.82rem" }}>Se usarán los tipos por defecto del sistema.</span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Tab: Catálogo de Procedimientos (Dermatológicos + Estéticos)
+// ═════════════════════════════════════════════════════════════════════
+const CATEGORIAS_PROC = {
+  dermatologico: {
+    label: "Dermatológico",
+    color: "#FF5722",
+    bg: "rgba(255,87,34,.10)",
+    border: "rgba(255,87,34,.3)",
+    icon: "bi-bandaid-fill",
+    btnBg: "#FF5722",
+  },
+  estetico: {
+    label: "Estético",
+    color: "#e91e8c",
+    bg: "rgba(233,30,140,.10)",
+    border: "rgba(233,30,140,.3)",
+    icon: "bi-stars",
+    btnBg: "#e91e8c",
+  },
+};
+
+const PROCEDIMIENTOS_DERMA_DEFAULT = [
+  "Biopsia punch","Biopsia incisional","Biopsia excisional",
+  "Exéresis de lesión benigna","Exéresis de lesión sospechosa/maligna",
+  "Cierre quirúrgico simple","Cierre con colgajo",
+  "Electrocauterización / electrofulguración","Crioterapia con nitrógeno líquido",
+  "Drenaje de absceso","Infiltración intralesional","Curetage",
+  "Retiro de quistes epidérmicos","Tratamiento de verrugas",
+  "Tratamiento de queratosis actínicas","Tratamiento de moluscos contagiosos",
+];
+
+const PROCEDIMIENTOS_ESTETICOS_DEFAULT = [
+  "Toxina botulínica","Botox masetero/bruxismo",
+  "PRP facial","PRP capilar","Dermapen / microneedling",
+  "Peeling químico","Láser CO2 fraccionado","Láser CO2 quirúrgico",
+  "Bioestimuladores de colágeno","Radiesse / Radiesse Plus",
+  "Enzimas lipolíticas","Tratamiento de cicatrices",
+  "Tratamiento de manchas","Tratamiento de melasma",
+  "Tratamiento de poros/textura","Tratamiento antiacné",
+  "Rejuvenecimiento facial","Ácido hialurónico",
+];
+
+function CatalogoProcedimientos() {
+  const [list, setList] = useState([]);
+  const [catTab, setCatTab] = useState("dermatologico");
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(emptyProc("dermatologico"));
+  const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState(null);
+  const [cargandoSeed, setCargandoSeed] = useState(false);
+
+  function emptyProc(cat) {
+    return { nombre: "", categoria: cat || catTab, descripcion: "", precio_ref: "", duracion_min: "" };
+  }
+
+  const cargar = () => {
+    api.get("/catalogos-procedimientos")
+      .then(r => setList(r.data.data || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const listFiltrada = list.filter(p => p.categoria === catTab);
+
+  const abrirNuevo = () => {
+    setForm(emptyProc(catTab));
+    setEditId(null);
+    setShowForm(true);
+    setAlert(null);
+  };
+
+  const abrirEditar = (p) => {
+    setForm({
+      nombre: p.nombre || "",
+      categoria: p.categoria || catTab,
+      descripcion: p.descripcion || "",
+      precio_ref: p.precio_ref != null ? String(p.precio_ref) : "",
+      duracion_min: p.duracion_min != null ? String(p.duracion_min) : "",
+    });
+    setEditId(p.id);
+    setShowForm(true);
+    setAlert(null);
+  };
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { setAlert({ t: "danger", m: "El nombre es obligatorio" }); return; }
+    setSaving(true);
+    try {
+      const payload = {
+        nombre: form.nombre.trim(),
+        categoria: form.categoria,
+        descripcion: form.descripcion.trim() || null,
+        precio_ref: form.precio_ref !== "" ? parseFloat(form.precio_ref) : null,
+        duracion_min: form.duracion_min !== "" ? parseInt(form.duracion_min, 10) : null,
+      };
+      if (editId) {
+        await api.put(`/catalogos-procedimientos/${editId}`, payload);
+        setAlert({ t: "success", m: "Procedimiento actualizado" });
+      } else {
+        await api.post("/catalogos-procedimientos", payload);
+        setAlert({ t: "success", m: "Procedimiento creado" });
+      }
+      setShowForm(false);
+      cargar();
+    } catch (e) {
+      setAlert({ t: "danger", m: e.response?.data?.msg || "Error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const eliminar = async (id) => {
+    await api.delete(`/catalogos-procedimientos/${id}`);
+    cargar();
+  };
+
+  const mover = async (id, direccion) => {
+    try {
+      await api.put(`/catalogos-procedimientos/${id}/mover`, { direccion });
+      cargar();
+    } catch {}
+  };
+
+  const cargarDefaults = async () => {
+    const defaults = catTab === "dermatologico"
+      ? PROCEDIMIENTOS_DERMA_DEFAULT
+      : PROCEDIMIENTOS_ESTETICOS_DEFAULT;
+    setCargandoSeed(true);
+    try {
+      for (const nombre of defaults) {
+        await api.post("/catalogos-procedimientos", { nombre, categoria: catTab }).catch(() => {});
+      }
+      setAlert({ t: "success", m: `${defaults.length} procedimientos predeterminados cargados` });
+      cargar();
+    } catch {
+      setAlert({ t: "danger", m: "Error al cargar predeterminados" });
+    } finally {
+      setCargandoSeed(false);
+    }
+  };
+
+  const meta = CATEGORIAS_PROC[catTab];
+
+  return (
+    <div>
+      {alert && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: alert.t === "success" ? "#dcfce7" : "#fee2e2",
+          color: alert.t === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${alert.t === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span>{alert.m}</span>
+          <button onClick={() => setAlert(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
+        </div>
+      )}
+
+      {/* Info banner */}
+      <div style={{
+        background: "#fdf4ff", border: "1px solid #e9d5ff", borderRadius: 10,
+        padding: "10px 16px", marginBottom: 16, fontSize: "0.82rem", color: "#7e22ce",
+        display: "flex", alignItems: "flex-start", gap: 8,
+      }}>
+        <i className="bi bi-info-circle-fill" style={{ fontSize: "1rem", flexShrink: 0, marginTop: 1 }}></i>
+        <span>
+          Define los <strong>procedimientos</strong> disponibles en tu clínica. Se usarán al registrar
+          procedimientos realizados, en presupuestos y en la historia clínica. Usa los botones ↑↓ para ordenarlos.
+        </span>
+      </div>
+
+      {/* Sub-tabs categoría */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+        {Object.entries(CATEGORIAS_PROC).map(([k, m]) => (
+          <button
+            key={k}
+            onClick={() => { setCatTab(k); setShowForm(false); }}
+            style={{
+              padding: "7px 18px", borderRadius: 8, border: "none", cursor: "pointer",
+              fontWeight: 700, fontSize: "0.83rem", transition: "all .15s",
+              background: catTab === k ? m.btnBg : "#fff",
+              color: catTab === k ? "#fff" : m.color,
+              boxShadow: catTab === k ? `0 3px 10px ${m.border}` : "0 1px 3px rgba(0,0,0,.07)",
+              border: `1px solid ${catTab === k ? "transparent" : m.border}`,
+              display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <i className={`bi ${m.icon}`} />
+            {m.label}
+            <span style={{
+              background: catTab === k ? "rgba(255,255,255,.25)" : m.bg,
+              borderRadius: 20, padding: "1px 7px", fontSize: "0.75rem", fontWeight: 700,
+            }}>
+              {list.filter(p => p.categoria === k).length}
+            </span>
+          </button>
+        ))}
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 16, flexWrap: "wrap" }}>
+        {listFiltrada.length === 0 && (
+          <button
+            onClick={cargarDefaults}
+            disabled={cargandoSeed}
+            style={{
+              background: "#f0fdf4", border: "1px solid #bbf7d0", borderRadius: 8,
+              color: "#166534", padding: "7px 14px", fontSize: "0.82rem", fontWeight: 600,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <i className="bi bi-magic"></i>
+            {cargandoSeed ? "Cargando…" : `Cargar ${meta.label}s predeterminados`}
+          </button>
+        )}
+        <button
+          onClick={abrirNuevo}
+          style={{
+            marginLeft: "auto", background: meta.btnBg, border: "none", borderRadius: 8,
+            color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600,
+            cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+          }}>
+          <i className="bi bi-plus-circle"></i> Nuevo procedimiento
+        </button>
+      </div>
+
+      {/* Formulario inline */}
+      {showForm && (
+        <div style={{
+          background: "#fff", border: `1px solid ${meta.border}`, borderRadius: 12,
+          marginBottom: 20, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.07)",
+        }}>
+          <div style={{
+            background: meta.bg, padding: "12px 20px", borderBottom: `1px solid ${meta.border}`,
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: meta.color }}>
+              <i className={`bi ${meta.icon} me-2`}></i>
+              {editId ? "Editar procedimiento" : `Nuevo procedimiento ${meta.label}`}
+            </span>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
+          </div>
+          <div className="row g-2" style={{ padding: "16px 20px" }}>
+            <div className="col-md-5">
+              <label className="form-label small fw-semibold">Nombre del procedimiento *</label>
+              <input className="form-control form-control-sm"
+                placeholder="Ej: Biopsia punch"
+                value={form.nombre}
+                onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+            </div>
+            <div className="col-md-3">
+              <label className="form-label small fw-semibold">Categoría</label>
+              <select className="form-select form-select-sm"
+                value={form.categoria}
+                onChange={e => setForm(f => ({ ...f, categoria: e.target.value }))}>
+                <option value="dermatologico">Dermatológico</option>
+                <option value="estetico">Estético</option>
+              </select>
+            </div>
+            <div className="col-md-2">
+              <label className="form-label small fw-semibold">Precio ref. (L)</label>
+              <input className="form-control form-control-sm" type="number" min="0" step="0.01"
+                placeholder="0.00"
+                value={form.precio_ref}
+                onChange={e => setForm(f => ({ ...f, precio_ref: e.target.value }))} />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label small fw-semibold">Duración (min)</label>
+              <input className="form-control form-control-sm" type="number" min="0"
+                placeholder="30"
+                value={form.duracion_min}
+                onChange={e => setForm(f => ({ ...f, duracion_min: e.target.value }))} />
+            </div>
+            <div className="col-12">
+              <label className="form-label small fw-semibold">Descripción (opcional)</label>
+              <input className="form-control form-control-sm"
+                placeholder="Notas internas o descripción del procedimiento"
+                value={form.descripcion}
+                onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
+            </div>
+            <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button
+                onClick={guardar}
+                disabled={saving}
+                style={{ background: meta.btnBg, border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
+                {saving ? "Guardando…" : editId ? "Actualizar" : "Crear"}
+              </button>
+              <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", color: "#374151", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Tabla */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 380px)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["#", "Procedimiento", "Descripción", "Precio ref.", "Duración", "Acciones"].map(h => (
+                  <th key={h} style={{
+                    padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                    color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                    borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                    background: "#f8fafc",
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {listFiltrada.map((p, idx) => (
+                <tr key={p.id} style={{ borderBottom: "1px solid #f3f4f6" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "11px 14px", width: 48 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+                      <button onClick={() => mover(p.id, "arriba")} disabled={idx === 0} title="Subir"
+                        style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#d1d5db" : "#6b7280", padding: "1px 4px", lineHeight: 1, fontSize: "0.78rem" }}>▲</button>
+                      <span style={{ fontWeight: 700, fontSize: "0.78rem", color: "#9ca3af" }}>{idx + 1}</span>
+                      <button onClick={() => mover(p.id, "abajo")} disabled={idx === listFiltrada.length - 1} title="Bajar"
+                        style={{ background: "none", border: "none", cursor: idx === listFiltrada.length - 1 ? "default" : "pointer", color: idx === listFiltrada.length - 1 ? "#d1d5db" : "#6b7280", padding: "1px 4px", lineHeight: 1, fontSize: "0.78rem" }}>▼</button>
+                    </div>
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                      <span style={{
+                        width: 7, height: 7, borderRadius: "50%",
+                        background: meta.color, flexShrink: 0, display: "inline-block",
+                      }} />
+                      <span style={{ fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>{p.nombre}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: p.descripcion ? "#374151" : "#d1d5db", maxWidth: 220 }}>
+                    {p.descripcion || "—"}
+                  </td>
+                  <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: p.precio_ref != null ? "#374151" : "#d1d5db", whiteSpace: "nowrap" }}>
+                    {p.precio_ref != null ? `L ${parseFloat(p.precio_ref).toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}
+                  </td>
+                  <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: p.duracion_min != null ? "#374151" : "#d1d5db", whiteSpace: "nowrap" }}>
+                    {p.duracion_min != null ? `${p.duracion_min} min` : "—"}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => abrirEditar(p)} title="Editar"
+                        style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, color: "#2563eb", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-pencil" style={{ fontSize: "0.82rem" }}></i>
+                      </button>
+                      <button onClick={() => eliminar(p.id)} title="Eliminar"
+                        style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 7, color: "#e11d48", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-trash3" style={{ fontSize: "0.82rem" }}></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {listFiltrada.length === 0 && (
+                <tr>
+                  <td colSpan={6} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                    <i className={`bi ${meta.icon}`} style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                    No hay procedimientos {meta.label.toLowerCase()}s configurados.<br />
+                    <span style={{ fontSize: "0.82rem" }}>
+                      Usa el botón "Cargar predeterminados" para agregar la lista estándar, o crea uno manualmente.
+                    </span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

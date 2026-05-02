@@ -45,6 +45,12 @@ export default function NavbarApp({ onMenuClick }) {
   const [showRespuestasDD, setShowRespuestasDD] = useState(false);
   const respuestasRef                         = useRef(null);
 
+  // ── Cumpleañeros (usuarios regulares no-super) ──────────────────
+  const [cumpleaneros, setCumpleaneros]         = useState([]);
+  const [showCumpleDD, setShowCumpleDD]         = useState(false);
+  const cumpleRef                               = useRef(null);
+  const [modalFelicitar, setModalFelicitar]     = useState(null);
+
   // ── Respuestas a reportes de soporte (usuarios regulares) ──
   useEffect(() => {
     if (user?.super) return;
@@ -124,6 +130,19 @@ export default function NavbarApp({ onMenuClick }) {
     return () => { es.close(); clearInterval(iv); };
   }, [user]);
 
+  // ── Cargar cumpleañeros del día (usuarios regulares) ───────────
+  useEffect(() => {
+    if (user?.super) return;
+    const fetchCumple = () => {
+      api.get("/cumpleanos", { params: { dias: 0 } })
+        .then(r => setCumpleaneros(r.data.data || []))
+        .catch(() => {});
+    };
+    fetchCumple();
+    const iv = setInterval(fetchCumple, 3600000); // recargar cada hora
+    return () => clearInterval(iv);
+  }, [user]);
+
   // Cerrar dropdown al hacer click fuera
   useEffect(() => {
     const handler = (e) => {
@@ -135,6 +154,9 @@ export default function NavbarApp({ onMenuClick }) {
       }
       if (respuestasRef.current && !respuestasRef.current.contains(e.target)) {
         setShowRespuestasDD(false);
+      }
+      if (cumpleRef.current && !cumpleRef.current.contains(e.target)) {
+        setShowCumpleDD(false);
       }
     };
     document.addEventListener("mousedown", handler);
@@ -479,6 +501,126 @@ export default function NavbarApp({ onMenuClick }) {
           </div>
         )}
 
+        {/* 🎂 Campana cumpleañeros — solo usuarios regulares */}
+        {!user?.super && cumpleaneros.length > 0 && (
+          <div ref={cumpleRef} style={{ position: "relative" }}>
+            <button
+              onClick={() => setShowCumpleDD(v => !v)}
+              title={`${cumpleaneros.length} paciente${cumpleaneros.length !== 1 ? "s" : ""} de cumpleaños hoy`}
+              style={{
+                background: "rgba(124,58,237,.2)",
+                border: "1px solid rgba(124,58,237,.5)",
+                borderRadius: 10, width: 36, height: 36,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                cursor: "pointer", position: "relative", flexShrink: 0,
+                animation: "cumple-pulse 2s infinite",
+              }}
+            >
+              <style>{`
+                @keyframes cumple-pulse {
+                  0%, 100% { box-shadow: 0 0 0 0 rgba(124,58,237,.5); }
+                  50%       { box-shadow: 0 0 0 6px rgba(124,58,237,0); }
+                }
+              `}</style>
+              <span style={{ fontSize: 16 }}>🎂</span>
+              <span style={{
+                position: "absolute", top: -5, right: -5,
+                background: "#7c3aed", color: "#fff",
+                fontSize: 10, fontWeight: 700, borderRadius: "50%",
+                width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
+                border: "2px solid #1a1a2e",
+              }}>
+                {cumpleaneros.length > 9 ? "9+" : cumpleaneros.length}
+              </span>
+            </button>
+
+            {/* Dropdown cumpleañeros */}
+            {showCumpleDD && (
+              <div style={{
+                position: "absolute", top: 44, right: 0, zIndex: 1200,
+                background: "#112240", border: "1px solid rgba(255,255,255,.1)",
+                borderRadius: 14, width: 320, boxShadow: "0 16px 48px rgba(0,0,0,.6)",
+                overflow: "hidden",
+              }}>
+                {/* Header */}
+                <div style={{
+                  padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.07)",
+                  display: "flex", alignItems: "center", justifyContent: "space-between",
+                }}>
+                  <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 13 }}>
+                    🎂 Cumpleañeros de hoy
+                  </span>
+                  <span style={{
+                    background: "rgba(124,58,237,.25)", color: "#c084fc",
+                    fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
+                  }}>
+                    {cumpleaneros.length} hoy
+                  </span>
+                </div>
+
+                <div style={{ maxHeight: 320, overflowY: "auto" }}>
+                  {cumpleaneros.map(p => (
+                    <div key={p.id} style={{ padding: "11px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                        <div style={{
+                          width: 36, height: 36, borderRadius: "50%", flexShrink: 0,
+                          background: "rgba(124,58,237,.25)", border: "1px solid rgba(124,58,237,.4)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#c084fc", fontWeight: 700, fontSize: 13,
+                          overflow: "hidden",
+                        }}>
+                          {p.foto_perfil
+                            ? <img src={p.foto_perfil.startsWith("http") ? p.foto_perfil : `${API_URL}/uploads/${p.foto_perfil}`}
+                                   alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                            : `${p.nombres?.[0]}${p.apellidos?.[0]}`
+                          }
+                        </div>
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0",
+                                        overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                            {p.nombres} {p.apellidos}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                            🎂 Cumple {p.edad} años hoy
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => { setModalFelicitar(p); setShowCumpleDD(false); }}
+                          style={{
+                            background: "rgba(124,58,237,.2)", border: "1px solid rgba(124,58,237,.4)",
+                            borderRadius: 7, padding: "5px 10px",
+                            color: "#c084fc", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          <i className="bi bi-send-fill me-1" />Felicitar
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Footer */}
+                <div style={{ borderTop: "1px solid rgba(255,255,255,.07)", padding: "10px 14px" }}>
+                  <button
+                    onClick={() => { navigate("/cumpleaneros"); setShowCumpleDD(false); }}
+                    style={{
+                      width: "100%", padding: "8px 12px",
+                      background: "rgba(124,58,237,.15)", border: "1px solid rgba(124,58,237,.3)",
+                      borderRadius: 8, color: "#c084fc", fontSize: "0.78rem", fontWeight: 700,
+                      cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                    }}
+                  >
+                    <i className="bi bi-cake2-fill" style={{ fontSize: 12 }} />
+                    Ver todos los cumpleañeros
+                    <i className="bi bi-arrow-right" style={{ fontSize: 11, marginLeft: "auto" }} />
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
         {/* User menu dropdown */}
         <div ref={userMenuRef} style={{ position: "relative" }}>
           <button
@@ -662,6 +804,203 @@ export default function NavbarApp({ onMenuClick }) {
     </nav>
 
     <ModalAyudaSoporte open={showAyuda} onClose={() => setShowAyuda(false)} />
+
+    {/* 🎂 Modal de felicitación de cumpleaños */}
+    {modalFelicitar && (
+      <ModalFelicitarNavbar
+        paciente={modalFelicitar}
+        onClose={() => setModalFelicitar(null)}
+      />
+    )}
     </>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────── */
+/*  Modal de felicitación (mini, integrado en Navbar)                        */
+/* ──────────────────────────────────────────────────────────────────────── */
+function ModalFelicitarNavbar({ paciente, onClose }) {
+  const nombre = `${paciente.nombres} ${paciente.apellidos}`;
+  const [canales, setCanales] = useState({
+    email:    !!(paciente.email),
+    whatsapp: !!(paciente.telefono),
+  });
+  const [mensaje, setMensaje] = useState(
+    `¡Hola ${paciente.nombres}! 🎂\n\nEn el día de tu cumpleaños, todo el equipo de nuestra clínica te desea un maravilloso día lleno de salud, alegría y momentos especiales.\n\n¡Que cumplas muchos más años! 🎉\n\nCon cariño,\nEl equipo de tu clínica`
+  );
+  const [enviando, setEnviando] = useState(false);
+  const [resultado, setResultado] = useState(null);
+
+  const toggleCanal = (c) => setCanales(prev => ({ ...prev, [c]: !prev[c] }));
+
+  const enviar = async () => {
+    const seleccionados = Object.entries(canales).filter(([,v]) => v).map(([k]) => k);
+    if (!seleccionados.length) return;
+    setEnviando(true);
+    try {
+      const res = await api.post("/cumpleanos/felicitar", {
+        paciente_id: paciente.id,
+        canales: seleccionados,
+        mensaje,
+      });
+      setResultado(res.data.resultados || {});
+    } catch (e) {
+      setResultado({ _error: e.response?.data?.msg || e.message });
+    } finally {
+      setEnviando(false);
+    }
+  };
+
+  return (
+    <div
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,.65)", backdropFilter: "blur(4px)",
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+      }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480,
+        boxShadow: "0 24px 60px rgba(0,0,0,.3)", overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{
+          background: "linear-gradient(135deg,#1a2744,#3b1d8a)",
+          padding: "16px 20px",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1rem" }}>
+              🎂 ¡Felicitar a {nombre}!
+            </div>
+            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.78rem", marginTop: 2 }}>
+              Cumple {paciente.edad} años hoy
+            </div>
+          </div>
+          <button onClick={onClose} style={{
+            background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.2)",
+            borderRadius: "50%", width: 30, height: 30, cursor: "pointer",
+            color: "#fff", fontSize: 16, display: "flex", alignItems: "center", justifyContent: "center",
+          }}>×</button>
+        </div>
+
+        <div style={{ padding: "18px 20px" }}>
+          {/* Canales */}
+          <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+            <button
+              onClick={() => toggleCanal("email")}
+              disabled={!paciente.email}
+              style={{
+                flex: 1, padding: "8px 10px", borderRadius: 9,
+                cursor: paciente.email ? "pointer" : "not-allowed",
+                background: canales.email ? "rgba(37,99,235,.1)" : "#f9fafb",
+                border: canales.email ? "2px solid #2563eb" : "2px solid #e5e7eb",
+                display: "flex", alignItems: "center", gap: 6,
+                opacity: paciente.email ? 1 : 0.4,
+              }}
+            >
+              <i className="bi bi-envelope-fill" style={{ color: canales.email ? "#2563eb" : "#9ca3af", fontSize: 14 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: canales.email ? "#2563eb" : "#6b7280" }}>
+                Email
+              </span>
+            </button>
+            <button
+              onClick={() => toggleCanal("whatsapp")}
+              disabled={!paciente.telefono}
+              style={{
+                flex: 1, padding: "8px 10px", borderRadius: 9,
+                cursor: paciente.telefono ? "pointer" : "not-allowed",
+                background: canales.whatsapp ? "rgba(37,211,102,.1)" : "#f9fafb",
+                border: canales.whatsapp ? "2px solid #25d366" : "2px solid #e5e7eb",
+                display: "flex", alignItems: "center", gap: 6,
+                opacity: paciente.telefono ? 1 : 0.4,
+              }}
+            >
+              <i className="bi bi-whatsapp" style={{ color: canales.whatsapp ? "#25d366" : "#9ca3af", fontSize: 14 }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: canales.whatsapp ? "#25d366" : "#6b7280" }}>
+                WhatsApp
+              </span>
+            </button>
+          </div>
+
+          {/* Mensaje */}
+          <textarea
+            value={mensaje}
+            onChange={e => setMensaje(e.target.value)}
+            rows={5}
+            style={{
+              width: "100%", padding: "10px 12px", borderRadius: 10, fontSize: 12.5,
+              border: "1px solid #e5e7eb", color: "#374151", resize: "vertical",
+              outline: "none", lineHeight: 1.6, fontFamily: "inherit", marginBottom: 14,
+            }}
+          />
+
+          {/* Resultado */}
+          {resultado && (
+            <div style={{ marginBottom: 12 }}>
+              {Object.entries(resultado).map(([canal, r]) => (
+                canal === "_error" ? (
+                  <div key="err" style={{
+                    background: "#fee2e2", borderRadius: 8, padding: "8px 12px",
+                    fontSize: 12, color: "#991b1b", marginBottom: 6,
+                  }}>
+                    <i className="bi bi-x-circle-fill me-2" />Error: {r}
+                  </div>
+                ) : (
+                  <div key={canal} style={{
+                    background: r.ok ? "#dcfce7" : "#fee2e2",
+                    borderRadius: 8, padding: "8px 12px", fontSize: 12,
+                    color: r.ok ? "#166534" : "#991b1b", marginBottom: 6,
+                    display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap",
+                  }}>
+                    <i className={`bi ${r.ok ? "bi-check-circle-fill" : "bi-x-circle-fill"}`} />
+                    <strong style={{ textTransform: "capitalize" }}>{canal}</strong>: {r.msg}
+                    {r.fallback && r.link && (
+                      <a href={r.link} target="_blank" rel="noreferrer" style={{
+                        marginLeft: "auto", background: "#25d366", color: "#fff",
+                        borderRadius: 6, padding: "3px 9px", fontSize: 11, fontWeight: 700,
+                        textDecoration: "none",
+                      }}>
+                        <i className="bi bi-whatsapp me-1" />Abrir
+                      </a>
+                    )}
+                  </div>
+                )
+              ))}
+            </div>
+          )}
+
+          {/* Botones */}
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button onClick={onClose} style={{
+              background: "transparent", border: "1px solid #d1d5db",
+              borderRadius: 8, padding: "8px 18px", color: "#374151",
+              cursor: "pointer", fontWeight: 600, fontSize: "0.83rem",
+            }}>
+              {resultado ? "Cerrar" : "Cancelar"}
+            </button>
+            {!resultado && (
+              <button
+                onClick={enviar}
+                disabled={enviando || (!canales.email && !canales.whatsapp)}
+                style={{
+                  background: "linear-gradient(135deg,#7c3aed,#db2777)",
+                  border: "none", borderRadius: 8, padding: "8px 20px",
+                  color: "#fff", fontWeight: 700, fontSize: "0.83rem",
+                  cursor: enviando ? "wait" : "pointer",
+                  display: "flex", alignItems: "center", gap: 7,
+                  opacity: (!canales.email && !canales.whatsapp) ? 0.5 : 1,
+                }}
+              >
+                {enviando
+                  ? <><i className="bi bi-hourglass-split" /> Enviando...</>
+                  : <><i className="bi bi-send-fill" /> Enviar</>}
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }

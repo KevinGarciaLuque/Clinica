@@ -292,7 +292,7 @@ function FilaCita({ cita, idx, onEstadoChange, navigate, estadosDisponibles }) {
       <td style={{ padding: "12px 14px", color: "#9ca3af", fontWeight: 700, fontSize: "0.82rem" }}>{idx + 1}</td>
       <td style={{ padding: "12px 14px" }}>
         <div style={{ fontWeight: 700, fontSize: "0.88rem", color: "#111827" }}>
-          {cita.paciente_apellidos}, {cita.paciente_nombres}
+          {cita.paciente_nombres} {cita.paciente_apellidos}
         </div>
         <div style={{ fontSize: "0.74rem", color: "#9ca3af", marginTop: 2 }}>
           {dayjs(cita.inicio).format("h:mm A")} - {dayjs(cita.fin).format("h:mm A")}
