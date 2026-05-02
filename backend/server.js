@@ -23,6 +23,7 @@ const corsOptions = {
     "Authorization",
     "x-clinica-id",
     "x-clinica-slug",
+    "x-session-token",
   ],
   optionsSuccessStatus: 204,
 };
