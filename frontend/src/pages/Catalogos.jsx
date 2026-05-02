@@ -1409,7 +1409,7 @@ function CatalogoProcedimientos() {
             key={k}
             onClick={() => { setCatTab(k); setShowForm(false); }}
             style={{
-              padding: "7px 18px", borderRadius: 8, border: "none", cursor: "pointer",
+              padding: "7px 18px", borderRadius: 8, cursor: "pointer",
               fontWeight: 700, fontSize: "0.83rem", transition: "all .15s",
               background: catTab === k ? m.btnBg : "#fff",
               color: catTab === k ? "#fff" : m.color,
