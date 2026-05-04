@@ -24,10 +24,20 @@ const CONTENT_HINTS = {
 };
 
 const defaultData = () => ({
-  _v: 2, logo_url: "", color: "#1a2744",
+  _v: 2, logo_url: "", color: "#1a2744", header_text_color: "#ffffff",
   clinica: "", medico: "", credenciales: "",
   contenido: "", footer: "",
   mostrar_firma: true, etiqueta_firma: "FIRMA",
+  clinica_font: "Arial, Helvetica, sans-serif",
+  clinica_font_size: "1.25",
+  medico_font: "Arial, Helvetica, sans-serif",
+  medico_font_size: "0.85",
+  horarios: JSON.stringify([
+    { dias: "Lunes a Viernes", horario: "8:00 AM - 5:00 PM" },
+    { dias: "Sábados", horario: "8:00 AM - 12:00 PM" },
+  ]),
+  mostrar_horarios: false,
+  es_predeterminada: false,
 });
 
 function parseContenido(raw) {
@@ -40,10 +50,15 @@ const nl2br = (s = "") => s.replace(/\n/g, "<br/>");
 
 function buildHTML(data, tipo, vars = {}) {
   const {
-    logo_url = "", color = "#1a2744",
+    logo_url = "", color = "#1a2744", header_text_color = "#ffffff",
     clinica = "Nombre del Consultorio", medico = "Dr(a). Nombre Medico",
     credenciales = "", contenido = "", footer = "",
     mostrar_firma = true, etiqueta_firma = "FIRMA",
+    clinica_font = "Arial, Helvetica, sans-serif",
+    clinica_font_size = "1.25",
+    medico_font = "Arial, Helvetica, sans-serif",
+    medico_font_size = "0.85",
+    horarios = "[]", mostrar_horarios = false,
   } = data;
 
   let bodyText = contenido;
@@ -282,17 +297,34 @@ function buildHTML(data, tipo, vars = {}) {
       </div>
     </div>` : "";
 
+  let horariosParsed = [];
+  try { horariosParsed = JSON.parse(horarios || "[]"); } catch { /* vacio */ }
+
+  const horariosBloque = (tipo === "receta" && mostrar_horarios && horariosParsed.length > 0) ? `
+    <div style="border-top:1px solid #e0e0e0;padding-top:12px;margin-top:8px;">
+      <div style="font-size:0.8em;font-weight:700;color:${color};margin-bottom:6px;display:flex;align-items:center;gap:4px;">
+        <span style="font-size:1em;">\uD83D\uDD52</span> Horarios de Atenci\u00f3n
+      </div>
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        ${horariosParsed.map(h => `
+          <div style="display:flex;gap:8px;align-items:baseline;font-size:0.78em;padding:3px 0;border-bottom:1px dotted #e0e0e0;">
+            <span style="font-weight:600;color:#374151;min-width:140px;">${h.dias}</span>
+            <span style="color:#555;">${h.horario}</span>
+          </div>`).join("")}
+      </div>
+    </div>` : "";
+
   const footerBloque = footer ? `
     <div style="background:${color};color:rgba(255,255,255,.88);padding:9px 20px;font-size:0.77em;text-align:center;">${footer}</div>` : "";
 
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;border:1px solid #ddd;overflow:hidden;">
-  <div style="background:${color};padding:14px 20px;display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  <div style="background:${color};padding:14px 20px;display:flex;align-items:center;gap:12px;">
+    ${logo_url ? `<div><img src="${logo_url}" style="max-height:100px;max-width:150px;object-fit:contain;background:rgba(255,255,255,.15);border-radius:6px;padding:5px;"/></div>` : ""}
     <div style="flex:1;">
-      <div style="color:#fff;font-size:1.25em;font-weight:bold;line-height:1.2;">${clinica || "<span style='opacity:.4;font-style:italic;font-size:.85em'>Nombre del consultorio</span>"}</div>
-      <div style="color:rgba(255,255,255,.9);font-size:0.85em;margin-top:5px;font-weight:600;">${medico || ""}</div>
-      ${credHTML ? `<div style="color:rgba(255,255,255,.75);font-size:0.79em;margin-top:3px;line-height:1.7;">${credHTML}</div>` : ""}
+      <div style="color:${header_text_color};font-size:${clinica_font_size}em;font-family:${clinica_font};font-weight:bold;line-height:1.2;">${clinica || "<span style='opacity:.4;font-style:italic;font-size:.85em'>Nombre del consultorio</span>"}</div>
+      <div style="color:${header_text_color}e6;font-size:${medico_font_size}em;font-family:${medico_font};font-weight:600;margin-top:5px;">${medico || ""}</div>
+      ${credHTML ? `<div style="color:${header_text_color}bf;font-size:0.79em;margin-top:3px;line-height:1.7;">${credHTML}</div>` : ""}
     </div>
-    ${logo_url ? `<div><img src="${logo_url}" style="max-height:75px;max-width:100px;object-fit:contain;background:rgba(255,255,255,.15);border-radius:6px;padding:5px;"/></div>` : ""}
   </div>
   <div style="padding:18px 20px;">
     ${tituloBloque}
@@ -300,7 +332,10 @@ function buildHTML(data, tipo, vars = {}) {
     ${tipo === "receta" ? rxBloque : ""}
     ${["incapacidad","referencia","constancia","laboratorio","estudios"].includes(tipo) ? contenidoBloque : ""}
   </div>
-  <div style="padding:0 20px 14px;">${firmaBloque}</div>
+  <div style="padding:0 20px 14px;">
+    ${tipo === "receta" ? horariosBloque : ""}
+    ${firmaBloque}
+  </div>
   ${footerBloque}
 </div>`;
 }
@@ -328,6 +363,26 @@ const COLORES_RAPIDOS = [
   "#1a2744","#0d47a1","#b71c1c","#1b5e20","#4a148c","#e65100","#37474f","#006064",
 ];
 
+const FUENTES = [
+  { label: "Arial (sans-serif)",     value: "Arial, Helvetica, sans-serif" },
+  { label: "Times New Roman (serif)", value: "'Times New Roman', Times, serif" },
+  { label: "Georgia (serif)",        value: "Georgia, 'Times New Roman', serif" },
+  { label: "Verdana (sans-serif)",   value: "Verdana, Geneva, sans-serif" },
+  { label: "Trebuchet MS",           value: "'Trebuchet MS', sans-serif" },
+  { label: "Courier New (monospace)",value: "'Courier New', Courier, monospace" },
+  { label: "Tahoma (sans-serif)",    value: "Tahoma, Geneva, sans-serif" },
+  { label: "Palatino (serif)",       value: "'Palatino Linotype', 'Book Antiqua', Palatino, serif" },
+  { label: "Lucida Console",         value: "'Lucida Console', Monaco, monospace" },
+  { label: "Comic Sans MS",          value: "'Comic Sans MS', cursive, sans-serif" },
+  { label: "Brush Script MT",        value: "'Brush Script MT', cursive" },
+  { label: "Segoe Script",           value: "'Segoe Script', cursive" },
+  { label: "Gabriola",               value: "Gabriola, cursive" },
+  { label: "Kristen ITC",            value: "'Kristen ITC', cursive" },
+  { label: "Lucida Handwriting",     value: "'Lucida Handwriting', cursive" },
+  { label: "Vladimir Script",        value: "'Vladimir Script', cursive" },
+  { label: "Edwardian Script ITC",   value: "'Edwardian Script ITC', cursive" },
+];
+
 /* ─── Componente principal ───────────────────────────────────────── */
 export default function Plantillas() {
   const { user } = useAuth();
@@ -338,13 +393,21 @@ export default function Plantillas() {
   const [cargando,  setCargando]  = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [msg,       setMsg]       = useState({ tipo: "", texto: "" });
+  const [predeterminada, setPredeterminada] = useState(null);
 
   useEffect(() => {
     const cargar = async () => {
       try {
         const res = await api.get(`/clinicas/${clinicaId}/plantillas`);
         const obj = {};
-        (res.data.data || []).forEach(p => { obj[p.tipo] = parseContenido(p.contenido); });
+        (res.data.data || []).forEach(p => {
+          const contenido = parseContenido(p.contenido);
+          if (p.es_predeterminada) {
+            contenido.es_predeterminada = true;
+            setPredeterminada(p.tipo);
+          }
+          obj[p.tipo] = contenido;
+        });
         setDatos(obj);
       } catch { /* sin plantillas aun */ }
       finally { setCargando(false); }
@@ -363,6 +426,17 @@ export default function Plantillas() {
     const reader = new FileReader();
     reader.onload = (ev) => set("logo_url", ev.target.result);
     reader.readAsDataURL(file);
+  };
+
+  const setPredeterminadaApi = async () => {
+    setMsg({ tipo: "", texto: "" });
+    try {
+      await api.post(`/clinicas/${clinicaId}/plantillas/predeterminada`, { tipo: tab });
+      setPredeterminada(tab);
+      setMsg({ tipo: "success", texto: `Plantilla de ${tipoActivo?.label} establecida como predeterminada` });
+    } catch (e) {
+      setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
+    }
   };
 
   const guardar = async () => {
@@ -449,7 +523,7 @@ export default function Plantillas() {
                   </button>
                 )}
               </div>
-              <small style={{ color: "#9ca3af", fontSize: "0.75rem" }}>El logo aparece en la esquina derecha del encabezado.</small>
+              <small style={{ color: "#9ca3af", fontSize: "0.75rem" }}>El logo aparece en la esquina izquierda del encabezado.</small>
             </div>
 
             {/* Color */}
@@ -471,16 +545,62 @@ export default function Plantillas() {
               </div>
             </div>
 
+            {/* Color del texto del encabezado */}
+            <div>
+              <label style={lStyle}><i className="bi bi-fonts me-2" style={{ color: tipoActivo?.color }} />Color del texto</label>
+              <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+                <div style={{ flex: 1, height: 36, borderRadius: 8, background: dataActual.header_text_color || "#ffffff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "0.75rem", color: "#374151", border: "1px solid #e5e7eb", fontWeight: 600 }}>
+                  {dataActual.header_text_color || "#ffffff"}
+                </div>
+                <label style={{ display: "flex", alignItems: "center", gap: 5, padding: "6px 10px", borderRadius: 8, border: "1px solid #d1d5db", background: "#f9fafb", cursor: "pointer", fontSize: "0.8rem", color: "#374151" }}>
+                  <input type="color" value={dataActual.header_text_color || "#ffffff"} onChange={e => set("header_text_color", e.target.value)} style={{ width: 24, height: 24, border: "none", padding: 0, cursor: "pointer", background: "none" }} />
+                  Otro color
+                </label>
+              </div>
+            </div>
+
             {/* Nombre consultorio */}
             <div>
               <label style={lStyle}><i className="bi bi-building me-2" style={{ color: tipoActivo?.color }} />Nombre del consultorio / cl\u00ednica</label>
               <input className="form-control" style={iStyle} placeholder="Ej: Consultorio Dental Dr. Ibarra" value={dataActual.clinica || ""} onChange={e => set("clinica", e.target.value)} />
             </div>
 
+            {/* Fuente del nombre del consultorio */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lStyle}><i className="bi bi-fonts me-2" style={{ color: tipoActivo?.color }} />Fuente</label>
+                <select className="form-select" style={iStyle} value={dataActual.clinica_font || "Arial, Helvetica, sans-serif"} onChange={e => set("clinica_font", e.target.value)}>
+                  {FUENTES.map(f => (
+                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ width: 120 }}>
+                <label style={lStyle}>Tamano (em)</label>
+                <input className="form-control" style={iStyle} type="number" step="0.1" min="0.5" max="3" value={dataActual.clinica_font_size || "1.25"} onChange={e => set("clinica_font_size", e.target.value)} />
+              </div>
+            </div>
+
             {/* Nombre medico */}
             <div>
-              <label style={lStyle}><i className="bi bi-person-fill me-2" style={{ color: tipoActivo?.color }} />Nombre del m\u00e9dico</label>
-              <input className="form-control" style={iStyle} placeholder="Ej: Dr. Juan P\u00e9rez Mart\u00ednez" value={dataActual.medico || ""} onChange={e => set("medico", e.target.value)} />
+              <label style={lStyle}><i className="bi bi-person-fill me-2" style={{ color: tipoActivo?.color }} />Nombre del médico</label>
+              <input className="form-control" style={iStyle} placeholder="Ej: Dr. Juan Pérez Martínez" value={dataActual.medico || ""} onChange={e => set("medico", e.target.value)} />
+            </div>
+
+            {/* Fuente del nombre del médico */}
+            <div style={{ display: "flex", gap: 8 }}>
+              <div style={{ flex: 1 }}>
+                <label style={lStyle}><i className="bi bi-fonts me-2" style={{ color: tipoActivo?.color }} />Fuente</label>
+                <select className="form-select" style={iStyle} value={dataActual.medico_font || "Arial, Helvetica, sans-serif"} onChange={e => set("medico_font", e.target.value)}>
+                  {FUENTES.map(f => (
+                    <option key={f.value} value={f.value} style={{ fontFamily: f.value }}>{f.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div style={{ width: 120 }}>
+                <label style={lStyle}>Tamaño (em)</label>
+                <input className="form-control" style={iStyle} type="number" step="0.1" min="0.5" max="3" value={dataActual.medico_font_size || "0.85"} onChange={e => set("medico_font_size", e.target.value)} />
+              </div>
             </div>
 
             {/* Credenciales */}
@@ -513,12 +633,77 @@ export default function Plantillas() {
             <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
               <div className="form-check" style={{ marginBottom: 0 }}>
                 <input className="form-check-input" type="checkbox" id="mostrar_firma" checked={dataActual.mostrar_firma !== false} onChange={e => set("mostrar_firma", e.target.checked)} />
-                <label className="form-check-label" htmlFor="mostrar_firma" style={{ fontSize: "0.84rem" }}>L\u00ednea de firma</label>
+                <label className="form-check-label" htmlFor="mostrar_firma" style={{ fontSize: "0.84rem" }}>Línea de firma</label>
               </div>
               {dataActual.mostrar_firma !== false && (
                 <input className="form-control" style={{ ...iStyle, flex: 1 }} placeholder="FIRMA" value={dataActual.etiqueta_firma || "FIRMA"} onChange={e => set("etiqueta_firma", e.target.value)} />
               )}
             </div>
+
+            {/* Horarios (solo receta) */}
+            {tab === "receta" && (
+              <div>
+                <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 10 }}>
+                  <div className="form-check" style={{ marginBottom: 0 }}>
+                    <input className="form-check-input" type="checkbox" id="mostrar_horarios" checked={!!dataActual.mostrar_horarios} onChange={e => set("mostrar_horarios", e.target.checked)} />
+                    <label className="form-check-label" htmlFor="mostrar_horarios" style={{ fontSize: "0.84rem", fontWeight: 600 }}>
+                      <i className="bi bi-clock-fill me-1" style={{ color: tipoActivo?.color }} />
+                      Horarios de atención
+                    </label>
+                  </div>
+                </div>
+
+                {dataActual.mostrar_horarios && (
+                  <div style={{ background: "#f9fafb", borderRadius: 8, padding: 12, border: "1px solid #e5e7eb" }}>
+                    {(() => {
+                      let lista = [];
+                      try { lista = JSON.parse(dataActual.horarios || "[]"); } catch { lista = []; }
+                      return (
+                        <>
+                          {lista.map((h, i) => (
+                            <div key={i} style={{ display: "flex", gap: 6, alignItems: "center", marginBottom: 6 }}>
+                              <input className="form-control" style={{ ...iStyle, flex: 1 }} placeholder="Días (ej: Lunes a Viernes)" value={h.dias} onChange={e => {
+                                const nueva = [...lista]; nueva[i] = { ...nueva[i], dias: e.target.value }; set("horarios", JSON.stringify(nueva));
+                              }} />
+                              <input className="form-control" style={{ ...iStyle, flex: 1 }} placeholder="Horario (ej: 8:00 AM - 5:00 PM)" value={h.horario} onChange={e => {
+                                const nueva = [...lista]; nueva[i] = { ...nueva[i], horario: e.target.value }; set("horarios", JSON.stringify(nueva));
+                              }} />
+                              <button onClick={() => { const nueva = lista.filter((_, j) => j !== i); set("horarios", JSON.stringify(nueva)); }} style={{ padding: "6px 8px", borderRadius: 6, border: "1px solid #fecaca", background: "#fff5f5", cursor: "pointer", color: "#dc2626", fontSize: "0.82rem" }}>
+                                <i className="bi bi-x-lg" />
+                              </button>
+                            </div>
+                          ))}
+                          <button onClick={() => { const nueva = [...lista, { dias: "", horario: "" }]; set("horarios", JSON.stringify(nueva)); }} style={{ padding: "6px 12px", borderRadius: 6, border: "1px dashed #d1d5db", background: "#fff", cursor: "pointer", fontSize: "0.8rem", color: tipoActivo?.color, fontWeight: 600, width: "100%" }}>
+                            <i className="bi bi-plus-circle me-1" /> Agregar horario
+                          </button>
+                        </>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Predeterminada (solo receta) */}
+            {tab === "receta" && (
+              <div style={{ padding: 12, borderRadius: 8, border: dataActual.es_predeterminada ? "2px solid #22c55e" : "1px solid #e5e7eb", background: dataActual.es_predeterminada ? "#f0fdf4" : "#fff" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
+                  <i className={`bi ${dataActual.es_predeterminada ? "bi-star-fill" : "bi-star"}`} style={{ color: dataActual.es_predeterminada ? "#f59e0b" : "#9ca3af", fontSize: "1.1rem" }} />
+                  <span style={{ fontWeight: 700, fontSize: "0.85rem", color: dataActual.es_predeterminada ? "#166534" : "#374151" }}>Plantilla predeterminada</span>
+                </div>
+                <small style={{ color: "#6b7280", fontSize: "0.75rem", display: "block", marginBottom: 8 }}>Esta plantilla se usara al generar el PDF en la consulta medica.</small>
+                {predeterminada !== tab && (
+                  <button onClick={setPredeterminadaApi} style={{ padding: "8px 14px", borderRadius: 7, border: "none", cursor: "pointer", background: "#f59e0b", color: "#fff", fontSize: "0.82rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6 }}>
+                    <i className="bi bi-check-circle-fill" /> Establecer como predeterminada
+                  </button>
+                )}
+                {predeterminada === tab && (
+                  <span style={{ fontSize: "0.8rem", color: "#22c55e", fontWeight: 600 }}>
+                    <i className="bi bi-check-circle-fill me-1" /> Esta es tu plantilla predeterminada
+                  </span>
+                )}
+              </div>
+            )}
 
             {/* Guardar */}
             <button onClick={guardar} disabled={guardando} style={{ padding: "11px", fontWeight: 700, fontSize: "0.9rem", borderRadius: 9, border: "none", cursor: guardando ? "default" : "pointer", background: guardando ? "#90caf9" : (tipoActivo?.color || "#1a2744"), color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, boxShadow: "0 2px 8px rgba(0,0,0,.15)" }}>

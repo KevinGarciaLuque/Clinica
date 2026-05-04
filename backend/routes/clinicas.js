@@ -607,7 +607,7 @@ router.get("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, 
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const [rows] = await pool.query(
-      `SELECT id, tipo, nombre, contenido, activo 
+      `SELECT id, tipo, nombre, contenido, activo, es_predeterminada
        FROM plantillas_documentos 
        WHERE clinica_id=? 
        ORDER BY tipo, nombre`,
@@ -625,7 +625,7 @@ router.get("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN","MEDICO"), async 
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { tipo } = req.params;
     const [rows] = await pool.query(
-      `SELECT id, tipo, nombre, contenido, activo 
+      `SELECT id, tipo, nombre, contenido, activo, es_predeterminada
        FROM plantillas_documentos 
        WHERE clinica_id=? AND tipo=? AND activo=1 
        LIMIT 1`,
@@ -687,6 +687,44 @@ router.delete("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN"), async (req, 
       [id, tipo]
     );
     res.json({ ok: true, msg: "Plantilla eliminada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /api/clinicas/:id/plantillas/predeterminada  → establecer plantilla predeterminada
+router.post("/:id/plantillas/predeterminada", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+  try {
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const { tipo } = req.body;
+
+    if (!tipo) {
+      return res.status(400).json({ ok: false, msg: "tipo es obligatorio" });
+    }
+
+    // Verificar que existe la plantilla
+    const [exist] = await pool.query(
+      "SELECT id FROM plantillas_documentos WHERE clinica_id=? AND tipo=? AND activo=1",
+      [id, tipo]
+    );
+
+    if (!exist.length) {
+      return res.status(404).json({ ok: false, msg: "Plantilla no encontrada" });
+    }
+
+    // Primero desmarcar todas las recetas predeterminadas de esta clinica
+    await pool.query(
+      "UPDATE plantillas_documentos SET es_predeterminada = 0 WHERE clinica_id=? AND tipo='receta'",
+      [id]
+    );
+
+    // Luego marcar esta como predeterminada
+    await pool.query(
+      "UPDATE plantillas_documentos SET es_predeterminada = 1 WHERE clinica_id=? AND tipo=?",
+      [id, tipo]
+    );
+
+    res.json({ ok: true, msg: "Plantilla predeterminada establecida" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

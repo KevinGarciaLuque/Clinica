@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -28,6 +29,7 @@ export default function GaleriaEstetica() {
   const { user } = useAuth();
   const [pacientes,    setPacientes]    = useState([]);
   const [pacientesConSesiones, setPacientesConSesiones] = useState([]);
+  const navigate = useNavigate();
   const [pacId,        setPacId]        = useState("");
   const [sesiones,     setSesiones]     = useState([]);
   const [sesionActual, setSesionActual] = useState(null);
@@ -192,23 +194,35 @@ export default function GaleriaEstetica() {
       <div style={{
         background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
         padding: "20px 24px",
-        display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap",
+        display: "flex", alignItems: "center", gap: 14, flexWrap: "wrap", justifyContent: "space-between",
       }}>
-        <div style={{
-          width: 46, height: 46, borderRadius: 12,
-          background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
-        }}>
-          <i className="bi bi-camera2" style={{ fontSize: 20, color: "#fff" }} />
-        </div>
-        <div style={{ flex: 1 }}>
-          <h4 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: "#fff" }}>
-            Galería Antes / Después
-          </h4>
-          <span style={{ color: "rgba(255,255,255,.5)", fontSize: 13 }}>
-            6 poses de rostro · Antes y Después del procedimiento
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 8,
+              color: "#fff", padding: "9px 16px", fontSize: 14, fontWeight: 600,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+            }}
+          >
+            <i className="bi bi-arrow-left" /> Atrás
+          </button>
+          <div style={{
+            width: 46, height: 46, borderRadius: 12,
+            background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
+          }}>
+            <i className="bi bi-camera2" style={{ fontSize: 20, color: "#fff" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <h4 style={{ margin: 0, fontWeight: 700, fontSize: 20, color: "#fff" }}>
+              Galería Antes / Después
+            </h4>
+            <span style={{ color: "rgba(255,255,255,.5)", fontSize: 13 }}>
+              6 poses de rostro · Antes y Después del procedimiento
+            </span>
+          </div>
         </div>
       </div>
       <div style={{ padding: "20px 24px" }}>

@@ -3,7 +3,7 @@
  * /estetica/biopsias
  */
 import { useState, useEffect, useCallback } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
@@ -604,11 +604,22 @@ export default function BiopsiaPatologia() {
               <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Registro y seguimiento de muestras histopatológicas</div>
             </div>
           </div>
-          <button
-            onClick={() => { setEditData(null); setShowForm(true); setDetalle(null); }}
-            style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", border: "none", borderRadius: 8, color: "#fff", padding: "8px 18px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: "0 2px 10px rgba(124,58,237,.4)" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <button
+              onClick={() => navigate(-1)}
+              style={{
+                background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 8,
+                color: "#fff", padding: "8px 16px", fontSize: "0.85rem", fontWeight: 700,
+                cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+              }}>
+              <i className="bi bi-arrow-left" /> Atrás
+            </button>
+            <button
+              onClick={() => { setEditData(null); setShowForm(true); setDetalle(null); }}
+              style={{ background: "linear-gradient(135deg,#7c3aed,#6d28d9)", border: "none", borderRadius: 8, color: "#fff", padding: "8px 18px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, boxShadow: "0 2px 10px rgba(124,58,237,.4)" }}>
             <i className="bi bi-plus-circle-fill"></i> Nueva Biopsia
           </button>
+        </div>
         </div>
 
         {/* Stats */}

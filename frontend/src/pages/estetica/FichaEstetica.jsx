@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 
 const C = {
@@ -61,6 +62,7 @@ const ZONAS = [
 export default function FichaEstetica() {
   const [pacientes,   setPacientes]  = useState([]);
   const [pacientesConFicha, setPacientesConFicha] = useState([]);
+  const navigate = useNavigate();
   const [pacId,       setPacId]      = useState("");
   const [ficha,       setFicha]      = useState(null);
   const [editando,    setEditando]   = useState(false);
@@ -216,14 +218,23 @@ export default function FichaEstetica() {
             </div>
           </div>
         </div>
-        {ficha && !editando && (
-          <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={abrir} style={{
-              background: C.accent, border: "none", borderRadius: 8,
-              color: "#fff", padding: "7px 16px", fontSize: "0.82rem",
-              cursor: "pointer", fontWeight: 600,
-              display: "flex", alignItems: "center", gap: 6,
-            }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button onClick={() => navigate(-1)} style={{
+            background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 8,
+            color: "#fff", padding: "7px 16px", fontSize: "0.82rem",
+            cursor: "pointer", fontWeight: 600,
+            display: "flex", alignItems: "center", gap: 6,
+          }}>
+            <i className="bi bi-arrow-left" /> Atrás
+          </button>
+          {ficha && !editando && (
+            <div style={{ display: "flex", gap: 8 }}>
+              <button onClick={abrir} style={{
+                background: C.accent, border: "none", borderRadius: 8,
+                color: "#fff", padding: "7px 16px", fontSize: "0.82rem",
+                cursor: "pointer", fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
               <i className="bi bi-pencil-square" /> Editar ficha
             </button>
             <button onClick={eliminarFicha} style={{
@@ -236,6 +247,7 @@ export default function FichaEstetica() {
             </button>
           </div>
         )}
+      </div>
       </div>
 
       {/* ── Contenido ── */}
@@ -888,7 +900,10 @@ export default function FichaEstetica() {
   );
 }
 
+
 // ── Componentes auxiliares ────────────────────────────────────────────────────
+
+
 
 function FilaFicha({ pac, onVer, onEditar, onEliminar }) {
   const [hover, setHover] = useState(false);
@@ -947,6 +962,7 @@ function FilaFicha({ pac, onVer, onEditar, onEliminar }) {
       </td>
     </tr>
   );
+
 }
 
 function ItemCompacto({ label, value }) {
@@ -960,6 +976,7 @@ function ItemCompacto({ label, value }) {
       </div>
     </div>
   );
+
 }
 
 function SeccionCard({ titulo, icono, children }) {
@@ -980,6 +997,7 @@ function SeccionCard({ titulo, icono, children }) {
       <div style={{ padding: "16px 18px" }}>{children}</div>
     </div>
   );
+
 }
 
 function ItemFicha({ label, value }) {
@@ -990,6 +1008,7 @@ function ItemFicha({ label, value }) {
       <div style={{ fontSize: 14, color: C.text, fontWeight: 500 }}>{value || "—"}</div>
     </div>
   );
+
 }
 
 function Lbl({ children }) {

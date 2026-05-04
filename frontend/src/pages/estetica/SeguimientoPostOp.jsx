@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 
 const C = {
@@ -29,6 +30,7 @@ const RESULTADO_OPC = ["Excelente", "Muy bueno", "Bueno", "Regular", "Requiere r
 export default function SeguimientoPostOp() {
   const [pacientes,   setPacientes]  = useState([]);
   const [pacId,       setPacId]      = useState("");
+  const navigate = useNavigate();
   const [registros,   setRegistros]  = useState([]);
   const [showModal,   setShowModal]  = useState(false);
   const [form,        setForm]       = useState(initForm());
@@ -78,6 +80,16 @@ export default function SeguimientoPostOp() {
         display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 14,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 8,
+              color: "#fff", padding: "9px 16px", fontSize: 14, fontWeight: 600,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+            }}
+          >
+            <i className="bi bi-arrow-left" /> Atrás
+          </button>
           <div style={{
             width: 46, height: 46, borderRadius: 12,
             background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,

@@ -77,6 +77,15 @@ export default function PerfilPaciente() {
   const [loading, setLoading] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
+  const [esteticaResumen, setEsteticaResumen] = useState({
+    loading: true,
+    ficha: 0,
+    presupuestos: 0,
+    consentimientos: 0,
+    seguimiento: 0,
+    galeria: 0,
+    biopsias: 0,
+  });
   
   // Pestaña activa
   const [tab, setTab] = useState(searchParams.get("tab") || "datos");
@@ -107,6 +116,9 @@ export default function PerfilPaciente() {
   // Sub-pestañas dentro de Historial Clínico
   const [subTabHistorial, setSubTabHistorial] = useState("consultas");
 
+  // Sub-pestañas dentro de Documentos / Exámenes
+  const [subTabDocumentos, setSubTabDocumentos] = useState("todos");
+
   // Historial de consultas - filtros y expansión
   const [filtroDesde,  setFiltroDesde]  = useState("");
   const [filtroHasta,  setFiltroHasta]  = useState("");
@@ -124,6 +136,47 @@ export default function PerfilPaciente() {
   // CARGA INICIAL
   // ══════════════════════════════════════════════════════════
   useEffect(() => { cargarTodo(); }, [id]);
+  useEffect(() => { cargarEsteticaResumen(); }, [id]);
+
+  const cargarEsteticaResumen = async () => {
+    setEsteticaResumen(r => ({ ...r, loading: true }));
+    try {
+      const ficha = localStorage.getItem(`ficha_estetica_${id}`) ? 1 : 0;
+      const presupuestos = JSON.parse(localStorage.getItem("presupuestos_est") || "[]")
+        .filter(p => String(p.paciente_id) === String(id)).length;
+      const consentimientos = JSON.parse(localStorage.getItem("consentimientos_est") || "[]")
+        .filter(c => String(c.paciente_id) === String(id)).length;
+      const seguimiento = JSON.parse(localStorage.getItem(`seguimiento_postop_${id}`) || "[]").length;
+
+      const [resGaleria, resBiopsias] = await Promise.all([
+        api.get(`/galeria-estetica/sesiones?paciente_id=${id}`),
+        api.get(`/biopsias?paciente_id=${id}`),
+      ]);
+
+      setEsteticaResumen({
+        loading: false,
+        ficha,
+        presupuestos,
+        consentimientos,
+        seguimiento,
+        galeria: (resGaleria.data.data || []).length,
+        biopsias: resBiopsias.data.total || (resBiopsias.data.data || []).length,
+      });
+    } catch (err) {
+      console.log("No se pudo cargar el resumen estético:", err);
+      setEsteticaResumen({
+        loading: false,
+        ficha: localStorage.getItem(`ficha_estetica_${id}`) ? 1 : 0,
+        presupuestos: JSON.parse(localStorage.getItem("presupuestos_est") || "[]")
+          .filter(p => String(p.paciente_id) === String(id)).length,
+        consentimientos: JSON.parse(localStorage.getItem("consentimientos_est") || "[]")
+          .filter(c => String(c.paciente_id) === String(id)).length,
+        seguimiento: JSON.parse(localStorage.getItem(`seguimiento_postop_${id}`) || "[]").length,
+        galeria: 0,
+        biopsias: 0,
+      });
+    }
+  };
 
   const cargarTodo = async () => {
     setLoading(true);
@@ -423,6 +476,12 @@ export default function PerfilPaciente() {
     }
   };
 
+  const documentosFiltrados = subTabDocumentos === "todos"
+    ? documentos
+    : documentos.filter(doc => doc.tipo === subTabDocumentos);
+
+  const contarDocumentos = (tipo) => documentos.filter(doc => doc.tipo === tipo).length;
+
   // ══════════════════════════════════════════════════════════
   // PESTAÑA 4: ELIMINAR PACIENTE (Doble confirmación)
   // ══════════════════════════════════════════════════════════
@@ -466,12 +525,22 @@ export default function PerfilPaciente() {
   const nombreCompleto = `${paciente.nombres} ${paciente.apellidos}`;
 
   /* ── Pestañas disponibles (dinámicas según módulos) ── */
+  const totalEstetica = esteticaResumen.ficha + esteticaResumen.galeria + esteticaResumen.presupuestos + esteticaResumen.consentimientos + esteticaResumen.seguimiento + esteticaResumen.biopsias;
+  const hayEstetica = [
+    "ficha_estetica", "galeria_estetica", "presupuestos",
+    "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"
+  ].some(clave => tieneModulo(clave));
+
   const TABS_PERFIL = [
     { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
     { key: "historial",   label: "Historial Clínico",    short: "Historial", icon: "bi-journal-medical",
       badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" },
     { key: "examenes",    label: "Exámenes",             short: "Exáms.",   icon: "bi-files",
       badge: documentos.length > 0 ? documentos.length : null, badgeColor: "#0891b2" },
+    ...(hayEstetica
+      ? [{ key: "estetica", label: "Estética", short: "Estética", icon: "bi-star-fill",
+          badge: esteticaResumen.loading ? null : totalEstetica > 0 ? totalEstetica : null, badgeColor: "#d97706" }]
+      : []),
     ...(tieneModulo("curva_crecimiento")
       ? [{ key: "crecimiento", label: "Curvas de Crecimiento", short: "Curvas", icon: "bi-graph-up-arrow" }]
       : []),
@@ -1521,18 +1590,42 @@ export default function PerfilPaciente() {
             <div className="card shadow-sm">
               <div className="card-header bg-white">
                 <h6 className="mb-0">
-                  <i className="bi bi-files me-2 text-info" />Documentos subidos ({documentos.length})
+                  <i className="bi bi-files me-2 text-info" />Documentos subidos ({documentosFiltrados.length})
+                  {subTabDocumentos !== "todos" && (
+                    <small className="text-muted ms-2">de {documentos.length}</small>
+                  )}
                 </h6>
               </div>
               <div className="card-body">
-                {documentos.length === 0 ? (
+                <div className="mb-3">
+                  <div className="d-flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={`btn btn-sm ${subTabDocumentos === "todos" ? "btn-primary" : "btn-outline-secondary"}`}
+                      onClick={() => setSubTabDocumentos("todos")}
+                    >
+                      Todos <span className="badge bg-white text-dark ms-1">{documentos.length}</span>
+                    </button>
+                    {TIPOS_DOC.map((tipo) => (
+                      <button
+                        key={tipo.value}
+                        type="button"
+                        className={`btn btn-sm ${subTabDocumentos === tipo.value ? "btn-primary" : "btn-outline-secondary"}`}
+                        onClick={() => setSubTabDocumentos(tipo.value)}
+                      >
+                        {tipo.label} <span className="badge bg-white text-dark ms-1">{contarDocumentos(tipo.value)}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                {documentosFiltrados.length === 0 ? (
                   <div className="text-center py-4">
                     <i className="bi bi-inbox" style={{ fontSize: "2.5rem", color: "#ccc" }} />
-                    <p className="text-muted mt-2">No hay documentos subidos</p>
+                    <p className="text-muted mt-2">No hay documentos en esta categoría</p>
                   </div>
                 ) : (
                   <div className="list-group list-group-flush">
-                    {documentos.map((doc) => {
+                    {documentosFiltrados.map((doc) => {
                       const tipoInfo = TIPOS_DOC.find(t => t.value === doc.tipo) || TIPOS_DOC[TIPOS_DOC.length - 1];
                       const esImagen = doc.mime_type?.startsWith('image/');
                       const esPdf = doc.mime_type === 'application/pdf';
@@ -1590,6 +1683,94 @@ export default function PerfilPaciente() {
                     })}
                   </div>
                 )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab === "estetica" && hayEstetica && (
+        <div className="row g-4">
+          <div className="col-12">
+            <div className="card shadow-sm">
+              <div className="card-header bg-white">
+                <h5 className="mb-0">
+                  <i className="bi bi-star-fill text-warning me-2" />Estética
+                  <small className="text-muted ms-2">
+                    {esteticaResumen.loading ? "Cargando datos estéticos..." : `${totalEstetica} registros encontrados`}
+                  </small>
+                </h5>
+              </div>
+              <div className="card-body">
+                <div className="row gy-3 gx-3">
+                  <div className="col-md-4">
+                    <div className="border rounded p-3 h-100">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-semibold">Ficha estética</span>
+                        <span className={`badge ${esteticaResumen.ficha ? "bg-success" : "bg-secondary"}`}>
+                          {esteticaResumen.ficha ? "Guardada" : "No registrada"}
+                        </span>
+                      </div>
+                      <p className="text-muted small mb-3">Información clínica estética asociada al paciente.</p>
+                      <Link to={`/estetica/ficha?paciente_id=${id}`} className="btn btn-sm btn-outline-primary">Abrir ficha</Link>
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="border rounded p-3 h-100">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-semibold">Galería antes/después</span>
+                        <span className="badge bg-info">{esteticaResumen.galeria}</span>
+                      </div>
+                      <p className="text-muted small mb-3">Sesiones de fotos estéticas cargadas para este paciente.</p>
+                      <Link to="/estetica/galeria" className="btn btn-sm btn-outline-primary">Ver galería</Link>
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="border rounded p-3 h-100">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-semibold">Presupuestos</span>
+                        <span className="badge bg-warning text-dark">{esteticaResumen.presupuestos}</span>
+                      </div>
+                      <p className="text-muted small mb-3">Presupuestos estéticos guardados en el perfil del paciente.</p>
+                      <Link to="/estetica/presupuestos" className="btn btn-sm btn-outline-primary">Abrir presupuestos</Link>
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="border rounded p-3 h-100">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-semibold">Consentimientos</span>
+                        <span className="badge bg-primary">{esteticaResumen.consentimientos}</span>
+                      </div>
+                      <p className="text-muted small mb-3">Consentimientos estéticos registrados para este paciente.</p>
+                      <Link to="/estetica/consentimientos" className="btn btn-sm btn-outline-primary">Ver consentimientos</Link>
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="border rounded p-3 h-100">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-semibold">Seguimiento post-op</span>
+                        <span className="badge bg-success">{esteticaResumen.seguimiento}</span>
+                      </div>
+                      <p className="text-muted small mb-3">Registros de control postoperatorio estético.</p>
+                      <Link to="/estetica/seguimiento" className="btn btn-sm btn-outline-primary">Abrir seguimiento</Link>
+                    </div>
+                  </div>
+
+                  <div className="col-md-4">
+                    <div className="border rounded p-3 h-100">
+                      <div className="d-flex align-items-center justify-content-between mb-2">
+                        <span className="fw-semibold">Biopsias / Patología</span>
+                        <span className="badge bg-danger">{esteticaResumen.biopsias}</span>
+                      </div>
+                      <p className="text-muted small mb-3">Biopsias y patologías ligados al paciente.</p>
+                      <Link to="/estetica/biopsias" className="btn btn-sm btn-outline-primary">Ver biopsias</Link>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

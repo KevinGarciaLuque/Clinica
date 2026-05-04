@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 
 const C = {
@@ -44,6 +45,7 @@ const PLANTILLAS = [
 export default function ConsentimientosEsteticos() {
   const [pacientes,      setPacientes]      = useState([]);
   const [consentimientos, setConsentimientos] = useState([]);
+  const navigate = useNavigate();
   const [showModal,      setShowModal]      = useState(false);
   const [plantillaSelec, setPlantillaSelec] = useState(null);
   const [form,           setForm]           = useState({ paciente_id: "", plantilla_id: "", notas: "" });
@@ -116,18 +118,30 @@ export default function ConsentimientosEsteticos() {
             </span>
           </div>
         </div>
-        <button
-          onClick={() => { setShowModal(true); setPlantillaSelec(null); setForm({ paciente_id: "", plantilla_id: "", notas: "" }); }}
-          style={{
-            background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
-            border: "none", borderRadius: 10, padding: "9px 18px",
-            color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
-            display: "flex", alignItems: "center", gap: 8,
-            boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
-          }}
-        >
-          <i className="bi bi-plus-lg" /> Nuevo consentimiento
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)", borderRadius: 8,
+              color: "#fff", padding: "9px 16px", fontSize: 14, fontWeight: 600,
+              cursor: "pointer", display: "flex", alignItems: "center", gap: 8,
+            }}
+          >
+            <i className="bi bi-arrow-left" /> Atrás
+          </button>
+          <button
+            onClick={() => { setShowModal(true); setPlantillaSelec(null); setForm({ paciente_id: "", plantilla_id: "", notas: "" }); }}
+            style={{
+              background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+              border: "none", borderRadius: 10, padding: "9px 18px",
+              color: "#fff", fontWeight: 600, fontSize: 14, cursor: "pointer",
+              display: "flex", alignItems: "center", gap: 8,
+              boxShadow: `0 4px 14px rgba(233,30,140,.4)`,
+            }}
+          >
+            <i className="bi bi-plus-lg" /> Nuevo consentimiento
+          </button>
+        </div>
       </div>
       <div style={{ padding: "20px 24px" }}>
 

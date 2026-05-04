@@ -299,32 +299,39 @@ const pool = require("./db");
     // Seed tipos de cita para la clínica de Gina Valladares (clinica_id = 17)
     {
       const gCid = 17;
-      const [existentes] = await pool.query(
-        `SELECT COUNT(*) AS n FROM catalogos_tipos_cita WHERE clinica_id = ? AND activo = 1`, [gCid]
+      const [clinica] = await pool.query(
+        `SELECT COUNT(*) AS n FROM clinicas WHERE id = ?`, [gCid]
       );
-      if (existentes[0].n === 0) {
-        const tiposGina = [
-          "Consulta dermatológica primera vez",
-          "Consulta dermatológica control",
-          "Consulta estética",
-          "Consulta pediátrica dermatológica",
-          "Consulta de urgencia dermatológica",
-          "Consulta online",
-          "Revisión postprocedimiento",
-          "Retiro de puntos",
-          "Curación postquirúrgica",
-          "Evaluación preláser",
-          "Evaluación postláser",
-        ];
-        for (let i = 0; i < tiposGina.length; i++) {
-          await pool.query(
-            `INSERT INTO catalogos_tipos_cita (clinica_id, nombre, orden) VALUES (?, ?, ?)`,
-            [gCid, tiposGina[i], i + 1]
-          );
-        }
-        console.log(`✅ [seed] ${tiposGina.length} tipos de cita insertados para clínica ${gCid} (Gina Valladares)`);
+      if (clinica[0].n === 0) {
+        console.log(`⚠️  [seed] Clínica ${gCid} no existe en la base de datos local, se omite seed de tipos de cita`);
       } else {
-        console.log(`✅ [seed] tipos de cita clínica ${gCid} ya existen, se omite`);
+        const [existentes] = await pool.query(
+          `SELECT COUNT(*) AS n FROM catalogos_tipos_cita WHERE clinica_id = ? AND activo = 1`, [gCid]
+        );
+        if (existentes[0].n === 0) {
+          const tiposGina = [
+            "Consulta dermatológica primera vez",
+            "Consulta dermatológica control",
+            "Consulta estética",
+            "Consulta pediátrica dermatológica",
+            "Consulta de urgencia dermatológica",
+            "Consulta online",
+            "Revisión postprocedimiento",
+            "Retiro de puntos",
+            "Curación postquirúrgica",
+            "Evaluación preláser",
+            "Evaluación postláser",
+          ];
+          for (let i = 0; i < tiposGina.length; i++) {
+            await pool.query(
+              `INSERT INTO catalogos_tipos_cita (clinica_id, nombre, orden) VALUES (?, ?, ?)`,
+              [gCid, tiposGina[i], i + 1]
+            );
+          }
+          console.log(`✅ [seed] ${tiposGina.length} tipos de cita insertados para clínica ${gCid} (Gina Valladares)`);
+        } else {
+          console.log(`✅ [seed] tipos de cita clínica ${gCid} ya existen, se omite`);
+        }
       }
     }
 
@@ -474,7 +481,7 @@ const pool = require("./db");
     console.log("✅ [auto-migrate] inventario_movimientos OK");
 
   } catch (e) {
-    console.warn("⚠️  [auto-migrate] verificaciones_email:", e.message);
+    console.warn("⚠️  [auto-migrate]:", e.message);
   }
 })();
 
