@@ -58,7 +58,7 @@ const VACUNAS_IZQUIERDA = [
   },
   {
     codigo: "PENTAVALENTE",
-    nombre: "PENTAVALENTE",
+    nombre: "HEXAVALENTE",
     descripcion: "(Difteria, Tos Ferina,\nTétanos, Hepatitis B\ny Neumonia por Hib)",
     dosis: [
       { key: "primera", label: "Primera" },
@@ -221,7 +221,7 @@ const GUIA_VACUNAS = [
   { vacuna: "Hepatitis B", grupo: "Niños", edad: "Recién Nacido" },
   { vacuna: "VPI (Inyectable)", grupo: "Niños", edad: "2 meses, 4 meses, 6 meses" },
   { vacuna: "VOP (Oral)", grupo: "Niños", edad: "2 meses, 4 meses, 6 meses, 10 meses" },
-  { vacuna: "Pentavalente", grupo: "Niños", edad: "2 meses, 4 meses, 6 meses" },
+  { vacuna: "Hexavalente", grupo: "Niños", edad: "2 meses, 4 meses, 6 meses" },
   { vacuna: "Neumococo", grupo: "Niños", edad: "2 meses, 4 meses, 6 meses, 12-15 meses" },
   { vacuna: "Rotavirus", grupo: "Niños", edad: "2 meses, 4 meses, 6 meses" },
   { vacuna: "SRP (Sarampión, Rubéola y Parotiditis)", grupo: "Niños", edad: "12 meses, 4-6 años" },
@@ -1620,7 +1620,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
               <ul className="mb-0" style={{ paddingLeft: 16 }}>
                 <li>* Solo aplica para inmunosuprimidos.</li>
                 <li>** Solo aplica para sector privado.</li>
-                <li>*** Opcional en caso de efectos adversos al componente pertussis de la vacuna Pentavalente.</li>
+              <li>*** Opcional en caso de efectos adversos al componente pertussis de la vacuna Hexavalente.</li>
                 <li>**** Solo aplica para pacientes de diálisis y víctimas de agresión sexual.</li>
                 <li>***** Solo aplica para mayores de cinco años.</li>
               </ul>
