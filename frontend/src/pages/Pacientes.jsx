@@ -8,6 +8,26 @@ import { useAuth } from "../auth/AuthContext";
 dayjs.locale("es");
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
+const TIPOS_CONSULTA_BASE = ["PRIMERA_VEZ", "CONTROL", "EMERGENCIA", "TELECONSULTA"];
+const TIPOS_CONSULTA_ESTETICA = [
+  "Consulta dermatológica primera vez",
+  "Consulta dermatológica control",
+  "Consulta estética",
+  "Consulta pediátrica dermatológica",
+  "Consulta de urgencia dermatológica",
+  "Consulta online",
+  "Revisión postprocedimiento",
+  "Retiro de puntos",
+  "Curación postquirúrgica",
+  "Evaluación prel\u00e1ser",
+  "Evaluación postl\u00e1ser",
+];
+
+function getTiposConsulta(tipoClave) {
+  return (tipoClave === "estetica" || tipoClave === "dermatologia")
+    ? TIPOS_CONSULTA_ESTETICA
+    : TIPOS_CONSULTA_BASE;
+}
 
 const fotoUrl = (foto) => {
   if (!foto) return null;
@@ -901,12 +921,35 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
   const [motivo, setMotivo] = useState("");
   const [saving, setSaving] = useState(false);
   const [err, setErr] = useState("");
+  const [tipoClinica, setTipoClinica] = useState("");
+  const [tiposCita, setTiposCita] = useState([]);
+  const tiposConsulta = tiposCita.length > 0 ? tiposCita.map(t => t.nombre) : getTiposConsulta(tipoClinica);
 
   useEffect(() => {
     api.get("/usuarios/medicos")
       .then(r => setMedicos(r.data.data || []))
       .catch(() => {});
   }, []);
+
+  useEffect(() => {
+    api.get("/clinicas")
+      .then(r => {
+        const lista = r.data.data || [];
+        const clinica = Array.isArray(lista) ? lista[0] : null;
+        setTipoClinica(clinica?.tipo_clave || "");
+      })
+      .catch(() => {});
+
+    api.get("/catalogos-tipos-cita")
+      .then(r => setTiposCita(r.data.data || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!tiposConsulta.includes(tipo)) {
+      setTipo(tiposConsulta[0] || "PRIMERA_VEZ");
+    }
+  }, [tiposConsulta, tipo]);
 
   // Cargar slots cuando se selecciona médico y fecha
   useEffect(() => {
@@ -1024,7 +1067,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                     <label className="form-label fw-semibold">Tipo</label>
                     <select className="form-select form-select-sm" value={tipo}
                       onChange={e => setTipo(e.target.value)}>
-                      {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
+                      {tiposConsulta.map(t => (
                         <option key={t}>{t}</option>
                       ))}
                     </select>
@@ -1090,7 +1133,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                     <label className="form-label fw-semibold">Tipo</label>
                     <select className="form-select form-select-sm" value={tipo}
                       onChange={e => setTipo(e.target.value)}>
-                      {["PRIMERA_VEZ","CONTROL","EMERGENCIA","TELECONSULTA"].map(t => (
+                      {tiposConsulta.map(t => (
                         <option key={t}>{t}</option>
                       ))}
                     </select>
