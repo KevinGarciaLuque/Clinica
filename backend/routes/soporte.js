@@ -283,9 +283,9 @@ router.put("/notificaciones-portal/:id/leer", auth(), async (req, res) => {
 router.get("/push/public-key", auth(), async (_req, res) => {
   const key = process.env.VAPID_PUBLIC_KEY || "";
   if (!key || !webPush.isConfigured()) {
-    return res.status(503).json({ ok: false, msg: "Push no configurado" });
+    return res.json({ ok: true, configured: false, publicKey: null });
   }
-  res.json({ ok: true, publicKey: key });
+  res.json({ ok: true, configured: true, publicKey: key });
 });
 
 router.post("/push/subscribe", auth(), async (req, res) => {

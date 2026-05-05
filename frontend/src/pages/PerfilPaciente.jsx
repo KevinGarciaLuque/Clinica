@@ -535,7 +535,7 @@ export default function PerfilPaciente() {
     { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
     { key: "historial",   label: "Historial Clínico",    short: "Historial", icon: "bi-journal-medical",
       badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" },
-    { key: "examenes",    label: "Exámenes",             short: "Exáms.",   icon: "bi-files",
+    { key: "examenes",    label: "Documentos",           short: "Docs.",    icon: "bi-files",
       badge: documentos.length > 0 ? documentos.length : null, badgeColor: "#0891b2" },
     ...(hayEstetica
       ? [{ key: "estetica", label: "Estética", short: "Estética", icon: "bi-star-fill",
@@ -1523,7 +1523,7 @@ export default function PerfilPaciente() {
             <div className="card shadow-sm h-100">
               <div className="card-header bg-primary text-white">
                 <h6 className="mb-0">
-                  <i className="bi bi-cloud-upload me-2" />Subir Examen
+                  <i className="bi bi-cloud-upload me-2" />Subir Documento
                 </h6>
               </div>
               <div className="card-body">
@@ -1597,25 +1597,58 @@ export default function PerfilPaciente() {
                 </h6>
               </div>
               <div className="card-body">
-                <div className="mb-3">
-                  <div className="d-flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      className={`btn btn-sm ${subTabDocumentos === "todos" ? "btn-primary" : "btn-outline-secondary"}`}
-                      onClick={() => setSubTabDocumentos("todos")}
-                    >
-                      Todos <span className="badge bg-white text-dark ms-1">{documentos.length}</span>
-                    </button>
-                    {TIPOS_DOC.map((tipo) => (
-                      <button
-                        key={tipo.value}
-                        type="button"
-                        className={`btn btn-sm ${subTabDocumentos === tipo.value ? "btn-primary" : "btn-outline-secondary"}`}
-                        onClick={() => setSubTabDocumentos(tipo.value)}
-                      >
-                        {tipo.label} <span className="badge bg-white text-dark ms-1">{contarDocumentos(tipo.value)}</span>
-                      </button>
-                    ))}
+                <div className="mb-3 border-bottom">
+                  <div style={{ display: "flex", gap: 3, overflowX: "auto", paddingBottom: 2 }}>
+                    {[
+                      { value: "todos", label: "Todos", count: documentos.length },
+                      ...TIPOS_DOC.map((tipo) => ({
+                        value: tipo.value,
+                        label: tipo.label,
+                        count: contarDocumentos(tipo.value),
+                      })),
+                    ].map((st) => {
+                      const isActive = subTabDocumentos === st.value;
+                      return (
+                        <button
+                          key={st.value}
+                          type="button"
+                          onClick={() => setSubTabDocumentos(st.value)}
+                          style={{
+                            flexShrink: 0,
+                            padding: "7px 12px",
+                            fontSize: "0.82rem",
+                            fontWeight: 600,
+                            borderRadius: "8px 8px 0 0",
+                            border: "none",
+                            cursor: "pointer",
+                            transition: "background .15s",
+                            background: isActive ? "#214a87" : "rgba(33,74,135,.1)",
+                            color: isActive ? "#fff" : "#214a87",
+                            whiteSpace: "nowrap",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                          }}
+                        >
+                          <span>{st.label}</span>
+                          <span
+                            style={{
+                              background: isActive ? "rgba(255,255,255,.25)" : "rgba(33,74,135,.18)",
+                              color: isActive ? "#fff" : "#214a87",
+                              borderRadius: 20,
+                              padding: "0 6px",
+                              fontSize: "0.7rem",
+                              fontWeight: 700,
+                              lineHeight: "18px",
+                              minWidth: 18,
+                              textAlign: "center",
+                            }}
+                          >
+                            {st.count}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 {documentosFiltrados.length === 0 ? (

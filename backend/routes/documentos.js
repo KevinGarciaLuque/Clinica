@@ -12,6 +12,13 @@ const auth         = require("../middlewares/auth");
 const upload       = require("../middlewares/upload");
 const cloudinary   = require("../utils/cloudinary");
 const streamifier  = require("streamifier");
+const fs           = require("fs");
+const path         = require("path");
+
+async function tablaExiste(nombreTabla) {
+  const [rows] = await pool.query("SHOW TABLES LIKE ?", [nombreTabla]);
+  return rows.length > 0;
+}
 
 // ── GET /api/pacientes/:pacienteId/documentos ─────────────
 router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
@@ -38,13 +45,52 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     // Obtener documentos (usando clinica_id del paciente para SUPER_ADMIN)
     const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
     
-    const [docs] = await pool.query(
-      `SELECT id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por, creado_en AS subido_en
-       FROM documentos_paciente
-       WHERE paciente_id=? AND clinica_id=?
-       ORDER BY creado_en DESC`,
-      [pacienteId, clinicaIdFinal]
-    );
+    let docs = [];
+    if (await tablaExiste("documentos_paciente")) {
+      try {
+        const [rows] = await pool.query(
+          `SELECT id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por, creado_en AS subido_en
+           FROM documentos_paciente
+           WHERE paciente_id=? AND clinica_id=?
+           ORDER BY creado_en DESC`,
+          [pacienteId, clinicaIdFinal]
+        );
+        docs = rows;
+      } catch (err) {
+        // Compatibilidad con esquemas antiguos donde la columna de fecha es subido_en
+        if (err?.code === "ER_BAD_FIELD_ERROR") {
+          const [rows] = await pool.query(
+            `SELECT id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por, subido_en
+             FROM documentos_paciente
+             WHERE paciente_id=? AND clinica_id=?
+             ORDER BY subido_en DESC`,
+            [pacienteId, clinicaIdFinal]
+          );
+          docs = rows;
+        } else {
+          throw err;
+        }
+      }
+    } else if (await tablaExiste("paciente_documentos")) {
+      // Compatibilidad legacy
+      const [rows] = await pool.query(
+        `SELECT id,
+                COALESCE(tipo, 'otro') AS tipo,
+                COALESCE(nombre, 'Documento') AS nombre_original,
+                url AS ruta_archivo,
+                NULL AS mime_type,
+                NULL AS tamano_bytes,
+                NULL AS subido_por,
+                subido_en
+         FROM paciente_documentos
+         WHERE paciente_id=? AND clinica_id=?
+         ORDER BY subido_en DESC`,
+        [pacienteId, clinicaIdFinal]
+      );
+      docs = rows;
+    } else {
+      return res.status(500).json({ ok: false, msg: "No existe tabla de documentos en la base de datos" });
+    }
     
     res.json({ ok: true, data: docs });
   } catch (e) {
@@ -81,7 +127,7 @@ router.post(
         return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
 
       const tipo = req.body.tipo || "otro";
-      const tiposValidos = ["dni_frente","dni_reverso","seguro","consentimiento","laboratorio","imagen","otro"];
+      const tiposValidos = ["dni_frente","dni_reverso","seguro","consentimiento","laboratorio","imagen","radiografia","receta","otro"];
       if (!tiposValidos.includes(tipo))
         return res.status(400).json({ ok: false, msg: "Tipo de documento inválido" });
 
@@ -102,34 +148,86 @@ router.post(
 
       const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
 
-      // Subir a Cloudinary desde el buffer en memoria
-      const uploadResult = await new Promise((resolve, reject) => {
-        const stream = cloudinary.uploader.upload_stream(
-          {
-            folder:        `clinica/pacientes/${clinicaIdFinal}`,
-            resource_type: "auto",
-            use_filename:  false,
-          },
-          (err, result) => (err ? reject(err) : resolve(result))
-        );
-        streamifier.createReadStream(req.file.buffer).pipe(stream);
-      });
-
-      const [r] = await pool.query(
-        `INSERT INTO documentos_paciente
-           (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, cloudinary_public_id, mime_type, tamano_bytes, subido_por)
-         VALUES (?,?,?,?,?,?,?,?,?)`,
-        [
-          pacienteId, clinicaIdFinal,
-          tipo,
-          req.file.originalname,
-          uploadResult.secure_url,
-          uploadResult.public_id,
-          req.file.mimetype,
-          req.file.size,
-          usuarioId,
-        ]
+      // Subir a Cloudinary si está configurado; si no, guardar local
+      const cloudinaryConfigured = !!(
+        process.env.CLOUDINARY_URL ||
+        (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
       );
+
+      let uploadResult;
+      if (cloudinaryConfigured) {
+        uploadResult = await new Promise((resolve, reject) => {
+          const stream = cloudinary.uploader.upload_stream(
+            {
+              folder:        `clinica/pacientes/${clinicaIdFinal}`,
+              resource_type: "auto",
+              use_filename:  false,
+            },
+            (err, result) => (err ? reject(err) : resolve(result))
+          );
+          streamifier.createReadStream(req.file.buffer).pipe(stream);
+        });
+      } else {
+        const ext = path.extname(req.file.originalname || "").toLowerCase() || ".bin";
+        const safeBase = (req.file.originalname || "documento")
+          .replace(/\.[^.]+$/, "")
+          .replace(/[^a-zA-Z0-9_-]/g, "_")
+          .slice(0, 50);
+        const filename = `doc-${pacienteId}-${Date.now()}-${safeBase}${ext}`;
+        const uploadsDir = path.join(__dirname, "../uploads/pacientes");
+        if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+        fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);
+        uploadResult = {
+          secure_url: `${req.protocol}://${req.get("host")}/uploads/pacientes/${filename}`,
+          public_id: null,
+        };
+      }
+
+      let r;
+      if (await tablaExiste("documentos_paciente")) {
+        try {
+          [r] = await pool.query(
+            `INSERT INTO documentos_paciente
+               (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, cloudinary_public_id, mime_type, tamano_bytes, subido_por)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [
+              pacienteId, clinicaIdFinal,
+              tipo,
+              req.file.originalname,
+              uploadResult.secure_url,
+              uploadResult.public_id,
+              req.file.mimetype,
+              req.file.size,
+              usuarioId,
+            ]
+          );
+        } catch (err) {
+          // Compatibilidad con esquemas sin cloudinary_public_id/subido_por
+          if (err?.code === "ER_BAD_FIELD_ERROR") {
+            [r] = await pool.query(
+              `INSERT INTO documentos_paciente
+                 (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes)
+               VALUES (?,?,?,?,?,?,?)`,
+              [
+                pacienteId, clinicaIdFinal, tipo,
+                req.file.originalname, uploadResult.secure_url,
+                req.file.mimetype, req.file.size,
+              ]
+            );
+          } else {
+            throw err;
+          }
+        }
+      } else if (await tablaExiste("paciente_documentos")) {
+        [r] = await pool.query(
+          `INSERT INTO paciente_documentos
+             (paciente_id, clinica_id, tipo, nombre, url)
+           VALUES (?,?,?,?,?)`,
+          [pacienteId, clinicaIdFinal, tipo, req.file.originalname, uploadResult.secure_url]
+        );
+      } else {
+        return res.status(500).json({ ok: false, msg: "No existe tabla de documentos en la base de datos" });
+      }
 
       res.status(201).json({
         ok: true,
@@ -158,16 +256,29 @@ router.delete("/:docId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPE
     const docId      = req.params.docId;
     const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
-    let query, params;
-    if (isSuperAdmin) {
-      query = "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=?";
-      params = [docId, pacienteId];
-    } else {
-      query = "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=? AND clinica_id=?";
-      params = [docId, pacienteId, clinicaId];
+    let doc = null;
+    if (await tablaExiste("documentos_paciente")) {
+      let query, params;
+      if (isSuperAdmin) {
+        query = "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=?";
+        params = [docId, pacienteId];
+      } else {
+        query = "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=? AND clinica_id=?";
+        params = [docId, pacienteId, clinicaId];
+      }
+      [[doc]] = await pool.query(query, params);
+    } else if (await tablaExiste("paciente_documentos")) {
+      let query, params;
+      if (isSuperAdmin) {
+        query = "SELECT * FROM paciente_documentos WHERE id=? AND paciente_id=?";
+        params = [docId, pacienteId];
+      } else {
+        query = "SELECT * FROM paciente_documentos WHERE id=? AND paciente_id=? AND clinica_id=?";
+        params = [docId, pacienteId, clinicaId];
+      }
+      [[doc]] = await pool.query(query, params);
     }
-    
-    const [[doc]] = await pool.query(query, params);
+
     if (!doc) return res.status(404).json({ ok: false, msg: "Documento no encontrado" });
 
     // Borrar de Cloudinary si tiene public_id
@@ -179,7 +290,11 @@ router.delete("/:docId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPE
       }
     }
 
-    await pool.query("DELETE FROM documentos_paciente WHERE id=?", [docId]);
+    if (await tablaExiste("documentos_paciente")) {
+      await pool.query("DELETE FROM documentos_paciente WHERE id=?", [docId]);
+    } else if (await tablaExiste("paciente_documentos")) {
+      await pool.query("DELETE FROM paciente_documentos WHERE id=?", [docId]);
+    }
 
     res.json({ ok: true, msg: "Documento eliminado" });
   } catch (e) {
@@ -195,10 +310,18 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SU
     const pacienteId = req.params.pacienteId;
     const docId      = req.params.docId;
 
-    const [[doc]] = await pool.query(
-      "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=? AND clinica_id=?",
-      [docId, pacienteId, clinicaId]
-    );
+    let doc = null;
+    if (await tablaExiste("documentos_paciente")) {
+      [[doc]] = await pool.query(
+        "SELECT * FROM documentos_paciente WHERE id=? AND paciente_id=? AND clinica_id=?",
+        [docId, pacienteId, clinicaId]
+      );
+    } else if (await tablaExiste("paciente_documentos")) {
+      [[doc]] = await pool.query(
+        "SELECT id, paciente_id, clinica_id, url AS ruta_archivo, NULL AS cloudinary_public_id, NULL AS mime_type FROM paciente_documentos WHERE id=? AND paciente_id=? AND clinica_id=?",
+        [docId, pacienteId, clinicaId]
+      );
+    }
     if (!doc) return res.status(404).json({ ok: false, msg: "Documento no encontrado" });
 
     if (!doc.ruta_archivo)
