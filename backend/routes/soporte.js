@@ -2,6 +2,7 @@ const router     = require("express").Router();
 const pool       = require("../db");
 const auth       = require("../middlewares/auth");
 const sse        = require("../utils/sseManager");
+const webPush    = require("../utils/webPush");
 
 // ──────────────────────────────────────────────
 //  GET /api/soporte/stream
@@ -239,6 +240,96 @@ router.put("/mis-respuestas/:id/leer", auth(), async (req, res) => {
     await pool.query(
       "UPDATE reportes_soporte SET leido_usuario=1 WHERE id=? AND usuario_id=?",
       [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// --------------------------------------------------------------
+// Notificaciones internas de portal (registro/agendamiento)
+// --------------------------------------------------------------
+router.get("/notificaciones-portal", auth(), async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT id, tipo, mensaje, paciente_id, cita_id, creado_en
+       FROM notificaciones_usuario
+       WHERE usuario_id = ? AND leida = 0
+       ORDER BY creado_en DESC
+       LIMIT 50`,
+      [req.user.id]
+    );
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.put("/notificaciones-portal/:id/leer", auth(), async (req, res) => {
+  try {
+    await pool.query(
+      `UPDATE notificaciones_usuario
+       SET leida = 1, leido_en = NOW()
+       WHERE id = ? AND usuario_id = ?`,
+      [req.params.id, req.user.id]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.get("/push/public-key", auth(), async (_req, res) => {
+  const key = process.env.VAPID_PUBLIC_KEY || "";
+  if (!key || !webPush.isConfigured()) {
+    return res.status(503).json({ ok: false, msg: "Push no configurado" });
+  }
+  res.json({ ok: true, publicKey: key });
+});
+
+router.post("/push/subscribe", auth(), async (req, res) => {
+  try {
+    const { subscription } = req.body || {};
+    const endpoint = subscription?.endpoint;
+    const p256dh = subscription?.keys?.p256dh;
+    const authKey = subscription?.keys?.auth;
+    if (!endpoint || !p256dh || !authKey) {
+      return res.status(400).json({ ok: false, msg: "Suscripción inválida" });
+    }
+
+    await pool.query(
+      `INSERT INTO push_subscriptions (user_id, clinica_id, endpoint, p256dh, auth, user_agent, activo)
+       VALUES (?, ?, ?, ?, ?, ?, 1)
+       ON DUPLICATE KEY UPDATE
+         user_id=VALUES(user_id),
+         clinica_id=VALUES(clinica_id),
+         p256dh=VALUES(p256dh),
+         auth=VALUES(auth),
+         user_agent=VALUES(user_agent),
+         activo=1`,
+      [
+        req.user.id,
+        req.user.clinica_id || req.tenant?.clinica_id || null,
+        endpoint,
+        p256dh,
+        authKey,
+        req.headers["user-agent"] || null,
+      ]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.post("/push/unsubscribe", auth(), async (req, res) => {
+  try {
+    const endpoint = req.body?.endpoint;
+    if (!endpoint) return res.status(400).json({ ok: false, msg: "endpoint requerido" });
+    await pool.query(
+      "UPDATE push_subscriptions SET activo=0 WHERE user_id=? AND endpoint=?",
+      [req.user.id, endpoint]
     );
     res.json({ ok: true });
   } catch (e) {

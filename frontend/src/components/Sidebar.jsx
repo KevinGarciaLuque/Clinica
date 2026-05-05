@@ -31,6 +31,7 @@ const adminItems = [
   { to: "/admin/horarios",   label: "Horarios médicos",   icon: "bi-clock-fill" },
   { to: "/admin/servicios",  label: "Servicios",          icon: "bi-tag-fill" },
   { to: "/admin/plantillas", label: "Plantillas",         icon: "bi-file-earmark-text-fill" },
+  { to: "/documentos-clinicos", label: "Documentos Clínicos", icon: "bi-file-earmark-richtext-fill" },
   { to: "/catalogos",        label: "Catálogos",          icon: "bi-journal-bookmark-fill" },
   { to: "/admin/config",     label: "Configuración",      icon: "bi-gear-fill" },
 ];
@@ -39,6 +40,7 @@ const medicoItems = [
   { to: "/admin/horarios",   label: "Horarios médicos",   icon: "bi-clock-fill" },
   { to: "/admin/servicios",  label: "Servicios",          icon: "bi-tag-fill" },
   { to: "/admin/plantillas", label: "Plantillas",         icon: "bi-file-earmark-text-fill" },
+  { to: "/documentos-clinicos", label: "Documentos Clínicos", icon: "bi-file-earmark-richtext-fill" },
   { to: "/catalogos",        label: "Catálogos",          icon: "bi-journal-bookmark-fill" },
   { to: "/admin/config",     label: "Configuración",      icon: "bi-gear-fill" },
 ];

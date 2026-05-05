@@ -6,6 +6,12 @@ import ModalAyudaSoporte from "./ModalAyudaSoporte";
 import { playNotificationSound } from "../utils/notificationSound";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const urlBase64ToUint8Array = (base64String) => {
+  const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
+  const rawData = window.atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+};
 
 const ROLE_COLOR = {
   SUPER_ADMIN:   "danger",
@@ -42,6 +48,7 @@ export default function NavbarApp({ onMenuClick }) {
   const userMenuRef                       = useRef(null);
   const [showAyuda, setShowAyuda]             = useState(false);
   const [misRespuestas, setMisRespuestas]     = useState([]);
+  const [notifsPortal, setNotifsPortal]       = useState([]);
   const [showRespuestasDD, setShowRespuestasDD] = useState(false);
   const respuestasRef                         = useRef(null);
 
@@ -55,8 +62,14 @@ export default function NavbarApp({ onMenuClick }) {
   useEffect(() => {
     if (user?.super) return;
     // Carga inicial
-    api.get("/soporte/mis-respuestas")
-      .then(r => setMisRespuestas(r.data.data || []))
+    Promise.all([
+      api.get("/soporte/mis-respuestas"),
+      api.get("/soporte/notificaciones-portal"),
+    ])
+      .then(([respSoporte, respPortal]) => {
+        setMisRespuestas(respSoporte.data.data || []);
+        setNotifsPortal(respPortal.data.data || []);
+      })
       .catch(() => {});
 
     // SSE — notificaciones en tiempo real
@@ -70,17 +83,40 @@ export default function NavbarApp({ onMenuClick }) {
         return [data, ...prev];
       });
     });
+    es.addEventListener("notificacion_portal", (e) => {
+      const data = JSON.parse(e.data);
+      setNotifsPortal(prev => {
+        playNotificationSound();
+        return [{
+          id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+          tipo: data.tipo,
+          mensaje: data.mensaje,
+          paciente_id: data.paciente_id || null,
+          cita_id: data.cita_id || null,
+          creado_en: new Date().toISOString(),
+          _live: true,
+        }, ...prev];
+      });
+    });
     es.onerror = () => {}; // reconexión automática del navegador
 
     // Fallback polling cada 60s (por si SSE falla)
     // También reproduce sonido si aparecen respuestas nuevas
     const iv = setInterval(() => {
-      api.get("/soporte/mis-respuestas")
-        .then(r => {
-          const nuevas = r.data.data || [];
+      Promise.all([
+        api.get("/soporte/mis-respuestas"),
+        api.get("/soporte/notificaciones-portal"),
+      ])
+        .then(([respSoporte, respPortal]) => {
+          const nuevasSoporte = respSoporte.data.data || [];
+          const nuevasPortal = respPortal.data.data || [];
           setMisRespuestas(prev => {
-            if (nuevas.length > prev.length) playNotificationSound();
-            return nuevas;
+            if (nuevasSoporte.length > prev.length) playNotificationSound();
+            return nuevasSoporte;
+          });
+          setNotifsPortal(prev => {
+            if (nuevasPortal.length > prev.length) playNotificationSound();
+            return nuevasPortal;
           });
         })
         .catch(() => {});
@@ -93,6 +129,17 @@ export default function NavbarApp({ onMenuClick }) {
     try {
       await api.put(`/soporte/mis-respuestas/${id}/leer`);
       setMisRespuestas(prev => prev.filter(r => r.id !== id));
+    } catch {}
+  };
+
+  const marcarNotifPortalLeida = async (id) => {
+    if (String(id).startsWith("live-")) {
+      setNotifsPortal(prev => prev.filter(n => n.id !== id));
+      return;
+    }
+    try {
+      await api.put(`/soporte/notificaciones-portal/${id}/leer`);
+      setNotifsPortal(prev => prev.filter(n => n.id !== id));
     } catch {}
   };
 
@@ -128,6 +175,39 @@ export default function NavbarApp({ onMenuClick }) {
     // Fallback polling cada 30s
     const iv = setInterval(fetchTodo, 30000);
     return () => { es.close(); clearInterval(iv); };
+  }, [user]);
+
+  useEffect(() => {
+    if (!user || user.super) return;
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
+
+    let cancelled = false;
+    const setupPush = async () => {
+      try {
+        const perm = await Notification.requestPermission();
+        if (perm !== "granted" || cancelled) return;
+
+        const reg = await navigator.serviceWorker.register("/sw.js");
+        const keyResp = await api.get("/soporte/push/public-key");
+        const publicKey = keyResp.data?.publicKey;
+        if (!publicKey) return;
+
+        let sub = await reg.pushManager.getSubscription();
+        if (!sub) {
+          sub = await reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          });
+        }
+        if (!sub) return;
+        await api.post("/soporte/push/subscribe", { subscription: sub.toJSON() });
+      } catch {
+        // Silencioso: push puede no estar habilitado en todos los entornos
+      }
+    };
+
+    setupPush();
+    return () => { cancelled = true; };
   }, [user]);
 
   // ── Cargar cumpleañeros del día (usuarios regulares) ───────────
@@ -406,22 +486,25 @@ export default function NavbarApp({ onMenuClick }) {
         {/* 🔔 Campana respuestas — solo usuarios regulares */}
         {!user?.super && (
           <div ref={respuestasRef} style={{ position: "relative" }}>
+            {(() => {
+              const totalNotifs = misRespuestas.length + notifsPortal.length;
+              return (
             <button
               onClick={() => setShowRespuestasDD(v => !v)}
-              title={misRespuestas.length ? `${misRespuestas.length} respuesta(s) a tus reportes` : "Sin notificaciones"}
+              title={totalNotifs ? `${totalNotifs} notificación(es) pendiente(s)` : "Sin notificaciones"}
               style={{
-                background: misRespuestas.length ? "rgba(16,185,129,.15)" : "rgba(255,255,255,.07)",
-                border: `1px solid ${misRespuestas.length ? "rgba(16,185,129,.4)" : "rgba(255,255,255,.12)"}`,
+                background: totalNotifs ? "rgba(16,185,129,.15)" : "rgba(255,255,255,.07)",
+                border: `1px solid ${totalNotifs ? "rgba(16,185,129,.4)" : "rgba(255,255,255,.12)"}`,
                 borderRadius: 10, width: 36, height: 36,
                 display: "flex", alignItems: "center", justifyContent: "center",
                 cursor: "pointer", position: "relative", flexShrink: 0,
               }}
             >
               <i
-                className={`bi ${misRespuestas.length ? "bi-bell-fill" : "bi-bell"}`}
-                style={{ color: misRespuestas.length ? "#10b981" : "rgba(255,255,255,.6)", fontSize: 15 }}
+                className={`bi ${totalNotifs ? "bi-bell-fill" : "bi-bell"}`}
+                style={{ color: totalNotifs ? "#10b981" : "rgba(255,255,255,.6)", fontSize: 15 }}
               />
-              {misRespuestas.length > 0 && (
+              {totalNotifs > 0 && (
                 <span style={{
                   position: "absolute", top: -5, right: -5,
                   background: "#10b981", color: "#fff",
@@ -429,10 +512,12 @@ export default function NavbarApp({ onMenuClick }) {
                   width: 18, height: 18, display: "flex", alignItems: "center", justifyContent: "center",
                   border: "2px solid #1a1a2e",
                 }}>
-                  {misRespuestas.length > 9 ? "9+" : misRespuestas.length}
+                  {totalNotifs > 9 ? "9+" : totalNotifs}
                 </span>
               )}
             </button>
+              );
+            })()}
 
             {showRespuestasDD && (
               <div style={{
@@ -448,54 +533,100 @@ export default function NavbarApp({ onMenuClick }) {
                 }}>
                   <span style={{ color: "#e2e8f0", fontWeight: 700, fontSize: 13 }}>
                     <i className="bi bi-bell-fill me-2" style={{ color: "#10b981" }} />
-                    Respuestas a tus reportes
+                    Notificaciones
                   </span>
                   <span style={{
                     background: "rgba(16,185,129,.2)", color: "#10b981",
                     fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
                   }}>
-                    {misRespuestas.length} nueva{misRespuestas.length !== 1 ? "s" : ""}
+                    {misRespuestas.length + notifsPortal.length} pendiente{(misRespuestas.length + notifsPortal.length) !== 1 ? "s" : ""}
                   </span>
                 </div>
 
-                {misRespuestas.length === 0 ? (
+                {notifsPortal.length > 0 && (
+                  <>
+                    <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#7dd3fc", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                      <i className="bi bi-link-45deg me-1" /> Portal público
+                    </div>
+                    {notifsPortal.map((n) => (
+                      <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{
+                            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                            background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <i className={`bi ${n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`} style={{ color: "#7dd3fc", fontSize: 14 }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 3 }}>
+                              {n.mensaje}
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginBottom: 7 }}>
+                              {new Date(n.creado_en).toLocaleString("es-HN")}
+                            </div>
+                            <button
+                              onClick={() => { marcarNotifPortalLeida(n.id); if ((misRespuestas.length + notifsPortal.length) <= 1) setShowRespuestasDD(false); }}
+                              style={{
+                                background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
+                                borderRadius: 6, padding: "4px 10px", color: "#7dd3fc",
+                                fontSize: 10, fontWeight: 700, cursor: "pointer",
+                              }}
+                            >
+                              <i className="bi bi-check-lg me-1" />Entendido
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {misRespuestas.length > 0 && (
+                  <>
+                    <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                      <i className="bi bi-reply-fill me-1" /> Soporte
+                    </div>
+                    {misRespuestas.map(r => (
+                      <div key={r.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{
+                            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                            background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <i className="bi bi-reply-fill" style={{ color: "#10b981", fontSize: 14 }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {r.asunto}
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", lineHeight: 1.5, marginBottom: 7 }}>
+                              {r.respuesta}
+                            </div>
+                            <button
+                              onClick={() => { marcarRespuestaLeida(r.id); if ((misRespuestas.length + notifsPortal.length) <= 1) setShowRespuestasDD(false); }}
+                              style={{
+                                background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
+                                borderRadius: 6, padding: "4px 10px", color: "#10b981",
+                                fontSize: 10, fontWeight: 700, cursor: "pointer",
+                              }}
+                            >
+                              <i className="bi bi-check-lg me-1" />Entendido
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
+                )}
+
+                {misRespuestas.length === 0 && notifsPortal.length === 0 ? (
                   <div style={{ padding: "28px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
                     <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
                     Sin notificaciones pendientes
                   </div>
-                ) : (
-                  misRespuestas.map(r => (
-                    <div key={r.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
-                      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                        <div style={{
-                          width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                          background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
-                          display: "flex", alignItems: "center", justifyContent: "center",
-                        }}>
-                          <i className="bi bi-reply-fill" style={{ color: "#10b981", fontSize: 14 }} />
-                        </div>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                            {r.asunto}
-                          </div>
-                          <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", lineHeight: 1.5, marginBottom: 7 }}>
-                            {r.respuesta}
-                          </div>
-                          <button
-                            onClick={() => { marcarRespuestaLeida(r.id); if (misRespuestas.length <= 1) setShowRespuestasDD(false); }}
-                            style={{
-                              background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
-                              borderRadius: 6, padding: "4px 10px", color: "#10b981",
-                              fontSize: 10, fontWeight: 700, cursor: "pointer",
-                            }}
-                          >
-                            <i className="bi bi-check-lg me-1" />Entendido
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  ))
-                )}
+                ) : null}
               </div>
             )}
           </div>

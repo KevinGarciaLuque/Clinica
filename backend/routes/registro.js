@@ -25,6 +25,8 @@ const cloudinary  = require("../utils/cloudinary");
 const streamifier = require("streamifier");
 const fs      = require("fs");
 const path    = require("path");
+const sse     = require("../utils/sseManager");
+const webPush = require("../utils/webPush");
 
 // ── Rate limiters ─────────────────────────────────────────
 const limiterStrict = rateLimit({
@@ -64,6 +66,54 @@ function validarSessionToken(req, res) {
   } catch {
     res.status(401).json({ ok: false, msg: "Sesión inválida o expirada. Por favor vuelve a verificar tu identidad." });
     return null;
+  }
+}
+
+async function crearNotificacionesPortal({
+  clinicaId,
+  tipo,
+  mensaje,
+  pacienteId = null,
+  citaId = null,
+}) {
+  try {
+    const [usuarios] = await pool.query(
+      `SELECT id
+       FROM usuarios
+       WHERE clinica_id = ? AND activo = 1 AND tipo <> 'SUPER_ADMIN'`,
+      [clinicaId]
+    );
+    if (!usuarios.length) return;
+
+    const values = usuarios.map((u) => [u.id, clinicaId, tipo, mensaje, pacienteId, citaId]);
+    await pool.query(
+      `INSERT INTO notificaciones_usuario
+       (usuario_id, clinica_id, tipo, mensaje, paciente_id, cita_id)
+       VALUES ?`,
+      [values]
+    );
+
+    for (const u of usuarios) {
+      sse.notifyUser(u.id, "notificacion_portal", {
+        tipo,
+        mensaje,
+        paciente_id: pacienteId,
+        cita_id: citaId,
+      });
+    }
+
+    await webPush.sendToUsers(
+      pool,
+      usuarios.map((u) => u.id),
+      {
+        title: "Nueva notificación",
+        body: mensaje,
+        tag: tipo,
+        data: { tipo, paciente_id: pacienteId, cita_id: citaId, url: "/citas" },
+      }
+    );
+  } catch (e) {
+    console.error("[notificacion_portal]", e.message);
   }
 }
 
@@ -186,6 +236,13 @@ router.post("/", async (req, res) => {
     await conn.commit();
 
     const sessionToken = generarSessionToken(pacienteId, clinica_id);
+
+    await crearNotificacionesPortal({
+      clinicaId: clinica_id,
+      tipo: "PACIENTE_REGISTRO_PORTAL",
+      mensaje: "Se registró paciente desde link",
+      pacienteId,
+    });
 
     res.status(201).json({
       ok:  true,
@@ -536,6 +593,15 @@ router.post("/cita", limiterModerate, async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?)`,
       [clinica_id, paciente_id, medico_id, inicio, fin, "CONTROL", motivo || null, "PORTAL"]
     );
+
+    await crearNotificacionesPortal({
+      clinicaId: clinica_id,
+      tipo: "CITA_AGENDADA_PORTAL",
+      mensaje: "Se agendó cita desde link",
+      pacienteId: Number(paciente_id),
+      citaId: r.insertId,
+    });
+
     res.json({ ok: true, id: r.insertId, msg: "Cita agendada exitosamente" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

@@ -191,6 +191,51 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] catalogos_tipos_cita OK");
 
+    // Notificaciones internas para usuarios de clínica (campanita navbar)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS notificaciones_usuario (
+        id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        usuario_id  INT UNSIGNED NOT NULL,
+        clinica_id  INT UNSIGNED NOT NULL,
+        tipo        VARCHAR(50) NOT NULL,
+        mensaje     VARCHAR(300) NOT NULL,
+        paciente_id INT UNSIGNED NULL,
+        cita_id     INT UNSIGNED NULL,
+        leida       TINYINT(1) DEFAULT 0,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        leido_en    DATETIME NULL,
+        INDEX idx_nu_usuario_leida (usuario_id, leida, creado_en),
+        INDEX idx_nu_clinica (clinica_id, creado_en),
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (clinica_id) REFERENCES clinicas(id) ON DELETE CASCADE,
+        FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE SET NULL,
+        FOREIGN KEY (cita_id) REFERENCES citas(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] notificaciones_usuario OK");
+
+    // Suscripciones Web Push por usuario
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS push_subscriptions (
+        id          BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id     INT UNSIGNED NOT NULL,
+        clinica_id  INT UNSIGNED NOT NULL,
+        endpoint    TEXT NOT NULL,
+        p256dh      VARCHAR(255) NOT NULL,
+        auth        VARCHAR(255) NOT NULL,
+        user_agent  VARCHAR(255) NULL,
+        activo      TINYINT(1) DEFAULT 1,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+        INDEX idx_ps_user_activo (user_id, activo),
+        INDEX idx_ps_clinica_activo (clinica_id, activo),
+        FOREIGN KEY (user_id) REFERENCES usuarios(id) ON DELETE CASCADE,
+        FOREIGN KEY (clinica_id) REFERENCES clinicas(id) ON DELETE CASCADE,
+        UNIQUE KEY uq_ps_endpoint (endpoint(255))
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] push_subscriptions OK");
+
     // Tabla catálogo de procedimientos dermatológicos/estéticos
     await pool.query(`
       CREATE TABLE IF NOT EXISTS catalogos_procedimientos (

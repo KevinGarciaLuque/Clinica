@@ -5,8 +5,9 @@ const router  = require("express").Router();
 const pool    = require("../db");
 const auth    = require("../middlewares/auth");
 const crypto  = require("crypto");
+const fs      = require("fs");
+const path    = require("path");
 const PDFDoc  = require("pdfkit");
-const QRCode  = require("qrcode");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
@@ -362,29 +363,23 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     // 2. Buscar plantilla predeterminada
     let tpl = null;
     const [tplRows] = await pool.query(
-      `SELECT contenido FROM plantillas_documentos WHERE clinica_id=? AND tipo='receta' AND es_predeterminada=1 AND activo=1 LIMIT 1`,
+      `SELECT contenido
+       FROM plantillas_documentos
+       WHERE clinica_id=? AND tipo='receta' AND activo=1
+       ORDER BY es_predeterminada DESC, id DESC
+       LIMIT 1`,
       [pr.clinica_id]
     );
     if (tplRows.length) {
       try { tpl = JSON.parse(tplRows[0].contenido); } catch { tpl = null; }
     }
 
-    // 3. Generar imagen QR como buffer PNG
-    const qrCode = pr.codigo_qr || `RX-${String(pr.id).padStart(8, "0")}`;
-    const baseUrl = process.env.FRONTEND_URL || "http://localhost:5173";
-    const qrText  = `${baseUrl}/rx/${qrCode}`;
-    const qrBuffer = await QRCode.toBuffer(qrText, {
-      type:  "png",
-      width: 120,
-      margin: 1,
-    });
-
-    // 4. Configurar valores del template o defaults
+    // 3. Configurar valores del template o defaults
     const tColor      = tpl?.color || "#1a2744";
     const tTextColor  = tpl?.header_text_color || "#ffffff";
     const tClinica    = tpl?.clinica || pr.clinica_nombre;
-    const tMedico     = tpl?.medico || `Dr(a). ${pr.med_nombres} ${pr.med_apellidos}`;
-    const tCred       = tpl?.credenciales || (pr.numero_colegiatura ? `Col. ${pr.numero_colegiatura}` : "") || pr.especialidad || "";
+    const tMedico     = tpl ? (tpl.medico || "") : `${pr.med_nombres} ${pr.med_apellidos}`;
+    const tCred       = tpl ? (tpl.credenciales || "") : ((pr.numero_colegiatura ? `Col. ${pr.numero_colegiatura}` : "") || pr.especialidad || "");
     const tFooter     = tpl?.footer || "";
     const tLogoUrl    = tpl?.logo_url || "";
     const tFirma      = tpl?.mostrar_firma !== false;
@@ -408,36 +403,41 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       "Tahoma": "Helvetica",
       "Trebuchet MS": "Helvetica",
       "Palatino": "Times-Roman",
-      "Brush Script MT": "Times-Roman",
-      "Segoe Script": "Helvetica",
-      "Gabriola": "Times-Roman",
-      "Kristen ITC": "Helvetica",
-      "Lucida Handwriting": "Times-Roman",
-      "Vladimir Script": "Times-Roman",
-      "Edwardian Script ITC": "Times-Roman",
       "Lucida Console": "Courier",
       "Comic Sans MS": "Helvetica",
     };
 
-    const getClinicaFont = () => {
-      const f = tpl?.clinica_font || "Arial, Helvetica, sans-serif";
+    const fontFileMap = {
+      "Brush Script MT": "BRUSHSCI.TTF",
+      "Gabriola": "Gabriola.ttf",
+      "Kristen ITC": "ITCKRIST.TTF",
+      "Lucida Handwriting": "LHANDW.TTF",
+      "Vladimir Script": "VLADIMIR.TTF",
+      "Edwardian Script ITC": "ITCEDSCR.TTF",
+    };
+
+    const resolveFont = (cssFont) => {
+      const f = cssFont || "Arial, Helvetica, sans-serif";
       const base = f.split(",")[0].replace(/['"]/g, "").trim();
-      const pdfFont = fontMap[base] || "Helvetica";
+      const baseNorm = base.toLowerCase();
+      const fontFile = fontFileMap[base] ? path.join("C:\\Windows\\Fonts", fontFileMap[base]) : "";
+      if (fontFile && fs.existsSync(fontFile)) {
+        return { normal: fontFile, bold: fontFile, italic: fontFile };
+      }
+      const pdfFont =
+        fontMap[base] ||
+        (baseNorm.includes("times") || baseNorm.includes("georgia") || baseNorm.includes("palatino") ? "Times-Roman" :
+         baseNorm.includes("courier") || baseNorm.includes("lucida console") || baseNorm.includes("monospace") ? "Courier" :
+         "Helvetica");
       return {
         normal: pdfFont,
         bold: pdfFont === "Courier" ? "Courier-Bold" : pdfFont === "Times-Roman" ? "Times-Bold" : "Helvetica-Bold",
+        italic: pdfFont === "Courier" ? "Courier-Oblique" : pdfFont === "Times-Roman" ? "Times-Italic" : "Helvetica-Oblique",
       };
     };
 
-    const getMedicoFont = () => {
-      const f = tpl?.medico_font || "Arial, Helvetica, sans-serif";
-      const base = f.split(",")[0].replace(/['"]/g, "").trim();
-      const pdfFont = fontMap[base] || "Helvetica";
-      return {
-        normal: pdfFont,
-        bold: pdfFont === "Courier" ? "Courier-Bold" : pdfFont === "Times-Roman" ? "Times-Bold" : "Helvetica-Bold",
-      };
-    };
+    const getClinicaFont = () => resolveFont(tpl?.clinica_font);
+    const getMedicoFont = () => resolveFont(tpl?.medico_font);
 
     // Descargar logo si existe
     let logoBuffer = null;
@@ -459,12 +459,52 @@ router.get("/:id/pdf", auth(), async (req, res) => {
               r.on("end", () => resolve(Buffer.concat(chunks)));
             }).on("error", () => resolve(null));
           });
+        } else {
+          const localPath = path.isAbsolute(tLogoUrl)
+            ? tLogoUrl
+            : path.join(process.cwd(), tLogoUrl);
+          if (fs.existsSync(localPath)) {
+            logoBuffer = await fs.promises.readFile(localPath);
+          }
         }
-      } catch { logoBuffer = null; }
+      } catch {
+        logoBuffer = null;
+      }
     }
 
+    const withDoctorPrefix = (name) => {
+      const raw = String(name || "").replace(/\s+/g, " ").trim();
+      if (!raw) return "";
+      const hasPrefix = /^(dr|dra|doctor|doctora)\.?/i.test(raw);
+      return hasPrefix ? raw : `Dr(a). ${raw}`;
+    };
+    const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const dedupeMedicoName = (rawName, fallbackBase) => {
+      let clean = String(rawName || "").replace(/\s+/g, " ").trim();
+      const base = String(fallbackBase || "").replace(/\s+/g, " ").trim();
+      if (!clean || !base) return clean;
+
+      const dupTail = new RegExp(
+        `(\\s|\\||-|,|;)*((dr\\(a\\)|dr|dra|doctor|doctora)\\.?\\s*)?${escapeRegExp(base)}$`,
+        "i"
+      );
+
+      const once = withDoctorPrefix(base).toLowerCase();
+      if (withDoctorPrefix(clean).toLowerCase() === once) return clean;
+
+      const trimmedTail = clean.replace(dupTail, "").trim();
+      if (trimmedTail && withDoctorPrefix(trimmedTail).toLowerCase() !== once) {
+        clean = trimmedTail;
+      }
+
+      return clean || base;
+    };
+
+    const medicoBase = `${pr.med_nombres} ${pr.med_apellidos}`.trim();
+    const medicoDisplay = tMedico ? withDoctorPrefix(dedupeMedicoName(tMedico, medicoBase)) : "";
+
     // 5. Construir PDF
-    const doc = new PDFDoc({ size: "LETTER", margin: 50 });
+    const doc = new PDFDoc({ size: "LETTER", margin: 0 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="receta-${pr.id}.pdf"`);
     doc.pipe(res);
@@ -474,105 +514,165 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const GRAY = "#555555";
 
     // ── Encabezado con color del template ──────────────────────────
-    const headerH = logoBuffer ? 80 : 70;
-    doc.rect(marginL, 40, pageW, headerH).fill(tColor);
-
     const clinicaFonts = getClinicaFont();
     const clinicaFontSize = parseFloat(tpl?.clinica_font_size) || 1.25;
     const medicoFonts = getMedicoFont();
     const medicoFontSize = parseFloat(tpl?.medico_font_size) || 0.85;
 
-    let headerTextX = 60;
-    let headerTextW = pageW - 130;
+    const clinicFontPt = Math.max(16, Math.min(clinicaFontSize * 10, 36));
+    const doctorFontPt = Math.max(11, Math.min(medicoFontSize * 9, 24));
 
-    if (logoBuffer) {
-      // Logo a la izquierda
-      doc.image(logoBuffer, 55, 42, { width: 55, fit: [55, 70] });
-      headerTextX = 120;
-      headerTextW = pageW - 180;
+    // Calcular alturas de encabezado
+    doc.fillColor(tTextColor).fontSize(clinicFontPt).font(clinicaFonts.bold);
+    const clinicHeight = doc.heightOfString(tClinica || "", { width: pageW - 100 });
+
+    doc.fontSize(doctorFontPt).font(medicoFonts.normal);
+    const doctorHeight = medicoDisplay ? doc.heightOfString(medicoDisplay, { width: pageW - 100 }) : 0;
+
+    let credHeight = 0;
+    if (tCred) {
+      doc.fontSize(8).font(medicoFonts.normal);
+      credHeight = doc.heightOfString(tCred, { width: pageW - 100 });
     }
+
+    const logoSize = logoBuffer ? 70 : 0;
+    const headerGaps = (medicoDisplay ? 6 : 0) + (tCred ? 4 : 0);
+    const headerH = Math.max(logoSize + 20, clinicHeight + doctorHeight + credHeight + headerGaps + 20);
+
+    // Dibuja fondo del encabezado
+    const topY = 14;
+
+    doc.rect(marginL, topY, pageW, headerH).fill(tColor);
+
+    // Logo a la izquierda (si existe)
+    let textX = marginL + 15;
+    if (logoBuffer) {
+      doc.save();
+      doc.fillOpacity(0.15).fillColor("#ffffff");
+      doc.roundedRect(marginL + 10, topY + 10, logoSize, logoSize, 6).fill();
+      doc.restore();
+      doc.image(logoBuffer, marginL + 10, topY + 10, { fit: [logoSize, logoSize] });
+      textX = marginL + logoSize + 20;
+    }
+
+    // Texto del encabezado a la derecha (clínica, médico, credenciales)
+    const textW = marginL + pageW - textX - 10;
+    const headerTextY = topY + 8;
 
     doc.fillColor(tTextColor)
-       .fontSize(clinicaFontSize * 14).font(clinicaFonts.bold)
-       .text(tClinica || "", headerTextX, 48, { width: headerTextW });
+       .fontSize(clinicFontPt).font(clinicaFonts.bold)
+       .text(tClinica || "", textX, headerTextY, { width: textW });
 
-    doc.fontSize(medicoFontSize * 11).font(medicoFonts.normal)
-       .text(tMedico, headerTextX, 48 + (clinicaFontSize * 14) + 2, { width: headerTextW });
-
-    if (tCred) {
-      const credY = 48 + (clinicaFontSize * 14) + 2 + (medicoFontSize * 11) + 4;
-      doc.fillColor(tTextColor + "bf").fontSize(8).font("Helvetica")
-         .text(tCred, headerTextX, credY, { width: headerTextW });
+    let nextHeaderY = headerTextY + clinicHeight;
+    if (medicoDisplay) {
+      nextHeaderY += 6;
+      doc.fillColor(tTextColor)
+         .fontSize(doctorFontPt).font(medicoFonts.normal)
+         .text(medicoDisplay, textX, nextHeaderY, { width: textW });
+      nextHeaderY += doctorHeight;
     }
 
-    // QR en esquina superior derecha
-    const qrX = marginL + pageW - 70;
-    doc.image(qrBuffer, qrX, 45, { width: 60, height: 60 });
-    doc.fillColor(tTextColor).fontSize(8).font("Helvetica")
-       .text(`Cód: ${qrCode}`, qrX - 5, 109, { width: 75, align: "center" });
+    if (tCred) {
+      const credY = nextHeaderY + 4;
+      doc.fillColor(tTextColor + "bf").fontSize(8).font(medicoFonts.normal)
+         .text(tCred, textX, credY, { width: textW });
+    }
 
-    // ── Título ──────────────────────────────────────────────────────
-    const titleY = 40 + headerH + 12;
-    doc.fillColor(tColor).fontSize(13).font("Helvetica-Bold")
-       .text("RECETA MÉDICA", marginL, titleY, { align: "center", width: pageW });
+    // En plantilla de receta, el bloque superior no muestra QR.
+    // Se mantiene la generación del código para validaciones públicas.
+    const recetaInfoY = topY + headerH + 14;
+    const pacienteTexto = `${pr.pac_nombres} ${pr.pac_apellidos}`;
+    const recetaFecha = new Date(pr.creado_en).toLocaleDateString("es-HN", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    });
 
-    // ── Datos del paciente y médico ─────────────────────────────────
-    const infoY = titleY + 22;
-    doc.rect(marginL, infoY, pageW, 56).fill("#f0f4ff");
+    doc.fillColor("#333").fontSize(11).font("Helvetica")
+       .text("Paciente:", marginL + 10, recetaInfoY);
+    doc.fillColor("#333").fontSize(11).font("Helvetica")
+       .text(pacienteTexto, marginL + 70, recetaInfoY, { width: pageW - 80, underline: true });
 
-    doc.fillColor(tColor).fontSize(8).font("Helvetica-Bold")
-       .text("PACIENTE", marginL + 10, infoY + 6);
-    doc.fillColor("#111").fontSize(10).font("Helvetica-Bold")
-       .text(`${pr.pac_nombres} ${pr.pac_apellidos}`, marginL + 10, infoY + 17);
-    doc.fillColor(GRAY).fontSize(8).font("Helvetica")
-       .text(
-         `DNI: ${pr.dni || "—"}  |  F.Nac: ${pr.fecha_nacimiento ? new Date(pr.fecha_nacimiento).toLocaleDateString("es-PE") : "—"}`,
-         marginL + 10, infoY + 31
-       )
-       .text(`Estado: ${pr.estado}`, marginL + 10, infoY + 43);
+    const fechaY = recetaInfoY;
+    doc.fillColor("#333").fontSize(11).font("Helvetica")
+       .text("Fecha:", marginL + pageW - 220, fechaY);
+    doc.fillColor("#333").fontSize(11).font("Helvetica")
+       .text(recetaFecha, marginL + pageW - 170, fechaY, { width: 150, underline: true });
 
-    const midX = marginL + pageW / 2 + 10;
-    doc.fillColor(tColor).fontSize(8).font("Helvetica-Bold")
-       .text("MÉDICO PRESCRIPTOR", midX, infoY + 6);
-    doc.fillColor("#111").fontSize(10).font("Helvetica-Bold")
-       .text(`Dr(a). ${pr.med_nombres} ${pr.med_apellidos}`, midX, infoY + 17);
-    doc.fillColor(GRAY).fontSize(8).font("Helvetica")
-       .text(pr.especialidad || "", midX, infoY + 31)
-       .text(`Fecha: ${new Date(pr.creado_en).toLocaleDateString("es-PE")}`, midX, infoY + 43);
+    const separatorY = fechaY + 24;
+    doc.strokeColor("#eeeeee").lineWidth(0.8)
+       .moveTo(marginL + 10, separatorY).lineTo(marginL + pageW - 10, separatorY).stroke();
+
+    const rxY = separatorY + 18;
+    doc.fillColor("#333").fontSize(30).font("Times-Bold")
+       .text("Rx", marginL + 10, rxY);
+
+    const recetaBodyY = rxY + 36;
+
+    /*
+    // Contenido/instrucciones de la plantilla de receta
+    if (tpl?.contenido) {
+      const plantillaTexto = String(tpl.contenido)
+        .replaceAll("{{paciente}}", `${pr.pac_nombres} ${pr.pac_apellidos}`)
+        .replaceAll("{{fecha}}", new Date(pr.creado_en).toLocaleDateString("es-PE"))
+        .replaceAll("{{diagnostico}}", "");
+      if (plantillaTexto.trim()) {
+        const blockY = tableTop;
+        const blockH = doc.heightOfString(plantillaTexto, { width: pageW - 20, lineGap: 1.5 }) + 14;
+        doc.rect(marginL, blockY, pageW, blockH).fill("#f9f9f9");
+        doc.fillColor(tColor).fontSize(7).font(medicoFonts.bold)
+           .text("Instrucciones", marginL + 10, blockY + 5);
+        doc.fillColor("#111").fontSize(7.5).font(medicoFonts.normal)
+           .text(plantillaTexto, marginL + 10, blockY + 16, { width: pageW - 20, lineGap: 1.5 });
+        tableTop = blockY + blockH + 8;
+      }
+    }
 
     // ── Tabla de medicamentos ───────────────────────────────────────
-    const tableTop = infoY + 66;
-    const cols = { med: 60, dosis: 220, dur: 320, cant: 400, inst: 455 };
-    const colW = { med: 155, dosis: 95, dur: 75, cant: 50, inst: pageW - 405 };
+    */
+    const plantillaTexto = String(tpl?.contenido || "")
+      .replaceAll("{{paciente}}", `${pr.pac_nombres} ${pr.pac_apellidos}`)
+      .replaceAll("{{fecha}}", new Date(pr.creado_en).toLocaleDateString("es-HN"))
+      .replaceAll("{{diagnostico}}", "")
+      .trim();
 
-    // Cabecera tabla
-    doc.rect(marginL, tableTop, pageW, 18).fill(tColor);
-    doc.fillColor("white").fontSize(8).font("Helvetica-Bold");
-    doc.text("Medicamento",  cols.med,  tableTop + 5, { width: colW.med  });
-    doc.text("Dosis",        cols.dosis, tableTop + 5, { width: colW.dosis });
-    doc.text("Duración",     cols.dur,   tableTop + 5, { width: colW.dur  });
-    doc.text("Cantidad",     cols.cant,  tableTop + 5, { width: colW.cant });
-    doc.text("Instrucciones",cols.inst,  tableTop + 5, { width: colW.inst });
+    const medsTexto = items.map((item, i) => {
+      const med = `${item.medicamento_nombre || "Medicamento"}${item.presentacion ? ` (${item.presentacion})` : ""}`;
+      const dosis = item.dosis || "-";
+      const duracion = item.duracion || "-";
+      const cantidad = item.cantidad || "-";
+      const inst = item.instrucciones || "-";
+      return `${i + 1}. ${med}\n   Dosis: ${dosis}   Duracion: ${duracion}   Cantidad: ${cantidad}\n   Indicaciones: ${inst}`;
+    }).join("\n\n");
 
-    let rowY = tableTop + 20;
+    const notasTexto = (pr.notas || "").trim();
+    const recetaTexto = [plantillaTexto, medsTexto, notasTexto ? `Notas:\n${notasTexto}` : ""]
+      .filter(Boolean)
+      .join("\n\n");
+
+    doc.fillColor("#111").fontSize(9.5).font("Helvetica")
+       .text(recetaTexto || " ", marginL + 10, recetaBodyY, { width: pageW - 20, lineGap: 2 });
+    const bodyH = doc.heightOfString(recetaTexto || " ", { width: pageW - 20, lineGap: 2 });
+    let rowY = recetaBodyY + Math.max(120, bodyH) + 8;
+    /*
     items.forEach((item, i) => {
-      const bg = i % 2 === 0 ? "#ffffff" : "#f7f9ff";
+      const bg = i % 2 === 0 ? "#ffffff" : "#fcfcfc";
       const med = item.medicamento_nombre + (item.presentacion ? ` (${item.presentacion})` : "");
       const inst = item.instrucciones || "—";
       
-      doc.fontSize(8).font("Helvetica");
+      doc.fontSize(7).font(medicoFonts.normal);
       const medHeight = doc.heightOfString(med, { width: colW.med });
       const instHeight = doc.heightOfString(inst, { width: colW.inst });
-      const rowHeight = Math.max(18, medHeight + 10, instHeight + 10);
+      const rowHeight = Math.max(14, medHeight + 6, instHeight + 6);
       
       doc.rect(marginL, rowY, pageW, rowHeight).fill(bg);
-      doc.fillColor("#111").fontSize(8).font("Helvetica");
+      doc.fillColor("#111").fontSize(7).font(medicoFonts.normal);
       
-      doc.text(med,                     cols.med,  rowY + 5, { width: colW.med });
-      doc.text(item.dosis       || "—", cols.dosis,rowY + 5, { width: colW.dosis });
-      doc.text(item.duracion    || "—", cols.dur,  rowY + 5, { width: colW.dur  });
-      doc.text(item.cantidad    || "—", cols.cant, rowY + 5, { width: colW.cant });
-      doc.text(inst,                    cols.inst, rowY + 5, { width: colW.inst });
+      doc.text(med,                     cols.med,  rowY + 3, { width: colW.med });
+      doc.text(item.dosis       || "—", cols.dosis,rowY + 3, { width: colW.dosis });
+      doc.text(item.duracion    || "—", cols.dur,  rowY + 3, { width: colW.dur  });
+      doc.text(item.cantidad    || "—", cols.cant, rowY + 3, { width: colW.cant });
+      doc.text(inst,                    cols.inst, rowY + 3, { width: colW.inst });
       
       rowY += rowHeight;
     });
@@ -581,58 +681,62 @@ router.get("/:id/pdf", auth(), async (req, res) => {
 
     // ── Notas ───────────────────────────────────────────────────────
     if (pr.notas) {
-      const notasY = rowY + 16;
-      doc.fillColor(tColor).fontSize(8).font("Helvetica-Bold").text("Indicaciones adicionales:", marginL, notasY);
-      doc.fillColor(GRAY).fontSize(9).font("Helvetica-Oblique")
-         .text(pr.notas, marginL, notasY + 13, { width: pageW });
-      rowY = notasY + 30 + Math.ceil(pr.notas.length / 90) * 12;
+      const notasY = rowY + 10;
+      doc.fillColor(tColor).fontSize(7).font(medicoFonts.bold).text("Indicaciones:", marginL, notasY);
+      doc.fillColor(GRAY).fontSize(7).font(medicoFonts.italic)
+         .text(pr.notas, marginL, notasY + 10, { width: pageW });
+      rowY = notasY + 22;
     }
 
     // ── Horarios de atención ───────────────────────────────────────
+    */
     if (tMostrarHorarios) {
-      const horariosY = rowY + 16;
+      const horariosY = rowY + 10;
       doc.moveTo(marginL, horariosY).lineTo(marginL + pageW, horariosY).stroke("#e0e0e0");
       
-      doc.fillColor(tColor).fontSize(9).font("Helvetica-Bold")
-         .text("Horarios de Atención", marginL, horariosY + 6);
+      doc.fillColor(tColor).fontSize(7).font("Helvetica-Bold")
+         .text("Horarios de Atención", marginL, horariosY + 4);
       
-      let hY = horariosY + 20;
+      let hY = horariosY + 14;
       tHorarios.forEach(h => {
-        doc.fontSize(8).font("Helvetica-Bold").fillColor("#374151")
-           .text(h.dias, marginL, hY, { width: 140 });
-        doc.fontSize(8).font("Helvetica").fillColor("#555")
-           .text(h.horario, marginL + 140, hY, { width: 120 });
-        hY += 14;
-        
-        // Línea punteada visual
-        doc.moveTo(marginL, hY - 2).lineTo(marginL + pageW, hY - 2).dash(2, { space: 3 }).stroke("#e0e0e0");
+        doc.fontSize(6.5).font("Helvetica-Bold").fillColor("#374151")
+           .text(h.dias, marginL, hY, { width: 120 });
+        doc.fontSize(6.5).font("Helvetica").fillColor("#555")
+           .text(h.horario, marginL + 120, hY, { width: 100 });
+        hY += 10;
       });
       
-      rowY = hY + 10;
+      rowY = hY + 8;
     }
 
+    // Mantener aire minimo sin separar la firma del bloque de contenido.
+    const minContentY = recetaBodyY + 150;
+    if (rowY < minContentY) rowY = minContentY;
+
     // ── Firma ───────────────────────────────────────────────────────
+    let firmaBottom = rowY;
     if (tFirma) {
-      const firmaY = Math.max(rowY + 40, doc.page.height - 140);
-      doc.moveTo(marginL + pageW - 200, firmaY).lineTo(marginL + pageW, firmaY).stroke(GRAY);
-      doc.fillColor(GRAY).fontSize(8).font("Helvetica")
-         .text(tFirmaLabel, marginL + pageW - 200, firmaY + 4, { width: 200, align: "center" })
-         .text(tMedico, marginL + pageW - 200, firmaY + 16, { width: 200, align: "center" });
+      const firmaY = rowY + 14;
+      doc.moveTo(marginL + pageW - 160, firmaY).lineTo(marginL + pageW, firmaY).stroke(GRAY);
+      doc.fillColor(GRAY).fontSize(6.5).font("Helvetica-Bold")
+         .text(tFirmaLabel, marginL + pageW - 160, firmaY + 3, { width: 160, align: "center" })
+      if (medicoDisplay) {
+        doc.fillColor(GRAY).fontSize(6.5).font("Helvetica")
+           .text(medicoDisplay, marginL + pageW - 160, firmaY + 12, { width: 160, align: "center" });
+      }
+      firmaBottom = firmaY + (medicoDisplay ? 24 : 14);
     }
 
     // ── Pie de página ───────────────────────────────────────────────
+    const footerY = Math.min(720, firmaBottom + 18);
     if (tFooter) {
-      doc.rect(marginL, doc.page.height - 50, pageW, 24).fill(tColor);
-      doc.fillColor("#ffffff").fontSize(7.5).font("Helvetica")
-         .text(tFooter, marginL + 5, doc.page.height - 43, { width: pageW - 10, align: "center" });
-    } else {
-      doc.rect(marginL, doc.page.height - 50, pageW, 24).fill("#e8eef8");
-      doc.fillColor(GRAY).fontSize(7.5).font("Helvetica")
-         .text(
-           `Receta N° ${String(pr.id).padStart(6, "0")}  ·  ${pr.clinica_nombre}  ·  Válida 30 días desde emisión  ·  Cód. verificación: ${qrCode}`,
-           marginL + 5, doc.page.height - 43, { width: pageW - 10, align: "center" }
-         );
+      doc.rect(marginL, footerY, pageW, 20).fill(tColor);
+      doc.fillColor("#ffffff").fontSize(6.5).font("Helvetica-Bold")
+         .text(tFooter, marginL + 5, footerY + 6, { width: pageW - 10, align: "center" });
     }
+
+    const cardBottom = tFooter ? footerY + 20 : Math.min(740, firmaBottom + 12);
+    doc.lineWidth(0.8).strokeColor("#dddddd").rect(marginL, topY, pageW, cardBottom - topY).stroke();
 
     doc.end();
   } catch (e) {

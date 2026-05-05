@@ -48,6 +48,7 @@ const CrecimientoPage = lazy(() => import("./pages/CrecimientoPage"));
 const VacunasPage     = lazy(() => import("./pages/VacunasPage"));
 const Cumpleaneros    = lazy(() => import("./pages/Cumpleaneros"));
 const Inventario      = lazy(() => import("./pages/Inventario"));
+const DocumentosClinicos = lazy(() => import("./pages/DocumentosClinicos"));
 
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
@@ -93,6 +94,11 @@ export default function App() {
         <Route path="/vacunas"                element={<VacunasPage />} />
         <Route path="/cumpleaneros"           element={<Cumpleaneros />} />
         <Route path="/inventario"             element={<Inventario />} />
+        <Route path="/documentos-clinicos"    element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
+            <DocumentosClinicos />
+          </RolRoute>
+        } />
 
         {/* Rutas de administración (ADMIN + SUPER_ADMIN) */}
         <Route path="/admin/usuarios" element={
