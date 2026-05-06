@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 
 const C = {
@@ -31,6 +31,8 @@ export default function SeguimientoPostOp() {
   const [pacientes,   setPacientes]  = useState([]);
   const [pacId,       setPacId]      = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pacienteIdInicial = searchParams.get("paciente_id");
   const [registros,   setRegistros]  = useState([]);
   const [showModal,   setShowModal]  = useState(false);
   const [form,        setForm]       = useState(initForm());
@@ -44,8 +46,15 @@ export default function SeguimientoPostOp() {
   }
 
   useEffect(() => {
-    api.get("/pacientes").then(r => setPacientes(r.data.data || [])).catch(() => {});
-  }, []);
+    api.get("/pacientes").then(r => {
+      const listaPacientes = r.data.data || [];
+      setPacientes(listaPacientes);
+      if (pacienteIdInicial) {
+        const pacienteInicial = listaPacientes.find(p => String(p.id) === String(pacienteIdInicial));
+        if (pacienteInicial) setPacId(String(pacienteInicial.id));
+      }
+    }).catch(() => {});
+  }, [pacienteIdInicial]);
 
   useEffect(() => {
     if (!pacId) { setRegistros([]); return; }

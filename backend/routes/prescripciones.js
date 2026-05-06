@@ -360,13 +360,17 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       [pr.id]
     );
 
-    // 2. Buscar plantilla predeterminada
+    // 2. Buscar plantilla predeterminada (fallback si la columna es_predeterminada no existe)
     let tpl = null;
+    const [predCol] = await pool.query(
+      "SHOW COLUMNS FROM plantillas_documentos LIKE 'es_predeterminada'"
+    );
+    const orderTpl = predCol.length ? "es_predeterminada DESC, id DESC" : "id DESC";
     const [tplRows] = await pool.query(
       `SELECT contenido
        FROM plantillas_documentos
        WHERE clinica_id=? AND tipo='receta' AND activo=1
-       ORDER BY es_predeterminada DESC, id DESC
+       ORDER BY ${orderTpl}
        LIMIT 1`,
       [pr.clinica_id]
     );

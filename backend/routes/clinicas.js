@@ -602,10 +602,22 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 //  PLANTILLAS DE DOCUMENTOS (recetas, laboratorio, estudios, informes)
 // ══════════════════════════════════════════════════════════════════════════
 
+async function ensurePlantillasPredeterminadaColumn() {
+  const [col] = await pool.query(
+    "SHOW COLUMNS FROM plantillas_documentos LIKE 'es_predeterminada'"
+  );
+  if (!col.length) {
+    await pool.query(
+      "ALTER TABLE plantillas_documentos ADD COLUMN es_predeterminada TINYINT(1) DEFAULT 0 AFTER activo"
+    );
+  }
+}
+
 // GET /api/clinicas/:id/plantillas  → obtener todas las plantillas de la clínica
 router.get("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
+    await ensurePlantillasPredeterminadaColumn();
     const [rows] = await pool.query(
       `SELECT id, tipo, nombre, contenido, activo, es_predeterminada
        FROM plantillas_documentos 
@@ -624,6 +636,7 @@ router.get("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN","MEDICO"), async 
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { tipo } = req.params;
+    await ensurePlantillasPredeterminadaColumn();
     const [rows] = await pool.query(
       `SELECT id, tipo, nombre, contenido, activo, es_predeterminada
        FROM plantillas_documentos 
@@ -697,6 +710,7 @@ router.post("/:id/plantillas/predeterminada", auth("SUPER_ADMIN","ADMIN","MEDICO
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { tipo } = req.body;
+    await ensurePlantillasPredeterminadaColumn();
 
     if (!tipo) {
       return res.status(400).json({ ok: false, msg: "tipo es obligatorio" });

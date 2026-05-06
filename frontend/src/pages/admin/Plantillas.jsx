@@ -1,10 +1,11 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useRef, useState } from "react";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 
-/* ─── Tipos de plantilla ──────────────────────────────────────────── */
+/* --- Tipos de plantilla -------------------------------------------- */
 const TIPOS = [
   { key: "receta",      label: "Receta",        icon: "bi-file-earmark-medical-fill", color: "#1565c0" },
+  { key: "constancia_libre", label: "Constancia Libre", icon: "bi-file-earmark-richtext-fill", color: "#0f766e" },
   { key: "incapacidad", label: "Incapacidad",    icon: "bi-bandaid-fill",              color: "#c62828" },
   { key: "referencia",  label: "Referencia",     icon: "bi-send-fill",                 color: "#6a1b9a" },
   { key: "constancia",  label: "Constancia",     icon: "bi-patch-check-fill",          color: "#00695c" },
@@ -15,6 +16,7 @@ const TIPOS = [
 
 const CONTENT_HINTS = {
   receta:      { label: "Instrucciones generales (opcional)", placeholder: "Este espacio quedara en blanco para que el medico escriba la receta.\n\nPuedes agregar instrucciones generales si lo deseas.\nEjemplo:\n- Tomar medicamentos con alimentos\n- Regresar a consulta si no mejora en 3 dias" },
+  constancia_libre: { label: "Cuerpo de la constancia", placeholder: "Yo, {{medico}}, medico tratante de {{paciente}}, certifico que presenta diagnostico de {{diagnostico}}.\n\nDebido a su condicion, se recomienda en el ambito escolar/laboral implementar adecuaciones razonables para favorecer su bienestar.\n\nAtentamente,\n{{medico}}" },
   incapacidad: { label: "Observaciones / Recomendaciones",   placeholder: "Observaciones medicas para el paciente o empleador.\nEjemplo:\nReposo absoluto en cama. Hidratacion adecuada. Dieta blanda.\nEvitar actividades fisicas por el periodo indicado." },
   referencia:  { label: "Recomendaciones / observaciones adicionales", placeholder: "Paciente con antecedentes de hipertension arterial controlada.\nSe solicita valoracion por dolor precordial atipico.\nTraer examenes previos al centro receptor." },
   constancia:  { label: "Texto principal de la constancia",  placeholder: "El suscrito medico hace constar que el/la paciente fue atendido(a) en esta unidad medica, presentando el diagnostico indicado, por lo cual se extiende la presente para los fines que estime conveniente." },
@@ -27,6 +29,10 @@ const defaultData = () => ({
   _v: 2, logo_url: "", color: "#1a2744", header_text_color: "#ffffff",
   clinica: "", medico: "", credenciales: "",
   contenido: "", footer: "",
+  titulo_documento: "CONSTANCIA MEDICA",
+  fecha_documento: "",
+  papel_size: "LETTER",
+  papel_orientacion: "portrait",
   mostrar_firma: true, etiqueta_firma: "FIRMA",
   clinica_font: "Arial, Helvetica, sans-serif",
   clinica_font_size: "1.25",
@@ -38,6 +44,7 @@ const defaultData = () => ({
   ]),
   mostrar_horarios: false,
   es_predeterminada: false,
+  sellos: [],
 });
 
 function parseContenido(raw) {
@@ -53,17 +60,20 @@ function buildHTML(data, tipo, vars = {}) {
     logo_url = "", color = "#1a2744", header_text_color = "#ffffff",
     clinica = "Nombre del Consultorio", medico = "Dr(a). Nombre Medico",
     credenciales = "", contenido = "", footer = "",
+    titulo_documento = "CONSTANCIA MEDICA",
     mostrar_firma = true, etiqueta_firma = "FIRMA",
     clinica_font = "Arial, Helvetica, sans-serif",
     clinica_font_size = "1.25",
     medico_font = "Arial, Helvetica, sans-serif",
     medico_font_size = "0.85",
     horarios = "[]", mostrar_horarios = false,
+    sellos = [],
   } = data;
 
   let bodyText = contenido;
   Object.entries(vars).forEach(([k, v]) => { bodyText = bodyText.replaceAll("{{" + k + "}}", v || ""); });
   const bodyHTML = nl2br(bodyText);
+  const bodyHTMLRich = /<[^>]+>/.test(bodyText) ? bodyText : nl2br(bodyText);
   const credHTML = nl2br(credenciales);
 
   const TITULOS = {
@@ -88,6 +98,14 @@ function buildHTML(data, tipo, vars = {}) {
     datosBloque = `<div style="display:flex;gap:20px;margin-bottom:14px;font-size:0.88em;border-bottom:1px solid #eee;padding-bottom:10px;">
       <div style="flex:2;">Paciente: <span style="display:inline-block;border-bottom:1px solid #555;min-width:180px;">${p}</span></div>
       <div style="flex:1;">Fecha: <span style="display:inline-block;border-bottom:1px solid #555;min-width:90px;">${fecha}</span></div>
+    </div>`;
+  } else if (tipo === "constancia_libre") {
+    datosBloque = `<div style="font-size:0.93em;line-height:1.9;">
+      <div style="text-align:center;font-weight:700;letter-spacing:.8px;color:${color};margin:4px 0 18px;">
+        ${titulo_documento || "CONSTANCIA MEDICA"}
+      </div>
+      <div>${bodyHTMLRich || "Completa el cuerpo de la constancia en el panel izquierdo."}</div>
+      <div style="margin-top:26px;">Fecha: <b>${fecha}</b></div>
     </div>`;
   } else if (tipo === "incapacidad") {
     const ciudad = vars.ciudad || "______________________________";
@@ -317,20 +335,33 @@ function buildHTML(data, tipo, vars = {}) {
   const footerBloque = footer ? `
     <div style="background:${color};color:rgba(255,255,255,.88);padding:9px 20px;font-size:0.77em;text-align:center;">${footer}</div>` : "";
 
+  const logoHeaderBloque = (logo_url && tipo !== "constancia_libre")
+    ? `<div><img src="${logo_url}" style="max-height:100px;max-width:150px;object-fit:contain;background:rgba(255,255,255,.15);border-radius:6px;padding:5px;"/></div>`
+    : "";
+
+  const sellosBloque = ((tipo === "constancia_libre" || tipo === "receta") && Array.isArray(sellos) && sellos.length > 0)
+    ? sellos.map(s => `
+      <img
+        src="${s.url || ""}"
+        style="position:absolute;left:${Number(s.x) || 0}px;top:${Number(s.y) || 0}px;width:${Number(s.w) || 120}px;max-width:220px;height:auto;z-index:5;opacity:0.98;pointer-events:none;"
+      />`).join("")
+    : "";
+
   return `<div style="font-family:Arial,Helvetica,sans-serif;max-width:720px;margin:0 auto;border:1px solid #ddd;overflow:hidden;">
   <div style="background:${color};padding:14px 20px;display:flex;align-items:center;gap:12px;">
-    ${logo_url ? `<div><img src="${logo_url}" style="max-height:100px;max-width:150px;object-fit:contain;background:rgba(255,255,255,.15);border-radius:6px;padding:5px;"/></div>` : ""}
+    ${logoHeaderBloque}
     <div style="flex:1;">
       <div style="color:${header_text_color};font-size:${clinica_font_size}em;font-family:${clinica_font};font-weight:bold;line-height:1.2;">${clinica || "<span style='opacity:.4;font-style:italic;font-size:.85em'>Nombre del consultorio</span>"}</div>
       <div style="color:${header_text_color}e6;font-size:${medico_font_size}em;font-family:${medico_font};font-weight:600;margin-top:5px;">${medico || ""}</div>
       ${credHTML ? `<div style="color:${header_text_color}bf;font-size:0.79em;margin-top:3px;line-height:1.7;">${credHTML}</div>` : ""}
     </div>
   </div>
-  <div style="padding:18px 20px;">
+  <div style="padding:18px 20px;position:relative;">
+    ${sellosBloque}
     ${tituloBloque}
     ${datosBloque}
     ${tipo === "receta" ? rxBloque : ""}
-    ${["incapacidad","referencia","constancia","laboratorio","estudios"].includes(tipo) ? contenidoBloque : ""}
+    ${["constancia_libre","incapacidad","referencia","constancia","laboratorio","estudios"].includes(tipo) ? contenidoBloque : ""}
   </div>
   <div style="padding:0 20px 14px;">
     ${tipo === "receta" ? horariosBloque : ""}
@@ -367,6 +398,7 @@ const FUENTES = [
   { label: "Arial (sans-serif)",     value: "Arial, Helvetica, sans-serif" },
   { label: "Times New Roman (serif)", value: "'Times New Roman', Times, serif" },
   { label: "Georgia (serif)",        value: "Georgia, 'Times New Roman', serif" },
+  { label: "Garamond (serif)",       value: "Garamond, 'Times New Roman', serif" },
   { label: "Verdana (sans-serif)",   value: "Verdana, Geneva, sans-serif" },
   { label: "Trebuchet MS",           value: "'Trebuchet MS', sans-serif" },
   { label: "Courier New (monospace)",value: "'Courier New', Courier, monospace" },
@@ -383,7 +415,7 @@ const FUENTES = [
   { label: "Edwardian Script ITC",   value: "'Edwardian Script ITC', cursive" },
 ];
 
-/* ─── Componente principal ───────────────────────────────────────── */
+/* --- Componente principal ----------------------------------------- */
 export default function Plantillas() {
   const { user } = useAuth();
   const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID;
@@ -394,6 +426,26 @@ export default function Plantillas() {
   const [guardando, setGuardando] = useState(false);
   const [msg,       setMsg]       = useState({ tipo: "", texto: "" });
   const [predeterminada, setPredeterminada] = useState(null);
+  const editorRef = useRef(null);
+  const pageRef = useRef(null);
+  const dragSelloRef = useRef(null);
+
+  const getPaper = (size, orientacion) => {
+    const s = String(size || "LETTER").toUpperCase();
+    const isLandscape = orientacion === "landscape";
+    const map = {
+      LETTER: { w: 816, h: 1056, css: "Letter" }, // 8.5x11 at 96dpi
+      HALF_LETTER: { w: 816, h: 528, css: "5.5in 8.5in" }, // media carta vertical
+      LEGAL: { w: 816, h: 1344, css: "Legal" },   // 8.5x14 at 96dpi
+      A4: { w: 794, h: 1123, css: "A4" },         // 210x297mm at 96dpi
+    };
+    const p = map[s] || map.LETTER;
+    return {
+      w: isLandscape ? p.h : p.w,
+      h: isLandscape ? p.w : p.h,
+      css: `${p.css} ${isLandscape ? "landscape" : "portrait"}`,
+    };
+  };
 
   useEffect(() => {
     const cargar = async () => {
@@ -452,11 +504,95 @@ export default function Plantillas() {
     } finally { setGuardando(false); }
   };
 
+  const imprimirVistaPrevia = () => {
+    const paper = getPaper(dataActual.papel_size, dataActual.papel_orientacion);
+    const w = window.open("", "_blank", "width=900,height=700");
+    if (!w) return;
+    w.document.write(`<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Vista previa - ${tipoActivo?.label || "Plantilla"}</title>
+  <style>
+    @page { size: ${paper.css}; margin: 10mm; }
+    * {
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    html, body { margin: 0; padding: 0; }
+    body { padding: 18px; background: #f3f4f6; font-family: Arial, sans-serif; }
+    @media print {
+      html, body { background: #fff !important; }
+      body { padding: 0; }
+    }
+  </style>
+</head>
+<body>
+  ${previewHtml}
+</body>
+</html>`);
+    w.document.close();
+    w.focus();
+    setTimeout(() => w.print(), 250);
+  };
+
+  const isRichWordMode = tab === "constancia_libre";
+  const canUseSellos = tab === "constancia_libre" || tab === "receta";
+
+  const execRich = (cmd) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand(cmd, false, null);
+    set("contenido", editorRef.current.innerHTML);
+  };
+
+  const onSelloMouseDown = (e, index) => {
+    if (!canUseSellos) return;
+    if (!pageRef.current) return;
+    e.preventDefault();
+    const pageRect = pageRef.current.getBoundingClientRect();
+    const sello = (dataActual.sellos || [])[index];
+    if (!sello) return;
+    dragSelloRef.current = {
+      index,
+      offsetX: e.clientX - pageRect.left - (Number(sello.x) || 0),
+      offsetY: e.clientY - pageRect.top - (Number(sello.y) || 0),
+    };
+  };
+
+  useEffect(() => {
+    const onMove = (e) => {
+      if (!dragSelloRef.current || !pageRef.current) return;
+      const pageRect = pageRef.current.getBoundingClientRect();
+      const idx = dragSelloRef.current.index;
+      const sello = (dataActual.sellos || [])[idx];
+      if (!sello) return;
+      const w = Number(sello.w) || 120;
+      const maxX = Math.max(0, pageRect.width - w);
+      const maxY = Math.max(0, pageRect.height - 40);
+      const nx = Math.max(0, Math.min(maxX, e.clientX - pageRect.left - dragSelloRef.current.offsetX));
+      const ny = Math.max(0, Math.min(maxY, e.clientY - pageRect.top - dragSelloRef.current.offsetY));
+      const nuevosSellos = [...(dataActual.sellos || [])];
+      nuevosSellos[idx] = { ...sello, x: Math.round(nx), y: Math.round(ny) };
+      setDataActual({ ...dataActual, sellos: nuevosSellos });
+    };
+    const onUp = () => { dragSelloRef.current = null; };
+    window.addEventListener("mousemove", onMove);
+    window.addEventListener("mouseup", onUp);
+    return () => {
+      window.removeEventListener("mousemove", onMove);
+      window.removeEventListener("mouseup", onUp);
+    };
+  }, [dataActual, setDataActual]);
+
   if (cargando) return <div className="text-center py-5"><div className="spinner-border" /></div>;
 
   const tipoActivo  = TIPOS.find(t => t.key === tab);
   const hint        = CONTENT_HINTS[tab] || { label: "Contenido", placeholder: "" };
-  const previewHtml = buildHTML(dataActual, tab, MUESTRA);
+  const varsPreview = tab === "constancia_libre"
+    ? { ...MUESTRA, fecha: dataActual.fecha_documento || MUESTRA.fecha }
+    : MUESTRA;
+  const previewHtml = buildHTML(dataActual, tab, varsPreview);
   const lStyle      = { fontWeight: 600, fontSize: "0.82rem", color: "#374151", marginBottom: 5, display: "block" };
   const iStyle      = { fontSize: "0.86rem" };
 
@@ -525,6 +661,68 @@ export default function Plantillas() {
               </div>
               <small style={{ color: "#9ca3af", fontSize: "0.75rem" }}>El logo aparece en la esquina izquierda del encabezado.</small>
             </div>
+
+            {canUseSellos && (
+              <div style={{ border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, background: "#fafafa" }}>
+                <label style={{ display: "inline-flex", alignItems: "center", gap: 7, background: "#fff", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 12px", cursor: "pointer", fontSize: "0.8rem", fontWeight: 600 }}>
+                  <i className="bi bi-plus-circle" /> Agregar sello movible
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    style={{ display: "none" }}
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (!files.length) return;
+                      files.forEach((file) => {
+                        const reader = new FileReader();
+                        reader.onload = (ev) => {
+                          const nuevos = [...(dataActual.sellos || []), { url: ev.target?.result, x: 40, y: 150, w: 120 }];
+                          setDataActual({ ...dataActual, sellos: nuevos });
+                        };
+                        reader.readAsDataURL(file);
+                      });
+                      e.target.value = "";
+                    }}
+                  />
+                </label>
+                <div style={{ marginTop: 8 }}>
+                  <small style={{ color: "#6b7280" }}>Tip: arrastra cada sello en la hoja de vista previa. Puedes subir varios.</small>
+                </div>
+                {(dataActual.sellos || []).length > 0 && (
+                  <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
+                    {(dataActual.sellos || []).map((s, i) => (
+                      <div key={i} style={{ display: "grid", gridTemplateColumns: "32px 1fr auto auto", gap: 8, alignItems: "center", background: "#fff", border: "1px solid #e5e7eb", borderRadius: 6, padding: "4px 6px" }}>
+                        <img src={s.url} alt={`Sello ${i + 1}`} style={{ width: 28, height: 28, objectFit: "contain" }} />
+                        <span style={{ fontSize: "0.76rem", color: "#374151" }}>Sello {i + 1}</span>
+                        <input
+                          type="number"
+                          min="60"
+                          max="220"
+                          step="5"
+                          value={s.w || 120}
+                          onChange={(e) => {
+                            const nuevos = [...(dataActual.sellos || [])];
+                            nuevos[i] = { ...nuevos[i], w: Number(e.target.value) || 120 };
+                            setDataActual({ ...dataActual, sellos: nuevos });
+                          }}
+                          style={{ width: 70, border: "1px solid #d1d5db", borderRadius: 6, padding: "3px 5px", fontSize: "0.75rem" }}
+                        />
+                        <button
+                          onClick={() => {
+                            const nuevos = (dataActual.sellos || []).filter((_, idx) => idx !== i);
+                            setDataActual({ ...dataActual, sellos: nuevos });
+                          }}
+                          style={{ border: "1px solid #fecaca", background: "#fff5f5", color: "#dc2626", borderRadius: 6, padding: "3px 7px", fontSize: "0.75rem" }}
+                        >
+                          Quitar
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
 
             {/* Color */}
             <div>
@@ -616,8 +814,61 @@ export default function Plantillas() {
             {/* Contenido */}
             <div>
               <label style={lStyle}><i className="bi bi-pencil-fill me-2" style={{ color: tipoActivo?.color }} />{hint.label}</label>
-              <textarea className="form-control" rows={5} style={{ ...iStyle, resize: "vertical" }} placeholder={hint.placeholder} value={dataActual.contenido || ""} onChange={e => set("contenido", e.target.value)} />
+              {isRichWordMode ? (
+                <div style={{ background: "#f9fafb", border: "1px dashed #d1d5db", borderRadius: 8, padding: "8px 10px", fontSize: "0.8rem", color: "#4b5563" }}>
+                  Edita el contenido directamente en la hoja de vista previa (panel derecho), como documento.
+                </div>
+              ) : (
+                <textarea className="form-control" rows={5} style={{ ...iStyle, resize: "vertical" }} placeholder={hint.placeholder} value={dataActual.contenido || ""} onChange={e => set("contenido", e.target.value)} />
+              )}
             </div>
+
+            {isRichWordMode && (
+              <div>
+                <label style={lStyle}><i className="bi bi-type me-2" style={{ color: tipoActivo?.color }} />Título del documento</label>
+                <input
+                  className="form-control"
+                  style={iStyle}
+                  placeholder="Ej: CONSTANCIA ESCOLAR, CERTIFICADO MEDICO, etc."
+                  value={dataActual.titulo_documento || ""}
+                  onChange={e => set("titulo_documento", e.target.value)}
+                />
+              </div>
+            )}
+
+            {isRichWordMode && (
+              <div>
+                <label style={lStyle}><i className="bi bi-calendar-event me-2" style={{ color: tipoActivo?.color }} />Fecha del documento</label>
+                <input
+                  className="form-control"
+                  style={iStyle}
+                  placeholder="Ej: 1 de mayo de 2026"
+                  value={dataActual.fecha_documento || ""}
+                  onChange={e => set("fecha_documento", e.target.value)}
+                />
+              </div>
+            )}
+
+            {isRichWordMode && (
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
+                  <label style={lStyle}><i className="bi bi-file-earmark-text me-2" style={{ color: tipoActivo?.color }} />Tamaño de papel</label>
+                  <select className="form-select" style={iStyle} value={dataActual.papel_size || "LETTER"} onChange={e => set("papel_size", e.target.value)}>
+                    <option value="LETTER">Carta (Letter)</option>
+                    <option value="HALF_LETTER">Receta (Media carta)</option>
+                    <option value="LEGAL">Oficio (Legal)</option>
+                    <option value="A4">A4</option>
+                  </select>
+                </div>
+                <div style={{ flex: 1 }}>
+                  <label style={lStyle}><i className="bi bi-aspect-ratio me-2" style={{ color: tipoActivo?.color }} />Orientación</label>
+                  <select className="form-select" style={iStyle} value={dataActual.papel_orientacion || "portrait"} onChange={e => set("papel_orientacion", e.target.value)}>
+                    <option value="portrait">Vertical</option>
+                    <option value="landscape">Horizontal</option>
+                  </select>
+                </div>
+              </div>
+            )}
 
             {/* Footer */}
             <div>
@@ -718,10 +969,107 @@ export default function Plantillas() {
               <i className="bi bi-eye-fill" style={{ color: tipoActivo?.color }} />
               <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1a2744" }}>Vista previa</span>
               <span style={{ fontSize: "0.72rem", background: "#e8f5e9", color: "#2e7d32", padding: "2px 8px", borderRadius: 10, fontWeight: 600 }}>Datos de ejemplo</span>
+              <button onClick={imprimirVistaPrevia} style={{ marginLeft: 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6 }}>
+                <i className="bi bi-printer-fill" /> Imprimir
+              </button>
               <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "#9ca3af", fontStyle: "italic" }}>Los cambios se reflejan en tiempo real</span>
             </div>
+            {isRichWordMode && (
+              <div style={{ background: "#fff", borderBottom: "1px solid #eef2f7", padding: "8px 16px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                <button onClick={() => execRich("bold")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Negrita"><b>B</b></button>
+                <button onClick={() => execRich("italic")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Cursiva"><i>I</i></button>
+                <button onClick={() => execRich("underline")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Subrayado"><u>U</u></button>
+                <button onClick={() => execRich("insertUnorderedList")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Lista"><i className="bi bi-list-ul" /></button>
+                <button onClick={() => execRich("justifyLeft")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Izquierda"><i className="bi bi-text-left" /></button>
+                <button onClick={() => execRich("justifyCenter")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Centrado"><i className="bi bi-text-center" /></button>
+                <button onClick={() => execRich("justifyRight")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Derecha"><i className="bi bi-text-right" /></button>
+              </div>
+            )}
             <div style={{ padding: "24px", background: "#eef0f3", minHeight: 500, overflow: "auto" }}>
-              <div style={{ background: "#fff", boxShadow: "0 3px 14px rgba(0,0,0,.13)", maxWidth: 720, margin: "0 auto" }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+              {isRichWordMode ? (
+                <div style={{ background: "#fff", boxShadow: "0 3px 14px rgba(0,0,0,.13)", width: getPaper(dataActual.papel_size, dataActual.papel_orientacion).w, minHeight: getPaper(dataActual.papel_size, dataActual.papel_orientacion).h, maxWidth: "100%", margin: "0 auto", border: "1px solid #ddd", overflow: "hidden", fontFamily: "Arial, Helvetica, sans-serif" }}>
+                  <div style={{ background: dataActual.color || "#1a2744", padding: "14px 20px", display: "flex", alignItems: "center", gap: 12 }}>
+                    {dataActual.logo_url ? (
+                      <div><img src={dataActual.logo_url} style={{ maxHeight: 100, maxWidth: 150, objectFit: "contain", background: "rgba(255,255,255,.15)", borderRadius: 6, padding: 5 }} /></div>
+                    ) : null}
+                    <div style={{ flex: 1 }}>
+                      <div style={{ color: dataActual.header_text_color || "#fff", fontSize: `${dataActual.clinica_font_size || "1.25"}em`, fontFamily: dataActual.clinica_font || "Arial, Helvetica, sans-serif", fontWeight: "bold", lineHeight: 1.2 }}>
+                        {dataActual.clinica || "Nombre del consultorio"}
+                      </div>
+                      <div style={{ color: `${dataActual.header_text_color || "#fff"}e6`, fontSize: `${dataActual.medico_font_size || "0.85"}em`, fontFamily: dataActual.medico_font || "Arial, Helvetica, sans-serif", fontWeight: 600, marginTop: 5 }}>
+                        {dataActual.medico || "Dr(a). Nombre Medico"}
+                      </div>
+                    </div>
+                  </div>
+                  <div ref={pageRef} style={{ padding: "18px 20px", position: "relative" }}>
+                    {(dataActual.sellos || []).map((s, i) => (
+                      <img
+                        key={`sello-${i}`}
+                        src={s.url}
+                        onMouseDown={(e) => onSelloMouseDown(e, i)}
+                        style={{
+                          position: "absolute",
+                          left: Number(s.x) || 0,
+                          top: Number(s.y) || 0,
+                          width: Number(s.w) || 120,
+                          maxWidth: 220,
+                          height: "auto",
+                          cursor: "move",
+                          zIndex: 5,
+                          userSelect: "none",
+                        }}
+                      />
+                    ))}
+                    <div style={{ textAlign: "center", fontWeight: 700, letterSpacing: ".8px", color: dataActual.color || "#1a2744", margin: "4px 0 18px" }}>
+                      {dataActual.titulo_documento || "CONSTANCIA MEDICA"}
+                    </div>
+                    <div
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={(e) => set("contenido", e.currentTarget.innerHTML)}
+                      style={{ minHeight: 260, outline: "none", fontSize: "0.93em", lineHeight: 1.9 }}
+                      dangerouslySetInnerHTML={{ __html: dataActual.contenido || "Escribe aqui la constancia medica..." }}
+                    />
+                    <div style={{ marginTop: 26 }}>Fecha: <b>{dataActual.fecha_documento || MUESTRA.fecha}</b></div>
+                  </div>
+                  <div style={{ padding: "0 20px 14px" }}>
+                    {dataActual.mostrar_firma !== false && (
+                      <div style={{ textAlign: "right", padding: "4px 0 8px" }}>
+                        <div style={{ display: "inline-block", textAlign: "center", minWidth: 160 }}>
+                          <div style={{ borderTop: "1px solid #333", paddingTop: 4, fontSize: "0.82em", fontWeight: 600 }}>{dataActual.etiqueta_firma || "FIRMA"}</div>
+                          <div style={{ fontSize: "0.76em", color: "#555" }}>{dataActual.medico || ""}</div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  {dataActual.footer ? (
+                    <div style={{ background: dataActual.color || "#1a2744", color: "rgba(255,255,255,.88)", padding: "9px 20px", fontSize: "0.77em", textAlign: "center" }}>{dataActual.footer}</div>
+                  ) : null}
+                </div>
+              ) : (
+                <div ref={pageRef} style={{ position: "relative", width: "fit-content", maxWidth: "100%", margin: "0 auto" }}>
+                  <div style={{ background: "#fff", boxShadow: "0 3px 14px rgba(0,0,0,.13)", maxWidth: 720, margin: "0 auto" }} dangerouslySetInnerHTML={{ __html: previewHtml }} />
+                  {canUseSellos && (dataActual.sellos || []).map((s, i) => (
+                    <img
+                      key={`sello-preview-${i}`}
+                      src={s.url}
+                      onMouseDown={(e) => onSelloMouseDown(e, i)}
+                      style={{
+                        position: "absolute",
+                        left: Number(s.x) || 0,
+                        top: Number(s.y) || 0,
+                        width: Number(s.w) || 120,
+                        maxWidth: 220,
+                        height: "auto",
+                        cursor: "move",
+                        zIndex: 6,
+                        userSelect: "none",
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
             <div style={{ borderTop: "1px solid #f0f0f0", padding: "9px 18px", display: "flex", gap: 16, flexWrap: "wrap" }}>
               {[
@@ -741,3 +1089,5 @@ export default function Plantillas() {
     </div>
   );
 }
+
+

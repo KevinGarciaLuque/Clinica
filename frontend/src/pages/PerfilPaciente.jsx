@@ -127,6 +127,7 @@ export default function PerfilPaciente() {
   const [alergiasPac,  setAlergiasPac]  = useState([]);
   const [showConsultaModal, setShowConsultaModal] = useState(false);
   const [consultaPaciente,  setConsultaPaciente]  = useState(null);
+  const [checkingCita, setCheckingCita] = useState(false);
 
   // Modal confirmación eliminar documento
   const [docAEliminar, setDocAEliminar] = useState(null);
@@ -482,6 +483,32 @@ export default function PerfilPaciente() {
 
   const contarDocumentos = (tipo) => documentos.filter(doc => doc.tipo === tipo).length;
 
+  // ── Consulta: mismo flujo que en listado de pacientes ─────────────────────
+  const handleConsultaClick = async (pacienteTarget) => {
+    if (!pacienteTarget?.id) return;
+    setCheckingCita(true);
+    try {
+      const hoy = dayjs().format("YYYY-MM-DD");
+      const res = await api.get("/citas", {
+        params: { desde: hoy, hasta: hoy, paciente_id: pacienteTarget.id }
+      });
+      const citasHoy = (res.data.data || []).filter(
+        c => !["CANCELADA", "NO_ASISTIO", "COMPLETADA"].includes(c.estado)
+      );
+      if (citasHoy.length > 0) {
+        navigate(`/consulta-medica?paciente_id=${pacienteTarget.id}&cita_id=${citasHoy[0].id}`);
+      } else {
+        setConsultaPaciente(pacienteTarget);
+        setShowConsultaModal(true);
+      }
+    } catch {
+      setConsultaPaciente(pacienteTarget);
+      setShowConsultaModal(true);
+    } finally {
+      setCheckingCita(false);
+    }
+  };
+
   // ══════════════════════════════════════════════════════════
   // PESTAÑA 4: ELIMINAR PACIENTE (Doble confirmación)
   // ══════════════════════════════════════════════════════════
@@ -625,9 +652,11 @@ export default function PerfilPaciente() {
           <button
             className="btn btn-sm"
             style={{ background: "#22c55e", color: "#fff", fontWeight: 600, border: "none", borderRadius: 8, padding: "7px 16px" }}
-            onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
+            onClick={() => handleConsultaClick(paciente)}
+            disabled={checkingCita}
           >
-            <i className="bi bi-plus-circle me-1" />Nueva Consulta
+            <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"} me-1`} />
+            {checkingCita ? "Verificando..." : "Nueva Consulta"}
           </button>
         </div>
 
@@ -1360,9 +1389,11 @@ export default function PerfilPaciente() {
                     <p className="text-muted mt-3">No hay consultas registradas</p>
                     <button
                       className="btn btn-success"
-                      onClick={() => { setConsultaPaciente(paciente); setShowConsultaModal(true); }}
+                      onClick={() => handleConsultaClick(paciente)}
+                      disabled={checkingCita}
                     >
-                      <i className="bi bi-plus-circle me-1" />Nueva Consulta
+                      <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"} me-1`} />
+                      {checkingCita ? "Verificando..." : "Nueva Consulta"}
                     </button>
                   </div>
                 ) : (() => {
@@ -1756,7 +1787,7 @@ export default function PerfilPaciente() {
                         <span className="badge bg-info">{esteticaResumen.galeria}</span>
                       </div>
                       <p className="text-muted small mb-3">Sesiones de fotos estéticas cargadas para este paciente.</p>
-                      <Link to="/estetica/galeria" className="btn btn-sm btn-outline-primary">Ver galería</Link>
+                      <Link to={`/estetica/galeria?paciente_id=${id}`} className="btn btn-sm btn-outline-primary">Ver galería</Link>
                     </div>
                   </div>
 
@@ -1778,7 +1809,7 @@ export default function PerfilPaciente() {
                         <span className="badge bg-primary">{esteticaResumen.consentimientos}</span>
                       </div>
                       <p className="text-muted small mb-3">Consentimientos estéticos registrados para este paciente.</p>
-                      <Link to="/estetica/consentimientos" className="btn btn-sm btn-outline-primary">Ver consentimientos</Link>
+                      <Link to={`/estetica/consentimientos?paciente_id=${id}`} className="btn btn-sm btn-outline-primary">Ver consentimientos</Link>
                     </div>
                   </div>
 
@@ -1789,7 +1820,7 @@ export default function PerfilPaciente() {
                         <span className="badge bg-success">{esteticaResumen.seguimiento}</span>
                       </div>
                       <p className="text-muted small mb-3">Registros de control postoperatorio estético.</p>
-                      <Link to="/estetica/seguimiento" className="btn btn-sm btn-outline-primary">Abrir seguimiento</Link>
+                      <Link to={`/estetica/seguimiento?paciente_id=${id}`} className="btn btn-sm btn-outline-primary">Abrir seguimiento</Link>
                     </div>
                   </div>
 
@@ -1800,7 +1831,7 @@ export default function PerfilPaciente() {
                         <span className="badge bg-danger">{esteticaResumen.biopsias}</span>
                       </div>
                       <p className="text-muted small mb-3">Biopsias y patologías ligados al paciente.</p>
-                      <Link to="/estetica/biopsias" className="btn btn-sm btn-outline-primary">Ver biopsias</Link>
+                      <Link to={`/estetica/biopsias?paciente_id=${id}`} className="btn btn-sm btn-outline-primary">Ver biopsias</Link>
                     </div>
                   </div>
                 </div>

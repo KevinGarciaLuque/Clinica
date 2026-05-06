@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { Row, Col, Form, Modal, Button } from "react-bootstrap";
 import api from "../api/api";
+import { useAuth } from "../auth/AuthContext";
 
 const TABS_CONFIG = [
   { id: "config-email",    icon: "bi-envelope-fill",  label: "Email / SMTP" },
@@ -12,6 +13,7 @@ const TABS_CONFIG = [
 ];
 
 const Recordatorios = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState("config-email");
   const [loading, setLoading] = useState(false);
   const [mensaje, setMensaje] = useState({ tipo: "", texto: "" });
@@ -77,6 +79,7 @@ const Recordatorios = () => {
     try {
       await Promise.all([
         cargarSMTPConfig(),
+        cargarEmailClinicaDefault(),
         cargarMensajeriaConfig(),
         cargarPlantillas(),
         cargarConfigAutomatico(),
@@ -85,6 +88,28 @@ const Recordatorios = () => {
       ]);
     } catch (error) {
       console.error("Error cargando datos:", error);
+    }
+  };
+
+  const cargarEmailClinicaDefault = async () => {
+    try {
+      const clinicaId = user?.clinica_id;
+      if (!clinicaId) return;
+      const { data } = await api.get(`/clinicas/${clinicaId}`);
+      const emailClinica = data?.data?.email || "";
+      const nombreClinica = data?.data?.nombre || "";
+      if (!emailClinica) return;
+      setSmtpConfig((prev) => {
+        // No sobrescribir si ya hay configuración SMTP cargada o escrita por usuario
+        if (prev.from_email) return prev;
+        return {
+          ...prev,
+          from_email: emailClinica,
+          from_name: prev.from_name || nombreClinica || prev.from_name,
+        };
+      });
+    } catch (error) {
+      console.error("Error cargando email de clínica:", error);
     }
   };
 

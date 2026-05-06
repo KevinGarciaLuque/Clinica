@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 
 const C = {
@@ -63,6 +63,8 @@ export default function FichaEstetica() {
   const [pacientes,   setPacientes]  = useState([]);
   const [pacientesConFicha, setPacientesConFicha] = useState([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pacienteIdInicial = searchParams.get("paciente_id");
   const [pacId,       setPacId]      = useState("");
   const [ficha,       setFicha]      = useState(null);
   const [editando,    setEditando]   = useState(false);
@@ -84,6 +86,14 @@ export default function FichaEstetica() {
       const pacs = r.data.data || [];
       setPacientes(pacs);
       cargarPacientesConFicha(pacs);
+      if (pacienteIdInicial) {
+        const pacienteInicial = pacs.find(p => String(p.id) === String(pacienteIdInicial));
+        if (pacienteInicial) {
+          setPacId(String(pacienteInicial.id));
+          setBusqueda(`${pacienteInicial.nombres} ${pacienteInicial.apellidos}`);
+          setMostrarLista(false);
+        }
+      }
     } catch (e) {
       console.error("Error al cargar pacientes:", e);
     }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -30,6 +30,8 @@ export default function GaleriaEstetica() {
   const [pacientes,    setPacientes]    = useState([]);
   const [pacientesConSesiones, setPacientesConSesiones] = useState([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pacienteIdInicial = searchParams.get("paciente_id");
   const [pacId,        setPacId]        = useState("");
   const [sesiones,     setSesiones]     = useState([]);
   const [sesionActual, setSesionActual] = useState(null);
@@ -89,6 +91,16 @@ export default function GaleriaEstetica() {
 
       console.log("Pacientes con sesiones:", pacientesConSesiones.length);
       setPacientesConSesiones(pacientesConSesiones);
+
+      // Si viene paciente_id por querystring, preseleccionarlo automáticamente
+      if (pacienteIdInicial) {
+        const pacienteInicial = todosPacientes.find(p => String(p.id) === String(pacienteIdInicial));
+        if (pacienteInicial) {
+          setPacId(pacienteInicial.id);
+          setBusqueda(`${pacienteInicial.nombres} ${pacienteInicial.apellidos}`);
+          setMostrarLista(false);
+        }
+      }
     } catch (e) {
       console.error("Error al cargar datos iniciales:", e);
       alert("Error al cargar datos: " + (e.response?.data?.message || e.message || "Verifica que el backend esté corriendo"));
@@ -973,7 +985,7 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
     return () => window.removeEventListener("resize", h);
-  }, []);
+  }, [pacienteIdInicial]);
 
   if (cargando) return <Spin />;
 

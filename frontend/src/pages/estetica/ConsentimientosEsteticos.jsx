@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 
 const C = {
@@ -46,15 +46,26 @@ export default function ConsentimientosEsteticos() {
   const [pacientes,      setPacientes]      = useState([]);
   const [consentimientos, setConsentimientos] = useState([]);
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const pacienteIdInicial = searchParams.get("paciente_id");
   const [showModal,      setShowModal]      = useState(false);
   const [plantillaSelec, setPlantillaSelec] = useState(null);
   const [form,           setForm]           = useState({ paciente_id: "", plantilla_id: "", notas: "" });
 
   useEffect(() => {
-    api.get("/pacientes").then(r => setPacientes(r.data.data || [])).catch(() => {});
+    api.get("/pacientes").then(r => {
+      const listaPacientes = r.data.data || [];
+      setPacientes(listaPacientes);
+      if (pacienteIdInicial) {
+        const pacienteInicial = listaPacientes.find(p => String(p.id) === String(pacienteIdInicial));
+        if (pacienteInicial) {
+          setForm(f => ({ ...f, paciente_id: String(pacienteInicial.id) }));
+        }
+      }
+    }).catch(() => {});
     const saved = JSON.parse(localStorage.getItem("consentimientos_est") || "[]");
     setConsentimientos(saved);
-  }, []);
+  }, [pacienteIdInicial]);
 
   const selecPlantilla = (id) => {
     const p = PLANTILLAS.find(p => p.id === Number(id));
@@ -76,7 +87,7 @@ export default function ConsentimientosEsteticos() {
     localStorage.setItem("consentimientos_est", JSON.stringify(lista));
     setConsentimientos(lista);
     setShowModal(false);
-    setForm({ paciente_id: "", plantilla_id: "", notas: "" });
+    setForm({ paciente_id: pacienteIdInicial || "", plantilla_id: "", notas: "" });
     setPlantillaSelec(null);
   };
 
@@ -130,7 +141,7 @@ export default function ConsentimientosEsteticos() {
             <i className="bi bi-arrow-left" /> Atrás
           </button>
           <button
-            onClick={() => { setShowModal(true); setPlantillaSelec(null); setForm({ paciente_id: "", plantilla_id: "", notas: "" }); }}
+            onClick={() => { setShowModal(true); setPlantillaSelec(null); setForm({ paciente_id: pacienteIdInicial || "", plantilla_id: "", notas: "" }); }}
             style={{
               background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
               border: "none", borderRadius: 10, padding: "9px 18px",
