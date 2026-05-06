@@ -10,6 +10,7 @@ const crypto = require("crypto");
 
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || "default-key-32-chars-long-xxxx";
 const IV_LENGTH = 16;
+let schemaReady = false;
 
 function encrypt(text) {
   const key = Buffer.from(ENCRYPTION_KEY.padEnd(32).slice(0, 32));
@@ -35,12 +36,127 @@ function decrypt(text) {
   }
 }
 
+async function ensureRecordatoriosSchema() {
+  if (schemaReady) return;
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS clinica_smtp_config (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL UNIQUE,
+      smtp_host VARCHAR(120) NOT NULL,
+      smtp_port INT NOT NULL DEFAULT 587,
+      smtp_user VARCHAR(150) NOT NULL,
+      smtp_pass VARCHAR(255) NOT NULL,
+      smtp_secure TINYINT(1) DEFAULT 0,
+      from_email VARCHAR(150) NOT NULL,
+      from_name VARCHAR(100) DEFAULT 'Clínica',
+      activo TINYINT(1) DEFAULT 1,
+      test_enviado_en DATETIME,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS clinica_mensajeria_config (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL,
+      servicio ENUM('TWILIO_SMS', 'TWILIO_WHATSAPP', 'OTRO') NOT NULL,
+      account_sid VARCHAR(100),
+      auth_token VARCHAR(255),
+      from_number VARCHAR(30),
+      activo TINYINT(1) DEFAULT 1,
+      test_enviado_en DATETIME,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_clinica_servicio (clinica_id, servicio)
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS plantillas_recordatorio (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL,
+      tipo ENUM('EMAIL', 'SMS', 'WHATSAPP') NOT NULL,
+      nombre VARCHAR(100) NOT NULL,
+      horas_antes INT NOT NULL,
+      asunto VARCHAR(200),
+      contenido TEXT NOT NULL,
+      activo TINYINT(1) DEFAULT 1,
+      es_predeterminada TINYINT(1) DEFAULT 0,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      KEY idx_tipo_activa (clinica_id, tipo, activo)
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS clinica_recordatorios_config (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL UNIQUE,
+      email_activo TINYINT(1) DEFAULT 0,
+      email_48h TINYINT(1) DEFAULT 0,
+      email_24h TINYINT(1) DEFAULT 1,
+      email_2h TINYINT(1) DEFAULT 0,
+      sms_activo TINYINT(1) DEFAULT 0,
+      sms_48h TINYINT(1) DEFAULT 0,
+      sms_24h TINYINT(1) DEFAULT 1,
+      sms_2h TINYINT(1) DEFAULT 0,
+      whatsapp_activo TINYINT(1) DEFAULT 0,
+      whatsapp_48h TINYINT(1) DEFAULT 0,
+      whatsapp_24h TINYINT(1) DEFAULT 1,
+      whatsapp_2h TINYINT(1) DEFAULT 0,
+      hora_ejecucion_diaria TIME DEFAULT '08:00:00',
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB
+  `);
+
+  await db.query(`
+    CREATE TABLE IF NOT EXISTS historial_recordatorios (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL,
+      cita_id INT UNSIGNED,
+      paciente_id INT UNSIGNED,
+      tipo ENUM('EMAIL', 'SMS', 'WHATSAPP') NOT NULL,
+      destinatario VARCHAR(150) NOT NULL,
+      asunto VARCHAR(200),
+      mensaje TEXT NOT NULL,
+      estado ENUM('ENVIADO', 'FALLIDO', 'PENDIENTE') DEFAULT 'PENDIENTE',
+      proveedor VARCHAR(60),
+      response_id VARCHAR(150),
+      error TEXT,
+      enviado_en DATETIME,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      KEY idx_historial_clinica (clinica_id, creado_en),
+      KEY idx_historial_paciente (paciente_id)
+    ) ENGINE=InnoDB
+  `);
+
+  const [predCol] = await db.query("SHOW COLUMNS FROM plantillas_recordatorio LIKE 'es_predeterminada'");
+  if (!predCol.length) {
+    await db.query("ALTER TABLE plantillas_recordatorio ADD COLUMN es_predeterminada TINYINT(1) DEFAULT 0");
+  }
+
+  schemaReady = true;
+}
+
+const withRecordatoriosSchema = (handler) => async (req, res, next) => {
+  try {
+    await ensureRecordatoriosSchema();
+    return handler(req, res, next);
+  } catch (error) {
+    console.error("Error preparando esquema de recordatorios:", error);
+    return res.status(500).json({ error: "No se pudo preparar el módulo de recordatorios" });
+  }
+};
+
 // ═══════════════════════════════════════════════════════════════
 // 1. CONFIGURACIÓN SMTP
 // ═══════════════════════════════════════════════════════════════
 
 // GET: Obtener config SMTP de la clínica
-router.get("/config/smtp", auth(), async (req, res) => {
+router.get("/config/smtp", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT id, clinica_id, smtp_host, smtp_port, smtp_user, smtp_secure,
@@ -59,10 +175,10 @@ router.get("/config/smtp", auth(), async (req, res) => {
     console.error("Error al obtener config SMTP:", error);
     res.status(500).json({ error: "Error al obtener configuración SMTP" });
   }
-});
+}));
 
 // POST: Guardar/actualizar config SMTP
-router.post("/config/smtp", auth(), async (req, res) => {
+router.post("/config/smtp", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, from_email, from_name, activo } = req.body;
 
@@ -111,10 +227,10 @@ router.post("/config/smtp", auth(), async (req, res) => {
     console.error("Error al guardar config SMTP:", error);
     res.status(500).json({ error: "Error al guardar configuración SMTP" });
   }
-});
+}));
 
 // POST: Enviar email de prueba
-router.post("/config/smtp/test", auth(), async (req, res) => {
+router.post("/config/smtp/test", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { email_destino } = req.body;
 
@@ -165,14 +281,14 @@ router.post("/config/smtp/test", auth(), async (req, res) => {
     console.error("Error al enviar email de prueba:", error);
     res.status(500).json({ error: "Error al enviar email: " + error.message });
   }
-});
+}));
 
 // ═══════════════════════════════════════════════════════════════
 // 2. CONFIGURACIÓN MENSAJERÍA (Twilio SMS/WhatsApp)
 // ═══════════════════════════════════════════════════════════════
 
 // GET: Obtener configs de mensajería
-router.get("/config/mensajeria", auth(), async (req, res) => {
+router.get("/config/mensajeria", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT id, servicio, account_sid, from_number, activo, test_enviado_en
@@ -186,10 +302,10 @@ router.get("/config/mensajeria", auth(), async (req, res) => {
     console.error("Error al obtener config mensajería:", error);
     res.status(500).json({ error: "Error al obtener configuración" });
   }
-});
+}));
 
 // POST: Guardar config de mensajería
-router.post("/config/mensajeria", auth(), async (req, res) => {
+router.post("/config/mensajeria", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { servicio, account_sid, auth_token, from_number, activo } = req.body;
 
@@ -221,10 +337,10 @@ router.post("/config/mensajeria", auth(), async (req, res) => {
     console.error("Error al guardar config mensajería:", error);
     res.status(500).json({ error: "Error al guardar configuración" });
   }
-});
+}));
 
 // POST: Enviar mensaje de prueba (SMS o WhatsApp)
-router.post("/config/mensajeria/test", auth(), async (req, res) => {
+router.post("/config/mensajeria/test", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { servicio, telefono_destino } = req.body;
 
@@ -266,14 +382,14 @@ router.post("/config/mensajeria/test", auth(), async (req, res) => {
     console.error("Error al enviar mensaje de prueba:", error);
     res.status(500).json({ error: "Error: " + error.message });
   }
-});
+}));
 
 // ═══════════════════════════════════════════════════════════════
 // 3. PLANTILLAS DE RECORDATORIOS
 // ═══════════════════════════════════════════════════════════════
 
 // GET: Listar plantillas
-router.get("/plantillas", auth(), async (req, res) => {
+router.get("/plantillas", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const [rows] = await db.query(
       `SELECT * FROM plantillas_recordatorio
@@ -287,10 +403,10 @@ router.get("/plantillas", auth(), async (req, res) => {
     console.error("Error al obtener plantillas:", error);
     res.status(500).json({ error: "Error al obtener plantillas" });
   }
-});
+}));
 
 // POST: Crear plantilla
-router.post("/plantillas", auth(), async (req, res) => {
+router.post("/plantillas", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { tipo, nombre, horas_antes, asunto, contenido, activo, es_predeterminada } = req.body;
 
@@ -306,10 +422,10 @@ router.post("/plantillas", auth(), async (req, res) => {
     console.error("Error al crear plantilla:", error);
     res.status(500).json({ error: "Error al crear plantilla" });
   }
-});
+}));
 
 // PUT: Actualizar plantilla
-router.put("/plantillas/:id", auth(), async (req, res) => {
+router.put("/plantillas/:id", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre, horas_antes, asunto, contenido, activo, es_predeterminada } = req.body;
@@ -326,10 +442,10 @@ router.put("/plantillas/:id", auth(), async (req, res) => {
     console.error("Error al actualizar plantilla:", error);
     res.status(500).json({ error: "Error al actualizar plantilla" });
   }
-});
+}));
 
 // DELETE: Eliminar plantilla
-router.delete("/plantillas/:id", auth(), async (req, res) => {
+router.delete("/plantillas/:id", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     await db.query(
       "DELETE FROM plantillas_recordatorio WHERE id = ? AND clinica_id = ?",
@@ -341,10 +457,10 @@ router.delete("/plantillas/:id", auth(), async (req, res) => {
     console.error("Error al eliminar plantilla:", error);
     res.status(500).json({ error: "Error al eliminar plantilla" });
   }
-});
+}));
 
 // POST: Crear plantillas predeterminadas
-router.post("/plantillas/crear-predeterminadas", auth(), async (req, res) => {
+router.post("/plantillas/crear-predeterminadas", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const plantillas = [
       // EMAIL
@@ -432,14 +548,14 @@ Si necesitas cancelar, contáctanos lo antes posible.
     console.error("Error al crear plantillas:", error);
     res.status(500).json({ error: "Error al crear plantillas" });
   }
-});
+}));
 
 // ═══════════════════════════════════════════════════════════════
 // 4. CONFIGURACIÓN DE RECORDATORIOS AUTOMÁTICOS
 // ═══════════════════════════════════════════════════════════════
 
 // GET: Obtener config de recordatorios automáticos
-router.get("/config/automatico", auth(), async (req, res) => {
+router.get("/config/automatico", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const [rows] = await db.query(
       "SELECT * FROM clinica_recordatorios_config WHERE clinica_id = ?",
@@ -465,10 +581,10 @@ router.get("/config/automatico", auth(), async (req, res) => {
     console.error("Error al obtener config automático:", error);
     res.status(500).json({ error: "Error al obtener configuración" });
   }
-});
+}));
 
 // PUT: Actualizar config de recordatorios automáticos
-router.put("/config/automatico", auth(), async (req, res) => {
+router.put("/config/automatico", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const config = req.body;
 
@@ -493,14 +609,14 @@ router.put("/config/automatico", auth(), async (req, res) => {
     console.error("Error al actualizar config automático:", error);
     res.status(500).json({ error: "Error al actualizar configuración" });
   }
-});
+}));
 
 // ═══════════════════════════════════════════════════════════════
 // 5. HISTORIAL DE RECORDATORIOS
 // ═══════════════════════════════════════════════════════════════
 
 // GET: Historial de recordatorios
-router.get("/historial", auth(), async (req, res) => {
+router.get("/historial", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const { limit = 100, tipo, estado } = req.query;
 
@@ -535,10 +651,10 @@ router.get("/historial", auth(), async (req, res) => {
     console.error("Error al obtener historial:", error);
     res.status(500).json({ error: "Error al obtener historial" });
   }
-});
+}));
 
 // GET: Estadísticas de recordatorios
-router.get("/estadisticas", auth(), async (req, res) => {
+router.get("/estadisticas", auth(), withRecordatoriosSchema(async (req, res) => {
   try {
     const [stats] = await db.query(
       `SELECT
@@ -559,6 +675,6 @@ router.get("/estadisticas", auth(), async (req, res) => {
     console.error("Error al obtener estadísticas:", error);
     res.status(500).json({ error: "Error al obtener estadísticas" });
   }
-});
+}));
 
 module.exports = router;
