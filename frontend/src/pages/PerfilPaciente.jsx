@@ -128,6 +128,15 @@ export default function PerfilPaciente() {
   const [showConsultaModal, setShowConsultaModal] = useState(false);
   const [consultaPaciente,  setConsultaPaciente]  = useState(null);
   const [checkingCita, setCheckingCita] = useState(false);
+  const [showReminderModal, setShowReminderModal] = useState(false);
+  const [loadingReminderData, setLoadingReminderData] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [plantillasRecordatorio, setPlantillasRecordatorio] = useState([]);
+  const [reminderForm, setReminderForm] = useState({
+    canal: "EMAIL",
+    asunto: "",
+    contenido: "",
+  });
 
   // Modal confirmación eliminar documento
   const [docAEliminar, setDocAEliminar] = useState(null);
@@ -509,6 +518,88 @@ export default function PerfilPaciente() {
     }
   };
 
+  const reemplazarVarsRecordatorio = (texto = "") =>
+    String(texto || "")
+      .replaceAll("{paciente}", nombreCompleto || "")
+      .replaceAll("{clinica}", "Clínica")
+      .replaceAll("{medico}", "")
+      .replaceAll("{fecha}", dayjs().format("DD/MM/YYYY"))
+      .replaceAll("{hora}", dayjs().format("HH:mm"));
+
+  const htmlATextoPlano = (html = "") => {
+    const conSaltos = String(html || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<li>/gi, "• ")
+      .replace(/<\/li>/gi, "\n");
+    const sinTags = conSaltos.replace(/<[^>]+>/g, "");
+    return sinTags
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
+  const aplicarPlantillaCanal = (canal, plantillas = plantillasRecordatorio) => {
+    const lista = (plantillas || []).filter((p) => p.tipo === canal && Number(p.activo) === 1);
+    const plantilla = lista.find((p) => Number(p.es_predeterminada) === 1) || lista[0];
+    const contenidoBase = plantilla?.contenido || "Hola {paciente}, este es un recordatorio de su clínica.";
+    const contenidoLimpio = canal === "EMAIL" ? htmlATextoPlano(contenidoBase) : contenidoBase;
+    setReminderForm((prev) => ({
+      ...prev,
+      canal,
+      asunto: canal === "EMAIL" ? reemplazarVarsRecordatorio(plantilla?.asunto || `Recordatorio - ${nombreCompleto}`) : "",
+      contenido: reemplazarVarsRecordatorio(contenidoLimpio),
+    }));
+  };
+
+  const abrirModalRecordatorio = async () => {
+    setShowReminderModal(true);
+    setLoadingReminderData(true);
+    try {
+      const { data } = await api.get("/recordatorios/plantillas");
+      const plantillas = data?.plantillas || [];
+      setPlantillasRecordatorio(plantillas);
+      aplicarPlantillaCanal("EMAIL", plantillas);
+    } catch (err) {
+      setPlantillasRecordatorio([]);
+      setReminderForm({
+        canal: "EMAIL",
+        asunto: `Recordatorio - ${nombreCompleto}`,
+        contenido: `Hola ${nombreCompleto}, este es un recordatorio de su clínica.`,
+      });
+      setMsg({ tipo: "danger", texto: err?.response?.data?.error || "No se pudieron cargar plantillas de recordatorio" });
+    } finally {
+      setLoadingReminderData(false);
+    }
+  };
+
+  const enviarRecordatorioManual = async () => {
+    if (!reminderForm.contenido?.trim()) {
+      setMsg({ tipo: "danger", texto: "Escribe el contenido del recordatorio" });
+      return;
+    }
+    setSendingReminder(true);
+    try {
+      await api.post("/recordatorios/enviar-manual", {
+        paciente_id: paciente.id,
+        canal: reminderForm.canal,
+        asunto: reminderForm.asunto,
+        contenido: reminderForm.contenido,
+      });
+      setMsg({ tipo: "success", texto: `Recordatorio ${reminderForm.canal} enviado correctamente` });
+      setShowReminderModal(false);
+    } catch (err) {
+      setMsg({ tipo: "danger", texto: err?.response?.data?.error || "Error al enviar recordatorio manual" });
+    } finally {
+      setSendingReminder(false);
+    }
+  };
+
   // ══════════════════════════════════════════════════════════
   // PESTAÑA 4: ELIMINAR PACIENTE (Doble confirmación)
   // ══════════════════════════════════════════════════════════
@@ -649,15 +740,25 @@ export default function PerfilPaciente() {
           </div>
 
           {/* Botón Nueva Consulta */}
-          <button
-            className="btn btn-sm"
-            style={{ background: "#22c55e", color: "#fff", fontWeight: 600, border: "none", borderRadius: 8, padding: "7px 16px" }}
-            onClick={() => handleConsultaClick(paciente)}
-            disabled={checkingCita}
-          >
-            <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"} me-1`} />
-            {checkingCita ? "Verificando..." : "Nueva Consulta"}
-          </button>
+          <div className="d-flex align-items-center gap-2">
+            <button
+              className="btn btn-sm"
+              style={{ background: "rgba(255,255,255,.14)", color: "#fff", fontWeight: 600, border: "1px solid rgba(255,255,255,.35)", borderRadius: 8, padding: "7px 14px" }}
+              onClick={abrirModalRecordatorio}
+            >
+              <i className="bi bi-bell me-1" />
+              Recordatorio
+            </button>
+            <button
+              className="btn btn-sm"
+              style={{ background: "#22c55e", color: "#fff", fontWeight: 600, border: "none", borderRadius: 8, padding: "7px 16px" }}
+              onClick={() => handleConsultaClick(paciente)}
+              disabled={checkingCita}
+            >
+              <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"} me-1`} />
+              {checkingCita ? "Verificando..." : "Nueva Consulta"}
+            </button>
+          </div>
         </div>
 
         {/* Mensaje inline bajo el header */}
@@ -2037,6 +2138,62 @@ export default function PerfilPaciente() {
                   <i className="bi bi-trash me-1" />Eliminar
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showReminderModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", zIndex: 2100, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
+          <div className="card shadow" style={{ width: "100%", maxWidth: 760, border: "none" }}>
+            <div className="card-header d-flex justify-content-between align-items-center">
+              <strong>Enviar recordatorio manual</strong>
+              <button type="button" className="btn-close" onClick={() => setShowReminderModal(false)} />
+            </div>
+            <div className="card-body">
+              <div className="row g-3">
+                <div className="col-md-4">
+                  <label className="form-label">Canal</label>
+                  <select
+                    className="form-select"
+                    value={reminderForm.canal}
+                    onChange={(e) => aplicarPlantillaCanal(e.target.value)}
+                    disabled={loadingReminderData || sendingReminder}
+                  >
+                    <option value="EMAIL">Email</option>
+                    <option value="SMS">SMS</option>
+                    <option value="WHATSAPP">WhatsApp</option>
+                  </select>
+                </div>
+                {reminderForm.canal === "EMAIL" && (
+                  <div className="col-md-8">
+                    <label className="form-label">Asunto</label>
+                    <input
+                      className="form-control"
+                      value={reminderForm.asunto}
+                      onChange={(e) => setReminderForm((prev) => ({ ...prev, asunto: e.target.value }))}
+                      disabled={loadingReminderData || sendingReminder}
+                    />
+                  </div>
+                )}
+                <div className="col-12">
+                  <label className="form-label">Mensaje</label>
+                  <textarea
+                    rows={8}
+                    className="form-control"
+                    value={reminderForm.contenido}
+                    onChange={(e) => setReminderForm((prev) => ({ ...prev, contenido: e.target.value }))}
+                    disabled={loadingReminderData || sendingReminder}
+                  />
+                  <div className="form-text">Variables: {"{paciente}"}, {"{clinica}"}, {"{fecha}"}, {"{hora}"}, {"{medico}"}</div>
+                </div>
+              </div>
+            </div>
+            <div className="card-footer d-flex justify-content-end gap-2">
+              <button className="btn btn-outline-secondary" onClick={() => setShowReminderModal(false)} disabled={sendingReminder}>Cancelar</button>
+              <button className="btn btn-primary" onClick={enviarRecordatorioManual} disabled={loadingReminderData || sendingReminder}>
+                {sendingReminder ? "Enviando..." : "Enviar ahora"}
+              </button>
             </div>
           </div>
         </div>

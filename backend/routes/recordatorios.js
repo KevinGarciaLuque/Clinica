@@ -3,6 +3,7 @@ const router = express.Router();
 const db = require("../db");
 const auth = require("../middlewares/auth");
 const crypto = require("crypto");
+const { tieneModuloHabilitado } = require("../middlewares/moduloPermiso");
 
 // ═══════════════════════════════════════════════════════════════
 // UTILIDADES DE ENCRIPTACIÓN
@@ -34,6 +35,35 @@ function decrypt(text) {
   } catch (err) {
     return text; // Si falla, devuelve el texto original
   }
+}
+
+function reemplazarVariables(texto = "", variables = {}) {
+  let resultado = texto || "";
+  for (const [key, value] of Object.entries(variables)) {
+    resultado = resultado.replace(new RegExp(`{${key}}`, "g"), value ?? "");
+  }
+  return resultado;
+}
+
+function escaparHtml(texto = "") {
+  return String(texto)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+function renderEmailHtml(contenido = "") {
+  const raw = String(contenido || "");
+  const pareceHtml = /<[^>]+>/.test(raw);
+  if (pareceHtml) return raw;
+  const cuerpo = escaparHtml(raw).replace(/\n/g, "<br>");
+  return `
+    <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto; line-height: 1.5;">
+      ${cuerpo}
+    </div>
+  `;
 }
 
 async function ensureRecordatoriosSchema() {
@@ -143,6 +173,16 @@ async function ensureRecordatoriosSchema() {
 
 const withRecordatoriosSchema = (handler) => async (req, res, next) => {
   try {
+    if (!req.user?.super) {
+      const permitido = await tieneModuloHabilitado(req.user?.clinica_id, req.user?.id, "recordatorios");
+      if (!permitido) {
+        return res.status(403).json({
+          ok: false,
+          error: "Módulo de recordatorios no habilitado para este usuario",
+          modulo_bloqueado: true,
+        });
+      }
+    }
     await ensureRecordatoriosSchema();
     return handler(req, res, next);
   } catch (error) {
@@ -674,6 +714,120 @@ router.get("/estadisticas", auth(), withRecordatoriosSchema(async (req, res) => 
   } catch (error) {
     console.error("Error al obtener estadísticas:", error);
     res.status(500).json({ error: "Error al obtener estadísticas" });
+  }
+}));
+
+// POST: Enviar recordatorio manual a un paciente (Email / SMS / WhatsApp)
+router.post("/enviar-manual", auth(), withRecordatoriosSchema(async (req, res) => {
+  try {
+    const { paciente_id, canal, asunto, contenido } = req.body || {};
+    const canalNorm = String(canal || "").toUpperCase();
+
+    if (!paciente_id || !["EMAIL", "SMS", "WHATSAPP"].includes(canalNorm)) {
+      return res.status(400).json({ error: "Datos inválidos para envío manual" });
+    }
+    if (!contenido || !String(contenido).trim()) {
+      return res.status(400).json({ error: "El contenido del recordatorio es obligatorio" });
+    }
+
+    const [pacRows] = await db.query(
+      `SELECT p.id, p.nombres, p.apellidos, p.email, p.telefono, c.nombre AS clinica_nombre
+       FROM pacientes p
+       LEFT JOIN clinicas c ON c.id = p.clinica_id
+       WHERE p.id = ? AND p.clinica_id = ?`,
+      [paciente_id, req.user.clinica_id]
+    );
+    if (!pacRows.length) {
+      return res.status(404).json({ error: "Paciente no encontrado para esta clínica" });
+    }
+    const paciente = pacRows[0];
+    const nombrePaciente = `${paciente.nombres || ""} ${paciente.apellidos || ""}`.trim();
+
+    const variables = {
+      paciente: nombrePaciente,
+      clinica: paciente.clinica_nombre || "Clínica",
+      fecha: "",
+      hora: "",
+      medico: req.user?.nombre || "",
+    };
+    const asuntoFinal = canalNorm === "EMAIL" ? (reemplazarVariables(asunto || `Recordatorio - ${variables.clinica}`, variables)) : null;
+    const contenidoFinal = reemplazarVariables(String(contenido), variables);
+
+    let destinatario = "";
+    let proveedor = "";
+    let responseId = null;
+
+    if (canalNorm === "EMAIL") {
+      if (!paciente.email) {
+        return res.status(400).json({ error: "El paciente no tiene email registrado" });
+      }
+      const [smtpRows] = await db.query(
+        "SELECT * FROM clinica_smtp_config WHERE clinica_id = ? AND activo = 1",
+        [req.user.clinica_id]
+      );
+      if (!smtpRows.length) {
+        return res.status(400).json({ error: "No hay configuración SMTP activa" });
+      }
+      const smtp = smtpRows[0];
+      const nodemailer = require("nodemailer");
+      const transporter = nodemailer.createTransport({
+        host: smtp.smtp_host,
+        port: smtp.smtp_port,
+        secure: smtp.smtp_secure === 1,
+        auth: {
+          user: smtp.smtp_user,
+          pass: decrypt(smtp.smtp_pass),
+        },
+      });
+      await transporter.sendMail({
+        from: `"${smtp.from_name || "Clínica"}" <${smtp.from_email}>`,
+        to: paciente.email,
+        subject: asuntoFinal,
+        html: renderEmailHtml(contenidoFinal),
+        text: contenidoFinal,
+      });
+      destinatario = paciente.email;
+      proveedor = "SMTP";
+    }
+
+    if (canalNorm === "SMS" || canalNorm === "WHATSAPP") {
+      if (!paciente.telefono) {
+        return res.status(400).json({ error: "El paciente no tiene teléfono registrado" });
+      }
+      const servicio = canalNorm === "SMS" ? "TWILIO_SMS" : "TWILIO_WHATSAPP";
+      const [cfgRows] = await db.query(
+        "SELECT * FROM clinica_mensajeria_config WHERE clinica_id = ? AND servicio = ? AND activo = 1",
+        [req.user.clinica_id, servicio]
+      );
+      if (!cfgRows.length) {
+        return res.status(400).json({ error: `No hay configuración activa para ${canalNorm}` });
+      }
+      const cfg = cfgRows[0];
+      const twilio = require("twilio");
+      const client = twilio(cfg.account_sid, decrypt(cfg.auth_token));
+      const from = canalNorm === "WHATSAPP" ? `whatsapp:${cfg.from_number}` : cfg.from_number;
+      const to = canalNorm === "WHATSAPP" ? `whatsapp:${paciente.telefono}` : paciente.telefono;
+      const r = await client.messages.create({
+        body: contenidoFinal,
+        from,
+        to,
+      });
+      destinatario = paciente.telefono;
+      proveedor = servicio;
+      responseId = r?.sid || null;
+    }
+
+    await db.query(
+      `INSERT INTO historial_recordatorios
+       (clinica_id, paciente_id, tipo, destinatario, asunto, mensaje, estado, proveedor, response_id, enviado_en)
+       VALUES (?, ?, ?, ?, ?, ?, 'ENVIADO', ?, ?, NOW())`,
+      [req.user.clinica_id, paciente.id, canalNorm, destinatario, asuntoFinal, contenidoFinal, proveedor, responseId]
+    );
+
+    return res.json({ success: true, message: `Recordatorio ${canalNorm} enviado correctamente` });
+  } catch (error) {
+    console.error("Error en envío manual de recordatorio:", error);
+    return res.status(500).json({ error: "Error al enviar recordatorio manual" });
   }
 }));
 

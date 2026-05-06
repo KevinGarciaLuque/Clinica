@@ -2134,9 +2134,25 @@ function DermaField({ label, children }) {
 function DermaTab({ datosDerma, setDatosDerma, firmada }) {
   const set = (key, val) => setDatosDerma(prev => ({ ...prev, [key]: val }));
   const d = datosDerma;
+  const [procCatalogo, setProcCatalogo] = useState([]);
+  const [procPick, setProcPick] = useState("");
+
+  useEffect(() => {
+    api.get("/catalogos-procedimientos")
+      .then(r => setProcCatalogo(r.data.data || []))
+      .catch(() => setProcCatalogo([]));
+  }, []);
 
   const inputStyle = { borderRadius: 7, fontSize: "0.85rem" };
   const textareaStyle = { borderRadius: 7, fontSize: "0.85rem", resize: "vertical" };
+  const agregarProcedimientoPrevio = () => {
+    const nombre = (procPick || "").trim();
+    if (!nombre) return;
+    const actual = (d.tratamientos_previos || "").trim();
+    const next = actual ? `${actual}, ${nombre}` : nombre;
+    set("tratamientos_previos", next);
+    setProcPick("");
+  };
 
   return (
     <div>
@@ -2173,6 +2189,30 @@ function DermaTab({ datosDerma, setDatosDerma, firmada }) {
                 disabled={firmada}
                 value={d.tratamientos_previos || ""}
                 onChange={e => set("tratamientos_previos", e.target.value)} />
+              <div className="d-flex gap-2 mt-2">
+                <input
+                  className="form-control form-control-sm"
+                  style={inputStyle}
+                  placeholder="Agregar desde catálogo de procedimientos…"
+                  value={procPick}
+                  onChange={(e) => setProcPick(e.target.value)}
+                  list="derma-procedimientos-list"
+                  disabled={firmada}
+                />
+                <button
+                  type="button"
+                  className="btn btn-outline-primary btn-sm"
+                  onClick={agregarProcedimientoPrevio}
+                  disabled={firmada || !procPick.trim()}
+                >
+                  Agregar
+                </button>
+              </div>
+              <datalist id="derma-procedimientos-list">
+                {procCatalogo.map((p) => (
+                  <option key={p.id} value={p.nombre} />
+                ))}
+              </datalist>
             </DermaField>
           </DermaFieldGroup>
 

@@ -280,6 +280,11 @@ export default function Citas() {
   const [sala,      setSala]        = useState([]);
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showEdit,         setShowEdit]          = useState(false);
+  const [showReminder, setShowReminder] = useState(false);
+  const [loadingReminderData, setLoadingReminderData] = useState(false);
+  const [sendingReminder, setSendingReminder] = useState(false);
+  const [plantillasRecordatorio, setPlantillasRecordatorio] = useState([]);
+  const [reminderForm, setReminderForm] = useState({ canal: "EMAIL", asunto: "", contenido: "" });
   const headerRef = useRef(null);
 
   // Sincronizar estado con cambios en la URL (cuando se navega desde el sidebar)
@@ -405,6 +410,90 @@ export default function Citas() {
         loadSalaEspera();
       })
       .catch(err => alert(err.response?.data?.msg || "Error al eliminar"));
+  };
+
+  const htmlATextoPlano = (html = "") => {
+    const conSaltos = String(html || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<li>/gi, "• ")
+      .replace(/<\/li>/gi, "\n");
+    const sinTags = conSaltos.replace(/<[^>]+>/g, "");
+    return sinTags
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
+
+  const reemplazarVarsRecordatorio = (texto = "") => {
+    const c = selEvent?.resource || {};
+    const paciente = `${c.paciente_nombres || ""} ${c.paciente_apellidos || ""}`.trim();
+    const medico = `${c.medico_nombres || ""} ${c.medico_apellidos || ""}`.trim();
+    return String(texto || "")
+      .replaceAll("{paciente}", paciente)
+      .replaceAll("{clinica}", "Clínica")
+      .replaceAll("{medico}", medico)
+      .replaceAll("{fecha}", c.inicio ? dayjs(c.inicio).format("DD/MM/YYYY") : dayjs().format("DD/MM/YYYY"))
+      .replaceAll("{hora}", c.inicio ? dayjs(c.inicio).format("HH:mm") : dayjs().format("HH:mm"));
+  };
+
+  const aplicarPlantillaCanal = (canal, plantillas = plantillasRecordatorio) => {
+    const lista = (plantillas || []).filter((p) => p.tipo === canal && Number(p.activo) === 1);
+    const plantilla = lista.find((p) => Number(p.es_predeterminada) === 1) || lista[0];
+    const contenidoBase = plantilla?.contenido || "Hola {paciente}, este es un recordatorio de su clínica.";
+    const contenidoLimpio = canal === "EMAIL" ? htmlATextoPlano(contenidoBase) : contenidoBase;
+    setReminderForm({
+      canal,
+      asunto: canal === "EMAIL" ? reemplazarVarsRecordatorio(plantilla?.asunto || "Recordatorio de cita") : "",
+      contenido: reemplazarVarsRecordatorio(contenidoLimpio),
+    });
+  };
+
+  const abrirRecordatorio = async () => {
+    if (!selEvent?.resource?.paciente_id) return;
+    setShowReminder(true);
+    setLoadingReminderData(true);
+    try {
+      const { data } = await api.get("/recordatorios/plantillas");
+      const plantillas = data?.plantillas || [];
+      setPlantillasRecordatorio(plantillas);
+      aplicarPlantillaCanal("EMAIL", plantillas);
+    } catch {
+      setPlantillasRecordatorio([]);
+      setReminderForm({
+        canal: "EMAIL",
+        asunto: "Recordatorio de cita",
+        contenido: reemplazarVarsRecordatorio("Hola {paciente}, le recordamos su cita el {fecha} a las {hora} con {medico}."),
+      });
+    } finally {
+      setLoadingReminderData(false);
+    }
+  };
+
+  const enviarRecordatorioManual = async () => {
+    const c = selEvent?.resource || {};
+    if (!c.paciente_id) return alert("No se encontró paciente para esta cita");
+    if (!reminderForm.contenido?.trim()) return alert("Escribe el contenido del recordatorio");
+    setSendingReminder(true);
+    try {
+      await api.post("/recordatorios/enviar-manual", {
+        paciente_id: c.paciente_id,
+        canal: reminderForm.canal,
+        asunto: reminderForm.asunto,
+        contenido: reminderForm.contenido,
+      });
+      alert(`Recordatorio ${reminderForm.canal} enviado correctamente`);
+      setShowReminder(false);
+    } catch (err) {
+      alert(err.response?.data?.error || "Error al enviar recordatorio");
+    } finally {
+      setSendingReminder(false);
+    }
   };
 
   return (
@@ -628,6 +717,20 @@ export default function Citas() {
           onCancelar={cancelarCita}
           onMostrarConfirmDelete={() => setShowConfirmDelete(true)}
           onEditar={() => { setShowDet(false); setShowEdit(true); }}
+          onRecordatorio={abrirRecordatorio}
+        />
+      )}
+
+      {showReminder && selEvent && (
+        <ModalRecordatorioManual
+          event={selEvent}
+          form={reminderForm}
+          loading={loadingReminderData}
+          sending={sendingReminder}
+          onClose={() => setShowReminder(false)}
+          onCanalChange={(canal) => aplicarPlantillaCanal(canal)}
+          onChange={(patch) => setReminderForm((prev) => ({ ...prev, ...patch }))}
+          onSend={enviarRecordatorioManual}
         />
       )}
 
@@ -1088,7 +1191,7 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
 }
 
 // ─── Modal Detalle Cita ───────────────────────────────────────────────────────
-function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar }) {
+function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar, onRecordatorio }) {
   const c = event.resource;
   const color = ESTADO_COLOR[c.estado] || { bg: "#6c757d", fg: "#fff" };
   const ACCIONES = {
@@ -1167,10 +1270,60 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
                 <i className="bi bi-pencil me-1"></i>Editar
               </button>
             )}
+            <button className="btn btn-outline-success btn-sm" onClick={onRecordatorio}>
+              <i className="bi bi-bell me-1"></i>Recordatorio
+            </button>
             {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
               <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
             )}
             <button className="btn btn-secondary btn-sm" onClick={onClose}>Cerrar</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalRecordatorioManual({ event, form, loading, sending, onClose, onCanalChange, onChange, onSend }) {
+  const c = event.resource || {};
+  return (
+    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 1060 }}>
+      <div className="modal-dialog modal-lg modal-dialog-centered">
+        <div className="modal-content">
+          <div className="modal-header">
+            <h5 className="modal-title">
+              <i className="bi bi-bell me-2"></i>Recordatorio manual
+            </h5>
+            <button className="btn-close" onClick={onClose} />
+          </div>
+          <div className="modal-body">
+            <div className="mb-2" style={{ fontSize: "0.85rem", color: "#475569" }}>
+              <strong>Paciente:</strong> {c.paciente_nombres} {c.paciente_apellidos}
+            </div>
+            <div className="row g-3">
+              <div className="col-md-4">
+                <label className="form-label">Canal</label>
+                <select className="form-select" value={form.canal} onChange={(e) => onCanalChange(e.target.value)} disabled={loading || sending}>
+                  <option value="EMAIL">Email</option>
+                  <option value="SMS">SMS</option>
+                  <option value="WHATSAPP">WhatsApp</option>
+                </select>
+              </div>
+              {form.canal === "EMAIL" && (
+                <div className="col-md-8">
+                  <label className="form-label">Asunto</label>
+                  <input className="form-control" value={form.asunto} onChange={(e) => onChange({ asunto: e.target.value })} disabled={loading || sending} />
+                </div>
+              )}
+              <div className="col-12">
+                <label className="form-label">Mensaje</label>
+                <textarea className="form-control" rows={8} value={form.contenido} onChange={(e) => onChange({ contenido: e.target.value })} disabled={loading || sending} />
+              </div>
+            </div>
+          </div>
+          <div className="modal-footer">
+            <button className="btn btn-secondary" onClick={onClose} disabled={sending}>Cancelar</button>
+            <button className="btn btn-primary" onClick={onSend} disabled={loading || sending}>{sending ? "Enviando..." : "Enviar ahora"}</button>
           </div>
         </div>
       </div>

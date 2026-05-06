@@ -49,6 +49,7 @@ export default function ConsentimientosEsteticos() {
   const [searchParams] = useSearchParams();
   const pacienteIdInicial = searchParams.get("paciente_id");
   const [showModal,      setShowModal]      = useState(false);
+  const [consentimientoVer, setConsentimientoVer] = useState(null);
   const [plantillaSelec, setPlantillaSelec] = useState(null);
   const [form,           setForm]           = useState({ paciente_id: "", plantilla_id: "", notas: "" });
 
@@ -79,6 +80,8 @@ export default function ConsentimientosEsteticos() {
     const nuevo = {
       id: Date.now(), ...form,
       procedimiento: plantillaSelec?.procedimiento || "—",
+      contenido: plantillaSelec?.contenido || "",
+      riesgos: plantillaSelec?.riesgos || [],
       paciente_nombre: pac ? `${pac.nombres} ${pac.apellidos}` : "—",
       firmado: false,
       creado_en: new Date().toISOString(),
@@ -226,6 +229,18 @@ export default function ConsentimientosEsteticos() {
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <button
+                  onClick={() => setConsentimientoVer(c)}
+                  style={{
+                    background: "rgba(33,150,243,.1)",
+                    border: "1px solid rgba(33,150,243,.25)",
+                    borderRadius: 8, padding: "6px 14px",
+                    color: "#2196f3",
+                    fontSize: 12, fontWeight: 600, cursor: "pointer",
+                  }}>
+                  <i className="bi bi-eye me-1" />
+                  Ver
+                </button>
+                <button
                   onClick={() => toggleFirma(c.id)}
                   style={{
                     background: c.firmado ? "rgba(245,158,11,.1)" : "rgba(16,185,129,.1)",
@@ -247,6 +262,52 @@ export default function ConsentimientosEsteticos() {
             </div>
           ))}
         </div>
+      )}
+
+      {consentimientoVer && (
+        <>
+          <div
+            style={{ position: "fixed", inset: 0, zIndex: 1060, background: "rgba(0,0,0,.45)", backdropFilter: "blur(4px)" }}
+            onClick={() => setConsentimientoVer(null)}
+          />
+          <div style={{
+            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%,-50%)",
+            zIndex: 1061, background: C.card, borderRadius: 16, width: "calc(100% - 32px)", maxWidth: 760,
+            maxHeight: "88vh", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.2)", border: `1px solid ${C.border}`,
+          }}>
+            <div style={{
+              background: "linear-gradient(135deg, #1a1035 0%, #2d1045 50%, #1a2744 100%)",
+              padding: "16px 22px", display: "flex", alignItems: "center", justifyContent: "space-between",
+              borderRadius: "16px 16px 0 0",
+            }}>
+              <h5 style={{ margin: 0, color: "#fff", fontWeight: 700, fontSize: 16 }}>
+                <i className="bi bi-file-earmark-text me-2" style={{ color: "#f9a8d4" }} />
+                Consentimiento emitido
+              </h5>
+              <button onClick={() => setConsentimientoVer(null)} style={{ background: "rgba(239,68,68,.2)", border: "none", borderRadius: 8, width: 30, height: 30, color: "#fca5a5", cursor: "pointer" }}>
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+            <div style={{ padding: "18px 22px" }}>
+              <div style={{ fontSize: 13, color: C.muted, marginBottom: 10 }}>
+                <strong>Paciente:</strong> {consentimientoVer.paciente_nombre}
+                <span style={{ margin: "0 8px", opacity: .4 }}>·</span>
+                <strong>Procedimiento:</strong> {consentimientoVer.procedimiento}
+              </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14, whiteSpace: "pre-wrap", color: C.textSub, fontSize: 14, lineHeight: 1.5 }}>
+                {consentimientoVer.contenido || "Sin contenido guardado."}
+              </div>
+              {!!consentimientoVer.riesgos?.length && (
+                <div style={{ marginTop: 14 }}>
+                  <div style={{ fontSize: 12, color: C.muted, fontWeight: 700, textTransform: "uppercase", marginBottom: 6 }}>Riesgos</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, color: C.textSub, fontSize: 13 }}>
+                    {consentimientoVer.riesgos.map((r, idx) => <li key={idx}>{r}</li>)}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </div>
+        </>
       )}
 
       </div>{/* fin padding */}

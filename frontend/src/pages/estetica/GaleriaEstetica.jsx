@@ -43,6 +43,7 @@ export default function GaleriaEstetica() {
   const [busqueda,     setBusqueda]     = useState("");
   const [mostrarLista, setMostrarLista] = useState(false);
   const [editando,     setEditando]     = useState(null);
+  const [catalogoProcedimientos, setCatalogoProcedimientos] = useState([]);
 
   useEffect(() => {
     cargarDatosIniciales();
@@ -52,9 +53,10 @@ export default function GaleriaEstetica() {
     setCargandoPacientes(true);
     try {
       // Cargar pacientes y sesiones en paralelo
-      const [resPacientes, resSesiones] = await Promise.all([
+      const [resPacientes, resSesiones, resProcedimientos] = await Promise.all([
         api.get("/pacientes"),
         api.get("/galeria-estetica/sesiones"), // Sin paciente_id = todas las sesiones
+        api.get("/catalogos-procedimientos").catch(() => ({ data: { data: [] } })),
       ]);
 
       const todosPacientes = resPacientes.data.data || [];
@@ -64,6 +66,7 @@ export default function GaleriaEstetica() {
       console.log("Sesiones cargadas:", todasSesiones.length);
 
       setPacientes(todosPacientes);
+      setCatalogoProcedimientos(resProcedimientos?.data?.data || []);
 
       // Agrupar sesiones por paciente
       const pacientesMap = {};
@@ -488,6 +491,7 @@ export default function GaleriaEstetica() {
                               type="text"
                               value={editando.nombre}
                               onChange={e => setEditando({ ...editando, nombre: e.target.value })}
+                              list="galeria-procedimientos-list"
                               style={{
                                 ...inputSt,
                                 padding: "6px 10px",
@@ -671,6 +675,7 @@ export default function GaleriaEstetica() {
                 placeholder="Ej: Rinoplastia, Bótox, Relleno labial..."
                 value={nuevaSesion.nombre}
                 onChange={e => setNuevaSesion(p => ({ ...p, nombre: e.target.value }))}
+                list="galeria-procedimientos-list"
               />
             </div>
             <div style={{ flex: "1 1 160px" }}>
@@ -709,6 +714,11 @@ export default function GaleriaEstetica() {
               </button>
             </div>
           </div>
+          <datalist id="galeria-procedimientos-list">
+            {catalogoProcedimientos.map((cp) => (
+              <option key={cp.id} value={cp.nombre} />
+            ))}
+          </datalist>
         </div>
       )}
 

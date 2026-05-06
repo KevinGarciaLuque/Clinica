@@ -5,6 +5,58 @@ const argon2 = require("argon2");
 const { uploadClinicas } = require("../middlewares/upload");
 const { seedPacienteDemo } = require("../utils/seedPacienteDemo");
 
+let moduloPermisosSchemaReady = false;
+
+async function ensureModuloPermisosSchema() {
+  if (moduloPermisosSchemaReady) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS clinica_modulos (
+      clinica_id INT UNSIGNED NOT NULL,
+      modulo_id INT UNSIGNED NOT NULL,
+      habilitado TINYINT(1) NOT NULL DEFAULT 1,
+      actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (clinica_id, modulo_id)
+    ) ENGINE=InnoDB
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS usuario_modulos (
+      usuario_id INT UNSIGNED NOT NULL,
+      modulo_id INT UNSIGNED NOT NULL,
+      habilitado TINYINT(1) NOT NULL,
+      actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+      PRIMARY KEY (usuario_id, modulo_id)
+    ) ENGINE=InnoDB
+  `);
+  moduloPermisosSchemaReady = true;
+}
+
+async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
+  const [[tipo]] = await pool.query("SELECT clave FROM tipos_clinica WHERE id=? LIMIT 1", [tipoId || null]);
+  const tipoClave = String(tipo?.clave || "").toLowerCase();
+  const esDerma = tipoClave.includes("derma") || tipoClave.includes("estetica");
+  const esPedia = Boolean(esPediatrica) || tipoClave.includes("pedi");
+
+  const [mods] = await pool.query("SELECT id, clave FROM modulos_sistema WHERE disponible=1");
+  const base = ["dashboard", "pacientes", "citas", "consulta", "historia_clinica", "estudios", "plantillas"];
+  const derma = ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia", "recordatorios"];
+  const pedia = ["curva_crecimiento", "vacunas"];
+  const generalExtras = ["inventario"];
+
+  const enabled = new Set(base);
+  if (esDerma) derma.forEach((k) => enabled.add(k));
+  if (esPedia) pedia.forEach((k) => enabled.add(k));
+  if (!esDerma && !esPedia) generalExtras.forEach((k) => enabled.add(k));
+
+  for (const m of mods) {
+    await pool.query(
+      `INSERT INTO clinica_modulos (clinica_id, modulo_id, habilitado)
+       VALUES (?, ?, ?)
+       ON DUPLICATE KEY UPDATE habilitado = VALUES(habilitado)`,
+      [clinicaId, m.id, enabled.has(m.clave) ? 1 : 0]
+    );
+  }
+}
+
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/tipos  → catálogo de tipos de clínica
 // ──────────────────────────────────────────────
@@ -24,6 +76,7 @@ router.get("/tipos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERM
 // ──────────────────────────────────────────────
 router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
+    await ensureModuloPermisosSchema();
     // SUPER_ADMIN tiene acceso a todos los módulos base
     if (req.user.super) {
       const [rows] = await pool.query(
@@ -72,7 +125,194 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFE
       return res.json({ ok: true, data: await agregarCurvaSiPed(base) });
     }
 
-    res.json({ ok: true, data: await agregarCurvaSiPed(rows) });
+    const baseRows = await agregarCurvaSiPed(rows);
+
+    // Aplicar override por clínica y por usuario
+    const [overrides] = await pool.query(
+      `
+      SELECT
+        ms.clave,
+        cm.habilitado AS habilitado_clinica,
+        um.habilitado AS habilitado_usuario
+      FROM modulos_sistema ms
+      LEFT JOIN clinica_modulos cm
+        ON cm.clinica_id = ? AND cm.modulo_id = ms.id
+      LEFT JOIN usuario_modulos um
+        ON um.usuario_id = ? AND um.modulo_id = ms.id
+      `,
+      [req.user.clinica_id, req.user.id]
+    );
+    const mapOverride = new Map(overrides.map(o => [o.clave, o]));
+
+    const efectivos = baseRows.filter((m) => {
+      const o = mapOverride.get(m.clave);
+      if (!o) return true;
+      if (o.habilitado_usuario !== null && o.habilitado_usuario !== undefined) {
+        return Number(o.habilitado_usuario) === 1;
+      }
+      if (o.habilitado_clinica !== null && o.habilitado_clinica !== undefined) {
+        return Number(o.habilitado_clinica) === 1;
+      }
+      return true;
+    });
+
+    res.json({ ok: true, data: efectivos });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// GET /api/clinicas/:id/modulos-permisos
+router.get("/:id/modulos-permisos", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await ensureModuloPermisosSchema();
+    const clinicaId = Number(req.params.id);
+    const [[clinica]] = await pool.query(
+      "SELECT id, nombre, tipo_id, es_pediatrica FROM clinicas WHERE id=? LIMIT 1",
+      [clinicaId]
+    );
+    if (!clinica) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    const [modulos] = await pool.query(
+      `
+      SELECT
+        ms.id, ms.clave, ms.nombre, ms.icono, ms.ruta, ms.orden,
+        IFNULL(cm.habilitado, 1) AS habilitado_clinica
+      FROM modulos_sistema ms
+      INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id AND tcm.tipo_id = ?
+      LEFT JOIN clinica_modulos cm ON cm.clinica_id = ? AND cm.modulo_id = ms.id
+      WHERE ms.disponible = 1
+        AND (? = 1 AND ms.para_pediatrica = 1 OR ? = 0 AND ms.para_normal = 1)
+      ORDER BY ms.orden
+      `,
+      [clinica.tipo_id, clinicaId, clinica.es_pediatrica ? 1 : 0, clinica.es_pediatrica ? 1 : 0]
+    );
+
+    const [usuarios] = await pool.query(
+      `
+      SELECT u.id, u.nombres, u.apellidos, u.tipo, u.email
+      FROM usuarios u
+      WHERE u.clinica_id = ? AND u.activo = 1 AND u.tipo IN ('ADMIN','MEDICO','ENFERMERA','RECEPCIONISTA')
+      ORDER BY u.tipo, u.apellidos, u.nombres
+      `,
+      [clinicaId]
+    );
+
+    res.json({ ok: true, data: { clinica, modulos, usuarios } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// PUT /api/clinicas/:id/modulos-permisos/clinica
+router.put("/:id/modulos-permisos/clinica", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await ensureModuloPermisosSchema();
+    const clinicaId = Number(req.params.id);
+    const { modulo_id, habilitado } = req.body || {};
+    if (!modulo_id || habilitado === undefined) {
+      return res.status(400).json({ ok: false, msg: "modulo_id y habilitado son obligatorios" });
+    }
+    await pool.query(
+      `
+      INSERT INTO clinica_modulos (clinica_id, modulo_id, habilitado)
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE habilitado = VALUES(habilitado)
+      `,
+      [clinicaId, modulo_id, habilitado ? 1 : 0]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// GET /api/clinicas/:id/modulos-permisos/usuario/:usuarioId
+router.get("/:id/modulos-permisos/usuario/:usuarioId", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await ensureModuloPermisosSchema();
+    const clinicaId = Number(req.params.id);
+    const usuarioId = Number(req.params.usuarioId);
+
+    const [[usuario]] = await pool.query(
+      "SELECT id, clinica_id, nombres, apellidos, tipo FROM usuarios WHERE id=? LIMIT 1",
+      [usuarioId]
+    );
+    if (!usuario || Number(usuario.clinica_id) !== clinicaId) {
+      return res.status(404).json({ ok: false, msg: "Usuario no encontrado en esta clínica" });
+    }
+
+    const [rows] = await pool.query(
+      `
+      SELECT
+        ms.id AS modulo_id,
+        ms.clave,
+        ms.nombre,
+        IFNULL(cm.habilitado, 1) AS habilitado_clinica,
+        um.habilitado AS habilitado_usuario
+      FROM modulos_sistema ms
+      INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id
+      INNER JOIN clinicas c ON c.tipo_id = tcm.tipo_id AND c.id = ?
+      LEFT JOIN clinica_modulos cm ON cm.clinica_id = c.id AND cm.modulo_id = ms.id
+      LEFT JOIN usuario_modulos um ON um.usuario_id = ? AND um.modulo_id = ms.id
+      WHERE ms.disponible = 1
+      ORDER BY ms.orden
+      `,
+      [clinicaId, usuarioId]
+    );
+
+    res.json({ ok: true, data: { usuario, modulos: rows } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// PUT /api/clinicas/:id/modulos-permisos/usuario/:usuarioId
+router.put("/:id/modulos-permisos/usuario/:usuarioId", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await ensureModuloPermisosSchema();
+    const clinicaId = Number(req.params.id);
+    const usuarioId = Number(req.params.usuarioId);
+    const { modulo_id, habilitado } = req.body || {};
+    if (!modulo_id || habilitado === undefined) {
+      return res.status(400).json({ ok: false, msg: "modulo_id y habilitado son obligatorios" });
+    }
+
+    const [[usuario]] = await pool.query(
+      "SELECT id, clinica_id FROM usuarios WHERE id=? LIMIT 1",
+      [usuarioId]
+    );
+    if (!usuario || Number(usuario.clinica_id) !== clinicaId) {
+      return res.status(404).json({ ok: false, msg: "Usuario no encontrado en esta clínica" });
+    }
+
+    await pool.query(
+      `
+      INSERT INTO usuario_modulos (usuario_id, modulo_id, habilitado)
+      VALUES (?, ?, ?)
+      ON DUPLICATE KEY UPDATE habilitado = VALUES(habilitado)
+      `,
+      [usuarioId, modulo_id, habilitado ? 1 : 0]
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /api/clinicas/:id/modulos-permisos/reaplicar-preset
+router.post("/:id/modulos-permisos/reaplicar-preset", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await ensureModuloPermisosSchema();
+    const clinicaId = Number(req.params.id);
+    const [[clinica]] = await pool.query(
+      "SELECT id, tipo_id, es_pediatrica FROM clinicas WHERE id=? LIMIT 1",
+      [clinicaId]
+    );
+    if (!clinica) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    await aplicarPresetModulosClinica(clinicaId, clinica.tipo_id, clinica.es_pediatrica ? 1 : 0);
+    res.json({ ok: true, msg: "Preset reaplicado correctamente" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -380,6 +620,7 @@ router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
 // POST /api/clinicas  → solo SUPER_ADMIN puede crear clínicas
 router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    await ensureModuloPermisosSchema();
     const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc,
             admin_nombres, admin_apellidos, admin_email, admin_password } = req.body;
 
@@ -401,6 +642,8 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
       [nombre, slug, tipoIdFinal, es_pediatrica ? 1 : 0, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
     );
     const clinicaId = r.insertId;
+
+    await aplicarPresetModulosClinica(clinicaId, tipoIdFinal, es_pediatrica ? 1 : 0);
 
     // Crear admin de la clínica si viene en el body
     let adminId = null;

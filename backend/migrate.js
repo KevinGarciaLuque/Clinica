@@ -57,6 +57,7 @@ async function runMigrations() {
       '037_modulo_biopsias_patologia.sql',
       '038_modulo_inventario.sql',
       '039_plantillas_predeterminada.sql',
+      '040_permisos_modulos_clinica_usuario.sql',
     ];
 
     for (const migration of migrations) {

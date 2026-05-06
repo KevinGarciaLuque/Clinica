@@ -25,6 +25,7 @@ const ESTADO_COL = {
 export default function Presupuestos() {
   const [pacientes,    setPacientes]   = useState([]);
   const [servicios,    setServicios]   = useState([]);
+  const [catalogoProcedimientos, setCatalogoProcedimientos] = useState([]);
   const [presupuestos, setPresupuestos] = useState([]);
   const navigate = useNavigate();
   const [showModal,    setShowModal]   = useState(false);
@@ -42,9 +43,11 @@ export default function Presupuestos() {
     Promise.all([
       api.get("/pacientes"),
       api.get("/servicios"),
-    ]).then(([rP, rS]) => {
+      api.get("/catalogos-procedimientos").catch(() => ({ data: { data: [] } })),
+    ]).then(([rP, rS, rProc]) => {
       setPacientes(rP.data.data || []);
       setServicios(rS.data.data || []);
+      setCatalogoProcedimientos(rProc?.data?.data || []);
     }).catch(() => {});
     cargar();
   }, []);
@@ -310,7 +313,8 @@ export default function Presupuestos() {
                 {form.procedimientos.map((p, i) => (
                   <div key={i} style={{ display: "flex", gap: 10, marginBottom: 8, alignItems: "center" }}>
                     <input style={{ ...inputSt, flex: 2 }} placeholder="Procedimiento"
-                      value={p.nombre} onChange={e => updProc(i, "nombre", e.target.value)} />
+                      value={p.nombre} onChange={e => updProc(i, "nombre", e.target.value)}
+                      list="presupuestos-procedimientos-list" />
                     <input style={{ ...inputSt, flex: 1 }} placeholder="S/ 0.00" type="number"
                       value={p.precio} onChange={e => updProc(i, "precio", e.target.value)} />
                     {form.procedimientos.length > 1 && (
@@ -321,6 +325,11 @@ export default function Presupuestos() {
                     )}
                   </div>
                 ))}
+                <datalist id="presupuestos-procedimientos-list">
+                  {catalogoProcedimientos.map((cp) => (
+                    <option key={cp.id} value={cp.nombre} />
+                  ))}
+                </datalist>
                 <button type="button" onClick={addProc}
                   style={{ background: `${C.accent}08`, border: `1px dashed ${C.accent}40`,
                              borderRadius: 8, padding: "7px 14px", color: C.accentD,

@@ -72,6 +72,10 @@ export default function Clinicas() {
   // Modal de detalles / uso de espacio
   const [showDetallesModal, setShowDetallesModal] = useState(false);
   const [clinicaDetalles, setClinicaDetalles]     = useState(null);
+  const [showPermisosModal, setShowPermisosModal] = useState(false);
+  const [permisosClinica, setPermisosClinica] = useState(null);
+  const [usuarioPermisosSel, setUsuarioPermisosSel] = useState("");
+  const [usuarioPermisosDetalle, setUsuarioPermisosDetalle] = useState(null);
 
   // Solicitudes de licencia pendientes
   const [solicitudes, setSolicitudes]     = useState([]);
@@ -205,6 +209,78 @@ export default function Clinicas() {
       setAllModulos((prev) =>
         prev.map((m) => (m.id === modId ? { ...m, [campo]: valor ? 1 : 0 } : m))
       );
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const abrirPermisosModulo = async (clinica) => {
+    try {
+      const r = await api.get(`/clinicas/${clinica.id}/modulos-permisos`);
+      setPermisosClinica(r.data.data);
+      setUsuarioPermisosSel("");
+      setUsuarioPermisosDetalle(null);
+      setShowPermisosModal(true);
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const toggleModuloClinica = async (modulo, value) => {
+    if (!permisosClinica?.clinica?.id) return;
+    try {
+      await api.put(`/clinicas/${permisosClinica.clinica.id}/modulos-permisos/clinica`, {
+        modulo_id: modulo.id,
+        habilitado: value,
+      });
+      setPermisosClinica((prev) => ({
+        ...prev,
+        modulos: prev.modulos.map((m) => (m.id === modulo.id ? { ...m, habilitado_clinica: value ? 1 : 0 } : m)),
+      }));
+      if (usuarioPermisosDetalle) {
+        setUsuarioPermisosDetalle((prev) => ({
+          ...prev,
+          modulos: prev.modulos.map((m) => (m.modulo_id === modulo.id ? { ...m, habilitado_clinica: value ? 1 : 0 } : m)),
+        }));
+      }
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const cargarPermisosUsuario = async (usuarioId) => {
+    if (!usuarioId || !permisosClinica?.clinica?.id) return;
+    try {
+      const r = await api.get(`/clinicas/${permisosClinica.clinica.id}/modulos-permisos/usuario/${usuarioId}`);
+      setUsuarioPermisosDetalle(r.data.data);
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const toggleModuloUsuario = async (modulo, value) => {
+    if (!usuarioPermisosDetalle?.usuario?.id || !permisosClinica?.clinica?.id) return;
+    try {
+      await api.put(`/clinicas/${permisosClinica.clinica.id}/modulos-permisos/usuario/${usuarioPermisosDetalle.usuario.id}`, {
+        modulo_id: modulo.modulo_id,
+        habilitado: value,
+      });
+      setUsuarioPermisosDetalle((prev) => ({
+        ...prev,
+        modulos: prev.modulos.map((m) => (m.modulo_id === modulo.modulo_id ? { ...m, habilitado_usuario: value ? 1 : 0 } : m)),
+      }));
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const reaplicarPresetClinica = async () => {
+    if (!permisosClinica?.clinica?.id) return;
+    try {
+      await api.post(`/clinicas/${permisosClinica.clinica.id}/modulos-permisos/reaplicar-preset`);
+      const r = await api.get(`/clinicas/${permisosClinica.clinica.id}/modulos-permisos`);
+      setPermisosClinica(r.data.data);
+      if (usuarioPermisosSel) await cargarPermisosUsuario(usuarioPermisosSel);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     }
@@ -651,6 +727,18 @@ export default function Clinicas() {
                   padding: "12px 20px", borderTop: `1px solid ${C.border}`,
                   display: "flex", gap: 10,
                 }}>
+                  <button
+                    onClick={() => abrirPermisosModulo(c)}
+                    title="Permisos por módulos y doctores"
+                    style={{
+                      background: "rgba(16,185,129,.08)", border: "1px solid rgba(16,185,129,.2)",
+                      borderRadius: 8, padding: "8px 10px",
+                      color: C.success, fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    }}
+                  >
+                    <i className="bi bi-sliders" />
+                  </button>
                   <button
                     onClick={() => { setClinicaDetalles(c); setShowDetallesModal(true); }}
                     title="Ver detalles de uso y almacenamiento"
@@ -1620,6 +1708,99 @@ export default function Clinicas() {
           clinicaNombre={clinicaDetalles.nombre}
           onClose={() => { setShowDetallesModal(false); setClinicaDetalles(null); }}
         />
+      )}
+
+      {showPermisosModal && permisosClinica?.clinica && (
+        <div className="modal show d-block" style={{ background: "rgba(0,0,0,.62)" }}>
+          <div className="modal-dialog modal-xl modal-dialog-scrollable">
+            <div className="modal-content" style={{ background: C.card, color: C.text, border: `1px solid ${C.border}` }}>
+              <div className="modal-header" style={{ borderBottom: `1px solid ${C.border}` }}>
+                <h5 className="modal-title">
+                  Permisos de módulos: {permisosClinica.clinica.nombre}
+                </h5>
+                <div className="d-flex align-items-center gap-2">
+                  <button
+                    className="btn btn-sm btn-outline-warning"
+                    onClick={reaplicarPresetClinica}
+                    title="Reaplica módulos según tipo/especialidad de clínica"
+                  >
+                    <i className="bi bi-arrow-repeat me-1"></i>Reaplicar preset
+                  </button>
+                  <button className="btn-close btn-close-white" onClick={() => setShowPermisosModal(false)} />
+                </div>
+              </div>
+              <div className="modal-body">
+                <div className="row g-4">
+                  <div className="col-lg-6">
+                    <h6 style={{ color: C.accent }}>Por clínica</h6>
+                    <div className="small" style={{ color: C.muted, marginBottom: 10 }}>
+                      Estos permisos aplican a toda la clínica.
+                    </div>
+                    <div style={{ maxHeight: 420, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                      {permisosClinica.modulos.map((m) => (
+                        <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}>
+                          <div>
+                            <div style={{ fontWeight: 600 }}>{m.nombre}</div>
+                            <div style={{ fontSize: 12, color: C.muted }}>{m.clave}</div>
+                          </div>
+                          <input type="checkbox" checked={Number(m.habilitado_clinica) === 1} onChange={(e) => toggleModuloClinica(m, e.target.checked)} />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="col-lg-6">
+                    <h6 style={{ color: C.success }}>Por doctor/usuario</h6>
+                    <div className="small" style={{ color: C.muted, marginBottom: 10 }}>
+                      Excepciones individuales sobre permisos de clínica.
+                    </div>
+                    <select
+                      className="form-select mb-3"
+                      value={usuarioPermisosSel}
+                      onChange={(e) => {
+                        setUsuarioPermisosSel(e.target.value);
+                        setUsuarioPermisosDetalle(null);
+                        if (e.target.value) cargarPermisosUsuario(e.target.value);
+                      }}
+                      style={{ background: C.inputBg, color: C.text, border: `1px solid ${C.border}` }}
+                    >
+                      <option value="">Selecciona usuario...</option>
+                      {permisosClinica.usuarios.map((u) => (
+                        <option key={u.id} value={u.id}>
+                          {u.apellidos} {u.nombres} ({u.tipo})
+                        </option>
+                      ))}
+                    </select>
+                    {usuarioPermisosDetalle ? (
+                      <div style={{ maxHeight: 360, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                        {usuarioPermisosDetalle.modulos.map((m) => {
+                          const efectivo = m.habilitado_usuario === null || m.habilitado_usuario === undefined
+                            ? Number(m.habilitado_clinica) === 1
+                            : Number(m.habilitado_usuario) === 1;
+                          return (
+                            <div key={m.modulo_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}>
+                              <div>
+                                <div style={{ fontWeight: 600 }}>{m.nombre}</div>
+                                <div style={{ fontSize: 12, color: C.muted }}>
+                                  Clínica: {Number(m.habilitado_clinica) === 1 ? "ON" : "OFF"} | Efectivo: {efectivo ? "ON" : "OFF"}
+                                </div>
+                              </div>
+                              <input type="checkbox" checked={efectivo} onChange={(e) => toggleModuloUsuario(m, e.target.checked)} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ) : (
+                      <div style={{ color: C.muted, fontSize: 13 }}>Selecciona un usuario para ajustar permisos individuales.</div>
+                    )}
+                  </div>
+                </div>
+              </div>
+              <div className="modal-footer" style={{ borderTop: `1px solid ${C.border}` }}>
+                <button className="btn btn-secondary" onClick={() => setShowPermisosModal(false)}>Cerrar</button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
