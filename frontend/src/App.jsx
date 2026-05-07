@@ -51,16 +51,25 @@ const Inventario      = lazy(() => import("./pages/Inventario"));
 const DocumentosClinicos = lazy(() => import("./pages/DocumentosClinicos"));
 
 function PageSkeleton() {
+  const isClient = typeof window !== "undefined";
+  const w = isClient ? window.innerWidth : 1200;
+  const isMobile = w < 768;
+  const isTablet = w >= 768 && w < 1024;
+
+  const pad = isMobile ? "12px 14px" : isTablet ? "16px 18px" : "20px 24px";
+  const headH = isMobile ? 60 : isTablet ? 68 : 76;
+  const cardH = isMobile ? 180 : isTablet ? 220 : 260;
+
   return (
-    <div style={{ padding: "20px 24px" }}>
-      <div style={{ height: 76, borderRadius: 12, background: "#eef2f7", marginBottom: 18 }} />
-      <div style={{ height: 42, borderRadius: 10, background: "#f3f6fb", marginBottom: 14, width: "55%" }} />
+    <div style={{ padding: pad }}>
+      <div style={{ height: headH, borderRadius: 12, background: "#eef2f7", marginBottom: 14 }} />
+      <div style={{ height: isMobile ? 34 : 42, borderRadius: 10, background: "#f3f6fb", marginBottom: 12, width: isMobile ? "78%" : isTablet ? "65%" : "55%" }} />
       <div style={{ display: "grid", gap: 12 }}>
         <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "95%" }} />
         <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "88%" }} />
-        <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "92%" }} />
+        {!isMobile && <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "92%" }} />}
       </div>
-      <div style={{ height: 260, borderRadius: 12, background: "#eef2f7", marginTop: 18 }} />
+      <div style={{ height: cardH, borderRadius: 12, background: "#eef2f7", marginTop: 14 }} />
     </div>
   );
 }
