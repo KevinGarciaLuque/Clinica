@@ -75,7 +75,6 @@ export default function PerfilPaciente() {
   const [historias, setHistorias] = useState([]);
   const [documentos, setDocumentos] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
   const [esteticaResumen, setEsteticaResumen] = useState({
@@ -148,16 +147,6 @@ export default function PerfilPaciente() {
   // ══════════════════════════════════════════════════════════
   useEffect(() => { cargarTodo(); }, [id]);
   useEffect(() => { cargarEsteticaResumen(); }, [id]);
-  useEffect(() => {
-    let timer;
-    if (loading) {
-      timer = setTimeout(() => setShowLoadingSpinner(true), 180);
-    } else {
-      setShowLoadingSpinner(false);
-    }
-    return () => clearTimeout(timer);
-  }, [loading]);
-
   const cargarEsteticaResumen = async () => {
     setEsteticaResumen(r => ({ ...r, loading: true }));
     try {
@@ -167,33 +156,24 @@ export default function PerfilPaciente() {
       const consentimientos = JSON.parse(localStorage.getItem("consentimientos_est") || "[]")
         .filter(c => String(c.paciente_id) === String(id)).length;
       const seguimiento = JSON.parse(localStorage.getItem(`seguimiento_postop_${id}`) || "[]").length;
-
       const [resGaleria, resBiopsias] = await Promise.all([
         api.get(`/galeria-estetica/sesiones?paciente_id=${id}`),
         api.get(`/biopsias?paciente_id=${id}`),
       ]);
-
       setEsteticaResumen({
-        loading: false,
-        ficha,
-        presupuestos,
-        consentimientos,
-        seguimiento,
+        loading: false, ficha, presupuestos, consentimientos, seguimiento,
         galeria: (resGaleria.data.data || []).length,
         biopsias: resBiopsias.data.total || (resBiopsias.data.data || []).length,
       });
     } catch (err) {
-      console.log("No se pudo cargar el resumen estético:", err);
+      console.log("No se pudo cargar el resumen est�tico:", err);
       setEsteticaResumen({
         loading: false,
         ficha: localStorage.getItem(`ficha_estetica_${id}`) ? 1 : 0,
-        presupuestos: JSON.parse(localStorage.getItem("presupuestos_est") || "[]")
-          .filter(p => String(p.paciente_id) === String(id)).length,
-        consentimientos: JSON.parse(localStorage.getItem("consentimientos_est") || "[]")
-          .filter(c => String(c.paciente_id) === String(id)).length,
+        presupuestos: JSON.parse(localStorage.getItem("presupuestos_est") || "[]").filter(p => String(p.paciente_id) === String(id)).length,
+        consentimientos: JSON.parse(localStorage.getItem("consentimientos_est") || "[]").filter(c => String(c.paciente_id) === String(id)).length,
         seguimiento: JSON.parse(localStorage.getItem(`seguimiento_postop_${id}`) || "[]").length,
-        galeria: 0,
-        biopsias: 0,
+        galeria: 0, biopsias: 0,
       });
     }
   };
@@ -202,448 +182,36 @@ export default function PerfilPaciente() {
     setLoading(true);
     setMsg({ tipo: "", texto: "" });
     try {
-      // Cargar paciente
       const resPac = await api.get(`/pacientes/${id}`);
       const dataPac = resPac.data.data;
-      
-      // Formatear fecha para el input tipo date (YYYY-MM-DD)
-      if (dataPac.fecha_nacimiento) {
-        dataPac.fecha_nacimiento = dataPac.fecha_nacimiento.split('T')[0];
-      }
-      
+      if (dataPac.fecha_nacimiento) dataPac.fecha_nacimiento = dataPac.fecha_nacimiento.split("T")[0];
       setPaciente(dataPac);
       setForm(dataPac);
-      // Cargar datos secundarios en paralelo para reducir espera inicial
       const [histResult, alergiasResult, docsResult] = await Promise.allSettled([
         api.get(`/historias?paciente_id=${id}`),
         api.get(`/historias/paciente/${id}/alergias`),
         api.get(`/pacientes/${id}/documentos`),
       ]);
-
-      if (histResult.status === "fulfilled") {
-        setHistorias(histResult.value.data.data || []);
-      } else {
-        console.log("No hay historias cl�nicas");
-        setHistorias([]);
-      }
-
-      if (alergiasResult.status === "fulfilled") {
-        setAlergiasPac(alergiasResult.value.data.data || []);
-      } else {
-        setAlergiasPac([]);
-      }
-
-      if (docsResult.status === "fulfilled") {
-        setDocumentos(docsResult.value.data.data || []);
-      } else {
-        console.log("No hay documentos");
-        setDocumentos([]);
-      }
-} catch (err) {
+      if (histResult.status === "fulfilled") setHistorias(histResult.value.data.data || []); else { console.log("No hay historias cl�nicas"); setHistorias([]); }
+      if (alergiasResult.status === "fulfilled") setAlergiasPac(alergiasResult.value.data.data || []); else setAlergiasPac([]);
+      if (docsResult.status === "fulfilled") setDocumentos(docsResult.value.data.data || []); else { console.log("No hay documentos"); setDocumentos([]); }
+    } catch (err) {
       setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error cargando paciente" });
     } finally {
       setLoading(false);
     }
   };
 
-  // ── Expandir consulta → cargar detalle ──────────────────────────────────
-  const toggleExpandPP = async (hId) => {
-    if (expandId === hId) { setExpandId(null); return; }
-    setExpandId(hId);
-    if (!detalle[hId]) {
-      try {
-        const r = await api.get(`/historias/${hId}`);
-        setDetalle(d => ({ ...d, [hId]: r.data.data }));
-      } catch { /* silencio */ }
-    }
-  };
-
-  // ── Imprimir consulta ─────────────────────────────────────────────────────
-  const imprimirConsultaPP = async (h) => {
-    let det = detalle[h.id];
-    if (!det) {
-      try {
-        const r = await api.get(`/historias/${h.id}`);
-        det = r.data.data;
-        setDetalle(d => ({ ...d, [h.id]: det }));
-      } catch {
-        alert("No se pudo cargar el detalle de la consulta");
-        return;
-      }
-    }
-    const vitals = det.objetivo
-      ? (typeof det.objetivo === "string" ? JSON.parse(det.objetivo) : det.objetivo)
-      : {};
-    const vitalesHtml = ["pa","fc","fr","temp","peso","talla","spo2"]
-      .filter(k => vitals[k])
-      .map(k => {
-        const labels = { pa:"P.A.", fc:"F.C.", fr:"F.R.", temp:"Temp.", peso:"Peso", talla:"Talla", spo2:"SpO₂" };
-        const units  = { pa:"mmHg", fc:"bpm", fr:"rpm", temp:"°C", peso:"kg", talla:"cm", spo2:"%" };
-        return `<span class="vital">${labels[k]}: <strong>${vitals[k]}</strong> ${units[k]}</span>`;
-      }).join("");
-    const prescHtml = (det.prescripciones || []).map(p => `
-      <div class="section">
-        <div class="section-title">Receta #${p.id} — ${p.estado}</div>
-        <ul>${(p.items || []).filter(Boolean).map(it =>
-          `<li>${it.medicamento_nombre || it.medicamento_texto || ""}${it.dosis ? ` — ${it.dosis}` : ""}${it.duracion ? ` — ${it.duracion}` : ""}</li>`
-        ).join("")}</ul>
-      </div>`).join("");
-    const estudiosHtml = (det.estudios || []).length > 0 ? `
-      <div class="section">
-        <div class="section-title">Estudios solicitados</div>
-        <ul>${(det.estudios || []).map(s =>
-          `<li>[${s.tipo}] ${s.descripcion} — ${s.estado}</li>`
-        ).join("")}</ul>
-      </div>` : "";
-    const alergiasHtml = alergiasPac.length > 0
-      ? `<div class="alergias">⚠ Alergias: ${alergiasPac.map(a => `${a.agente} (${a.severidad})`).join(" | ")}</div>`
-      : "";
-    const html = `<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <title>Consulta — ${det.pac_nombres} ${det.pac_apellidos} — ${dayjs(det.creado_en).format("DD/MM/YYYY")}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 24px 32px; }
-    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #166ae8; padding-bottom: 12px; margin-bottom: 16px; }
-    .header-left h1 { font-size: 18px; color: #166ae8; }
-    .header-left p { font-size: 12px; color: #555; margin-top: 2px; }
-    .header-right { text-align: right; font-size: 12px; color: #555; }
-    .paciente { background: #f4f6fb; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
-    .paciente h2 { font-size: 15px; margin-bottom: 4px; }
-    .paciente .datos { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: #555; }
-    .alergias { background: #fff3cd; border: 1px solid #ffc107; border-radius: 4px; padding: 6px 10px; margin-bottom: 12px; font-size: 12px; font-weight: bold; color: #856404; }
-    .vitales { display: flex; flex-wrap: wrap; gap: 10px; background: #eef2ff; border-radius: 4px; padding: 10px 14px; margin-bottom: 14px; }
-    .vital { font-size: 12px; color: #333; }
-    .section { margin-bottom: 14px; }
-    .section-title { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #166ae8; border-bottom: 1px solid #dde3f5; padding-bottom: 3px; margin-bottom: 6px; }
-    .section p, .section pre { font-size: 13px; color: #333; white-space: pre-wrap; line-height: 1.5; }
-    ul { padding-left: 20px; } ul li { margin-bottom: 3px; }
-    .badge-cie { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; margin-right: 6px; }
-    .firma { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ccc; display: flex; justify-content: flex-end; }
-    .firma-box { text-align: center; }
-    .firma-box .linea { width: 200px; border-top: 1px solid #333; margin: 0 auto 4px; }
-    .firma-box p { font-size: 12px; color: #444; }
-    @media print { body { padding: 12px 20px; } }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <div class="header-left">
-      <h1>Historia Clínica Electrónica</h1>
-      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}${det.especialidad ? ` — ${det.especialidad}` : ""}</p>
-    </div>
-    <div class="header-right">
-      <p><strong>Fecha:</strong> ${dayjs(det.creado_en).format("DD/MM/YYYY HH:mm")}</p>
-      <p><strong>Estado:</strong> ${det.estado}</p>
-      <p><strong>Consulta #${det.id}</strong></p>
-    </div>
-  </div>
-  <div class="paciente">
-    <h2>${det.pac_nombres} ${det.pac_apellidos}</h2>
-    <div class="datos">
-      ${det.fecha_nacimiento ? `<span>Nacimiento: ${dayjs(det.fecha_nacimiento).format("DD/MM/YYYY")}</span>` : ""}
-      ${det.sexo ? `<span>Sexo: ${det.sexo}</span>` : ""}
-      ${det.pac_tel ? `<span>Tel: ${det.pac_tel}</span>` : ""}
-      ${det.pac_email ? `<span>Email: ${det.pac_email}</span>` : ""}
-    </div>
-  </div>
-  ${alergiasHtml}
-  ${vitalesHtml ? `<div class="vitales">${vitalesHtml}</div>` : ""}
-  ${det.diagnostico_cie ? `<div class="section"><div class="section-title">Diagnóstico</div><p><span class="badge-cie">CIE: ${det.diagnostico_cie}</span>${det.diagnostico_desc || ""}</p></div>` : ""}
-  ${det.subjetivo ? `<div class="section"><div class="section-title">Motivo / Anamnesis</div><p>${det.subjetivo}</p></div>` : ""}
-  ${det.examen_fisico ? `<div class="section"><div class="section-title">Examen Físico</div><pre>${det.examen_fisico}</pre></div>` : ""}
-  ${det.plan ? `<div class="section"><div class="section-title">Plan de tratamiento</div><pre>${det.plan}</pre></div>` : ""}
-  ${prescHtml}${estudiosHtml}
-  <div class="firma"><div class="firma-box"><div class="linea"></div><p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>${det.especialidad ? `<p>${det.especialidad}</p>` : ""}</div></div>
-</body></html>`;
-    const win = window.open("", "_blank", "width=800,height=900");
-    if (!win) { alert("El navegador bloqueó la ventana emergente. Permite popups para este sitio."); return; }
-    win.document.write(html);
-    win.document.close();
-    win.focus();
-    setTimeout(() => { win.print(); }, 400);
-  };
-
-  // ── PDF de receta ─────────────────────────────────────────────────────────
-  const printRxPP = async (rxId) => {
-    try {
-      const res = await api.get(`/prescripciones/${rxId}/pdf`, { responseType: "blob" });
-      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
-      window.open(url, "_blank");
-    } catch {
-      alert("No se pudo generar el PDF");
-    }
-  };
-
-  // ══════════════════════════════════════════════════════════
-  // PESTAÑA 1: DATOS GENERALES
-  // ══════════════════════════════════════════════════════════
-  const guardarDatos = async (e) => {
-    e.preventDefault();
-    setGuardando(true);
-    setMsg({ tipo: "", texto: "" });
-    try {
-      await api.put(`/pacientes/${id}`, form);
-      
-      // Si hay foto nueva, subirla
-      if (fotoFile) {
-        const fd = new FormData();
-        fd.append("foto", fotoFile);
-        await api.post(`/pacientes/${id}/foto`, fd, {
-          headers: { "Content-Type": "multipart/form-data" }
-        });
-        setFotoFile(null);
-        setFotoPreview(null);
-      }
-      
-      setMsg({ tipo: "success", texto: "Datos actualizados correctamente" });
-      setEditandoDatos(false);
-      await cargarTodo();
-    } catch (err) {
-      setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error al guardar" });
-    } finally {
-      setGuardando(false);
-    }
-  };
-
-  const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
-
-  const handleFotoChange = (e) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setFotoFile(file);
-      setFotoPreview(URL.createObjectURL(file));
-    }
-  };
-
-  // Webcam
-  useEffect(() => {
-    if (!showWebcam) return;
-    let stopped = false;
-    navigator.mediaDevices.getUserMedia({ video: { facingMode: webcamFacing } })
-      .then(stream => {
-        if (stopped) { stream.getTracks().forEach(t => t.stop()); return; }
-        streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      })
-      .catch(() => { setShowWebcam(false); alert("No se pudo acceder a la cámara."); });
-    return () => {
-      stopped = true;
-      streamRef.current?.getTracks().forEach(t => t.stop());
-    };
-  }, [showWebcam, webcamFacing]);
-
-  const cerrarWebcam = () => {
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    setShowWebcam(false);
-  };
-
-  const capturarFoto = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    const ctx = canvas.getContext("2d");
-    if (webcamFacing === "user") {
-      ctx.translate(canvas.width, 0);
-      ctx.scale(-1, 1);
-    }
-    ctx.drawImage(video, 0, 0);
-    canvas.toBlob(blob => {
-      const file = new File([blob], "webcam-foto.jpg", { type: "image/jpeg" });
-      setFotoFile(file);
-      setFotoPreview(URL.createObjectURL(blob));
-      cerrarWebcam();
-    }, "image/jpeg", 0.92);
-  };
-
-  // ══════════════════════════════════════════════════════════
-  // PESTAÑA 3: SUBIR EXÁMENES / DOCUMENTOS
-  // ══════════════════════════════════════════════════════════
-  const subirDocumento = async () => {
-    if (!archivo) return;
-    setSubiendo(true);
-    setMsg({ tipo: "", texto: "" });
-    try {
-      const fd = new FormData();
-      fd.append("archivo", archivo);
-      fd.append("tipo", tipoDoc);
-      await api.post(`/pacientes/${id}/documentos`, fd, {
-        headers: { "Content-Type": "multipart/form-data" }
-      });
-      setArchivo(null);
-      if (fileRef.current) fileRef.current.value = "";
-      setMsg({ tipo: "success", texto: "Documento subido correctamente" });
-      await cargarTodo();
-    } catch (err) {
-      setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error al subir" });
-    } finally {
-      setSubiendo(false);
-    }
-  };
-
-  const eliminarDocumento = async (docId) => {
-    try {
-      await api.delete(`/pacientes/${id}/documentos/${docId}`);
-      setMsg({ tipo: "success", texto: "Documento eliminado" });
-      setDocumentos(d => d.filter(doc => doc.id !== docId));
-    } catch {
-      setMsg({ tipo: "danger", texto: "Error al eliminar documento" });
-    } finally {
-      setDocAEliminar(null);
-    }
-  };
-
-  const documentosFiltrados = subTabDocumentos === "todos"
-    ? documentos
-    : documentos.filter(doc => doc.tipo === subTabDocumentos);
-
-  const contarDocumentos = (tipo) => documentos.filter(doc => doc.tipo === tipo).length;
-
-  // ── Consulta: mismo flujo que en listado de pacientes ─────────────────────
-  const handleConsultaClick = async (pacienteTarget) => {
-    if (!pacienteTarget?.id) return;
-    setCheckingCita(true);
-    try {
-      const hoy = dayjs().format("YYYY-MM-DD");
-      const res = await api.get("/citas", {
-        params: { desde: hoy, hasta: hoy, paciente_id: pacienteTarget.id }
-      });
-      const citasHoy = (res.data.data || []).filter(
-        c => !["CANCELADA", "NO_ASISTIO", "COMPLETADA"].includes(c.estado)
-      );
-      if (citasHoy.length > 0) {
-        navigate(`/consulta-medica?paciente_id=${pacienteTarget.id}&cita_id=${citasHoy[0].id}`);
-      } else {
-        setConsultaPaciente(pacienteTarget);
-        setShowConsultaModal(true);
-      }
-    } catch {
-      setConsultaPaciente(pacienteTarget);
-      setShowConsultaModal(true);
-    } finally {
-      setCheckingCita(false);
-    }
-  };
-
-  const reemplazarVarsRecordatorio = (texto = "") =>
-    String(texto || "")
-      .replaceAll("{paciente}", nombreCompleto || "")
-      .replaceAll("{clinica}", "Clínica")
-      .replaceAll("{medico}", "")
-      .replaceAll("{fecha}", dayjs().format("DD/MM/YYYY"))
-      .replaceAll("{hora}", dayjs().format("HH:mm"));
-
-  const htmlATextoPlano = (html = "") => {
-    const conSaltos = String(html || "")
-      .replace(/<br\s*\/?>/gi, "\n")
-      .replace(/<\/p>/gi, "\n")
-      .replace(/<\/div>/gi, "\n")
-      .replace(/<\/h[1-6]>/gi, "\n")
-      .replace(/<li>/gi, "• ")
-      .replace(/<\/li>/gi, "\n");
-    const sinTags = conSaltos.replace(/<[^>]+>/g, "");
-    return sinTags
-      .replace(/&nbsp;/g, " ")
-      .replace(/&amp;/g, "&")
-      .replace(/&lt;/g, "<")
-      .replace(/&gt;/g, ">")
-      .replace(/\n{3,}/g, "\n\n")
-      .trim();
-  };
-
-  const aplicarPlantillaCanal = (canal, plantillas = plantillasRecordatorio) => {
-    const lista = (plantillas || []).filter((p) => p.tipo === canal && Number(p.activo) === 1);
-    const plantilla = lista.find((p) => Number(p.es_predeterminada) === 1) || lista[0];
-    const contenidoBase = plantilla?.contenido || "Hola {paciente}, este es un recordatorio de su clínica.";
-    const contenidoLimpio = canal === "EMAIL" ? htmlATextoPlano(contenidoBase) : contenidoBase;
-    setReminderForm((prev) => ({
-      ...prev,
-      canal,
-      asunto: canal === "EMAIL" ? reemplazarVarsRecordatorio(plantilla?.asunto || `Recordatorio - ${nombreCompleto}`) : "",
-      contenido: reemplazarVarsRecordatorio(contenidoLimpio),
-    }));
-  };
-
-  const abrirModalRecordatorio = async () => {
-    setShowReminderModal(true);
-    setLoadingReminderData(true);
-    try {
-      const { data } = await api.get("/recordatorios/plantillas");
-      const plantillas = data?.plantillas || [];
-      setPlantillasRecordatorio(plantillas);
-      aplicarPlantillaCanal("EMAIL", plantillas);
-    } catch (err) {
-      setPlantillasRecordatorio([]);
-      setReminderForm({
-        canal: "EMAIL",
-        asunto: `Recordatorio - ${nombreCompleto}`,
-        contenido: `Hola ${nombreCompleto}, este es un recordatorio de su clínica.`,
-      });
-      setMsg({ tipo: "danger", texto: err?.response?.data?.error || "No se pudieron cargar plantillas de recordatorio" });
-    } finally {
-      setLoadingReminderData(false);
-    }
-  };
-
-  const enviarRecordatorioManual = async () => {
-    if (!reminderForm.contenido?.trim()) {
-      setMsg({ tipo: "danger", texto: "Escribe el contenido del recordatorio" });
-      return;
-    }
-    setSendingReminder(true);
-    try {
-      await api.post("/recordatorios/enviar-manual", {
-        paciente_id: paciente.id,
-        canal: reminderForm.canal,
-        asunto: reminderForm.asunto,
-        contenido: reminderForm.contenido,
-      });
-      setMsg({ tipo: "success", texto: `Recordatorio ${reminderForm.canal} enviado correctamente` });
-      setShowReminderModal(false);
-    } catch (err) {
-      setMsg({ tipo: "danger", texto: err?.response?.data?.error || "Error al enviar recordatorio manual" });
-    } finally {
-      setSendingReminder(false);
-    }
-  };
-
-  // ══════════════════════════════════════════════════════════
-  // PESTAÑA 4: ELIMINAR PACIENTE (Doble confirmación)
-  // ══════════════════════════════════════════════════════════
-  const eliminarPaciente = async () => {
-    const nombreCompleto = `${paciente.nombres} ${paciente.apellidos}`;
-    if (textoConfirmacion !== nombreCompleto) {
-      setMsg({ tipo: "danger", texto: "El nombre no coincide. Por favor verifica." });
-      return;
-    }
-    
-    setEliminando(true);
-    try {
-      await api.delete(`/pacientes/${id}`);
-      setMsg({ tipo: "success", texto: "Paciente eliminado correctamente" });
-      setTimeout(() => navigate("/pacientes"), 1500);
-    } catch (err) {
-      setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error al eliminar" });
-      setEliminando(false);
-    }
-  };
-
-  // ══════════════════════════════════════════════════════════
-  // RENDER
-  // ══════════════════════════════════════════════════════════
   if (loading) {
-    if (showLoadingSpinner) {
-      return (
-        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: 400 }}>
-          <div className="spinner-border text-primary" />
-        </div>
-      );
-    }
-    return <div style={{ minHeight: 400 }} />;
+    return (
+      <div style={{ padding: "14px", minHeight: 400 }}>
+        <div style={{ height: 64, borderRadius: 12, background: "#eef2f7", marginBottom: 12 }} />
+        <div style={{ height: 36, borderRadius: 10, background: "#f3f6fb", marginBottom: 12, width: "70%" }} />
+        <div style={{ height: 12, borderRadius: 8, background: "#f3f6fb", marginBottom: 10, width: "95%" }} />
+        <div style={{ height: 12, borderRadius: 8, background: "#f3f6fb", marginBottom: 10, width: "86%" }} />
+        <div style={{ height: 220, borderRadius: 12, background: "#eef2f7", marginTop: 12 }} />
+      </div>
+    );
   }
 
   if (!paciente) {
@@ -2490,6 +2058,8 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     </div>
   );
 }
+
+
 
 
 
