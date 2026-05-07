@@ -201,7 +201,86 @@ export default function PerfilPaciente() {
       setLoading(false);
     }
   };
+  const htmlATextoPlano = (html = "") => {
+    const conSaltos = String(html || "")
+      .replace(/<br\s*\/?>/gi, "\n")
+      .replace(/<\/p>/gi, "\n")
+      .replace(/<\/div>/gi, "\n")
+      .replace(/<\/h[1-6]>/gi, "\n")
+      .replace(/<li>/gi, "* ")
+      .replace(/<\/li>/gi, "\n");
+    const sinTags = conSaltos.replace(/<[^>]+>/g, "");
+    return sinTags
+      .replace(/&nbsp;/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&lt;/g, "<")
+      .replace(/&gt;/g, ">")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  };
 
+  const reemplazarVarsRecordatorio = (texto = "") => {
+    const pacienteNombre = `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim();
+    return String(texto || "")
+      .replaceAll("{paciente}", pacienteNombre)
+      .replaceAll("{clinica}", "Clinica")
+      .replaceAll("{medico}", "")
+      .replaceAll("{fecha}", dayjs().format("DD/MM/YYYY"))
+      .replaceAll("{hora}", dayjs().format("HH:mm"));
+  };
+
+  const aplicarPlantillaCanal = (canal, plantillas = plantillasRecordatorio) => {
+    const lista = (plantillas || []).filter((p) => p.tipo === canal && Number(p.activo) === 1);
+    const plantilla = lista.find((p) => Number(p.es_predeterminada) === 1) || lista[0];
+    const contenidoBase = plantilla?.contenido || "Hola {paciente}, este es un recordatorio de su clinica.";
+    const contenidoLimpio = canal === "EMAIL" ? htmlATextoPlano(contenidoBase) : contenidoBase;
+    setReminderForm({
+      canal,
+      asunto: canal === "EMAIL" ? reemplazarVarsRecordatorio(plantilla?.asunto || "Recordatorio de cita") : "",
+      contenido: reemplazarVarsRecordatorio(contenidoLimpio),
+    });
+  };
+
+  const abrirModalRecordatorio = async () => {
+    if (!paciente?.id) return;
+    setShowReminderModal(true);
+    setLoadingReminderData(true);
+    try {
+      const { data } = await api.get("/recordatorios/plantillas");
+      const plantillas = data?.plantillas || [];
+      setPlantillasRecordatorio(plantillas);
+      aplicarPlantillaCanal("EMAIL", plantillas);
+    } catch {
+      setPlantillasRecordatorio([]);
+      setReminderForm({
+        canal: "EMAIL",
+        asunto: "Recordatorio de cita",
+        contenido: reemplazarVarsRecordatorio("Hola {paciente}, le recordamos su cita en la clinica."),
+      });
+    } finally {
+      setLoadingReminderData(false);
+    }
+  };
+
+  const enviarRecordatorioManual = async () => {
+    if (!paciente?.id) return alert("No se encontro el paciente para este recordatorio");
+    if (!reminderForm.contenido?.trim()) return alert("Escribe el contenido del recordatorio");
+    setSendingReminder(true);
+    try {
+      await api.post("/recordatorios/enviar-manual", {
+        paciente_id: paciente.id,
+        canal: reminderForm.canal,
+        asunto: reminderForm.asunto,
+        contenido: reminderForm.contenido,
+      });
+      alert(`Recordatorio ${reminderForm.canal} enviado correctamente`);
+      setShowReminderModal(false);
+    } catch (err) {
+      alert(err.response?.data?.error || "Error al enviar recordatorio");
+    } finally {
+      setSendingReminder(false);
+    }
+  };
   if (loading) {
     return (
       <div style={{ padding: "14px", minHeight: 400 }}>
@@ -2058,6 +2137,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     </div>
   );
 }
+
 
 
 
