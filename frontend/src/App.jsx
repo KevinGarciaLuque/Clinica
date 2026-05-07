@@ -50,6 +50,21 @@ const Cumpleaneros    = lazy(() => import("./pages/Cumpleaneros"));
 const Inventario      = lazy(() => import("./pages/Inventario"));
 const DocumentosClinicos = lazy(() => import("./pages/DocumentosClinicos"));
 
+function PageSkeleton() {
+  return (
+    <div style={{ padding: "20px 24px" }}>
+      <div style={{ height: 76, borderRadius: 12, background: "#eef2f7", marginBottom: 18 }} />
+      <div style={{ height: 42, borderRadius: 10, background: "#f3f6fb", marginBottom: 14, width: "55%" }} />
+      <div style={{ display: "grid", gap: 12 }}>
+        <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "95%" }} />
+        <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "88%" }} />
+        <div style={{ height: 14, borderRadius: 8, background: "#f3f6fb", width: "92%" }} />
+      </div>
+      <div style={{ height: 260, borderRadius: 12, background: "#eef2f7", marginTop: 18 }} />
+    </div>
+  );
+}
+
 /** Componente para proteger rutas por rol */
 function RolRoute({ children, roles }) {
   const raw = localStorage.getItem("user");
@@ -62,7 +77,7 @@ function RolRoute({ children, roles }) {
 
 export default function App() {
   return (
-    <Suspense fallback={<div style={{display:"flex",justifyContent:"center",alignItems:"center",height:"100vh",color:"#6c757d"}}>Cargando...</div>}>
+    <Suspense fallback={null}>
     <Routes>
       {/* Rutas públicas */}
       <Route path="/login"           element={<Login />} />
@@ -80,13 +95,13 @@ export default function App() {
         {/* Rutas generales */}
         <Route path="/"                       element={<Dashboard />} />
         <Route path="/pacientes"              element={<Pacientes />} />
-        <Route path="/pacientes/:id/perfil"   element={<PerfilPaciente />} />
+        <Route path="/pacientes/:id/perfil"   element={<Suspense fallback={<PageSkeleton />}><PerfilPaciente /></Suspense>} />
         <Route path="/citas"                  element={<Citas />} />
         <Route path="/chat-ia"                element={<ChatIA />} />
         <Route path="/consulta"               element={<Consulta />} />
-        <Route path="/consulta-medica"        element={<ConsultaMedica />} />
-        <Route path="/historia/:paciente_id"  element={<HistoriaClinica />} />
-        <Route path="/historia"               element={<HistoriaClinica />} />
+        <Route path="/consulta-medica"        element={<Suspense fallback={<PageSkeleton />}><ConsultaMedica /></Suspense>} />
+        <Route path="/historia/:paciente_id"  element={<Suspense fallback={<PageSkeleton />}><HistoriaClinica /></Suspense>} />
+        <Route path="/historia"               element={<Suspense fallback={<PageSkeleton />}><HistoriaClinica /></Suspense>} />
         <Route path="/estudios"               element={<Estudios />} />
         <Route path="/perfil"                 element={<PerfilUsuario />} />
         <Route path="/catalogos"              element={<Catalogos />} />
@@ -96,7 +111,9 @@ export default function App() {
         <Route path="/inventario"             element={<Inventario />} />
         <Route path="/documentos-clinicos"    element={
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
-            <DocumentosClinicos />
+            <Suspense fallback={<PageSkeleton />}>
+              <DocumentosClinicos />
+            </Suspense>
           </RolRoute>
         } />
 

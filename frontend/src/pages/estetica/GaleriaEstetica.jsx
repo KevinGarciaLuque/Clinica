@@ -995,7 +995,7 @@ function SesionFotos({ sesion, pacId, onCerrar }) {
     const h = () => setIsMobile(window.innerWidth < 768);
     window.addEventListener("resize", h);
     return () => window.removeEventListener("resize", h);
-  }, [pacienteIdInicial]);
+  }, []);
 
   if (cargando) return <Spin />;
 

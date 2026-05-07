@@ -75,6 +75,7 @@ export default function PerfilPaciente() {
   const [historias, setHistorias] = useState([]);
   const [documentos, setDocumentos] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
   const [esteticaResumen, setEsteticaResumen] = useState({
@@ -147,6 +148,15 @@ export default function PerfilPaciente() {
   // ══════════════════════════════════════════════════════════
   useEffect(() => { cargarTodo(); }, [id]);
   useEffect(() => { cargarEsteticaResumen(); }, [id]);
+  useEffect(() => {
+    let timer;
+    if (loading) {
+      timer = setTimeout(() => setShowLoadingSpinner(true), 180);
+    } else {
+      setShowLoadingSpinner(false);
+    }
+    return () => clearTimeout(timer);
+  }, [loading]);
 
   const cargarEsteticaResumen = async () => {
     setEsteticaResumen(r => ({ ...r, loading: true }));
@@ -203,32 +213,33 @@ export default function PerfilPaciente() {
       
       setPaciente(dataPac);
       setForm(dataPac);
-      
-      // Cargar historias clínicas
-      try {
-        const resHist = await api.get(`/historias?paciente_id=${id}`);
-        setHistorias(resHist.data.data || []);
-      } catch (e) {
-        console.log("No hay historias clínicas");
+      // Cargar datos secundarios en paralelo para reducir espera inicial
+      const [histResult, alergiasResult, docsResult] = await Promise.allSettled([
+        api.get(`/historias?paciente_id=${id}`),
+        api.get(`/historias/paciente/${id}/alergias`),
+        api.get(`/pacientes/${id}/documentos`),
+      ]);
+
+      if (histResult.status === "fulfilled") {
+        setHistorias(histResult.value.data.data || []);
+      } else {
+        console.log("No hay historias cl�nicas");
         setHistorias([]);
       }
 
-      // Cargar alergias (para impresión de consulta)
-      try {
-        const resAl = await api.get(`/historias/paciente/${id}/alergias`);
-        setAlergiasPac(resAl.data.data || []);
-      } catch { setAlergiasPac([]); }
-      
-      // Cargar documentos
-      try {
-        const resDocs = await api.get(`/pacientes/${id}/documentos`);
-        setDocumentos(resDocs.data.data || []);
-      } catch (e) {
+      if (alergiasResult.status === "fulfilled") {
+        setAlergiasPac(alergiasResult.value.data.data || []);
+      } else {
+        setAlergiasPac([]);
+      }
+
+      if (docsResult.status === "fulfilled") {
+        setDocumentos(docsResult.value.data.data || []);
+      } else {
         console.log("No hay documentos");
         setDocumentos([]);
       }
-      
-    } catch (err) {
+} catch (err) {
       setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error cargando paciente" });
     } finally {
       setLoading(false);
@@ -624,7 +635,7 @@ export default function PerfilPaciente() {
   // ══════════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════════
-  if (loading) {
+  if (loading && showLoadingSpinner) {
     return (
       <div className="d-flex justify-content-center align-items-center" style={{ minHeight: 400 }}>
         <div className="spinner-border text-primary" />
@@ -2476,3 +2487,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     </div>
   );
 }
+
+
+
+

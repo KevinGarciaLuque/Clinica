@@ -79,6 +79,14 @@ const FORM_VACIO = {
   foto_perfil: null,
 };
 
+let perfilPacientePreloadPromise = null;
+const preloadPerfilPaciente = () => {
+  if (!perfilPacientePreloadPromise) {
+    perfilPacientePreloadPromise = import("./PerfilPaciente");
+  }
+  return perfilPacientePreloadPromise;
+};
+
 export default function Pacientes() {
   const { user }  = useAuth();
   const navigate = useNavigate();
@@ -119,6 +127,19 @@ export default function Pacientes() {
   };
 
   useEffect(() => { cargar(); }, []);  // eslint-disable-line
+
+  useEffect(() => {
+    if (!lista.length) return;
+    if (typeof window === "undefined") return;
+    if (typeof window.requestIdleCallback === "function") {
+      const id = window.requestIdleCallback(() => {
+        preloadPerfilPaciente();
+      }, { timeout: 1500 });
+      return () => window.cancelIdleCallback?.(id);
+    }
+    const t = setTimeout(() => preloadPerfilPaciente(), 600);
+    return () => clearTimeout(t);
+  }, [lista.length]);
 
   const guardarPaciente = async (e) => {
     e.preventDefault();
@@ -649,7 +670,10 @@ export default function Pacientes() {
                   <tr 
                     key={p.id} 
                     onClick={() => navigate(`/pacientes/${p.id}/perfil`)}
-                    onMouseEnter={() => setHoveredRow(p.id)}
+                    onMouseEnter={() => {
+                      setHoveredRow(p.id);
+                      preloadPerfilPaciente();
+                    }}
                     onMouseLeave={() => setHoveredRow(null)}
                     style={{ 
                       borderBottom: `1px solid ${C.border}`,
@@ -665,6 +689,7 @@ export default function Pacientes() {
                             if (p.foto_perfil) {
                               setModalFoto(fotoUrl(p.foto_perfil));
                             } else {
+                              preloadPerfilPaciente();
                               navigate(`/pacientes/${p.id}/perfil`);
                             }
                           }}
@@ -745,7 +770,8 @@ export default function Pacientes() {
                         </button>
                         <Link 
                           to={`/pacientes/${p.id}/perfil`}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); preloadPerfilPaciente(); }}
+                          onMouseEnter={preloadPerfilPaciente}
                           style={{
                             background: "rgba(13,110,253,0.1)", border: "none", borderRadius: 6,
                             padding: "6px 12px", color: C.accent, fontSize: 12, fontWeight: 600,
@@ -776,7 +802,8 @@ export default function Pacientes() {
                         </button>
                         <Link 
                           to={`/pacientes/${p.id}/perfil?tab=crecimiento`}
-                          onClick={(e) => e.stopPropagation()}
+                          onClick={(e) => { e.stopPropagation(); preloadPerfilPaciente(); }}
+                          onMouseEnter={preloadPerfilPaciente}
                           style={{
                             background: "rgba(14,165,233,0.1)", border: "none", borderRadius: 6,
                             padding: "6px 12px", color: "#0ea5e9", fontSize: 12, fontWeight: 600,
