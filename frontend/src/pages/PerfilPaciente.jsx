@@ -635,12 +635,15 @@ export default function PerfilPaciente() {
   // ══════════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════════
-  if (loading && showLoadingSpinner) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: 400 }}>
-        <div className="spinner-border text-primary" />
-      </div>
-    );
+  if (loading) {
+    if (showLoadingSpinner) {
+      return (
+        <div className="d-flex justify-content-center align-items-center" style={{ minHeight: 400 }}>
+          <div className="spinner-border text-primary" />
+        </div>
+      );
+    }
+    return <div style={{ minHeight: 400 }} />;
   }
 
   if (!paciente) {
@@ -2487,6 +2490,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     </div>
   );
 }
+
 
 
 
