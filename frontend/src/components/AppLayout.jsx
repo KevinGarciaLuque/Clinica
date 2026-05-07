@@ -141,7 +141,9 @@ export default function AppLayout() {
           className="flex-grow-1 p-3 p-md-4"
           style={{ overflowY: "auto", background: "#f1f5f9", minWidth: 0, height: "100%" }}
         >
-          <Outlet />
+          <div key={pathname} className="route-fade-enter">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
