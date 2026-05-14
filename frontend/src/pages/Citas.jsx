@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
 import { useAuth } from "../auth/AuthContext";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
@@ -260,6 +260,7 @@ function eventPropGetter(event) {
 
 // ─── componente principal ─────────────────────────────────────────────────────
 export default function Citas() {
+  const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [tipoClinica, setTipoClinica] = useState("");
@@ -373,6 +374,13 @@ export default function Citas() {
     setSelEvent(event);
     setShowDet(true);
     setTimeout(() => headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
+  };
+
+  const verHistoriaClinica = () => {
+    const pacienteId = selEvent?.resource?.paciente_id;
+    if (!pacienteId) return;
+    setShowDet(false);
+    navigate(`/pacientes/${pacienteId}/perfil?tab=historial`);
   };
 
   const cambiarEstado = (estado) => {
@@ -718,6 +726,7 @@ export default function Citas() {
           onMostrarConfirmDelete={() => setShowConfirmDelete(true)}
           onEditar={() => { setShowDet(false); setShowEdit(true); }}
           onRecordatorio={abrirRecordatorio}
+          onVerHistoria={verHistoriaClinica}
         />
       )}
 
@@ -1191,7 +1200,7 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
 }
 
 // ─── Modal Detalle Cita ───────────────────────────────────────────────────────
-function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar, onRecordatorio }) {
+function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar, onRecordatorio, onVerHistoria }) {
   const c = event.resource;
   const color = ESTADO_COLOR[c.estado] || { bg: "#6c757d", fg: "#fff" };
   const ACCIONES = {
@@ -1272,6 +1281,9 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
             )}
             <button className="btn btn-outline-success btn-sm" onClick={onRecordatorio}>
               <i className="bi bi-bell me-1"></i>Recordatorio
+            </button>
+            <button className="btn btn-outline-info btn-sm" onClick={onVerHistoria}>
+              <i className="bi bi-journal-medical me-1"></i>Ver historia clínica
             </button>
             {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
               <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
