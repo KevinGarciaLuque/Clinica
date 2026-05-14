@@ -10,14 +10,14 @@ import { useAuth } from "../auth/AuthContext";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const VITALS_FIELDS = [
-  { key: "pa",    label: "P.A.",   placeholder: "120/80",  unit: "mmHg" },
-  { key: "fc",    label: "F.C.",   placeholder: "72",      unit: "bpm"  },
-  { key: "fr",    label: "F.R.",   placeholder: "16",      unit: "rpm"  },
-  { key: "temp",  label: "Temp.",  placeholder: "36.5",    unit: "°C"   },
-  { key: "peso",  label: "Peso",   placeholder: "70",      unit: "kg"   },
-  { key: "talla", label: "Talla",  placeholder: "170",     unit: "cm"   },
-  { key: "spo2",  label: "SpO₂",  placeholder: "98",      unit: "%"    },
-  { key: "imc",   label: "IMC",   placeholder: "—",       unit: "kg/m²", readOnly: true },
+  { key: "pa",    label: "P.A.",   placeholder: "Ej: 120/80", unit: "mmHg" },
+  { key: "fc",    label: "F.C.",   placeholder: "Ej: 72",     unit: "bpm"  },
+  { key: "fr",    label: "F.R.",   placeholder: "Ej: 16",     unit: "rpm"  },
+  { key: "temp",  label: "Temp.",  placeholder: "Ej: 36.5",   unit: "°C"   },
+  { key: "peso",  label: "Peso",   placeholder: "Ej: 70",     unit: "kg"   },
+  { key: "talla", label: "Talla",  placeholder: "Ej: 170",    unit: "cm"   },
+  { key: "spo2",  label: "SpO₂",   placeholder: "Ej: 98",     unit: "%"    },
+  { key: "imc",   label: "IMC",    placeholder: "Auto",       unit: "kg/m²", readOnly: true },
 ];
 
 function calcIMC(peso, talla) {
@@ -888,6 +888,16 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
 
   return (
     <div className="row g-3">
+      <style>{`
+        .vital-input::placeholder {
+          color: #b8c1cc !important;
+          opacity: 1 !important;
+        }
+        .vital-input.vital-empty {
+          color: #8b95a1 !important;
+          font-style: italic;
+        }
+      `}</style>
       {/* Signos vitales */}
       <div className="col-12">
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", padding: "16px 20px", boxShadow: "0 1px 4px rgba(0,0,0,.05)" }}>
@@ -905,10 +915,16 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
                     {f.label} <span style={{ color: "#9ca3af" }}>{f.unit}</span>
                   </div>
                   <input
-                    className="form-control form-control-sm border-0 p-0"
-                    style={{ background: "transparent", fontWeight: 600, fontSize: "0.9rem", color: "#111827" }}
+                    className={`form-control form-control-sm border-0 p-0 vital-input ${vitals[f.key] ? "" : "vital-empty"}`}
+                    style={{
+                      background: "transparent",
+                      fontWeight: vitals[f.key] ? 600 : 500,
+                      fontSize: "0.9rem",
+                      color: vitals[f.key] ? "#111827" : "#9ca3af",
+                    }}
                     placeholder={f.placeholder}
                     value={vitals[f.key] || ""}
+                    autoComplete="off"
                     readOnly={f.readOnly || firmada}
                     onChange={f.readOnly ? undefined : e => setVitals(v => ({ ...v, [f.key]: e.target.value }))}
                   />
