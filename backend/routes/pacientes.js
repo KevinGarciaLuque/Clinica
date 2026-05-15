@@ -18,9 +18,9 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
       return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
     }
 
-    const q = (req.query.q || "").trim();
+    const q = (req.query.q || "").trim().slice(0, 100);
     let sql =
-      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id FROM pacientes ";
+      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes ";
     const params = [];
 
     // Filtrar por clínica si no es SUPER_ADMIN
@@ -53,15 +53,15 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
     // SUPER_ADMIN puede ver todos los pacientes, otros solo de su clínica
     let query, params;
     if (isSuperAdmin) {
-      query = "SELECT * FROM pacientes WHERE id = ?";
+      query = "SELECT p.*, TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) AS edad FROM pacientes p WHERE p.id = ?";
       params = [req.params.id];
     } else {
-      query = "SELECT * FROM pacientes WHERE id = ? AND clinica_id = ?";
+      query = "SELECT p.*, TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) AS edad FROM pacientes p WHERE p.id = ? AND p.clinica_id = ?";
       params = [req.params.id, clinicaId];
     }
-    
+
     const [[p]] = await pool.query(query, params);
-    
+
     if (!p) {
       return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
     }
@@ -82,6 +82,19 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
 
     if (!nombres || !apellidos) {
       return res.status(400).json({ ok: false, msg: "nombres y apellidos son obligatorios" });
+    }
+    if (nombres.length > 150 || apellidos.length > 150) {
+      return res.status(400).json({ ok: false, msg: "Nombres o apellidos demasiado largos (máx. 150 caracteres)" });
+    }
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      return res.status(400).json({ ok: false, msg: "Formato de email inválido" });
+    }
+    if (fecha_nacimiento) {
+      const nac = new Date(fecha_nacimiento);
+      const ahora = new Date();
+      if (isNaN(nac.getTime()) || nac > ahora || nac.getFullYear() < 1900) {
+        return res.status(400).json({ ok: false, msg: "Fecha de nacimiento inválida" });
+      }
     }
 
     // Formatear fecha si viene en formato ISO
@@ -227,6 +240,9 @@ router.post(
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
+      if (req.file.size > 5 * 1024 * 1024) {
+        return res.status(400).json({ ok: false, msg: "El archivo excede el tamaño máximo permitido (5 MB)" });
+      }
 
       const clinicaId    = req.tenant?.clinica_id;
       const { id }       = req.params;
@@ -251,7 +267,9 @@ router.post(
       if (isCloudinaryConfigured) {
         // Eliminar foto anterior de Cloudinary si existe
         if (p.foto_cloudinary_id) {
-          try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
+          try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch (err) {
+            console.error("[foto/upload] No se pudo eliminar foto anterior de Cloudinary:", err.message);
+          }
         }
 
         // Subir nueva foto a Cloudinary desde el buffer en memoria

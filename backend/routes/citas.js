@@ -92,6 +92,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
                       p.fecha_nacimiento AS paciente_fecha_nac,
                       p.ciudad AS paciente_ciudad,
                       p.departamento AS paciente_departamento,
+                      p.foto_perfil AS paciente_foto_perfil,
                       u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
                       e.nombre AS especialidad
                FROM citas c

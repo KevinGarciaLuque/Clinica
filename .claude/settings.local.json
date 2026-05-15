@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(edad)",
+      "Bash(grep -rn \"`edad`\\\\|edad \" \"c:/Programacion/Clinica/backend/routes/setup.js\")",
+      "Bash(node --input-type=module --eval \"import\\('./src/pages/ConsultaMedica.jsx'\\)\")",
+      "Bash(npx vite *)"
+    ]
+  }
+}

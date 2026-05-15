@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
 import { useAuth } from "../auth/AuthContext";
@@ -13,6 +14,13 @@ import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 dayjs.locale("es");
 const localizer = dayjsLocalizer(dayjs);
 const DnDCalendar = withDragAndDrop(Calendar);
+
+const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const fotoUrl = (foto) => {
+  if (!foto) return null;
+  if (foto.startsWith("http")) return foto;
+  return `${API_BASE}/uploads/${foto.replace(/^\/?uploads\//, "")}`;
+};
 
 // ─── Helper edad ─────────────────────────────────────────────────────────────
 function calcEdad(fechaNac) {
@@ -1090,162 +1098,187 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
     }
   };
 
-  return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 1055 }}>
-      <div className="modal-dialog modal-dialog-centered modal-dialog-scrollable" style={{ maxWidth: 480, margin: "1rem auto" }}>
-        <div className="modal-content" style={{ fontSize: "0.85rem" }}>
-          <div className="modal-header py-2 px-3">
-            <h6 className="modal-title mb-0 fw-bold">
-              <i className="bi bi-calendar-plus me-2 text-primary" />
-              Nueva Cita
-            </h6>
-            <button className="btn-close btn-sm" onClick={onClose} />
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1055,
+      background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 500, background: "#fff",
+        borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        overflow: "hidden", display: "flex", flexDirection: "column",
+        maxHeight: "calc(100vh - 40px)",
+      }}>
+        {/* Header */}
+        <div style={{
+          background: "linear-gradient(135deg, #213564 0%, #1a2744 100%)",
+          padding: "14px 18px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="bi bi-calendar-plus" style={{ color: "#93c5fd", fontSize: "1.1rem" }}></i>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Nueva Cita</div>
           </div>
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body px-3 py-2">
-              {err && <div className="alert alert-danger py-1 px-2 mb-2" style={{ fontSize: "0.8rem" }}>{err}</div>}
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
 
-              <div className="row g-2">
-                {/* Paciente */}
-                <div className="col-12 position-relative">
-                  <label className="form-label mb-1">Paciente</label>
-                  <input className="form-control form-control-sm" placeholder="Buscar por nombre o DNI…"
-                    value={pacBusq}
-                    onChange={e => { setPacBusq(e.target.value); setPacSel(null); setForm(f => ({ ...f, paciente_id: "" })); }} />
-                  {pacList.length > 0 && (
-                    <ul className="list-group position-absolute z-3 shadow-sm" style={{ top: "100%", left: 0, right: 0, maxHeight: 160, overflowY: "auto", fontSize: "0.8rem" }}>
-                      {pacList.map(p => {
-                        const edad = calcEdad(p.fecha_nacimiento);
-                        return (
-                          <li key={p.id} className="list-group-item list-group-item-action py-2 px-2" style={{ cursor: "pointer" }}
-                            onClick={() => selPaciente(p)}>
-                            <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#111827" }}>
-                              {p.nombres} {p.apellidos}
-                            </div>
-                            <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
-                              {p.dni && <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>DNI {p.dni}</span>}
-                              {edad && (
-                                <span style={{
-                                  background: "rgba(124,58,237,.1)", color: "#6d28d9",
-                                  borderRadius: 4, padding: "0 5px", fontSize: "0.68rem", fontWeight: 700,
-                                }}>{edad}</span>
-                              )}
-                              {p.ciudad && (
-                                <span style={{
-                                  background: "rgba(14,165,233,.1)", color: "#0369a1",
-                                  borderRadius: 4, padding: "0 5px", fontSize: "0.68rem", fontWeight: 700,
-                                }}>
-                                  <i className="bi bi-geo-alt" style={{ fontSize: 9 }} /> {p.ciudad}
-                                </span>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                  {pacSel && (
-                    <div style={{
-                      marginTop: 6, padding: "6px 10px", borderRadius: 8,
-                      background: "rgba(34,197,94,.07)", border: "1px solid rgba(34,197,94,.25)",
-                    }}>
-                      <ChipPacienteCita
-                        apellidos={pacSel.apellidos}
-                        nombres={pacSel.nombres}
-                        ciudad={pacSel.ciudad}
-                        fechaNac={pacSel.fecha_nacimiento}
-                        tel={pacSel.telefono}
-                        size="sm"
-                      />
-                    </div>
-                  )}
-                </div>
+        {/* Body */}
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+          <div style={{ padding: "18px 20px", overflowY: "auto", flex: 1, fontSize: "0.85rem" }}>
+            {err && <div className="alert alert-danger py-1 px-2 mb-3" style={{ fontSize: "0.8rem", borderRadius: 8 }}><i className="bi bi-exclamation-triangle me-1"></i>{err}</div>}
 
-                {/* Médico + Fecha */}
-                <div className="col-8">
-                  <label className="form-label mb-1">Médico</label>
-                  <select className="form-select form-select-sm" value={form.medico_id}
-                    onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
-                    <option value="">— Selecciona —</option>
-                    {medicos.map(m => (
-                      <option key={m.id} value={m.id}>
-                        Dr. {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-4">
-                  <label className="form-label mb-1">Fecha</label>
-                  <input type="date" className="form-control form-control-sm" value={fechaSel}
-                    onChange={e => setFechaSel(e.target.value)} />
-                </div>
+            <div className="row g-2">
+              {/* Paciente */}
+              <div className="col-12 position-relative">
+                <label className="form-label fw-semibold small mb-1">Paciente</label>
+                <input className="form-control form-control-sm" placeholder="Buscar por nombre o DNI…"
+                  value={pacBusq}
+                  onChange={e => { setPacBusq(e.target.value); setPacSel(null); setForm(f => ({ ...f, paciente_id: "" })); }} />
+                {pacList.length > 0 && (
+                  <ul className="list-group position-absolute z-3 shadow-sm" style={{ top: "100%", left: 0, right: 0, maxHeight: 160, overflowY: "auto", fontSize: "0.8rem" }}>
+                    {pacList.map(p => {
+                      const edad = calcEdad(p.fecha_nacimiento);
+                      return (
+                        <li key={p.id} className="list-group-item list-group-item-action py-2 px-2" style={{ cursor: "pointer" }}
+                          onClick={() => selPaciente(p)}>
+                          <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#111827" }}>
+                            {p.nombres} {p.apellidos}
+                          </div>
+                          <div style={{ display: "flex", gap: 4, marginTop: 2, flexWrap: "wrap" }}>
+                            {p.dni && <span style={{ fontSize: "0.72rem", color: "#6b7280" }}>DNI {p.dni}</span>}
+                            {edad && (
+                              <span style={{
+                                background: "rgba(124,58,237,.1)", color: "#6d28d9",
+                                borderRadius: 4, padding: "0 5px", fontSize: "0.68rem", fontWeight: 700,
+                              }}>{edad}</span>
+                            )}
+                            {p.ciudad && (
+                              <span style={{
+                                background: "rgba(14,165,233,.1)", color: "#0369a1",
+                                borderRadius: 4, padding: "0 5px", fontSize: "0.68rem", fontWeight: 700,
+                              }}>
+                                <i className="bi bi-geo-alt" style={{ fontSize: 9 }} /> {p.ciudad}
+                              </span>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
+                {pacSel && (
+                  <div style={{
+                    marginTop: 6, padding: "6px 10px", borderRadius: 8,
+                    background: "rgba(34,197,94,.07)", border: "1px solid rgba(34,197,94,.25)",
+                  }}>
+                    <ChipPacienteCita
+                      apellidos={pacSel.apellidos}
+                      nombres={pacSel.nombres}
+                      ciudad={pacSel.ciudad}
+                      fechaNac={pacSel.fecha_nacimiento}
+                      tel={pacSel.telefono}
+                      size="sm"
+                    />
+                  </div>
+                )}
+              </div>
 
-                {/* Slots */}
-                {slots.length > 0 && (
-                  <div className="col-12">
-                    <label className="form-label mb-1">Horarios disponibles</label>
-                    <div className="d-flex flex-wrap gap-1">
-                      {slots.map(s => (
-                        <button key={s.inicio} type="button" style={{ fontSize: "0.75rem", padding: "2px 8px" }}
-                          className={`btn btn-sm ${slotSel === s.inicio ? "btn-primary" : "btn-outline-primary"}`}
-                          onClick={() => selSlot(s)}>
+              {/* Médico + Fecha */}
+              <div className="col-8">
+                <label className="form-label fw-semibold small mb-1">Médico</label>
+                <select className="form-select form-select-sm" value={form.medico_id}
+                  onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
+                  <option value="">— Selecciona —</option>
+                  {medicos.map(m => (
+                    <option key={m.id} value={m.id}>
+                      Dr. {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-4">
+                <label className="form-label fw-semibold small mb-1">Fecha</label>
+                <input type="date" className="form-control form-control-sm" value={fechaSel}
+                  onChange={e => setFechaSel(e.target.value)} />
+              </div>
+
+              {/* Slots */}
+              {slots.length > 0 && (
+                <div className="col-12">
+                  <label className="form-label fw-semibold small mb-1">Horarios disponibles</label>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                    {slots.map(s => {
+                      const isSel = slotSel === s.inicio;
+                      return (
+                        <button key={s.inicio} type="button"
+                          onClick={() => selSlot(s)}
+                          style={{
+                            padding: "4px 11px", borderRadius: 8, fontSize: "0.75rem",
+                            fontWeight: isSel ? 700 : 500, cursor: "pointer",
+                            border: `1.5px solid ${isSel ? "#213564" : "#d1d5db"}`,
+                            background: isSel ? "#dbeafe" : "#f9fafb",
+                            color: isSel ? "#213564" : "#374151",
+                            transition: "all .12s",
+                          }}>
                           {dayjs(s.inicio).format("h:mm A")}
                         </button>
-                      ))}
-                    </div>
+                      );
+                    })}
                   </div>
-                )}
-                {form.medico_id && fechaSel && slots.length === 0 && (
-                  <div className="col-12">
-                    <small className="text-muted">Sin horarios disponibles. Ingresa hora manualmente.</small>
-                  </div>
-                )}
+                </div>
+              )}
+              {form.medico_id && fechaSel && slots.length === 0 && (
+                <div className="col-12">
+                  <small className="text-muted"><i className="bi bi-calendar-x me-1"></i>Sin horarios disponibles. Ingresa hora manualmente.</small>
+                </div>
+              )}
 
-                {/* Horas */}
-                <div className="col-6 col-sm-6">
-                  <TimePicker12h label="Hora inicio" value={horaInicio} onChange={setHoraInicio} required />
-                </div>
-                <div className="col-6 col-sm-6">
-                  <TimePicker12h label="Hora fin" value={horaFin} onChange={setHoraFin} required />
-                </div>
+              {/* Horas */}
+              <div className="col-6">
+                <TimePicker12h label="Hora inicio" value={horaInicio} onChange={setHoraInicio} required />
+              </div>
+              <div className="col-6">
+                <TimePicker12h label="Hora fin" value={horaFin} onChange={setHoraFin} required />
+              </div>
 
-                {/* Tipo + Canal + Motivo */}
-                <div className="col-4">
-                  <label className="form-label mb-1">Tipo</label>
-                  <select className="form-select form-select-sm" value={form.tipo_consulta}
-                    onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
-                    {tiposConsulta.map(t => (
-                      <option key={t}>{t}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-4">
-                  <label className="form-label mb-1">Canal</label>
-                  <select className="form-select form-select-sm" value={form.canal}
-                    onChange={e => setForm(f => ({ ...f, canal: e.target.value }))}>
-                    {["RECEPCION","APP","TELEFONO","WEB"].map(c => (
-                      <option key={c}>{c}</option>
-                    ))}
-                  </select>
-                </div>
-                <div className="col-4">
-                  <label className="form-label mb-1">Motivo</label>
-                  <input className="form-control form-control-sm" value={form.motivo}
-                    onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Opcional" />
-                </div>
+              {/* Tipo + Canal + Motivo */}
+              <div className="col-4">
+                <label className="form-label fw-semibold small mb-1">Tipo</label>
+                <select className="form-select form-select-sm" value={form.tipo_consulta}
+                  onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
+                  {tiposConsulta.map(t => <option key={t}>{t}</option>)}
+                </select>
+              </div>
+              <div className="col-4">
+                <label className="form-label fw-semibold small mb-1">Canal</label>
+                <select className="form-select form-select-sm" value={form.canal}
+                  onChange={e => setForm(f => ({ ...f, canal: e.target.value }))}>
+                  {["RECEPCION","APP","TELEFONO","WEB"].map(c => <option key={c}>{c}</option>)}
+                </select>
+              </div>
+              <div className="col-4">
+                <label className="form-label fw-semibold small mb-1">Motivo</label>
+                <input className="form-control form-control-sm" value={form.motivo}
+                  onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))} placeholder="Opcional" />
               </div>
             </div>
+          </div>
 
-            <div className="modal-footer py-2 px-3">
-              <button type="button" className="btn btn-sm btn-secondary" onClick={onClose}>Cancelar</button>
-              <button type="submit" className="btn btn-sm btn-primary" disabled={saving}>
-                {saving ? "Guardando…" : "Crear Cita"}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Footer */}
+          <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-sm" disabled={saving}
+              style={{ background: "linear-gradient(135deg, #213564, #1a2744)", color: "#fff", border: "none", fontWeight: 600, borderRadius: 8, padding: "6px 20px" }}>
+              <i className="bi bi-calendar-check me-1"></i>{saving ? "Guardando…" : "Crear Cita"}
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1263,203 +1296,436 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
     NO_ASISTIO:  [],
   };
   const acciones = ACCIONES[c.estado] || [];
+  const [fotoOpen, setFotoOpen] = useState(false);
+  const foto = fotoUrl(c.paciente_foto_perfil);
 
-  return (
-    <div
-      className="modal show d-block"
-      style={{
-        position: "fixed",
-        inset: 0,
-        zIndex: 1060,
-        background: "rgba(15,23,42,.62)",
-        backdropFilter: "blur(2px)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        padding: 16,
-      }}
-    >
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(10,18,35,.72)", backdropFilter: "blur(4px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
       <style>{`
-        .detalle-cita-modal .modal-content {
-          border: none;
-          border-radius: 14px;
-          overflow: hidden;
-          box-shadow: 0 24px 48px rgba(0,0,0,.28);
+        .dcm-wrap {
+          width: 100%; max-width: 560px;
+          border-radius: 18px; overflow: hidden;
+          box-shadow: 0 32px 72px rgba(0,0,0,.5);
+          background: #fff;
+          display: flex; flex-direction: column;
+          max-height: calc(100vh - 40px);
+          animation: dcm-in .18s ease;
         }
-        .detalle-cita-modal .modal-body {
-          max-height: calc(100vh - 220px);
-          overflow-y: auto;
+        @keyframes dcm-in {
+          from { opacity: 0; transform: translateY(12px) scale(.97); }
+          to   { opacity: 1; transform: none; }
         }
-        .detalle-cita-actions {
-          display: flex;
-          flex-wrap: wrap;
-          gap: 8px;
-          width: 100%;
+        .dcm-header {
+          background: linear-gradient(135deg, #162236 0%, #1e3a60 100%);
+          padding: 20px 22px 18px;
+          display: flex; align-items: flex-start; justify-content: space-between; gap: 12px;
+          flex-shrink: 0;
         }
-        .detalle-cita-actions .btn {
-          white-space: nowrap;
+        .dcm-header-sup {
+          font-size: 10px; font-weight: 700; letter-spacing: 1.4px;
+          text-transform: uppercase; color: rgba(255,255,255,.45); margin-bottom: 4px;
         }
-        @media (max-width: 768px) {
-          .detalle-cita-modal .modal-dialog {
-            max-width: 100% !important;
+        .dcm-patient-name {
+          font-size: 17px; font-weight: 700; color: #fff; line-height: 1.25;
+          margin-bottom: 9px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .dcm-header-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+        .dcm-estado-pill {
+          font-size: 10px; font-weight: 800; letter-spacing: .7px;
+          padding: 3px 11px; border-radius: 20px; display: inline-block;
+        }
+        .dcm-chip {
+          font-size: 11px; color: rgba(255,255,255,.65);
+          background: rgba(255,255,255,.1); border-radius: 20px;
+          padding: 3px 10px; display: flex; align-items: center; gap: 4px;
+        }
+        .dcm-close {
+          background: rgba(255,255,255,.1); border: none; color: #fff;
+          width: 30px; height: 30px; border-radius: 50%;
+          display: flex; align-items: center; justify-content: center;
+          cursor: pointer; flex-shrink: 0; transition: background .15s; font-size: 13px;
+          margin-top: 2px;
+        }
+        .dcm-close:hover { background: rgba(255,255,255,.22); }
+        .dcm-body { padding: 18px 22px; overflow-y: auto; flex: 1; }
+        .dcm-section-label {
+          font-size: 9px; font-weight: 800; letter-spacing: 1.2px;
+          text-transform: uppercase; color: #94a3b8; margin-bottom: 10px;
+        }
+        .dcm-grid {
+          display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px;
+        }
+        .dcm-card {
+          background: #f8fafc; border-radius: 10px; padding: 9px 12px;
+          border: 1px solid #e2e8f0;
+        }
+        .dcm-card.full { grid-column: 1 / -1; }
+        .dcm-card-label {
+          font-size: 9px; font-weight: 700; letter-spacing: .9px;
+          text-transform: uppercase; color: #94a3b8; margin-bottom: 2px;
+          display: flex; align-items: center; gap: 4px;
+        }
+        .dcm-card-val { font-size: 13px; font-weight: 600; color: #1e293b; line-height: 1.3; }
+        .dcm-card-sub { font-size: 11px; color: #64748b; margin-top: 1px; }
+        .dcm-card-val.muted { color: #94a3b8; font-weight: 400; font-style: italic; }
+        .dcm-patient-card {
+          background: linear-gradient(135deg, #f0f5ff, #f8faff);
+          border-radius: 11px; padding: 10px 14px;
+          border: 1px solid #dbeafe; margin-bottom: 14px;
+        }
+        .dcm-patient-chips { display: flex; gap: 5px; flex-wrap: wrap; }
+        .dcm-p-chip {
+          font-size: 10px; font-weight: 600; padding: 1px 8px;
+          border-radius: 20px; display: flex; align-items: center; gap: 3px;
+        }
+        .dcm-p-chip.age { background: #e0e7ff; color: #3730a3; }
+        .dcm-p-chip.loc { background: #dcfce7; color: #166534; }
+        .dcm-estado-box {
+          background: #f0f9ff; border: 1px solid #bae6fd;
+          border-radius: 11px; padding: 11px 14px; margin-bottom: 4px;
+        }
+        .dcm-estado-box-label {
+          font-size: 9px; font-weight: 800; letter-spacing: 1px;
+          text-transform: uppercase; color: #0369a1; margin-bottom: 8px;
+          display: flex; align-items: center; gap: 5px;
+        }
+        .dcm-estado-btns { display: flex; gap: 6px; flex-wrap: wrap; }
+        .dcm-est-btn {
+          font-size: 11px; font-weight: 700; letter-spacing: .4px;
+          padding: 5px 14px; border-radius: 20px; border: none;
+          cursor: pointer; transition: opacity .15s, transform .1s;
+        }
+        .dcm-est-btn:hover { opacity: .82; transform: translateY(-1px); }
+        .dcm-footer {
+          padding: 11px 22px 14px; border-top: 1px solid #e2e8f0;
+          display: flex; gap: 7px; align-items: center; flex-wrap: wrap;
+          background: #f8fafc; flex-shrink: 0;
+        }
+        .dcm-footer-danger-row { display: contents; }
+        .dcm-footer-right { display: flex; gap: 7px; flex: 1; justify-content: flex-end; flex-wrap: wrap; }
+        .dcm-btn {
+          font-size: 12px; font-weight: 600; padding: 7px 13px;
+          border-radius: 8px; border: none; cursor: pointer;
+          display: flex; align-items: center; gap: 5px;
+          transition: all .15s; white-space: nowrap; line-height: 1;
+        }
+        .dcm-btn:hover { transform: translateY(-1px); }
+        .dcm-btn-icon {
+          font-size: 12px; font-weight: 600; padding: 7px 10px;
+          border-radius: 8px; border: none; cursor: pointer;
+          display: flex; align-items: center; gap: 4px;
+          transition: all .15s; white-space: nowrap;
+        }
+        .dcm-btn-icon:hover { transform: translateY(-1px); }
+        .dcm-danger-icon { background: #fff0f0; color: #dc2626; border: 1px solid #fecaca; }
+        .dcm-danger-icon:hover { background: #fee2e2; }
+        .dcm-cancel-btn { background: #fff8f0; color: #c2410c; border: 1px solid #fed7aa; }
+        .dcm-cancel-btn:hover { background: #ffedd5; }
+        .dcm-ghost { background: #fff; color: #475569; border: 1px solid #cbd5e1; }
+        .dcm-ghost:hover { background: #f1f5f9; }
+        .dcm-primary { background: #1e40af; color: #fff; }
+        .dcm-primary:hover { background: #1d3fa3; }
+        .dcm-dark { background: #1e293b; color: #fff; }
+        .dcm-dark:hover { background: #0f172a; }
+        @media (max-width: 600px) {
+          .dcm-card.full { grid-column: 1 / -1; }
+          .dcm-header { padding: 16px 16px 14px; }
+          .dcm-body { padding: 14px 16px; }
+          .dcm-patient-name { font-size: 15px; }
+          .dcm-footer {
+            padding: 10px 16px 14px;
+            flex-direction: column;
+            gap: 8px;
           }
-          .detalle-cita-modal .modal-body {
-            max-height: calc(100vh - 200px);
-            padding: 14px;
+          .dcm-footer-danger-row {
+            display: flex;
+            gap: 8px;
+            width: 100%;
           }
-          .detalle-cita-modal .table th,
-          .detalle-cita-modal .table td {
-            font-size: .95rem;
-            vertical-align: top;
+          .dcm-footer-danger-row .dcm-btn-icon {
+            flex: 1;
+            justify-content: center;
           }
-          .detalle-cita-actions {
+          .dcm-footer-right {
             display: grid;
             grid-template-columns: 1fr 1fr;
-          }
-          .detalle-cita-actions .btn {
+            gap: 8px;
             width: 100%;
-            font-size: .84rem;
-            padding: 6px 8px;
           }
-          .detalle-cita-actions .btn-danger {
-            grid-column: 1 / -1;
-          }
-          .detalle-cita-actions .btn-secondary {
-            grid-column: 2;
-          }
+          .dcm-footer-right .dcm-btn { justify-content: center; }
+          .dcm-footer-right .dcm-dark { grid-column: 1 / -1; }
         }
       `}</style>
-      <div className="modal-dialog" style={{ margin: 0, width: "100%", maxWidth: 640 }}>
-        <div className="modal-content detalle-cita-modal">
-          <div
-            className="modal-header"
-            style={{
-              background: `linear-gradient(135deg, ${color.bg}, #f8fafc)`,
-              color: color.fg,
-              borderBottom: "1px solid rgba(0,0,0,.08)",
+
+      <div className="dcm-wrap">
+        {/* Lightbox foto paciente */}
+        {fotoOpen && foto && createPortal(
+          <div onClick={() => setFotoOpen(false)} style={{
+            position: "fixed", top: 0, left: 0, width: "100vw", height: "100vh", zIndex: 10000,
+            background: "rgba(0,0,0,.85)", display: "flex",
+            alignItems: "center", justifyContent: "center", cursor: "zoom-out",
+          }}>
+            <button onClick={() => setFotoOpen(false)} style={{
+              position: "absolute", top: 20, right: 20,
+              width: 40, height: 40, borderRadius: "50%",
+              background: "rgba(255,255,255,.15)", border: "2px solid rgba(255,255,255,.3)",
+              color: "#fff", fontSize: 18, cursor: "pointer",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              backdropFilter: "blur(4px)", transition: "background .15s",
             }}
+              onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.28)"}
+              onMouseLeave={e => e.currentTarget.style.background = "rgba(255,255,255,.15)"}
+            >
+              <i className="bi bi-x-lg"></i>
+            </button>
+            <img src={foto} alt="Foto paciente"
+              style={{ maxWidth: "90vw", maxHeight: "85vh", borderRadius: 12, boxShadow: "0 8px 40px rgba(0,0,0,.6)", objectFit: "contain" }} />
+          </div>,
+          document.body
+        )}
+
+        {/* Header */}
+        <div className="dcm-header">
+          {/* Avatar con foto — clickeable */}
+          <button
+            onClick={() => foto && setFotoOpen(true)}
+            title={foto ? "Ver foto del paciente" : "Sin foto registrada"}
+            style={{
+              width: 52, height: 52, borderRadius: "50%", flexShrink: 0,
+              border: foto ? "2px solid rgba(255,255,255,.4)" : "2px dashed rgba(255,255,255,.2)",
+              background: foto ? "transparent" : "linear-gradient(135deg,#2563eb,#1d4ed8)",
+              backgroundImage: foto ? `url(${foto})` : "none",
+              backgroundSize: "cover", backgroundPosition: "center",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: "#fff", fontSize: 18, fontWeight: 700,
+              cursor: foto ? "zoom-in" : "default",
+              padding: 0, overflow: "hidden",
+              transition: "border-color .2s, transform .15s",
+            }}
+            onMouseEnter={e => { if (foto) e.currentTarget.style.transform = "scale(1.06)"; }}
+            onMouseLeave={e => { e.currentTarget.style.transform = "scale(1)"; }}
           >
-            <h5 className="modal-title">Detalle de Cita</h5>
-            <button className="btn-close"
-              style={{ filter: color.fg === "#fff" ? "invert(1)" : "" }} onClick={onClose} />
+            {!foto && (c.paciente_apellidos || "?")[0].toUpperCase()}
+          </button>
+
+          <div style={{ flex: 1, minWidth: 0, marginLeft: 12 }}>
+            <div className="dcm-header-sup">Detalle de Cita</div>
+            <div className="dcm-patient-name">
+              {c.paciente_apellidos} {c.paciente_nombres}
+            </div>
+            <div className="dcm-header-chips">
+              <span className="dcm-estado-pill" style={{ background: color.bg, color: color.fg }}>
+                {c.estado.replace(/_/g, " ")}
+              </span>
+              {c.paciente_ciudad && (
+                <span className="dcm-chip">
+                  <i className="bi bi-geo-alt-fill"></i>{c.paciente_ciudad}
+                </span>
+              )}
+              <span className="dcm-chip">
+                <i className="bi bi-calendar2"></i>{dayjs(c.inicio).format("DD/MM/YYYY")}
+              </span>
+            </div>
           </div>
-          <div className="modal-body">
-            <table className="table table-sm table-borderless">
-              <tbody>
-                <tr>
-                  <th style={{ whiteSpace: "nowrap" }}>Paciente</th>
-                  <td>
-                    <ChipPacienteCita
-                      apellidos={c.paciente_apellidos}
-                      nombres={c.paciente_nombres}
-                      ciudad={c.paciente_ciudad}
-                      departamento={c.paciente_departamento}
-                      fechaNac={c.paciente_fecha_nac}
-                      tel={c.paciente_tel}
-                    />
-                  </td>
-                </tr>
-                <tr><th>Médico</th><td>Dr. {c.medico_apellidos} {c.medico_nombres}</td></tr>
-                <tr><th>Inicio</th><td>{dayjs(c.inicio).format("DD/MM/YYYY h:mm A")}</td></tr>
-                <tr><th>Fin</th><td>{dayjs(c.fin).format("h:mm A")}</td></tr>
-                <tr><th>Tipo</th><td>{c.tipo_consulta}</td></tr>
-                <tr><th>Canal</th><td>{c.canal}</td></tr>
-                <tr><th>Motivo</th><td>{c.motivo || "—"}</td></tr>
-                <tr>
-                  <th>Estado</th>
-                  <td><span className="badge" style={{ background: color.bg, color: color.fg }}>{c.estado}</span></td>
-                </tr>
-              </tbody>
-            </table>
-            {acciones.length > 0 && (
-              <div className="mt-2">
-                <small className="text-muted d-block mb-1">Cambiar estado:</small>
-                <div className="d-flex gap-2 flex-wrap">
-                  {acciones.map(est => (
-                    <button key={est} className="btn btn-sm"
-                      style={{ background: ESTADO_COLOR[est].bg, color: ESTADO_COLOR[est].fg }}
-                      onClick={() => onEstado(est)}>
-                      {est.replace("_", " ")}
-                    </button>
-                  ))}
-                </div>
+          <button className="dcm-close" onClick={onClose}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="dcm-body">
+          {/* Info rápida del paciente — sin repetir el nombre */}
+          <div className="dcm-patient-card">
+            <div className="dcm-patient-chips" style={{ margin: 0 }}>
+              {c.paciente_fecha_nac && (
+                <span className="dcm-p-chip age">
+                  <i className="bi bi-person"></i>
+                  {dayjs().diff(dayjs(c.paciente_fecha_nac), "year")} años
+                </span>
+              )}
+              {(c.paciente_ciudad || c.paciente_departamento) && (
+                <span className="dcm-p-chip loc">
+                  <i className="bi bi-geo-alt"></i>
+                  {[c.paciente_ciudad, c.paciente_departamento].filter(Boolean).join(", ")}
+                </span>
+              )}
+              {c.paciente_tel && (
+                <span className="dcm-p-chip" style={{ background: "#f0fdf4", color: "#166534" }}>
+                  <i className="bi bi-telephone"></i>{c.paciente_tel}
+                </span>
+              )}
+              {!foto && (
+                <span className="dcm-p-chip" style={{ background: "#fef9c3", color: "#854d0e" }}>
+                  <i className="bi bi-camera"></i> Sin foto
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Info grid */}
+          <div className="dcm-section-label">Información de la cita</div>
+          <div className="dcm-grid">
+            <div className="dcm-card">
+              <div className="dcm-card-label"><i className="bi bi-calendar-event"></i> Inicio</div>
+              <div className="dcm-card-val">{dayjs(c.inicio).format("DD/MM/YYYY")}</div>
+              <div className="dcm-card-sub">{dayjs(c.inicio).format("h:mm A")}</div>
+            </div>
+            <div className="dcm-card">
+              <div className="dcm-card-label"><i className="bi bi-clock"></i> Fin</div>
+              <div className="dcm-card-val">{dayjs(c.fin).format("h:mm A")}</div>
+            </div>
+            <div className="dcm-card">
+              <div className="dcm-card-label"><i className="bi bi-clipboard2-pulse"></i> Tipo</div>
+              <div className="dcm-card-val">{c.tipo_consulta}</div>
+            </div>
+            <div className="dcm-card">
+              <div className="dcm-card-label"><i className="bi bi-send"></i> Canal</div>
+              <div className="dcm-card-val">{c.canal}</div>
+            </div>
+            <div className="dcm-card full">
+              <div className="dcm-card-label"><i className="bi bi-person-badge"></i> Médico</div>
+              <div className="dcm-card-val">Dr. {c.medico_apellidos} {c.medico_nombres}</div>
+            </div>
+            <div className="dcm-card full">
+              <div className="dcm-card-label"><i className="bi bi-chat-text"></i> Motivo</div>
+              <div className={`dcm-card-val${!c.motivo ? " muted" : ""}`}>
+                {c.motivo || "Sin motivo registrado"}
               </div>
+            </div>
+          </div>
+
+          {/* Cambiar estado */}
+          {acciones.length > 0 && (
+            <div className="dcm-estado-box">
+              <div className="dcm-estado-box-label">
+                <i className="bi bi-arrow-repeat"></i> Cambiar estado
+              </div>
+              <div className="dcm-estado-btns">
+                {acciones.map(est => (
+                  <button key={est} className="dcm-est-btn"
+                    style={{ background: ESTADO_COLOR[est].bg, color: ESTADO_COLOR[est].fg }}
+                    onClick={() => onEstado(est)}>
+                    {est.replace(/_/g, " ")}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="dcm-footer">
+          {/* Fila peligrosa: trash + cancelar juntos */}
+          <div className="dcm-footer-danger-row">
+            <button className="dcm-btn-icon dcm-danger-icon" onClick={onMostrarConfirmDelete} title="Eliminar permanentemente">
+              <i className="bi bi-trash3"></i>
+            </button>
+            {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
+              <button className="dcm-btn-icon dcm-cancel-btn" onClick={onCancelar}>
+                <i className="bi bi-x-circle"></i> Cancelar
+              </button>
             )}
           </div>
-          <div className="modal-footer">
-            <div className="detalle-cita-actions">
-              <button className="btn btn-danger btn-sm"
-                onClick={onMostrarConfirmDelete}
-                title="Eliminar registro permanentemente de la base de datos">
-                <i className="bi bi-trash3"></i> Eliminar permanentemente
+
+          {/* Acciones principales — derecha en desktop, grid en móvil */}
+          <div className="dcm-footer-right">
+            <button className="dcm-btn dcm-ghost" onClick={onRecordatorio}>
+              <i className="bi bi-bell"></i> Recordatorio
+            </button>
+            <button className="dcm-btn dcm-ghost" onClick={onVerHistoria}>
+              <i className="bi bi-journal-medical"></i> Historia
+            </button>
+            {c.estado === "PENDIENTE" && (
+              <button className="dcm-btn dcm-primary" onClick={onEditar}>
+                <i className="bi bi-pencil"></i> Editar
               </button>
-              {c.estado === "PENDIENTE" && (
-                <button className="btn btn-outline-primary btn-sm" onClick={onEditar}>
-                  <i className="bi bi-pencil me-1"></i>Editar
-                </button>
-              )}
-              <button className="btn btn-outline-success btn-sm" onClick={onRecordatorio}>
-                <i className="bi bi-bell me-1"></i>Recordatorio
-              </button>
-              <button className="btn btn-outline-info btn-sm" onClick={onVerHistoria}>
-                <i className="bi bi-journal-medical me-1"></i>Ver historia clínica
-              </button>
-              {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
-                <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
-              )}
-              <button className="btn btn-secondary btn-sm" onClick={onClose}>Cerrar</button>
-            </div>
+            )}
+            <button className="dcm-btn dcm-dark" onClick={onClose}>Cerrar</button>
           </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 function ModalRecordatorioManual({ event, form, loading, sending, onClose, onCanalChange, onChange, onSend }) {
   const c = event.resource || {};
-  return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 1060 }}>
-      <div className="modal-dialog modal-lg modal-dialog-centered">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">
-              <i className="bi bi-bell me-2"></i>Recordatorio manual
-            </h5>
-            <button className="btn-close" onClick={onClose} />
-          </div>
-          <div className="modal-body">
-            <div className="mb-2" style={{ fontSize: "0.85rem", color: "#475569" }}>
-              <strong>Paciente:</strong> {c.paciente_nombres} {c.paciente_apellidos}
-            </div>
-            <div className="row g-3">
-              <div className="col-md-4">
-                <label className="form-label">Canal</label>
-                <select className="form-select" value={form.canal} onChange={(e) => onCanalChange(e.target.value)} disabled={loading || sending}>
-                  <option value="EMAIL">Email</option>
-                  <option value="SMS">SMS</option>
-                  <option value="WHATSAPP">WhatsApp</option>
-                </select>
-              </div>
-              {form.canal === "EMAIL" && (
-                <div className="col-md-8">
-                  <label className="form-label">Asunto</label>
-                  <input className="form-control" value={form.asunto} onChange={(e) => onChange({ asunto: e.target.value })} disabled={loading || sending} />
-                </div>
-              )}
-              <div className="col-12">
-                <label className="form-label">Mensaje</label>
-                <textarea className="form-control" rows={8} value={form.contenido} onChange={(e) => onChange({ contenido: e.target.value })} disabled={loading || sending} />
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1060,
+      background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 620, background: "#fff",
+        borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        overflow: "hidden", display: "flex", flexDirection: "column",
+        maxHeight: "calc(100vh - 40px)",
+      }}>
+        {/* Header */}
+        <div style={{
+          background: "linear-gradient(135deg, #213564 0%, #1a2744 100%)",
+          padding: "14px 18px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="bi bi-bell-fill" style={{ color: "#93c5fd", fontSize: "1.1rem" }}></i>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Recordatorio manual</div>
+              <div style={{ color: "rgba(255,255,255,.65)", fontSize: "0.75rem" }}>
+                {c.paciente_nombres} {c.paciente_apellidos}
               </div>
             </div>
           </div>
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onClose} disabled={sending}>Cancelar</button>
-            <button className="btn btn-primary" onClick={onSend} disabled={loading || sending}>{sending ? "Enviando..." : "Enviar ahora"}</button>
+          <button onClick={onClose} disabled={sending}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "18px 20px", overflowY: "auto", flex: 1 }}>
+          <div className="row g-3">
+            <div className="col-md-4">
+              <label className="form-label fw-semibold small">Canal</label>
+              <select className="form-select form-select-sm" value={form.canal}
+                onChange={(e) => onCanalChange(e.target.value)} disabled={loading || sending}>
+                <option value="EMAIL">Email</option>
+                <option value="SMS">SMS</option>
+                <option value="WHATSAPP">WhatsApp</option>
+              </select>
+            </div>
+            {form.canal === "EMAIL" && (
+              <div className="col-md-8">
+                <label className="form-label fw-semibold small">Asunto</label>
+                <input className="form-control form-control-sm" value={form.asunto}
+                  onChange={(e) => onChange({ asunto: e.target.value })} disabled={loading || sending} />
+              </div>
+            )}
+            <div className="col-12">
+              <label className="form-label fw-semibold small">Mensaje</label>
+              <textarea className="form-control form-control-sm" rows={8} value={form.contenido}
+                onChange={(e) => onChange({ contenido: e.target.value })} disabled={loading || sending} />
+            </div>
           </div>
         </div>
+
+        {/* Footer */}
+        <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
+          <button className="btn btn-outline-secondary btn-sm" onClick={onClose} disabled={sending}>Cancelar</button>
+          <button className="btn btn-sm" onClick={onSend} disabled={loading || sending}
+            style={{ background: "linear-gradient(135deg, #213564, #1a2744)", color: "#fff", border: "none", fontWeight: 600, borderRadius: 8, padding: "6px 20px" }}>
+            <i className="bi bi-send me-1"></i>{sending ? "Enviando…" : "Enviar ahora"}
+          </button>
+        </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -1502,23 +1768,48 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
     }
   };
 
-  return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)" }}>
-      <div className="modal-dialog modal-lg modal-dialog-scrollable">
-        <div className="modal-content">
-          <div className="modal-header">
-            <h5 className="modal-title">
-              <i className="bi bi-pencil-square me-2"></i>Editar Cita
-            </h5>
-            <button className="btn-close" onClick={onClose} />
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1055,
+      background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 580, background: "#fff",
+        borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        overflow: "hidden", display: "flex", flexDirection: "column",
+        maxHeight: "calc(100vh - 40px)",
+      }}>
+        {/* Header */}
+        <div style={{
+          background: "linear-gradient(135deg, #213564 0%, #1a2744 100%)",
+          padding: "14px 18px", display: "flex", alignItems: "center",
+          justifyContent: "space-between", flexShrink: 0,
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="bi bi-pencil-square" style={{ color: "#93c5fd", fontSize: "1.1rem" }}></i>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Editar Cita</div>
+              <div style={{ color: "rgba(255,255,255,.65)", fontSize: "0.75rem" }}>
+                {c.paciente_nombres} {c.paciente_apellidos}
+              </div>
+            </div>
           </div>
-          <form onSubmit={handleSubmit}>
-            <div className="modal-body row g-3">
-              {err && <div className="col-12"><div className="alert alert-danger py-2">{err}</div></div>}
+          <button onClick={onClose}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
 
+        {/* Body */}
+        <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
+          <div style={{ padding: "18px 20px", overflowY: "auto", flex: 1 }}>
+            {err && <div className="alert alert-danger py-2 mb-3" style={{ borderRadius: 8, fontSize: "0.85rem" }}><i className="bi bi-exclamation-triangle me-1"></i>{err}</div>}
+
+            <div className="row g-3">
               <div className="col-12">
-                <label className="form-label fw-semibold">Paciente</label>
-                <div className="form-control" style={{ background: "#f8fafc", cursor: "default", minHeight: 60 }}>
+                <label className="form-label fw-semibold small">Paciente</label>
+                <div style={{ padding: "8px 12px", borderRadius: 8, background: "#f8fafc", border: "1px solid #e5e7eb" }}>
                   <ChipPacienteCita
                     apellidos={c.paciente_apellidos}
                     nombres={c.paciente_nombres}
@@ -1531,8 +1822,8 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
               </div>
 
               <div className="col-md-6">
-                <label className="form-label fw-semibold">Médico</label>
-                <select className="form-select" value={form.medico_id}
+                <label className="form-label fw-semibold small">Médico</label>
+                <select className="form-select form-select-sm" value={form.medico_id}
                   onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
                   {medicos.map(m => (
                     <option key={m.id} value={String(m.id)}>
@@ -1543,8 +1834,8 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
               </div>
 
               <div className="col-md-6">
-                <label className="form-label fw-semibold">Fecha</label>
-                <input type="date" className="form-control" value={fechaSel}
+                <label className="form-label fw-semibold small">Fecha</label>
+                <input type="date" className="form-control form-control-sm" value={fechaSel}
                   onChange={e => setFechaSel(e.target.value)} required />
               </div>
 
@@ -1556,79 +1847,96 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
               </div>
 
               <div className="col-md-4">
-                <label className="form-label fw-semibold">Tipo</label>
-                <select className="form-select" value={form.tipo_consulta}
+                <label className="form-label fw-semibold small">Tipo</label>
+                <select className="form-select form-select-sm" value={form.tipo_consulta}
                   onChange={e => setForm(f => ({ ...f, tipo_consulta: e.target.value }))}>
-                  {tiposConsulta.map(t => (
-                    <option key={t}>{t}</option>
-                  ))}
+                  {tiposConsulta.map(t => <option key={t}>{t}</option>)}
                 </select>
               </div>
               <div className="col-md-4">
-                <label className="form-label fw-semibold">Canal</label>
-                <select className="form-select" value={form.canal}
+                <label className="form-label fw-semibold small">Canal</label>
+                <select className="form-select form-select-sm" value={form.canal}
                   onChange={e => setForm(f => ({ ...f, canal: e.target.value }))}>
-                  {["RECEPCION","APP","TELEFONO","WEB"].map(ch => (
-                    <option key={ch}>{ch}</option>
-                  ))}
+                  {["RECEPCION","APP","TELEFONO","WEB"].map(ch => <option key={ch}>{ch}</option>)}
                 </select>
               </div>
               <div className="col-md-4">
-                <label className="form-label fw-semibold">Motivo</label>
-                <input className="form-control" value={form.motivo}
+                <label className="form-label fw-semibold small">Motivo</label>
+                <input className="form-control form-control-sm" value={form.motivo}
                   onChange={e => setForm(f => ({ ...f, motivo: e.target.value }))}
                   placeholder="Opcional" />
               </div>
             </div>
+          </div>
 
-            <div className="modal-footer">
-              <button type="button" className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-              <button type="submit" className="btn btn-primary" disabled={saving}>
-                {saving ? "Guardando…" : "Guardar cambios"}
-              </button>
-            </div>
-          </form>
-        </div>
+          {/* Footer */}
+          <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
+            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancelar</button>
+            <button type="submit" className="btn btn-sm" disabled={saving}
+              style={{ background: "linear-gradient(135deg, #213564, #1a2744)", color: "#fff", border: "none", fontWeight: 600, borderRadius: 8, padding: "6px 20px" }}>
+              <i className="bi bi-floppy me-1"></i>{saving ? "Guardando…" : "Guardar cambios"}
+            </button>
+          </div>
+        </form>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // ─── Modal Confirmación Eliminar ──────────────────────────────────────────────
 function ModalConfirmDelete({ onConfirm, onCancel, pacienteNombre, fecha }) {
-  return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.7)", zIndex: 1060 }}>
-      <div className="modal-dialog modal-dialog-centered">
-        <div className="modal-content border-danger">
-          <div className="modal-header bg-danger text-white">
-            <h5 className="modal-title">
-              <i className="bi bi-exclamation-triangle-fill me-2"></i>
-              Confirmar Eliminación Permanente
-            </h5>
-            <button className="btn-close btn-close-white" onClick={onCancel} />
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 1060,
+      background: "rgba(15,23,42,.65)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 460, background: "#fff",
+        borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,.3)",
+        overflow: "hidden",
+      }}>
+        {/* Header danger */}
+        <div style={{
+          background: "linear-gradient(135deg, #b91c1c, #dc2626)",
+          padding: "14px 18px", display: "flex", alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="bi bi-exclamation-triangle-fill" style={{ color: "#fecaca", fontSize: "1.1rem" }}></i>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Confirmar eliminación permanente</div>
           </div>
-          <div className="modal-body">
-            <div className="alert alert-warning mb-3">
-              <strong>⚠️ ADVERTENCIA:</strong> Esta acción eliminará permanentemente el registro de la base de datos y <strong>no se puede deshacer</strong>.
-            </div>
-            <p className="mb-2"><strong>Paciente:</strong> {pacienteNombre}</p>
-            <p className="mb-3"><strong>Fecha:</strong> {fecha}</p>
-            <p className="text-muted small mb-0">
-              Si solo deseas cancelar la cita sin eliminar el registro, usa el botón "Cancelar cita" en su lugar.
-            </p>
+          <button onClick={onCancel}
+            style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "18px 20px" }}>
+          <div className="alert alert-warning py-2 mb-3" style={{ borderRadius: 8, fontSize: "0.85rem" }}>
+            <strong>⚠️ ADVERTENCIA:</strong> Esta acción eliminará permanentemente el registro de la base de datos y <strong>no se puede deshacer</strong>.
           </div>
-          <div className="modal-footer">
-            <button className="btn btn-secondary" onClick={onCancel}>
-              <i className="bi bi-x-circle me-1"></i>
-              No, volver
-            </button>
-            <button className="btn btn-danger" onClick={onConfirm}>
-              <i className="bi bi-trash3-fill me-1"></i>
-              Sí, eliminar permanentemente
-            </button>
-          </div>
+          <p className="mb-2" style={{ fontSize: "0.9rem" }}><strong>Paciente:</strong> {pacienteNombre}</p>
+          <p className="mb-3" style={{ fontSize: "0.9rem" }}><strong>Fecha:</strong> {fecha}</p>
+          <p className="text-muted mb-0" style={{ fontSize: "0.82rem" }}>
+            Si solo deseas cancelar la cita sin eliminar el registro, usa el botón "Cancelar cita" en su lugar.
+          </p>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button className="btn btn-outline-secondary btn-sm" onClick={onCancel}>
+            <i className="bi bi-x-circle me-1"></i>No, volver
+          </button>
+          <button className="btn btn-sm btn-danger" onClick={onConfirm}
+            style={{ fontWeight: 600, borderRadius: 8, padding: "6px 18px" }}>
+            <i className="bi bi-trash3-fill me-1"></i>Sí, eliminar permanentemente
+          </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

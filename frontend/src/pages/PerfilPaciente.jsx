@@ -90,7 +90,9 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const [tab, setTab] = useState(searchParams.get("tab") || "datos");
+  const VALID_TABS = ["datos", "historial", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const tabParam = searchParams.get("tab");
+  const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
   
   // Edición datos generales
   const [editandoDatos, setEditandoDatos] = useState(false);
@@ -140,6 +142,9 @@ export default function PerfilPaciente() {
     contenido: "",
   });
 
+  // nombreCompleto derivado del estado — disponible desde el inicio del componente
+  const nombreCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}` : "";
+
   // Modal confirmación eliminar documento
   const [docAEliminar, setDocAEliminar] = useState(null);
   const [docViewer, setDocViewer] = useState(null); // doc a visualizar en modal
@@ -166,6 +171,15 @@ export default function PerfilPaciente() {
   // ══════════════════════════════════════════════════════════
   useEffect(() => { cargarTodo(); }, [id]);
   useEffect(() => { cargarEsteticaResumen(); }, [id]);
+
+  // Limpiar estado de edición al cambiar de pestaña
+  useEffect(() => {
+    setEditandoDatos(false);
+    setMsg({ tipo: "", texto: "" });
+    if (paciente) setForm(paciente);
+    setFotoFile(null);
+    setFotoPreview(null);
+  }, [tab]); // eslint-disable-line
   useEffect(() => {
     let timer;
     if (loading) {
@@ -186,7 +200,7 @@ export default function PerfilPaciente() {
         .filter(c => String(c.paciente_id) === String(id)).length;
       const seguimiento = JSON.parse(localStorage.getItem(`seguimiento_postop_${id}`) || "[]").length;
 
-      const [resGaleria, resBiopsias] = await Promise.all([
+      const [resGaleria, resBiopsias] = await Promise.allSettled([
         api.get(`/galeria-estetica/sesiones?paciente_id=${id}`),
         api.get(`/biopsias?paciente_id=${id}`),
       ]);
@@ -197,8 +211,10 @@ export default function PerfilPaciente() {
         presupuestos,
         consentimientos,
         seguimiento,
-        galeria: (resGaleria.data.data || []).length,
-        biopsias: resBiopsias.data.total || (resBiopsias.data.data || []).length,
+        galeria: resGaleria.status === "fulfilled" ? (resGaleria.value.data.data || []).length : 0,
+        biopsias: resBiopsias.status === "fulfilled"
+          ? (resBiopsias.value.data.total || (resBiopsias.value.data.data || []).length)
+          : 0,
       });
     } catch (err) {
       console.log("No se pudo cargar el resumen estético:", err);
@@ -313,8 +329,16 @@ export default function PerfilPaciente() {
           `<li>[${s.tipo}] ${s.descripcion} — ${s.estado}</li>`
         ).join("")}</ul>
       </div>` : "";
-    const alergiasHtml = alergiasPac.length > 0
-      ? `<div class="alergias">⚠ Alergias: ${alergiasPac.map(a => `${a.agente} (${a.severidad})`).join(" | ")}</div>`
+    let alergias = alergiasPac;
+    if (!alergias.length) {
+      try {
+        const rAl = await api.get(`/historias/paciente/${id}/alergias`);
+        alergias = rAl.data.data || [];
+        setAlergiasPac(alergias);
+      } catch { /* no bloquea la impresión */ }
+    }
+    const alergiasHtml = alergias.length > 0
+      ? `<div class="alergias">⚠ Alergias: ${alergias.map(a => `${a.agente} (${a.severidad})`).join(" | ")}</div>`
       : "";
     const html = `<!DOCTYPE html>
 <html lang="es">
@@ -514,10 +538,9 @@ export default function PerfilPaciente() {
       await api.delete(`/pacientes/${id}/documentos/${docId}`);
       setMsg({ tipo: "success", texto: "Documento eliminado" });
       setDocumentos(d => d.filter(doc => doc.id !== docId));
+      setDocAEliminar(null);
     } catch {
       setMsg({ tipo: "danger", texto: "Error al eliminar documento" });
-    } finally {
-      setDocAEliminar(null);
     }
   };
 
@@ -614,6 +637,10 @@ export default function PerfilPaciente() {
   };
 
   const enviarRecordatorioManual = async () => {
+    if (!paciente?.id) {
+      setMsg({ tipo: "danger", texto: "Paciente no disponible" });
+      return;
+    }
     if (!reminderForm.contenido?.trim()) {
       setMsg({ tipo: "danger", texto: "Escribe el contenido del recordatorio" });
       return;
@@ -639,7 +666,6 @@ export default function PerfilPaciente() {
   // PESTAÑA 4: ELIMINAR PACIENTE (Doble confirmación)
   // ══════════════════════════════════════════════════════════
   const eliminarPaciente = async () => {
-    const nombreCompleto = `${paciente.nombres} ${paciente.apellidos}`;
     if (textoConfirmacion !== nombreCompleto) {
       setMsg({ tipo: "danger", texto: "El nombre no coincide. Por favor verifica." });
       return;
@@ -684,8 +710,6 @@ export default function PerfilPaciente() {
       </div>
     );
   }
-
-  const nombreCompleto = `${paciente.nombres} ${paciente.apellidos}`;
 
   /* ── Pestañas disponibles (dinámicas según módulos) ── */
   const totalEstetica = esteticaResumen.ficha + esteticaResumen.galeria + esteticaResumen.presupuestos + esteticaResumen.consentimientos + esteticaResumen.seguimiento + esteticaResumen.biopsias;
@@ -765,11 +789,17 @@ export default function PerfilPaciente() {
                     <i className="bi bi-credit-card me-1" />{paciente.dni}
                   </span>
                 )}
-                {paciente.edad && (
-                  <span style={{ background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.85)", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem" }}>
-                    <i className="bi bi-calendar3 me-1" />{paciente.edad} años
-                  </span>
-                )}
+                {paciente.fecha_nacimiento && (() => {
+                  const hoy = new Date();
+                  const nac = new Date(paciente.fecha_nacimiento);
+                  let e = hoy.getFullYear() - nac.getFullYear();
+                  if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
+                  return e >= 0 ? (
+                    <span style={{ background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.85)", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem" }}>
+                      <i className="bi bi-calendar3 me-1" />{e} años
+                    </span>
+                  ) : null;
+                })()}
                 {paciente.grupo_sanguineo && (
                   <span style={{ background: "rgba(239,68,68,.4)", color: "#fff", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem", fontWeight: 600 }}>
                     <i className="bi bi-droplet-fill me-1" />{paciente.grupo_sanguineo}
@@ -1253,7 +1283,13 @@ export default function PerfilPaciente() {
                     <div className="col-md-4">
                       <label className="text-muted small">Fecha de nacimiento</label>
                       <p className="fw-semibold mb-0">
-                        {paciente.fecha_nacimiento ? new Date(paciente.fecha_nacimiento).toLocaleDateString() : "—"}
+                        {paciente.fecha_nacimiento ? (() => {
+                          const hoy = new Date();
+                          const nac = new Date(paciente.fecha_nacimiento);
+                          let e = hoy.getFullYear() - nac.getFullYear();
+                          if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
+                          return `${nac.toLocaleDateString()} (${e} años)`;
+                        })() : "—"}
                       </p>
                     </div>
                     <div className="col-md-4">

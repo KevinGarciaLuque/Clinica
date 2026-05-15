@@ -1,6 +1,6 @@
 /**
  * FASE 4 — Consulta SOAP (Historia Clínica Electrónica)
- * URL: /consulta?paciente_id=&cita_id=&historia_id=
+ * URL: /consulta-medica?paciente_id=&cita_id=&historia_id=
  */
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
@@ -185,7 +185,7 @@ export default function Consulta() {
     } finally {
       setSaving(false);
     }
-  }, [soap, vitals, hid, paciente, pacId, citaId]);
+  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma]);
 
   // ── UI ───────────────────────────────────────────────────────────────────────
   const edad = paciente?.fecha_nacimiento
@@ -443,6 +443,8 @@ export default function Consulta() {
               datosDerma={datosDerma}
               setDatosDerma={setDatosDerma}
               firmada={soloLectura}
+              paciente={paciente}
+              pacienteId={paciente?.id || pacId}
             />
           )}
         </div>{/* /tab-content */}
@@ -943,7 +945,7 @@ function SoapTextareaIA({ label, sublabel, value, onChange, readOnly, rows = 3, 
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const aceptar = () => {
-    const sep = value.trimEnd().endsWith(".") || value.trimEnd().endsWith(",") ? " " : " ";
+    const sep = value.trimEnd().endsWith(".") || value.trimEnd().endsWith(",") ? " " : ". ";
     onChange({ target: { value: value.trimEnd() + sep + sugerencia } });
     setSugerencia("");
     taRef.current?.focus();
@@ -1365,6 +1367,12 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
 // ══════════════════════════════════════════════════════════════════════
 function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoCie, diagnosticoDesc }) {
   const [subTab, setSubTab] = useState("receta");
+  const [pendingSugItems, setPendingSugItems] = useState([]);
+
+  const handleAgregar = (newItems) => {
+    setPendingSugItems(newItems);
+    setSubTab("receta");
+  };
 
   return (
     <div>
@@ -1397,24 +1405,31 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoC
         ))}
       </div>
 
-      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} />}
+      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} pendingSugItems={pendingSugItems} onClearPending={() => setPendingSugItems([])} />}
       {subTab === "historial" && <SubHistorialPaciente pacienteId={pacienteId} />}
-      {subTab === "sugeridas" && <SubSugeridadCie diagnosticoCie={diagnosticoCie} diagnosticoDesc={diagnosticoDesc} onAgregar={(items) => setSubTab("receta")} />}
+      {subTab === "sugeridas" && <SubSugeridadCie diagnosticoCie={diagnosticoCie} diagnosticoDesc={diagnosticoDesc} onAgregar={handleAgregar} />}
       {subTab === "favoritas" && <SubFavoritas firmada={firmada} />}
     </div>
   );
 }
 
 // ── Sub-tab: Receta de esta consulta ──────────────────────────────────────────
-function SubRecetaActual({ historiaId, pacienteId, citaId, firmada }) {
+function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugItems = [], onClearPending }) {
   const [list,      setList]      = useState([]);
   const [showForm,  setShowForm]  = useState(false);
   const [items,     setItems]     = useState([newRxItem()]);
   const [notas,     setNotas]     = useState("");
+
+  useEffect(() => {
+    if (!pendingSugItems.length) return;
+    setItems(pendingSugItems);
+    setShowForm(true);
+    onClearPending?.();
+  }, [pendingSugItems]); // eslint-disable-line react-hooks/exhaustive-deps
   const [saving,    setSaving]    = useState(false);
   const [savingFav, setSavingFav] = useState(false);
   const [alertMsg,  setAlertMsg]  = useState(null);
-  const [medSearch, setMedSearch] = useState([]);
+  const [medSearch, setMedSearch] = useState(null);
   const [showSaveFav, setShowSaveFav] = useState(false);
   const [favNombre, setFavNombre] = useState("");
   const [medFavSet, setMedFavSet] = useState(new Set());
@@ -1464,7 +1479,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada }) {
       if (medFavList.length > 0) {
         setMedSearch({ idx, list: medFavList, soloFavoritos: true });
       } else {
-        setMedSearch([]);
+        setMedSearch(null);
       }
       return;
     }
@@ -1483,7 +1498,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada }) {
       cantidad: med.cantidad_default || it.cantidad,
       instrucciones: med.instrucciones_default || it.instrucciones,
     } : it));
-    setMedSearch([]);
+    setMedSearch(null);
   };
 
   const setItem = (idx, field, val) =>
@@ -1653,7 +1668,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada }) {
                       value={item.medicamento_texto}
                       onFocus={() => { if (!item.medicamento_texto) searchMed("", idx); }}
                       onChange={e => { setItem(idx, "medicamento_texto", e.target.value); setItem(idx, "medicamento_id", null); searchMed(e.target.value, idx); }}
-                      onBlur={() => setTimeout(() => setMedSearch([]), 200)} />
+                      onBlur={() => setTimeout(() => setMedSearch(null), 200)} />
                     {medSearch?.idx === idx && medSearch.list?.length > 0 && (
                       <ul className="list-group position-absolute z-3 shadow"
                         style={{ top: "100%", left: 0, right: 0, maxHeight: 200, overflowY: "auto", borderRadius: 8 }}>
@@ -1817,11 +1832,10 @@ function SubHistorialPaciente({ pacienteId }) {
 }
 
 // ── Sub-tab: Sugerencias por CIE-10 ──────────────────────────────────────────
-function SubSugeridadCie({ diagnosticoCie, diagnosticoDesc }) {
+function SubSugeridadCie({ diagnosticoCie, diagnosticoDesc, onAgregar }) {
   const [sugeridas, setSugeridas] = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [agregados, setAgregados] = useState(new Set());
-  const [alertMsg,  setAlertMsg]  = useState(null);
 
   useEffect(() => {
     if (!diagnosticoCie) { setSugeridas([]); return; }
@@ -1843,12 +1857,6 @@ function SubSugeridadCie({ diagnosticoCie, diagnosticoDesc }) {
 
   return (
     <div>
-      {alertMsg && (
-        <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`}>
-          {alertMsg.msg} <button className="btn-close" onClick={() => setAlertMsg(null)} />
-        </div>
-      )}
-
       <div className="d-flex align-items-center gap-2 mb-3">
         <span className="badge bg-primary" style={{ fontFamily: "monospace" }}>{diagnosticoCie}</span>
         <span className="small fw-semibold">{diagnosticoDesc}</span>
@@ -1884,16 +1892,18 @@ function SubSugeridadCie({ diagnosticoCie, diagnosticoDesc }) {
               {!agregados.has(med.id) ? (
                 <button className="btn btn-outline-primary btn-sm ms-2 text-nowrap"
                   style={{ flexShrink: 0 }}
-                  onClick={async () => {
-                    // Copiar al portapapeles como favorita no, mas bien ir a crear receta
-                    try {
-                      // Agregar directo como item en una nueva receta usando el endpoint de prescripción
-                      // Guardamos como "seleccionado" para feedback visual
-                      setAgregados(prev => new Set(prev).add(med.id));
-                      setAlertMsg({ type: "success", msg: `✓ ${med.nombre_generico} — Ve a "Nueva Receta" y búscalo en el catálogo, ya tiene dosis pre-llenada.` });
-                    } catch {}
+                  onClick={() => {
+                    setAgregados(prev => new Set(prev).add(med.id));
+                    onAgregar([{
+                      medicamento_id:    med.id,
+                      medicamento_texto: med.nombre_generico + (med.presentacion ? ` (${med.presentacion})` : ""),
+                      dosis:             med.dosis_default        || "",
+                      duracion:          med.duracion_default     || "",
+                      cantidad:          med.cantidad_default     || "",
+                      instrucciones:     med.instrucciones_default || "",
+                    }]);
                   }}>
-                  <i className="bi bi-plus-circle me-1"></i>Seleccionar
+                  <i className="bi bi-plus-circle me-1"></i>Agregar a receta
                 </button>
               ) : (
                 <span className="badge bg-success ms-2" style={{ padding: "6px 10px" }}>
@@ -2409,11 +2419,12 @@ function DermaField({ label, children }) {
   );
 }
 
-function DermaTab({ datosDerma, setDatosDerma, firmada }) {
+function DermaTab({ datosDerma, setDatosDerma, firmada, paciente, pacienteId }) {
   const set = (key, val) => setDatosDerma(prev => ({ ...prev, [key]: val }));
   const d = datosDerma;
   const [procCatalogo, setProcCatalogo] = useState([]);
   const [procPick, setProcPick] = useState("");
+  const [showAgendarModal, setShowAgendarModal] = useState(false);
 
   useEffect(() => {
     api.get("/catalogos-procedimientos")
@@ -2601,11 +2612,44 @@ function DermaTab({ datosDerma, setDatosDerma, firmada }) {
                 onChange={e => set("indicaciones_medicas", e.target.value)} />
             </DermaField>
             <DermaField label="Próxima cita sugerida">
-              <input type="date" className="form-control form-control-sm" style={inputStyle}
-                disabled={firmada}
-                value={d.proxima_cita || ""}
-                onChange={e => set("proxima_cita", e.target.value)} />
+              {d.proxima_cita ? (
+                <div className="d-flex align-items-center gap-2 px-2 py-2 rounded border"
+                  style={{ background: "rgba(91,33,182,0.06)", borderColor: "#ddd6fe" }}>
+                  <i className="bi bi-calendar-check-fill" style={{ color: "#7c3aed", flexShrink: 0 }}></i>
+                  <span className="flex-grow-1 small fw-semibold" style={{ color: "#5b21b6" }}>
+                    {dayjs(d.proxima_cita).isValid()
+                      ? dayjs(d.proxima_cita).format("dddd D [de] MMMM [de] YYYY [·] HH:mm")
+                      : d.proxima_cita}
+                  </span>
+                  {!firmada && (
+                    <button type="button" className="btn btn-link btn-sm p-0 text-danger lh-1"
+                      title="Quitar cita"
+                      onClick={() => set("proxima_cita", "")}>
+                      <i className="bi bi-x-circle-fill"></i>
+                    </button>
+                  )}
+                </div>
+              ) : (
+                <button type="button"
+                  className="btn btn-outline-secondary btn-sm w-100"
+                  disabled={firmada}
+                  style={{ borderRadius: 7, fontSize: "0.82rem", borderStyle: "dashed" }}
+                  onClick={() => setShowAgendarModal(true)}>
+                  <i className="bi bi-calendar-plus me-2"></i>Ver disponibilidad y agendar…
+                </button>
+              )}
             </DermaField>
+            {showAgendarModal && (
+              <ModalAgendarProximaCita
+                paciente={paciente}
+                pacienteId={pacienteId}
+                onClose={() => setShowAgendarModal(false)}
+                onConfirm={(fechaHora) => {
+                  set("proxima_cita", fechaHora);
+                  setShowAgendarModal(false);
+                }}
+              />
+            )}
           </DermaFieldGroup>
 
         </div>
@@ -2617,6 +2661,219 @@ function DermaTab({ datosDerma, setDatosDerma, firmada }) {
           Los campos de esta pestaña se guardan automáticamente junto con el SOAP al presionar <strong>Borrador</strong> o <strong>Firmar y Cerrar</strong>.
         </div>
       )}
+    </div>
+  );
+}
+
+// ─── Modal Agendar Próxima Cita (desde tab Derma) ────────────────────────────
+function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
+  const [medicos,     setMedicos]     = useState([]);
+  const [medicoId,    setMedicoId]    = useState("");
+  const [fechaSel,    setFechaSel]    = useState(dayjs().add(1, "week").format("YYYY-MM-DD"));
+  const [slots,       setSlots]       = useState([]);
+  const [slotSel,     setSlotSel]     = useState(null);
+  const [horaInicio,  setHoraInicio]  = useState("");
+  const [horaFin,     setHoraFin]     = useState("");
+  const [tipo,        setTipo]        = useState("CONTROL");
+  const [motivo,      setMotivo]      = useState("");
+  const [loadSlots,   setLoadSlots]   = useState(false);
+  const [saving,      setSaving]      = useState(false);
+  const [err,         setErr]         = useState("");
+
+  useEffect(() => {
+    api.get("/usuarios/medicos")
+      .then(r => setMedicos(r.data.data || []))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!medicoId || !fechaSel) { setSlots([]); return; }
+    setLoadSlots(true);
+    api.get("/citas/slots", { params: { medico_id: medicoId, fecha: fechaSel } })
+      .then(r => setSlots(r.data.data || []))
+      .catch(() => setSlots([]))
+      .finally(() => setLoadSlots(false));
+  }, [medicoId, fechaSel]);
+
+  const selSlot = (s) => {
+    setSlotSel(s);
+    setHoraInicio(dayjs(s.inicio).format("HH:mm"));
+    setHoraFin(dayjs(s.fin).format("HH:mm"));
+  };
+
+  const handleConfirm = async () => {
+    if (!medicoId) { setErr("Selecciona un médico"); return; }
+    if (!horaInicio || !horaFin) { setErr("Selecciona un horario"); return; }
+    const inicio = dayjs(`${fechaSel} ${horaInicio}`);
+    const fin    = dayjs(`${fechaSel} ${horaFin}`);
+    if (fin.isBefore(inicio) || fin.isSame(inicio)) {
+      setErr("La hora de fin debe ser posterior a la de inicio"); return;
+    }
+    setSaving(true); setErr("");
+    try {
+      await api.post("/citas", {
+        paciente_id:   paciente?.id || pacienteId,
+        medico_id:     medicoId,
+        inicio:        inicio.format("YYYY-MM-DD HH:mm:ss"),
+        fin:           fin.format("YYYY-MM-DD HH:mm:ss"),
+        tipo_consulta: tipo,
+        motivo:        motivo || null,
+        canal:         "RECEPCION",
+      });
+      onConfirm(inicio.format("YYYY-MM-DD HH:mm"));
+    } catch (ex) {
+      setErr(ex.response?.data?.msg || "Error al agendar la cita");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 10500,
+      background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 560, background: "#fff",
+        borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{
+          background: "linear-gradient(135deg, #5b21b6, #7c3aed)",
+          padding: "14px 18px", display: "flex", alignItems: "center",
+          justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <i className="bi bi-calendar-plus" style={{ color: "#e9d5ff", fontSize: "1.1rem" }}></i>
+            <div>
+              <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Agendar próxima cita</div>
+              {paciente && (
+                <div style={{ color: "rgba(255,255,255,.65)", fontSize: "0.75rem" }}>
+                  {paciente.nombres} {paciente.apellidos}
+                </div>
+              )}
+            </div>
+          </div>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "#e9d5ff", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
+            <i className="bi bi-x-lg"></i>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "18px 20px" }}>
+          {err && (
+            <div className="alert alert-danger py-2 mb-3" style={{ borderRadius: 8, fontSize: "0.85rem" }}>
+              <i className="bi bi-exclamation-triangle me-2"></i>{err}
+            </div>
+          )}
+
+          {/* Médico */}
+          <div className="mb-3">
+            <label className="form-label fw-semibold small">Médico</label>
+            <select className="form-select form-select-sm" value={medicoId} onChange={e => { setMedicoId(e.target.value); setSlotSel(null); setHoraInicio(""); setHoraFin(""); }}>
+              <option value="">— Seleccionar médico —</option>
+              {medicos.map(m => (
+                <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos}{m.especialidad ? ` · ${m.especialidad}` : ""}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Fecha */}
+          <div className="row g-2 mb-3">
+            <div className="col-6">
+              <label className="form-label fw-semibold small">Fecha</label>
+              <input type="date" className="form-control form-control-sm"
+                min={dayjs().add(1, "day").format("YYYY-MM-DD")}
+                value={fechaSel}
+                onChange={e => { setFechaSel(e.target.value); setSlotSel(null); setHoraInicio(""); setHoraFin(""); }} />
+            </div>
+            <div className="col-6">
+              <label className="form-label fw-semibold small">Tipo de consulta</label>
+              <select className="form-select form-select-sm" value={tipo} onChange={e => setTipo(e.target.value)}>
+                {["CONTROL","PRIMERA_VEZ","EMERGENCIA","TELECONSULTA"].map(t => <option key={t}>{t}</option>)}
+              </select>
+            </div>
+          </div>
+
+          {/* Slots disponibles */}
+          {medicoId && (
+            <div className="mb-3">
+              <label className="form-label fw-semibold small d-flex align-items-center gap-2">
+                Horarios disponibles
+                {loadSlots && <span className="spinner-border spinner-border-sm text-secondary" style={{ width: "0.75rem", height: "0.75rem" }}></span>}
+              </label>
+              {!loadSlots && slots.length === 0 && (
+                <div className="text-muted small" style={{ padding: "8px 0" }}>
+                  <i className="bi bi-calendar-x me-1"></i>Sin horarios disponibles para esta fecha. Prueba otro día.
+                </div>
+              )}
+              {slots.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  {slots.map((s, i) => {
+                    const isSel = slotSel?.inicio === s.inicio;
+                    return (
+                      <button key={i} type="button"
+                        onClick={() => selSlot(s)}
+                        style={{
+                          padding: "5px 12px", borderRadius: 8, fontSize: "0.78rem",
+                          fontWeight: isSel ? 700 : 500, cursor: "pointer",
+                          border: `1.5px solid ${isSel ? "#7c3aed" : "#d1d5db"}`,
+                          background: isSel ? "#ede9fe" : "#f9fafb",
+                          color: isSel ? "#5b21b6" : "#374151",
+                          transition: "all .12s",
+                        }}>
+                        {dayjs(s.inicio).format("HH:mm")} – {dayjs(s.fin).format("HH:mm")}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Hora manual (si no hay slots o quiere personalizar) */}
+          <div className="row g-2 mb-3">
+            <div className="col-6">
+              <label className="form-label fw-semibold small">Hora inicio</label>
+              <input type="time" className="form-control form-control-sm"
+                value={horaInicio} onChange={e => { setHoraInicio(e.target.value); setSlotSel(null); }} />
+            </div>
+            <div className="col-6">
+              <label className="form-label fw-semibold small">Hora fin</label>
+              <input type="time" className="form-control form-control-sm"
+                value={horaFin} onChange={e => { setHoraFin(e.target.value); setSlotSel(null); }} />
+            </div>
+          </div>
+
+          {/* Motivo */}
+          <div className="mb-1">
+            <label className="form-label fw-semibold small">Motivo (opcional)</label>
+            <input className="form-control form-control-sm" value={motivo}
+              onChange={e => setMotivo(e.target.value)} placeholder="Control, revisión, seguimiento…" />
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button className="btn btn-outline-secondary btn-sm" onClick={onClose} disabled={saving}>
+            Cancelar
+          </button>
+          <button
+            className="btn btn-sm"
+            disabled={saving || !medicoId || !horaInicio || !horaFin}
+            onClick={handleConfirm}
+            style={{
+              background: "linear-gradient(135deg, #5b21b6, #7c3aed)",
+              color: "#fff", border: "none", fontWeight: 600, borderRadius: 8,
+              padding: "6px 20px",
+            }}>
+            <i className="bi bi-calendar-check me-1"></i>
+            {saving ? "Agendando…" : "Confirmar cita"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
