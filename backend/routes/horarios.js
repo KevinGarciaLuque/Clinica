@@ -34,8 +34,8 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
                       h.slot_minutos, h.activo,
                       u.nombres, u.apellidos
                FROM horarios_medico h
-               JOIN usuarios u ON u.id = h.medico_id
-               WHERE h.clinica_id=?`;
+               LEFT JOIN usuarios u ON u.id = h.medico_id
+               WHERE h.clinica_id=? AND h.activo=1`;
     const params = [clinicaId];
 
     if (medico_id) { sql += " AND h.medico_id=?"; params.push(medico_id); }

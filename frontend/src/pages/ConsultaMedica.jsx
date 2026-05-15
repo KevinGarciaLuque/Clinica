@@ -3,6 +3,7 @@
  * URL: /consulta-medica?paciente_id=&cita_id=&historia_id=
  */
 import { useState, useEffect, useCallback, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { FaCheckCircle } from "react-icons/fa";
@@ -196,10 +197,10 @@ export default function Consulta() {
 
   const TAB_LIST = [
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
+    ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
     { id: "rx",           icon: "bi-capsule",          label: "Prescripción" },
     { id: "estudios",     icon: "bi-eyedropper",       label: "Estudios" },
     { id: "antecedentes", icon: "bi-folder2-open",     label: "Antecedentes" },
-    ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
   ];
 
   return (
@@ -356,38 +357,40 @@ export default function Consulta() {
 
         {/* ── Tabs principales ── */}
         <div style={{
-          background: "#fff",
+          background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
           borderRadius: "12px 12px 0 0",
-          borderBottom: "1px solid #e5e7eb",
           display: "flex",
           padding: "0 6px",
-          boxShadow: "0 1px 4px rgba(0,0,0,.04)",
-          marginBottom: 0,
           overflowX: "auto",
         }}>
-          {TAB_LIST.map(t => (
-            <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              style={{
-                background: "none",
-                border: "none",
-                borderBottom: tab === t.id ? "2.5px solid #3b82f6" : "2.5px solid transparent",
-                color: tab === t.id ? "#2563eb" : "#6b7280",
-                fontWeight: tab === t.id ? 700 : 500,
-                padding: "12px 18px",
-                fontSize: "0.85rem",
-                cursor: "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 6,
-                whiteSpace: "nowrap",
-                transition: "all .15s",
-              }}>
-              <i className={`bi ${t.icon}`}></i>
-              {t.label}
-            </button>
-          ))}
+          {TAB_LIST.map(t => {
+            const isActive = tab === t.id;
+            return (
+              <button
+                key={t.id}
+                onClick={() => setTab(t.id)}
+                style={{
+                  flexShrink: 0,
+                  padding: "7px 16px",
+                  fontSize: "0.82rem",
+                  fontWeight: 600,
+                  borderRadius: "8px 8px 0 0",
+                  border: "none",
+                  cursor: "pointer",
+                  transition: "background .15s",
+                  background: isActive ? "#fff" : "rgba(255,255,255,.1)",
+                  color: isActive ? "#1a2744" : "rgba(255,255,255,.75)",
+                  whiteSpace: "nowrap",
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                }}
+              >
+                <i className={`bi ${t.icon}`}></i>
+                {t.label}
+              </button>
+            );
+          })}
         </div>
 
         {/* Contenido de tab */}
@@ -695,9 +698,13 @@ function ModalCambiosGuardados({ onClose }) {
 // ══════════════════════════════════════════════════════════════════════
 function PacienteResumenCard({ resumen }) {
   const [expandido, setExpandido] = useState(false);
+  const [indice, setIndice] = useState(0);
+  const [hoverPrev, setHoverPrev] = useState(false);
+  const [hoverNext, setHoverNext] = useState(false);
   if (!resumen) return null;
 
-  const { es_nuevo, total_consultas, ultima_consulta: ult } = resumen;
+  const { es_nuevo, total_consultas, consultas_previas } = resumen;
+  const lista = consultas_previas || (resumen.ultima_consulta ? [resumen.ultima_consulta] : []);
 
   if (es_nuevo) {
     return (
@@ -721,9 +728,7 @@ function PacienteResumenCard({ resumen }) {
           <i className="bi bi-stars"></i>
         </div>
         <div>
-          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#15803d" }}>
-            PACIENTE NUEVO
-          </div>
+          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#15803d" }}>PACIENTE NUEVO</div>
           <div style={{ fontSize: "0.75rem", color: "#16a34a", marginTop: 1 }}>
             Primera consulta registrada en esta clínica
           </div>
@@ -731,6 +736,9 @@ function PacienteResumenCard({ resumen }) {
       </div>
     );
   }
+
+  const actual = lista[indice];
+  const total  = lista.length;
 
   return (
     <div style={{
@@ -743,12 +751,7 @@ function PacienteResumenCard({ resumen }) {
       transition: "background .2s",
     }}>
       {/* Cabecera siempre visible */}
-      <div
-        onClick={() => setExpandido(e => !e)}
-        style={{
-          display: "flex", alignItems: "center", gap: 10,
-          padding: "10px 16px", cursor: "pointer",
-        }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 16px" }}>
         <div style={{
           width: 32, height: 32, borderRadius: "50%",
           background: "linear-gradient(135deg, #3b82f6, #1d4ed8)", color: "#fff",
@@ -757,7 +760,9 @@ function PacienteResumenCard({ resumen }) {
         }}>
           <i className="bi bi-arrow-repeat"></i>
         </div>
-        <div style={{ flex: 1 }}>
+
+        {/* Texto central — clickeable para expandir */}
+        <div style={{ flex: 1, cursor: "pointer" }} onClick={() => setExpandido(e => !e)}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1d4ed8" }}>
               CONSULTA SUBSECUENTE
@@ -770,136 +775,143 @@ function PacienteResumenCard({ resumen }) {
               {total_consultas} {total_consultas === 1 ? "visita previa" : "visitas previas"}
             </span>
           </div>
-          {ult && (
+          {actual && (
             <div style={{ fontSize: "0.73rem", color: "#6b7280", marginTop: 2 }}>
-              Última visita: {dayjs(ult.fecha).format("DD/MM/YYYY")}
-              {ult.diagnostico_cie && (
+              Última visita: {dayjs(actual.fecha).format("DD/MM/YYYY")}
+              {actual.diagnostico_cie && (
                 <span style={{ marginLeft: 6, color: "#3b82f6" }}>
-                  · {ult.diagnostico_cie}{ult.diagnostico_desc ? ` – ${ult.diagnostico_desc}` : ""}
+                  · {actual.diagnostico_cie}{actual.diagnostico_desc ? ` – ${actual.diagnostico_desc}` : ""}
                 </span>
               )}
             </div>
           )}
         </div>
-        <div style={{ color: "#9ca3af", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 4 }}>
-          <span style={{ fontSize: "0.72rem" }}>{expandido ? "Cerrar" : "Ver última consulta"}</span>
+
+        {/* Controles carrusel */}
+        {total > 1 && (
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              onClick={() => setIndice(i => Math.min(i + 1, total - 1))}
+              disabled={indice >= total - 1}
+              onMouseEnter={() => setHoverPrev(true)}
+              onMouseLeave={() => setHoverPrev(false)}
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                border: `1px solid ${indice >= total - 1 ? "#e2e8f0" : hoverPrev ? "#93c5fd" : "#bfdbfe"}`,
+                background: indice >= total - 1 ? "#f1f5f9" : hoverPrev ? "#dbeafe" : "#eff6ff",
+                color: indice >= total - 1 ? "#cbd5e1" : hoverPrev ? "#1d4ed8" : "#3b82f6",
+                cursor: indice >= total - 1 ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "0.75rem", flexShrink: 0,
+                transform: hoverPrev && indice < total - 1 ? "scale(1.12)" : "scale(1)",
+                transition: "all .15s",
+                boxShadow: hoverPrev && indice < total - 1 ? "0 2px 8px rgba(59,130,246,.25)" : "none",
+              }}
+              title="Consulta anterior"
+            >
+              <i className="bi bi-chevron-left"></i>
+            </button>
+            <span style={{ fontSize: "0.72rem", color: "#6b7280", minWidth: 36, textAlign: "center" }}>
+              {indice + 1} / {total}
+            </span>
+            <button
+              onClick={() => setIndice(i => Math.max(i - 1, 0))}
+              disabled={indice <= 0}
+              onMouseEnter={() => setHoverNext(true)}
+              onMouseLeave={() => setHoverNext(false)}
+              style={{
+                width: 28, height: 28, borderRadius: "50%",
+                border: `1px solid ${indice <= 0 ? "#e2e8f0" : hoverNext ? "#93c5fd" : "#bfdbfe"}`,
+                background: indice <= 0 ? "#f1f5f9" : hoverNext ? "#dbeafe" : "#eff6ff",
+                color: indice <= 0 ? "#cbd5e1" : hoverNext ? "#1d4ed8" : "#3b82f6",
+                cursor: indice <= 0 ? "not-allowed" : "pointer",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: "0.75rem", flexShrink: 0,
+                transform: hoverNext && indice > 0 ? "scale(1.12)" : "scale(1)",
+                transition: "all .15s",
+                boxShadow: hoverNext && indice > 0 ? "0 2px 8px rgba(59,130,246,.25)" : "none",
+              }}
+              title="Consulta siguiente"
+            >
+              <i className="bi bi-chevron-right"></i>
+            </button>
+          </div>
+        )}
+
+        {/* Toggle expandir */}
+        <div
+          onClick={() => setExpandido(e => !e)}
+          style={{ color: "#9ca3af", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
+        >
+          <span style={{ fontSize: "0.72rem" }}>{expandido ? "Cerrar" : "Ver detalle"}</span>
           <i className={`bi bi-chevron-${expandido ? "up" : "down"}`} style={{ fontSize: "0.72rem" }}></i>
         </div>
       </div>
 
       {/* Detalle expandible */}
-      {expandido && ult && (
-        <div style={{
-          borderTop: "1px solid #dbeafe",
-          padding: "14px 16px",
-          background: "#f8faff",
-        }}>
+      {expandido && actual && (
+        <div style={{ borderTop: "1px solid #dbeafe", padding: "14px 16px", background: "#f8faff" }}>
           {/* Médico y fecha */}
-          <div style={{
-            display: "flex", flexWrap: "wrap", gap: 16,
-            marginBottom: 12, fontSize: "0.8rem",
-          }}>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 12, fontSize: "0.8rem" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <i className="bi bi-calendar3" style={{ color: "#3b82f6" }}></i>
               <span style={{ color: "#374151" }}>
-                <strong>Fecha:</strong> {dayjs(ult.fecha).format("DD [de] MMMM [de] YYYY")}
+                <strong>Fecha:</strong> {dayjs(actual.fecha).format("DD [de] MMMM [de] YYYY")}
               </span>
             </div>
-            {ult.medico && (
+            {actual.medico && (
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <i className="bi bi-person-badge" style={{ color: "#3b82f6" }}></i>
                 <span style={{ color: "#374151" }}>
-                  <strong>Médico:</strong> Dr. {ult.medico}
-                  {ult.especialidad && <span style={{ color: "#9ca3af" }}> · {ult.especialidad}</span>}
+                  <strong>Médico:</strong> Dr. {actual.medico}
+                  {actual.especialidad && <span style={{ color: "#9ca3af" }}> · {actual.especialidad}</span>}
                 </span>
               </div>
             )}
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-            {/* Motivo / Subjetivo */}
-            {ult.subjetivo && (
-              <div style={{
-                background: "#fff", borderRadius: 8, padding: "10px 12px",
-                border: "1px solid #e5e7eb",
-              }}>
-                <div style={{
-                  fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
-                  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
-                }}>
+            {actual.subjetivo && (
+              <div style={{ background: "#fff", borderRadius: 8, padding: "10px 12px", border: "1px solid #e5e7eb" }}>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
                   <i className="bi bi-chat-square-text me-1 text-primary"></i>Motivo / Subjetivo
                 </div>
-                <p style={{ margin: 0, fontSize: "0.82rem", color: "#374151", lineHeight: 1.5 }}>
-                  {ult.subjetivo}
-                </p>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "#374151", lineHeight: 1.5 }}>{actual.subjetivo}</p>
               </div>
             )}
-
-            {/* Diagnóstico */}
-            {ult.diagnostico_cie && (
-              <div style={{
-                background: "#fff", borderRadius: 8, padding: "10px 12px",
-                border: "1px solid #e5e7eb",
-              }}>
-                <div style={{
-                  fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
-                  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
-                }}>
+            {actual.diagnostico_cie && (
+              <div style={{ background: "#fff", borderRadius: 8, padding: "10px 12px", border: "1px solid #e5e7eb" }}>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
                   <i className="bi bi-clipboard2-pulse me-1 text-danger"></i>Diagnóstico
                 </div>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 6 }}>
-                  <span style={{
-                    background: "#fee2e2", color: "#dc2626",
-                    borderRadius: 6, padding: "1px 7px", fontSize: "0.72rem",
-                    fontWeight: 700, fontFamily: "monospace", flexShrink: 0,
-                  }}>
-                    {ult.diagnostico_cie}
+                  <span style={{ background: "#fee2e2", color: "#dc2626", borderRadius: 6, padding: "1px 7px", fontSize: "0.72rem", fontWeight: 700, fontFamily: "monospace", flexShrink: 0 }}>
+                    {actual.diagnostico_cie}
                   </span>
-                  {ult.diagnostico_desc && (
-                    <span style={{ fontSize: "0.82rem", color: "#374151", lineHeight: 1.4 }}>
-                      {ult.diagnostico_desc}
-                    </span>
+                  {actual.diagnostico_desc && (
+                    <span style={{ fontSize: "0.82rem", color: "#374151", lineHeight: 1.4 }}>{actual.diagnostico_desc}</span>
                   )}
                 </div>
               </div>
             )}
-
-            {/* Plan */}
-            {ult.plan && (
-              <div style={{
-                background: "#fff", borderRadius: 8, padding: "10px 12px",
-                border: "1px solid #e5e7eb",
-                gridColumn: ult.subjetivo && ult.diagnostico_cie ? "1 / -1" : undefined,
-              }}>
-                <div style={{
-                  fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
-                  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4,
-                }}>
+            {actual.plan && (
+              <div style={{ background: "#fff", borderRadius: 8, padding: "10px 12px", border: "1px solid #e5e7eb", gridColumn: actual.subjetivo && actual.diagnostico_cie ? "1 / -1" : undefined }}>
+                <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
                   <i className="bi bi-list-check me-1 text-success"></i>Plan de tratamiento
                 </div>
-                <p style={{ margin: 0, fontSize: "0.82rem", color: "#374151", lineHeight: 1.5 }}>
-                  {ult.plan}
-                </p>
+                <p style={{ margin: 0, fontSize: "0.82rem", color: "#374151", lineHeight: 1.5 }}>{actual.plan}</p>
               </div>
             )}
           </div>
 
-          {/* Medicamentos */}
-          {ult.medicamentos?.length > 0 && (
+          {actual.medicamentos?.length > 0 && (
             <div style={{ marginTop: 12 }}>
-              <div style={{
-                fontSize: "0.7rem", fontWeight: 700, color: "#6b7280",
-                textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6,
-              }}>
+              <div style={{ fontSize: "0.7rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 6 }}>
                 <i className="bi bi-capsule me-1 text-warning"></i>Medicamentos recetados
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {ult.medicamentos.map((m, i) => (
-                  <div key={i} style={{
-                    background: "#fffbeb", border: "1px solid #fde68a",
-                    borderRadius: 8, padding: "5px 10px", fontSize: "0.78rem",
-                    color: "#92400e",
-                  }}>
+                {actual.medicamentos.map((m, i) => (
+                  <div key={i} style={{ background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8, padding: "5px 10px", fontSize: "0.78rem", color: "#92400e" }}>
                     <strong>{m.nombre}</strong>
                     {m.dosis && <span style={{ color: "#b45309" }}> · {m.dosis}</span>}
                     {m.duracion && <span style={{ color: "#b45309" }}> · {m.duracion}</span>}
@@ -2402,7 +2414,7 @@ function DermaFieldGroup({ title, icon, children }) {
   return (
     <div style={{ marginBottom: 20 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12, paddingBottom: 6, borderBottom: "1px solid #e5e7eb" }}>
-        <i className={`bi ${icon}`} style={{ color: "#8b5cf6", fontSize: "1rem" }}></i>
+        <i className={`bi ${icon}`} style={{ color: "#1d4ed8", fontSize: "1rem" }}></i>
         <span style={{ fontWeight: 700, fontSize: "0.85rem", color: "#374151", textTransform: "uppercase", letterSpacing: "0.05em" }}>{title}</span>
       </div>
       {children}
@@ -2446,11 +2458,11 @@ function DermaTab({ datosDerma, setDatosDerma, firmada, paciente, pacienteId }) 
   return (
     <div>
       {/* Banner informativo */}
-      <div style={{ background: "linear-gradient(135deg, #f5f3ff, #ede9fe)", border: "1px solid #ddd6fe", borderRadius: 10, padding: "10px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
-        <i className="bi bi-bandaid-fill" style={{ color: "#7c3aed", fontSize: "1.2rem" }}></i>
+      <div style={{ background: "linear-gradient(135deg, #f0f5ff, #e8f0fe)", border: "1px solid #bfdbfe", borderRadius: 10, padding: "10px 16px", marginBottom: 20, display: "flex", alignItems: "center", gap: 10 }}>
+        <i className="bi bi-bandaid-fill" style={{ color: "#1d4ed8", fontSize: "1.2rem" }}></i>
         <div>
-          <span style={{ fontWeight: 700, color: "#5b21b6", fontSize: "0.9rem" }}>Historia Clínica Dermatológica</span>
-          <div style={{ fontSize: "0.75rem", color: "#7c3aed", marginTop: 1 }}>Campos específicos para consultas de dermatología y estética. Se guardan junto con la historia SOAP al presionar Borrador o Firmar.</div>
+          <span style={{ fontWeight: 700, color: "#1a2744", fontSize: "0.9rem" }}>Historia Clínica Dermatológica</span>
+          <div style={{ fontSize: "0.75rem", color: "#2563eb", marginTop: 1 }}>Campos específicos para consultas de dermatología y estética. Se guardan junto con la historia SOAP al presionar Borrador o Firmar.</div>
         </div>
       </div>
 
@@ -2614,9 +2626,9 @@ function DermaTab({ datosDerma, setDatosDerma, firmada, paciente, pacienteId }) 
             <DermaField label="Próxima cita sugerida">
               {d.proxima_cita ? (
                 <div className="d-flex align-items-center gap-2 px-2 py-2 rounded border"
-                  style={{ background: "rgba(91,33,182,0.06)", borderColor: "#ddd6fe" }}>
-                  <i className="bi bi-calendar-check-fill" style={{ color: "#7c3aed", flexShrink: 0 }}></i>
-                  <span className="flex-grow-1 small fw-semibold" style={{ color: "#5b21b6" }}>
+                  style={{ background: "rgba(26,39,68,0.06)", borderColor: "#bfdbfe" }}>
+                  <i className="bi bi-calendar-check-fill" style={{ color: "#1a2744", flexShrink: 0 }}></i>
+                  <span className="flex-grow-1 small fw-semibold" style={{ color: "#1a2744" }}>
                     {dayjs(d.proxima_cita).isValid()
                       ? dayjs(d.proxima_cita).format("dddd D [de] MMMM [de] YYYY [·] HH:mm")
                       : d.proxima_cita}
@@ -2631,9 +2643,13 @@ function DermaTab({ datosDerma, setDatosDerma, firmada, paciente, pacienteId }) 
                 </div>
               ) : (
                 <button type="button"
-                  className="btn btn-outline-secondary btn-sm w-100"
+                  className="btn btn-sm w-100"
                   disabled={firmada}
-                  style={{ borderRadius: 7, fontSize: "0.82rem", borderStyle: "dashed" }}
+                  style={{
+                    borderRadius: 7, fontSize: "0.82rem", borderStyle: "dashed",
+                    border: "1px dashed #243b72", color: "#1a2744",
+                    background: "rgba(26,39,68,0.04)",
+                  }}
                   onClick={() => setShowAgendarModal(true)}>
                   <i className="bi bi-calendar-plus me-2"></i>Ver disponibilidad y agendar…
                 </button>
@@ -2728,7 +2744,7 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
     }
   };
 
-  return (
+  return createPortal(
     <div style={{
       position: "fixed", inset: 0, zIndex: 10500,
       background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
@@ -2741,12 +2757,12 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
       }}>
         {/* Header */}
         <div style={{
-          background: "linear-gradient(135deg, #5b21b6, #7c3aed)",
+          background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
           padding: "14px 18px", display: "flex", alignItems: "center",
           justifyContent: "space-between",
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <i className="bi bi-calendar-plus" style={{ color: "#e9d5ff", fontSize: "1.1rem" }}></i>
+            <i className="bi bi-calendar-plus" style={{ color: "rgba(255,255,255,.8)", fontSize: "1.1rem" }}></i>
             <div>
               <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Agendar próxima cita</div>
               {paciente && (
@@ -2756,7 +2772,7 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
               )}
             </div>
           </div>
-          <button onClick={onClose} style={{ background: "none", border: "none", color: "#e9d5ff", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
+          <button onClick={onClose} style={{ background: "none", border: "none", color: "rgba(255,255,255,.7)", fontSize: "1.2rem", cursor: "pointer", lineHeight: 1 }}>
             <i className="bi bi-x-lg"></i>
           </button>
         </div>
@@ -2819,9 +2835,9 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
                         style={{
                           padding: "5px 12px", borderRadius: 8, fontSize: "0.78rem",
                           fontWeight: isSel ? 700 : 500, cursor: "pointer",
-                          border: `1.5px solid ${isSel ? "#7c3aed" : "#d1d5db"}`,
-                          background: isSel ? "#ede9fe" : "#f9fafb",
-                          color: isSel ? "#5b21b6" : "#374151",
+                          border: `1.5px solid ${isSel ? "#1d4ed8" : "#d1d5db"}`,
+                          background: isSel ? "#dbeafe" : "#f9fafb",
+                          color: isSel ? "#1a2744" : "#374151",
                           transition: "all .12s",
                         }}>
                         {dayjs(s.inicio).format("HH:mm")} – {dayjs(s.fin).format("HH:mm")}
@@ -2865,7 +2881,7 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
             disabled={saving || !medicoId || !horaInicio || !horaFin}
             onClick={handleConfirm}
             style={{
-              background: "linear-gradient(135deg, #5b21b6, #7c3aed)",
+              background: "linear-gradient(135deg, #213564, #1a2744)",
               color: "#fff", border: "none", fontWeight: 600, borderRadius: 8,
               padding: "6px 20px",
             }}>
@@ -2874,7 +2890,8 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

@@ -391,61 +391,63 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","ENFERMERA","
       return res.json({ ok: true, data: { es_nuevo: true, total_consultas: 0, ultima_consulta: null } });
     }
 
-    // Última consulta firmada (excluyendo la actual si se indicó)
-    let ultSql = `
-      SELECT h.id, h.creado_en, h.diagnostico_cie, h.diagnosticos_secundarios,
-             h.plan, h.subjetivo, h.examen_fisico,
+    // Todas las consultas firmadas previas (excluyendo la actual)
+    let listSql = `
+      SELECT h.id, h.creado_en, h.diagnostico_cie,
+             h.plan, h.subjetivo,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
-             e.nombre AS especialidad
+             e.nombre AS especialidad,
+             c.descripcion AS cie_desc
       FROM historias_clinicas h
       JOIN usuarios u ON u.id = h.medico_id
       LEFT JOIN especialidades e ON e.id = u.especialidad_id
+      LEFT JOIN cie10 c ON c.codigo = h.diagnostico_cie
       WHERE h.paciente_id=? AND h.clinica_id=? AND h.estado='FIRMADA'`;
-    const ultParams = [paciente_id, cid];
-    if (exclude_id) { ultSql += " AND h.id != ?"; ultParams.push(exclude_id); }
-    ultSql += " ORDER BY h.creado_en DESC LIMIT 1";
+    const listParams = [paciente_id, cid];
+    if (exclude_id) { listSql += " AND h.id != ?"; listParams.push(exclude_id); }
+    listSql += " ORDER BY h.creado_en DESC LIMIT 20";
 
-    const [[ult]] = await pool.query(ultSql, ultParams);
-    if (!ult) return res.json({ ok: true, data: { es_nuevo: true, total_consultas: 0, ultima_consulta: null } });
+    const [rows] = await pool.query(listSql, listParams);
+    if (!rows.length) return res.json({ ok: true, data: { es_nuevo: true, total_consultas: 0, consultas_previas: [] } });
 
-    // Descripción del CIE-10 principal
-    let dxDesc = "";
-    if (ult.diagnostico_cie) {
-      const [[cie]] = await pool.query(
-        "SELECT descripcion FROM cie10 WHERE codigo=? LIMIT 1",
-        [ult.diagnostico_cie]
-      );
-      dxDesc = cie?.descripcion || "";
-    }
-
-    // Medicamentos de esa consulta
-    const [meds] = await pool.query(
-      `SELECT COALESCE(m.nombre_generico, pi.medicamento_texto) AS nombre,
+    // Medicamentos de todas esas consultas en una sola query
+    const ids = rows.map(r => r.id);
+    const [allMeds] = await pool.query(
+      `SELECT pr.historia_id,
+              COALESCE(m.nombre_generico, pi.medicamento_texto) AS nombre,
               pi.dosis, pi.duracion
        FROM prescripcion_items pi
        JOIN prescripciones pr ON pr.id = pi.prescripcion_id
        LEFT JOIN medicamentos m ON m.id = pi.medicamento_id
-       WHERE pr.historia_id=? AND pr.clinica_id=?
-       LIMIT 8`,
-      [ult.id, cid]
+       WHERE pr.historia_id IN (?) AND pr.clinica_id=?`,
+      [ids, cid]
     );
+    const medsByHistoria = {};
+    for (const med of allMeds) {
+      if (!medsByHistoria[med.historia_id]) medsByHistoria[med.historia_id] = [];
+      if (medsByHistoria[med.historia_id].length < 8)
+        medsByHistoria[med.historia_id].push({ nombre: med.nombre, dosis: med.dosis, duracion: med.duracion });
+    }
+
+    const consultas_previas = rows.map(r => ({
+      id:               r.id,
+      fecha:            r.creado_en,
+      medico:           `${r.med_nombres} ${r.med_apellidos}`,
+      especialidad:     r.especialidad || "",
+      diagnostico_cie:  r.diagnostico_cie || "",
+      diagnostico_desc: r.cie_desc || "",
+      plan:             r.plan || "",
+      subjetivo:        r.subjetivo || "",
+      medicamentos:     medsByHistoria[r.id] || [],
+    }));
 
     res.json({
       ok: true,
       data: {
         es_nuevo: false,
         total_consultas: total,
-        ultima_consulta: {
-          id:          ult.id,
-          fecha:       ult.creado_en,
-          medico:      `${ult.med_nombres} ${ult.med_apellidos}`,
-          especialidad: ult.especialidad || "",
-          diagnostico_cie:  ult.diagnostico_cie || "",
-          diagnostico_desc: dxDesc,
-          plan:        ult.plan || "",
-          subjetivo:   ult.subjetivo || "",
-          medicamentos: meds,
-        },
+        ultima_consulta: consultas_previas[0],
+        consultas_previas,
       },
     });
   } catch (e) {

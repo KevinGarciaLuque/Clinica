@@ -131,7 +131,7 @@ export default function Horarios() {
   const porDia = DIAS.map((dia, idx) => ({
     dia,
     idx,
-    bloques: horarios.filter((h) => h.dia_semana === idx),
+    bloques: horarios.filter((h) => Number(h.dia_semana) === idx),
   }));
 
   return (
