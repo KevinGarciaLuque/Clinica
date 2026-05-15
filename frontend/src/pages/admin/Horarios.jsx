@@ -15,6 +15,12 @@ function to12h(time) {
   return `${h12}:${mm} ${ampm}`;
 }
 
+/** Normaliza "HH:mm:ss" → "HH:mm" para el TimePicker */
+function toHHmm(time) {
+  if (!time) return "";
+  return String(time).slice(0, 5);
+}
+
 /** TimePicker 12h — recibe y emite "HH:mm" (24h) */
 function TimePicker12h({ value, onChange, label, required }) {
   const parse = (v) => {
@@ -67,6 +73,7 @@ export default function Horarios() {
   const [horarios, setHorarios]     = useState([]);
   const [medicoSel, setMedicoSel]   = useState("");
   const [form, setForm]             = useState(EMPTY);
+  const [editandoId, setEditandoId] = useState(null);
   const [cargando, setCargando]     = useState(false);
   const [error, setError]           = useState("");
   const [showModal, setShowModal]   = useState(false);
@@ -101,7 +108,22 @@ export default function Horarios() {
   useEffect(() => { cargarHorarios(medicoSel); }, [medicoSel, cargarHorarios]);
 
   const abrirNuevo = (diaIdx = 0) => {
+    setEditandoId(null);
     setForm({ ...EMPTY, medico_id: medicoSel, dia_semana: diaIdx });
+    setError("");
+    setShowModal(true);
+  };
+
+  const abrirEditar = (e, bloque) => {
+    e.stopPropagation();
+    setEditandoId(bloque.id);
+    setForm({
+      medico_id: bloque.medico_id,
+      dia_semana: Number(bloque.dia_semana),
+      hora_inicio: toHHmm(bloque.hora_inicio),
+      hora_fin: toHHmm(bloque.hora_fin),
+      slot_minutos: bloque.slot_minutos,
+    });
     setError("");
     setShowModal(true);
   };
@@ -109,15 +131,27 @@ export default function Horarios() {
   const guardar = async (e) => {
     e.preventDefault(); setError("");
     try {
-      await api.post("/horarios", form);
+      if (editandoId) {
+        await api.put(`/horarios/${editandoId}`, form);
+      } else {
+        await api.post("/horarios", form);
+      }
       setShowModal(false);
+      setEditandoId(null);
       cargarHorarios(medicoSel);
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     }
   };
 
-  const eliminar = async (id) => {
+  const cerrarModal = () => {
+    setShowModal(false);
+    setEditandoId(null);
+    setError("");
+  };
+
+  const eliminar = async (e, id) => {
+    e.stopPropagation();
     if (!confirm("¿Eliminar este bloque horario?")) return;
     try {
       await api.delete(`/horarios/${id}`);
@@ -127,7 +161,6 @@ export default function Horarios() {
     }
   };
 
-  // Agrupar horarios por día
   const porDia = DIAS.map((dia, idx) => ({
     dia,
     idx,
@@ -261,7 +294,7 @@ export default function Horarios() {
                     <span style={{
                       width: 22, height: 22, borderRadius: "50%",
                       background: bloques.length ? "rgba(255,255,255,.2)" : "#2563eb",
-                      color: bloques.length ? "#fff" : "#fff",
+                      color: "#fff",
                       display: "flex", alignItems: "center", justifyContent: "center",
                       fontSize: "1rem", fontWeight: 700,
                     }}>+</span>
@@ -289,13 +322,26 @@ export default function Horarios() {
                             ({b.slot_minutos} min/turno)
                           </span>
                         </div>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); eliminar(b.id); }}
-                          style={{
-                            background: "transparent", border: "1px solid #ef4444",
-                            borderRadius: 6, color: "#ef4444",
-                            padding: "2px 8px", fontSize: "0.78rem", cursor: "pointer", fontWeight: 700,
-                          }}>✕</button>
+                        <div style={{ display: "flex", gap: 5 }}>
+                          <button
+                            onClick={(e) => abrirEditar(e, b)}
+                            title="Editar"
+                            style={{
+                              background: "transparent", border: "1px solid #2563eb",
+                              borderRadius: 6, color: "#2563eb",
+                              padding: "2px 8px", fontSize: "0.78rem", cursor: "pointer",
+                            }}>
+                            <i className="bi bi-pencil-fill"></i>
+                          </button>
+                          <button
+                            onClick={(e) => eliminar(e, b.id)}
+                            title="Eliminar"
+                            style={{
+                              background: "transparent", border: "1px solid #ef4444",
+                              borderRadius: 6, color: "#ef4444",
+                              padding: "2px 8px", fontSize: "0.78rem", cursor: "pointer", fontWeight: 700,
+                            }}>✕</button>
+                        </div>
                       </div>
                     ))
                   )}
@@ -317,10 +363,12 @@ export default function Horarios() {
               display: "flex", alignItems: "center", justifyContent: "space-between",
             }}>
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <i className="bi bi-clock-fill" style={{ color: "#7dd3fc" }}></i>
-                <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>Nuevo bloque horario</span>
+                <i className={`bi ${editandoId ? "bi-pencil-fill" : "bi-clock-fill"}`} style={{ color: "#7dd3fc" }}></i>
+                <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem" }}>
+                  {editandoId ? "Editar bloque horario" : "Nuevo bloque horario"}
+                </span>
               </div>
-              <button onClick={() => setShowModal(false)} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", padding: "2px 8px", fontSize: "1rem" }}>×</button>
+              <button onClick={cerrarModal} style={{ background: "rgba(255,255,255,.15)", border: "none", borderRadius: 6, color: "#fff", cursor: "pointer", padding: "2px 8px", fontSize: "1rem" }}>×</button>
             </div>
             {/* Modal body */}
             <form onSubmit={guardar}>
@@ -335,7 +383,8 @@ export default function Horarios() {
                   <select
                     value={form.medico_id}
                     onChange={(e) => setForm({ ...form, medico_id: e.target.value })}
-                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: "0.87rem" }}
+                    disabled={!!editandoId}
+                    style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: "0.87rem", background: editandoId ? "#f9fafb" : "#fff" }}
                   >
                     <option value="">— Elige —</option>
                     {medicos.map((m) => (
@@ -372,16 +421,17 @@ export default function Horarios() {
               </div>
               {/* Modal footer */}
               <div style={{ padding: "12px 24px 20px", display: "flex", justifyContent: "flex-end", gap: 10 }}>
-                <button type="button" onClick={() => setShowModal(false)} style={{
+                <button type="button" onClick={cerrarModal} style={{
                   background: "transparent", border: "1px solid #d1d5db", borderRadius: 8,
                   padding: "8px 20px", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: "0.87rem",
                 }}>Cancelar</button>
                 <button type="submit" style={{
-                  background: "#2563eb", border: "none", borderRadius: 8,
+                  background: editandoId ? "#059669" : "#2563eb", border: "none", borderRadius: 8,
                   padding: "8px 22px", color: "#fff", fontWeight: 600, fontSize: "0.87rem", cursor: "pointer",
                   display: "flex", alignItems: "center", gap: 7,
                 }}>
-                  <i className="bi bi-check-lg"></i> Guardar
+                  <i className={`bi ${editandoId ? "bi-check-circle-fill" : "bi-check-lg"}`}></i>
+                  {editandoId ? "Guardar cambios" : "Guardar"}
                 </button>
               </div>
             </form>
