@@ -8,6 +8,7 @@ import "dayjs/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import api from "../api/api";
+import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 
 dayjs.locale("es");
 const localizer = dayjsLocalizer(dayjs);
@@ -286,7 +287,24 @@ export default function Citas() {
   const [sendingReminder, setSendingReminder] = useState(false);
   const [plantillasRecordatorio, setPlantillasRecordatorio] = useState([]);
   const [reminderForm, setReminderForm] = useState({ canal: "EMAIL", asunto: "", contenido: "" });
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false, type: "info", title: "", message: "", showCancel: false,
+  });
   const headerRef = useRef(null);
+
+  const showFeedback = useCallback((cfg) => {
+    setFeedbackModal({
+      open: true,
+      type: cfg.type || "info",
+      title: cfg.title || "Mensaje",
+      message: cfg.message || "",
+      confirmText: cfg.confirmText || "Aceptar",
+      cancelText: cfg.cancelText || "Cancelar",
+      showCancel: !!cfg.showCancel,
+      onConfirm: cfg.onConfirm,
+      onCancel: cfg.onCancel,
+    });
+  }, []);
 
   // Sincronizar estado con cambios en la URL (cuando se navega desde el sidebar)
   useEffect(() => {
@@ -359,7 +377,7 @@ export default function Citas() {
       setEvents(prev => prev.map(e =>
         e.id === event.id ? { ...e, start: event.start, end: event.end } : e
       ));
-      alert(err.response?.data?.msg || "Error al reprogramar");
+      showFeedback({ type: "error", title: "No se pudo reprogramar", message: err.response?.data?.msg || "Error al reprogramar" });
     });
   };
 
@@ -393,19 +411,29 @@ export default function Citas() {
         // Recargar sala de espera si estamos en esa tab
         loadSalaEspera();
       })
-      .catch(err => alert(err.response?.data?.msg || "Error"));
+      .catch(err => showFeedback({ type: "error", title: "No se pudo cambiar estado", message: err.response?.data?.msg || "Error" }));
   };
 
   const cancelarCita = () => {
-    if (!confirm("¿Cancelar esta cita?")) return;
-    api.delete(`/citas/${selEvent.id}`)
-      .then(() => { 
-        setEvents(prev => prev.filter(e => e.id !== selEvent.id)); 
-        setShowDet(false);
-        // Recargar sala de espera si estamos en esa tab
-        loadSalaEspera();
-      })
-      .catch(err => alert(err.response?.data?.msg || "Error"));
+    showFeedback({
+      type: "warning",
+      title: "Cancelar cita",
+      message: "¿Seguro que deseas cancelar esta cita?",
+      showCancel: true,
+      confirmText: "Sí, cancelar",
+      onConfirm: async () => {
+        setFeedbackModal((m) => ({ ...m, open: false }));
+        try {
+          await api.delete(`/citas/${selEvent.id}`);
+          setEvents(prev => prev.filter(e => e.id !== selEvent.id));
+          setShowDet(false);
+          loadSalaEspera();
+        } catch (err) {
+          showFeedback({ type: "error", title: "No se pudo cancelar", message: err.response?.data?.msg || "Error" });
+        }
+      },
+      onCancel: () => setFeedbackModal((m) => ({ ...m, open: false })),
+    });
   };
 
   const eliminarPermanente = () => {
@@ -417,7 +445,7 @@ export default function Citas() {
         // Recargar sala de espera si estamos en esa tab
         loadSalaEspera();
       })
-      .catch(err => alert(err.response?.data?.msg || "Error al eliminar"));
+      .catch(err => showFeedback({ type: "error", title: "No se pudo eliminar", message: err.response?.data?.msg || "Error al eliminar" }));
   };
 
   const htmlATextoPlano = (html = "") => {
@@ -485,8 +513,14 @@ export default function Citas() {
 
   const enviarRecordatorioManual = async () => {
     const c = selEvent?.resource || {};
-    if (!c.paciente_id) return alert("No se encontró paciente para esta cita");
-    if (!reminderForm.contenido?.trim()) return alert("Escribe el contenido del recordatorio");
+    if (!c.paciente_id) {
+      showFeedback({ type: "warning", title: "Paciente no disponible", message: "No se encontró paciente para esta cita" });
+      return;
+    }
+    if (!reminderForm.contenido?.trim()) {
+      showFeedback({ type: "warning", title: "Falta contenido", message: "Escribe el contenido del recordatorio" });
+      return;
+    }
     setSendingReminder(true);
     try {
       await api.post("/recordatorios/enviar-manual", {
@@ -495,10 +529,14 @@ export default function Citas() {
         asunto: reminderForm.asunto,
         contenido: reminderForm.contenido,
       });
-      alert(`Recordatorio ${reminderForm.canal} enviado correctamente`);
       setShowReminder(false);
+      showFeedback({
+        type: "success",
+        title: "Recordatorio enviado",
+        message: `Recordatorio ${reminderForm.canal} enviado correctamente`,
+      });
     } catch (err) {
-      alert(err.response?.data?.error || "Error al enviar recordatorio");
+      showFeedback({ type: "error", title: "Error al enviar recordatorio", message: err.response?.data?.error || "Error al enviar recordatorio" });
     } finally {
       setSendingReminder(false);
     }
@@ -762,6 +800,18 @@ export default function Citas() {
           fecha={dayjs(selEvent.resource.inicio).format("DD/MM/YYYY h:mm A")}
         />
       )}
+
+      <AnimatedFeedbackModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        message={feedbackModal.message}
+        confirmText={feedbackModal.confirmText}
+        cancelText={feedbackModal.cancelText}
+        showCancel={feedbackModal.showCancel}
+        onConfirm={feedbackModal.onConfirm || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
+        onCancel={feedbackModal.onCancel || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
+      />
     </div>
   );
 }
@@ -1215,10 +1265,80 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
   const acciones = ACCIONES[c.estado] || [];
 
   return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)" }}>
-      <div className="modal-dialog">
-        <div className="modal-content">
-          <div className="modal-header" style={{ background: color.bg, color: color.fg }}>
+    <div
+      className="modal show d-block"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1060,
+        background: "rgba(15,23,42,.62)",
+        backdropFilter: "blur(2px)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+    >
+      <style>{`
+        .detalle-cita-modal .modal-content {
+          border: none;
+          border-radius: 14px;
+          overflow: hidden;
+          box-shadow: 0 24px 48px rgba(0,0,0,.28);
+        }
+        .detalle-cita-modal .modal-body {
+          max-height: calc(100vh - 220px);
+          overflow-y: auto;
+        }
+        .detalle-cita-actions {
+          display: flex;
+          flex-wrap: wrap;
+          gap: 8px;
+          width: 100%;
+        }
+        .detalle-cita-actions .btn {
+          white-space: nowrap;
+        }
+        @media (max-width: 768px) {
+          .detalle-cita-modal .modal-dialog {
+            max-width: 100% !important;
+          }
+          .detalle-cita-modal .modal-body {
+            max-height: calc(100vh - 200px);
+            padding: 14px;
+          }
+          .detalle-cita-modal .table th,
+          .detalle-cita-modal .table td {
+            font-size: .95rem;
+            vertical-align: top;
+          }
+          .detalle-cita-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+          }
+          .detalle-cita-actions .btn {
+            width: 100%;
+            font-size: .84rem;
+            padding: 6px 8px;
+          }
+          .detalle-cita-actions .btn-danger {
+            grid-column: 1 / -1;
+          }
+          .detalle-cita-actions .btn-secondary {
+            grid-column: 2;
+          }
+        }
+      `}</style>
+      <div className="modal-dialog" style={{ margin: 0, width: "100%", maxWidth: 640 }}>
+        <div className="modal-content detalle-cita-modal">
+          <div
+            className="modal-header"
+            style={{
+              background: `linear-gradient(135deg, ${color.bg}, #f8fafc)`,
+              color: color.fg,
+              borderBottom: "1px solid rgba(0,0,0,.08)",
+            }}
+          >
             <h5 className="modal-title">Detalle de Cita</h5>
             <button className="btn-close"
               style={{ filter: color.fg === "#fff" ? "invert(1)" : "" }} onClick={onClose} />
@@ -1267,28 +1387,28 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
             )}
           </div>
           <div className="modal-footer">
-            <div className="me-auto">
-              <button className="btn btn-danger btn-sm" 
+            <div className="detalle-cita-actions">
+              <button className="btn btn-danger btn-sm"
                 onClick={onMostrarConfirmDelete}
                 title="Eliminar registro permanentemente de la base de datos">
                 <i className="bi bi-trash3"></i> Eliminar permanentemente
               </button>
-            </div>
-            {c.estado === "PENDIENTE" && (
-              <button className="btn btn-outline-primary btn-sm" onClick={onEditar}>
-                <i className="bi bi-pencil me-1"></i>Editar
+              {c.estado === "PENDIENTE" && (
+                <button className="btn btn-outline-primary btn-sm" onClick={onEditar}>
+                  <i className="bi bi-pencil me-1"></i>Editar
+                </button>
+              )}
+              <button className="btn btn-outline-success btn-sm" onClick={onRecordatorio}>
+                <i className="bi bi-bell me-1"></i>Recordatorio
               </button>
-            )}
-            <button className="btn btn-outline-success btn-sm" onClick={onRecordatorio}>
-              <i className="bi bi-bell me-1"></i>Recordatorio
-            </button>
-            <button className="btn btn-outline-info btn-sm" onClick={onVerHistoria}>
-              <i className="bi bi-journal-medical me-1"></i>Ver historia clínica
-            </button>
-            {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
-              <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
-            )}
-            <button className="btn btn-secondary btn-sm" onClick={onClose}>Cerrar</button>
+              <button className="btn btn-outline-info btn-sm" onClick={onVerHistoria}>
+                <i className="bi bi-journal-medical me-1"></i>Ver historia clínica
+              </button>
+              {c.estado !== "CANCELADA" && c.estado !== "COMPLETADA" && (
+                <button className="btn btn-outline-danger btn-sm" onClick={onCancelar}>Cancelar cita</button>
+              )}
+              <button className="btn btn-secondary btn-sm" onClick={onClose}>Cerrar</button>
+            </div>
           </div>
         </div>
       </div>

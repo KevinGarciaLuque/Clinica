@@ -11,6 +11,7 @@ import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom"
 import dayjs from "dayjs";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
+import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 
 const API_BASE_PP = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE_PP = { BORRADOR: "warning text-dark", FIRMADA: "success" };
@@ -142,6 +143,23 @@ export default function PerfilPaciente() {
   // Modal confirmación eliminar documento
   const [docAEliminar, setDocAEliminar] = useState(null);
   const [docViewer, setDocViewer] = useState(null); // doc a visualizar en modal
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false, type: "info", title: "", message: "", showCancel: false,
+  });
+
+  const showFeedback = (cfg) => {
+    setFeedbackModal({
+      open: true,
+      type: cfg.type || "info",
+      title: cfg.title || "Mensaje",
+      message: cfg.message || "",
+      confirmText: cfg.confirmText || "Aceptar",
+      cancelText: cfg.cancelText || "Cancelar",
+      showCancel: !!cfg.showCancel,
+      onConfirm: cfg.onConfirm,
+      onCancel: cfg.onCancel,
+    });
+  };
 
   // ══════════════════════════════════════════════════════════
   // CARGA INICIAL
@@ -267,7 +285,7 @@ export default function PerfilPaciente() {
         det = r.data.data;
         setDetalle(d => ({ ...d, [h.id]: det }));
       } catch {
-        alert("No se pudo cargar el detalle de la consulta");
+        showFeedback({ type: "error", title: "No se pudo imprimir", message: "No se pudo cargar el detalle de la consulta" });
         return;
       }
     }
@@ -359,7 +377,10 @@ export default function PerfilPaciente() {
   <div class="firma"><div class="firma-box"><div class="linea"></div><p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>${det.especialidad ? `<p>${det.especialidad}</p>` : ""}</div></div>
 </body></html>`;
     const win = window.open("", "_blank", "width=800,height=900");
-    if (!win) { alert("El navegador bloqueó la ventana emergente. Permite popups para este sitio."); return; }
+    if (!win) {
+      showFeedback({ type: "warning", title: "Ventana bloqueada", message: "El navegador bloqueó la ventana emergente. Permite popups para este sitio." });
+      return;
+    }
     win.document.write(html);
     win.document.close();
     win.focus();
@@ -373,7 +394,7 @@ export default function PerfilPaciente() {
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       window.open(url, "_blank");
     } catch {
-      alert("No se pudo generar el PDF");
+      showFeedback({ type: "error", title: "Error al generar PDF", message: "No se pudo generar el PDF" });
     }
   };
 
@@ -428,7 +449,10 @@ export default function PerfilPaciente() {
         streamRef.current = stream;
         if (videoRef.current) videoRef.current.srcObject = stream;
       })
-      .catch(() => { setShowWebcam(false); alert("No se pudo acceder a la cámara."); });
+      .catch(() => {
+        setShowWebcam(false);
+        showFeedback({ type: "error", title: "Cámara no disponible", message: "No se pudo acceder a la cámara." });
+      });
     return () => {
       stopped = true;
       streamRef.current?.getTracks().forEach(t => t.stop());
@@ -1599,7 +1623,14 @@ export default function PerfilPaciente() {
                                       </Link>
                                     )}
                                     <button
-                                      className="btn btn-outline-secondary btn-sm ms-auto"
+                                      className="btn btn-outline-primary btn-sm ms-auto"
+                                      title="Editar consulta"
+                                      onClick={() => navigate(`/consulta-medica?historia_id=${h.id}&editar=1`)}
+                                    >
+                                      <i className="bi bi-pencil-square me-1" />Editar
+                                    </button>
+                                    <button
+                                      className="btn btn-outline-secondary btn-sm"
                                       title="Imprimir consulta"
                                       onClick={() => imprimirConsultaPP(h)}
                                     >
@@ -2231,6 +2262,18 @@ export default function PerfilPaciente() {
           }}
         />
       )}
+
+      <AnimatedFeedbackModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        message={feedbackModal.message}
+        confirmText={feedbackModal.confirmText}
+        cancelText={feedbackModal.cancelText}
+        showCancel={feedbackModal.showCancel}
+        onConfirm={feedbackModal.onConfirm || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
+        onCancel={feedbackModal.onCancel || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
+      />
 
       {/* ── Modal Webcam ──────────────────────────────────── */}
       {showWebcam && (

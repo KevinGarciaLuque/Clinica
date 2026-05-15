@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
+import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 
 dayjs.locale("es");
 
@@ -106,8 +107,25 @@ export default function Pacientes() {
   const [checkingCita, setCheckingCita] = useState(false);
   const [showWebcam, setShowWebcam] = useState(false);
   const [webcamFacing, setWebcamFacing] = useState("user");
+  const [feedbackModal, setFeedbackModal] = useState({
+    open: false, type: "info", title: "", message: "", showCancel: false,
+  });
   const videoRef = useRef(null);
   const streamRef = useRef(null);
+
+  const showFeedback = (cfg) => {
+    setFeedbackModal({
+      open: true,
+      type: cfg.type || "info",
+      title: cfg.title || "Mensaje",
+      message: cfg.message || "",
+      confirmText: cfg.confirmText || "Aceptar",
+      cancelText: cfg.cancelText || "Cancelar",
+      showCancel: !!cfg.showCancel,
+      onConfirm: cfg.onConfirm,
+      onCancel: cfg.onCancel,
+    });
+  };
 
   // Sincronizar con cambios de URL (ej: click en "Registrar" del sidebar)
   useEffect(() => {
@@ -267,7 +285,14 @@ export default function Pacientes() {
       streamRef.current = stream;
       if (videoRef.current) videoRef.current.srcObject = stream;
     }).catch(() => {
-      if (active) { alert("No se pudo acceder a la cámara. Verifica los permisos del navegador."); setShowWebcam(false); }
+      if (active) {
+        showFeedback({
+          type: "error",
+          title: "Cámara no disponible",
+          message: "No se pudo acceder a la cámara. Verifica los permisos del navegador.",
+        });
+        setShowWebcam(false);
+      }
     });
     return () => {
       active = false;
@@ -930,6 +955,18 @@ export default function Pacientes() {
           </div>
         </div>
       )}
+
+      <AnimatedFeedbackModal
+        open={feedbackModal.open}
+        type={feedbackModal.type}
+        title={feedbackModal.title}
+        message={feedbackModal.message}
+        confirmText={feedbackModal.confirmText}
+        cancelText={feedbackModal.cancelText}
+        showCancel={feedbackModal.showCancel}
+        onConfirm={feedbackModal.onConfirm || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
+        onCancel={feedbackModal.onCancel || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
+      />
     </div>
   );
 }

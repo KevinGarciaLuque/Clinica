@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import { FaCheckCircle } from "react-icons/fa";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 
@@ -42,6 +43,7 @@ export default function Consulta() {
   const pacId      = params.get("paciente_id");
   const citaId     = params.get("cita_id");
   const historiaId = params.get("historia_id");
+  const editMode   = params.get("editar") === "1";
 
   const [tab,       setTab]       = useState("soap");
   const [historia,  setHistoria]  = useState(null);   // loaded historia object
@@ -50,6 +52,9 @@ export default function Consulta() {
   const [firmada,   setFirmada]   = useState(false);
   const [saving,    setSaving]    = useState(false);
   const [alertMsg,  setAlertMsg]  = useState(null);   // { type, msg }
+  const [showSignedModal, setShowSignedModal] = useState(false);
+  const [showSavedChangesModal, setShowSavedChangesModal] = useState(false);
+  const [showConfirmSignedEditSave, setShowConfirmSignedEditSave] = useState(false);
   const [showConsultaModal,  setShowConsultaModal]  = useState(false);
   const [consultaPaciente,   setConsultaPaciente]   = useState(null);
   const [resumenPac, setResumenPac] = useState(null); // nuevo vs. subsecuente
@@ -64,6 +69,7 @@ export default function Consulta() {
 
   // Campos específicos dermatología
   const [datosDerma, setDatosDerma] = useState({});
+  const soloLectura = firmada && !editMode;
 
   // ── carga inicial ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -140,18 +146,27 @@ export default function Consulta() {
         diagnostico_cie: soap.diagnostico_cie || null,
         diagnosticos_secundarios: soap.diagnosticos_secundarios,
         plan:        soap.plan,
-        estado:      sign ? "FIRMADA" : "BORRADOR",
+        estado:      sign ? "FIRMADA" : (firmada ? "FIRMADA" : "BORRADOR"),
         datos_derma: Object.keys(datosDerma).length ? datosDerma : null,
       };
 
       if (hid) {
-        await api.put(`/historias/${hid}`, payload);
+        const putUrl = (firmada && editMode)
+          ? `/historias/${hid}?editar=1`
+          : `/historias/${hid}`;
+        await api.put(putUrl, payload);
         if (sign) {
           await api.post(`/historias/${hid}/firmar`);
           setFirmada(true);
-          setAlertMsg({ type: "success", msg: "Historia firmada y cita marcada como COMPLETADA." });
+          setAlertMsg(null);
+          setShowSignedModal(true);
         } else {
-          setAlertMsg({ type: "success", msg: "Guardado como borrador." });
+          if (firmada) {
+            setAlertMsg(null);
+            setShowSavedChangesModal(true);
+          } else {
+            setAlertMsg({ type: "success", msg: "Guardado como borrador." });
+          }
         }
       } else {
         const r = await api.post("/historias", payload);
@@ -159,7 +174,8 @@ export default function Consulta() {
         if (sign) {
           await api.post(`/historias/${r.data.id}/firmar`);
           setFirmada(true);
-          setAlertMsg({ type: "success", msg: "Historia firmada." });
+          setAlertMsg(null);
+          setShowSignedModal(true);
         } else {
           setAlertMsg({ type: "success", msg: "Historia creada." });
         }
@@ -218,6 +234,11 @@ export default function Consulta() {
                   FIRMADA
                 </span>
               )}
+              {firmada && editMode && (
+                <span style={{ background: "#2563eb", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 600 }}>
+                  EDICIÓN
+                </span>
+              )}
               {!firmada && hid && (
                 <span style={{ background: "#f59e0b", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 600 }}>
                   BORRADOR
@@ -229,30 +250,47 @@ export default function Consulta() {
             </div>
           </div>
         </div>
-        {!firmada && (
+        {!soloLectura && (
           <div className="d-flex gap-2">
-            <button
-              onClick={() => handleSave(false)}
-              disabled={saving}
-              style={{
-                background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.25)",
-                borderRadius: 8, color: "#e2e8f0", padding: "6px 16px", fontSize: "0.82rem",
-                cursor: "pointer", fontWeight: 500,
-              }}>
-              <i className="bi bi-floppy me-1"></i>{saving ? "Guardando…" : "Borrador"}
-            </button>
-            <button
-              onClick={() => handleSave(true)}
-              disabled={saving}
-              style={{
-                background: "linear-gradient(135deg, #22c55e, #16a34a)",
-                border: "none", borderRadius: 8, color: "#fff",
-                padding: "6px 18px", fontSize: "0.82rem",
-                cursor: "pointer", fontWeight: 600,
-                boxShadow: "0 2px 8px rgba(34,197,94,.4)",
-              }}>
-              <i className="bi bi-check2-circle me-1"></i>Firmar y Cerrar
-            </button>
+            {firmada ? (
+              <button
+                onClick={() => setShowConfirmSignedEditSave(true)}
+                disabled={saving}
+                style={{
+                  background: "linear-gradient(135deg, #0ea5e9, #0284c7)",
+                  border: "none", borderRadius: 8, color: "#fff",
+                  padding: "6px 18px", fontSize: "0.82rem",
+                  cursor: "pointer", fontWeight: 600,
+                  boxShadow: "0 2px 8px rgba(14,165,233,.35)",
+                }}>
+                <i className="bi bi-save2 me-1"></i>{saving ? "Guardando…" : "Guardar cambios"}
+              </button>
+            ) : (
+              <>
+                <button
+                  onClick={() => handleSave(false)}
+                  disabled={saving}
+                  style={{
+                    background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.25)",
+                    borderRadius: 8, color: "#e2e8f0", padding: "6px 16px", fontSize: "0.82rem",
+                    cursor: "pointer", fontWeight: 500,
+                  }}>
+                  <i className="bi bi-floppy me-1"></i>{saving ? "Guardando…" : "Borrador"}
+                </button>
+                <button
+                  onClick={() => handleSave(true)}
+                  disabled={saving}
+                  style={{
+                    background: "linear-gradient(135deg, #22c55e, #16a34a)",
+                    border: "none", borderRadius: 8, color: "#fff",
+                    padding: "6px 18px", fontSize: "0.82rem",
+                    cursor: "pointer", fontWeight: 600,
+                    boxShadow: "0 2px 8px rgba(34,197,94,.4)",
+                  }}>
+                  <i className="bi bi-check2-circle me-1"></i>Firmar y Cerrar
+                </button>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -366,7 +404,7 @@ export default function Consulta() {
             <SoapTab
               soap={soap} setSoap={setSoap}
               vitals={vitals} setVitals={setVitals}
-              firmada={firmada}
+              firmada={soloLectura}
             />
           )}
 
@@ -376,7 +414,7 @@ export default function Consulta() {
               historiaId={hid}
               pacienteId={paciente?.id || pacId}
               citaId={citaId}
-              firmada={firmada}
+              firmada={soloLectura}
               diagnosticoCie={soap.diagnostico_cie}
               diagnosticoDesc={soap.diagnostico_desc}
             />
@@ -387,7 +425,7 @@ export default function Consulta() {
             <EstudiosTab
               historiaId={hid}
               pacienteId={paciente?.id || pacId}
-              firmada={firmada}
+              firmada={soloLectura}
             />
           )}
 
@@ -395,7 +433,7 @@ export default function Consulta() {
           {tab === "antecedentes" && (
             <AntecedentesTab
               pacienteId={paciente?.id || pacId}
-              firmada={firmada}
+              firmada={soloLectura}
             />
           )}
 
@@ -404,7 +442,7 @@ export default function Consulta() {
             <DermaTab
               datosDerma={datosDerma}
               setDatosDerma={setDatosDerma}
-              firmada={firmada}
+              firmada={soloLectura}
             />
           )}
         </div>{/* /tab-content */}
@@ -422,6 +460,230 @@ export default function Consulta() {
           }}
         />
       )}
+
+      {showSignedModal && (
+        <ModalHistoriaFirmada
+          paciente={paciente}
+          onClose={() => setShowSignedModal(false)}
+          onVerHistorial={() => {
+            setShowSignedModal(false);
+            if (paciente?.id) navigate(`/pacientes/${paciente.id}/perfil?tab=historial`);
+          }}
+        />
+      )}
+
+      {showConfirmSignedEditSave && (
+        <ModalConfirmarEdicionFirmada
+          onCancel={() => setShowConfirmSignedEditSave(false)}
+          onConfirm={async () => {
+            setShowConfirmSignedEditSave(false);
+            await handleSave(false);
+          }}
+          saving={saving}
+        />
+      )}
+
+      {showSavedChangesModal && (
+        <ModalCambiosGuardados
+          onClose={() => setShowSavedChangesModal(false)}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalHistoriaFirmada({ paciente, onClose, onVerHistorial }) {
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 9999,
+      background: "rgba(15,23,42,.55)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      backdropFilter: "blur(3px)",
+    }}>
+      <style>{`
+        @keyframes popIn {
+          0% { transform: scale(.86); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes checkDraw {
+          0% { stroke-dashoffset: 24; }
+          100% { stroke-dashoffset: 0; }
+        }
+        .signed-modal {
+          animation: popIn .28s ease-out;
+        }
+        .signed-check {
+          stroke-dasharray: 24;
+          stroke-dashoffset: 24;
+          animation: checkDraw .5s ease-out .15s forwards;
+        }
+      `}</style>
+
+      <div className="signed-modal" style={{
+        width: "100%",
+        maxWidth: 460,
+        background: "#fff",
+        borderRadius: 16,
+        border: "1px solid #dcfce7",
+        boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        overflow: "hidden",
+      }}>
+        <div style={{ padding: "22px 22px 16px", textAlign: "center" }}>
+          <div style={{
+            width: 76,
+            height: 76,
+            margin: "0 auto 14px",
+            borderRadius: "50%",
+            background: "linear-gradient(135deg,#22c55e,#16a34a)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            boxShadow: "0 8px 22px rgba(34,197,94,.35)",
+          }}>
+            <svg width="38" height="38" viewBox="0 0 24 24" fill="none">
+              <path className="signed-check" d="M5 12.5L10 17L19 8.5" stroke="#fff" strokeWidth="2.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </div>
+
+          <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#166534", marginBottom: 6 }}>
+            Historia firmada
+          </div>
+          <div style={{ fontSize: "0.9rem", color: "#4b5563" }}>
+            La consulta de <strong>{paciente?.nombres} {paciente?.apellidos}</strong> se guardó correctamente.
+          </div>
+        </div>
+
+        <div style={{
+          padding: "14px 16px 18px",
+          borderTop: "1px solid #ecfdf5",
+          display: "flex",
+          gap: 10,
+          justifyContent: "flex-end",
+          flexWrap: "wrap",
+        }}>
+          <button className="btn btn-outline-secondary btn-sm" onClick={onClose}>
+            Cerrar
+          </button>
+          <button className="btn btn-success btn-sm" onClick={onVerHistorial}>
+            <i className="bi bi-journal-medical me-1"></i>Ver historial clínico
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalConfirmarEdicionFirmada({ onCancel, onConfirm, saving }) {
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 10000,
+      background: "rgba(15,23,42,.55)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+    }}>
+      <div style={{
+        width: "100%",
+        maxWidth: 500,
+        background: "#fff",
+        borderRadius: 14,
+        border: "1px solid #fde68a",
+        boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          padding: "14px 18px",
+          background: "#fffbeb",
+          borderBottom: "1px solid #fde68a",
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          fontWeight: 700,
+          color: "#92400e",
+        }}>
+          <i className="bi bi-exclamation-triangle-fill"></i>
+          Confirmar cambios en historia firmada
+        </div>
+        <div style={{ padding: "16px 18px", color: "#374151", fontSize: "0.92rem" }}>
+          Vas a modificar una historia clínica ya firmada. Esta acción actualizará el contenido clínico registrado.
+          ¿Deseas continuar?
+        </div>
+        <div style={{
+          padding: "0 18px 16px",
+          display: "flex",
+          justifyContent: "flex-end",
+          gap: 10,
+        }}>
+          <button className="btn btn-outline-secondary btn-sm" onClick={onCancel} disabled={saving}>
+            Cancelar
+          </button>
+          <button className="btn btn-primary btn-sm" onClick={onConfirm} disabled={saving}>
+            <i className="bi bi-save2 me-1"></i>{saving ? "Guardando..." : "Sí, guardar cambios"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalCambiosGuardados({ onClose }) {
+  return (
+    <div style={{
+      position: "fixed",
+      inset: 0,
+      zIndex: 10001,
+      background: "rgba(15,23,42,.55)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: 16,
+      backdropFilter: "blur(2px)",
+    }}>
+      <style>{`
+        @keyframes successPop {
+          0% { transform: scale(.85); opacity: 0; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes checkPulse {
+          0% { transform: scale(.6); opacity: 0; }
+          70% { transform: scale(1.08); opacity: 1; }
+          100% { transform: scale(1); opacity: 1; }
+        }
+        .saved-modal-pop { animation: successPop .25s ease-out; }
+        .saved-check-pop { animation: checkPulse .45s ease-out; }
+      `}</style>
+
+      <div className="saved-modal-pop" style={{
+        width: "100%",
+        maxWidth: 430,
+        background: "#fff",
+        borderRadius: 14,
+        border: "1px solid #dcfce7",
+        boxShadow: "0 16px 48px rgba(0,0,0,.22)",
+        padding: "22px 18px 16px",
+        textAlign: "center",
+      }}>
+        <div className="saved-check-pop" style={{ marginBottom: 10 }}>
+          <FaCheckCircle size={60} color="#16a34a" />
+        </div>
+        <div style={{ fontWeight: 800, color: "#166534", fontSize: "1.05rem", marginBottom: 6 }}>
+          Cambios guardados correctamente
+        </div>
+        <div style={{ color: "#4b5563", fontSize: "0.9rem", marginBottom: 14 }}>
+          La historia clínica firmada fue actualizada.
+        </div>
+        <button className="btn btn-success btn-sm" onClick={onClose}>
+          Aceptar
+        </button>
+      </div>
     </div>
   );
 }

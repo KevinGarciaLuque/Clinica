@@ -182,13 +182,16 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { id } = req.params;
+    const permitirEdicionFirmada = String(req.query.editar || "") === "1";
 
     const [[h]] = await pool.query(
       "SELECT estado, medico_id FROM historias_clinicas WHERE id=? AND clinica_id=?",
       [id, cid]
     );
     if (!h) return res.status(404).json({ ok: false, msg: "No encontrado" });
-    if (h.estado === "FIRMADA") return res.status(400).json({ ok: false, msg: "No se puede editar una historia firmada" });
+    if (h.estado === "FIRMADA" && !permitirEdicionFirmada) {
+      return res.status(400).json({ ok: false, msg: "No se puede editar una historia firmada" });
+    }
     if (!req.user.super && h.medico_id !== req.user.id) {
       return res.status(403).json({ ok: false, msg: "Solo el médico autor puede editar" });
     }
@@ -237,12 +240,14 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
       [id, cid]
     );
     if (!h) return res.status(404).json({ ok: false, msg: "No encontrado" });
-    if (h.estado === "FIRMADA") return res.json({ ok: true, msg: "Ya firmada" });
+    const yaFirmada = h.estado === "FIRMADA";
 
-    await pool.query(
-      "UPDATE historias_clinicas SET estado='FIRMADA' WHERE id=? AND clinica_id=?",
-      [id, cid]
-    );
+    if (!yaFirmada) {
+      await pool.query(
+        "UPDATE historias_clinicas SET estado='FIRMADA' WHERE id=? AND clinica_id=?",
+        [id, cid]
+      );
+    }
 
     // Completar la cita automáticamente
     if (h.cita_id) {
@@ -252,7 +257,7 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
       );
     }
 
-    res.json({ ok: true });
+    res.json({ ok: true, msg: yaFirmada ? "Ya firmada (cita sincronizada)" : "Historia firmada" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
