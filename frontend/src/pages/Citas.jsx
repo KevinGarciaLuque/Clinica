@@ -1657,7 +1657,7 @@ function ModalRecordatorioManual({ event, form, loading, sending, onClose, onCan
   const c = event.resource || {};
   return createPortal(
     <div style={{
-      position: "fixed", inset: 0, zIndex: 1060,
+      position: "fixed", inset: 0, zIndex: 10002,
       background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     }}>
@@ -1770,7 +1770,7 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
 
   return createPortal(
     <div style={{
-      position: "fixed", inset: 0, zIndex: 1055,
+      position: "fixed", inset: 0, zIndex: 10002,
       background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     }}>
