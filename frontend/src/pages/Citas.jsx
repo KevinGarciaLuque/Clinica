@@ -1888,7 +1888,7 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
 function ModalConfirmDelete({ onConfirm, onCancel, pacienteNombre, fecha }) {
   return createPortal(
     <div style={{
-      position: "fixed", inset: 0, zIndex: 1060,
+      position: "fixed", inset: 0, zIndex: 10001,
       background: "rgba(15,23,42,.65)", backdropFilter: "blur(3px)",
       display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
     }}>
