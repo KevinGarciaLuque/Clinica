@@ -157,9 +157,14 @@ export default function ConfigClinica() {
   const precioGb = Number(storage?.precio_por_gb_lps || 0);
   const totalEstimado = Number(gbSolicitados || 0) * precioGb;
   const cuotaGb = Number(storage?.cuota_gb || 0);
-  const planBaseGb = Math.min(cuotaGb, Number(import.meta.env.VITE_STORAGE_BASE_GB || 20));
+  const planBaseGb = Math.min(cuotaGb, Number(import.meta.env.VITE_STORAGE_BASE_GB || 25));
   const extraCompradoGb = Math.max(cuotaGb - planBaseGb, 0);
   const extraPctSobreTotal = cuotaGb > 0 ? (extraCompradoGb / cuotaGb) * 100 : 0;
+  const usoGb = Number(storage?.espacio_kb || 0) / 1048576;
+  const consumoBaseGb = Math.min(usoGb, planBaseGb);
+  const consumoExtraGb = extraCompradoGb > 0 ? Math.min(Math.max(usoGb - planBaseGb, 0), extraCompradoGb) : 0;
+  const baseUsoPct = planBaseGb > 0 ? pct((consumoBaseGb / planBaseGb) * 100) : 0;
+  const extraUsoPct = extraCompradoGb > 0 ? pct((consumoExtraGb / extraCompradoGb) * 100) : 0;
 
   if (cargando) {
     return (
@@ -373,15 +378,23 @@ export default function ConfigClinica() {
                   </button>
                 </div>
 
-                <div style={{ height: 12, background: "#e4edff", borderRadius: 999, overflow: "hidden" }}>
-                  <div
-                    style={{
-                      height: "100%",
-                      width: `${usoPct}%`,
-                      background: usoPct >= 90 ? "linear-gradient(90deg,#ef4444,#f97316)" : "linear-gradient(90deg,#2563eb,#3b82f6)",
-                      transition: "width .2s ease",
-                    }}
-                  />
+                <div style={{ marginBottom: 10 }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                    <div style={{ color: "#3556a8", fontWeight: 700, fontSize: 12 }}>Espacio base del plan</div>
+                    <div style={{ color: "#51607e", fontSize: 12 }}>
+                      {consumoBaseGb.toFixed(2)} GB / {planBaseGb.toFixed(2)} GB ({baseUsoPct.toFixed(1)}%)
+                    </div>
+                  </div>
+                  <div style={{ height: 12, background: "#e4edff", borderRadius: 999, overflow: "hidden" }}>
+                    <div
+                      style={{
+                        height: "100%",
+                        width: `${baseUsoPct}%`,
+                        background: baseUsoPct >= 90 ? "linear-gradient(90deg,#ef4444,#f97316)" : "linear-gradient(90deg,#2563eb,#3b82f6)",
+                        transition: "width .2s ease",
+                      }}
+                    />
+                  </div>
                 </div>
 
                 {extraCompradoGb > 0 && (
@@ -389,14 +402,14 @@ export default function ConfigClinica() {
                     <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
                       <div style={{ color: "#3556a8", fontWeight: 700, fontSize: 12 }}>Espacio extra comprado</div>
                       <div style={{ color: "#51607e", fontSize: 12 }}>
-                        {extraCompradoGb.toFixed(2)} GB ({extraPctSobreTotal.toFixed(1)}% del total)
+                        {consumoExtraGb.toFixed(2)} GB / {extraCompradoGb.toFixed(2)} GB ({extraUsoPct.toFixed(1)}%)
                       </div>
                     </div>
                     <div style={{ height: 10, background: "#e8eafc", borderRadius: 999, overflow: "hidden" }}>
                       <div
                         style={{
                           height: "100%",
-                          width: `${Math.max(2, extraPctSobreTotal)}%`,
+                          width: `${Math.max(0, extraUsoPct)}%`,
                           background: "linear-gradient(90deg,#7c3aed,#a78bfa)",
                           transition: "width .2s ease",
                         }}
