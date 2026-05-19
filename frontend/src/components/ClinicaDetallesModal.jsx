@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+﻿import { useEffect, useState } from "react";
 import api from "../api/api";
 import BitacoraModal from "./BitacoraModal";
 
@@ -15,7 +15,7 @@ const C = {
   muted:   "#94a3b8",
 };
 
-/* ── helpers ── */
+/* â”€â”€ helpers â”€â”€ */
 const fmt = (n) => Number(n).toLocaleString("es");
 
 function formatBytes(kb) {
@@ -31,7 +31,7 @@ function nivelAlmacenamiento(kb) {
   return                       { label: "Alto",     color: C.danger,  pct: Math.min(67 + ((kb - 200*1024) / (300*1024)) * 33, 100) };
 }
 
-/* ── Tarjeta de stat ── */
+/* â”€â”€ Tarjeta de stat â”€â”€ */
 function StatCard({ icon, label, value, color = C.accent, sub }) {
   return (
     <div style={{
@@ -57,7 +57,7 @@ function StatCard({ icon, label, value, color = C.accent, sub }) {
   );
 }
 
-/* ── Barra de desglose ── */
+/* â”€â”€ Barra de desglose â”€â”€ */
 function BarraDesglose({ label, icon, cantidad, kb, colorBar }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0" }}>
@@ -66,7 +66,7 @@ function BarraDesglose({ label, icon, cantidad, kb, colorBar }) {
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
           <span style={{ fontSize: 13, color: C.text }}>{label}</span>
           <span style={{ fontSize: 12, color: C.muted, fontFamily: "monospace" }}>
-            {fmt(cantidad)} arch. · {formatBytes(kb)}
+            {fmt(cantidad)} arch. Â· {formatBytes(kb)}
           </span>
         </div>
         <div style={{ height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3, overflow: "hidden" }}>
@@ -87,18 +87,72 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
   const [cargando, setCargando] = useState(true);
   const [error, setError]     = useState("");
   const [showBitacora, setShowBitacora] = useState(false);
+  const [cuotaTotalInput, setCuotaTotalInput] = useState("");
+  const [precioGbInput, setPrecioGbInput] = useState("");
+  const [guardandoCuota, setGuardandoCuota] = useState(false);
+  const [guardandoPrecio, setGuardandoPrecio] = useState(false);
 
   useEffect(() => {
     if (!clinicaId) return;
     setCargando(true);
     setError("");
     api.get(`/clinicas/${clinicaId}/detalles`)
-      .then((r) => setData(r.data.data))
+      .then((r) => {
+        setData(r.data.data);
+        setCuotaTotalInput(String(r.data.data?.almacenamiento?.cuota_gb ?? ""));
+        setPrecioGbInput(String(r.data.data?.almacenamiento?.precio_por_gb_lps ?? ""));
+      })
       .catch((e) => setError(e.response?.data?.msg || e.message))
       .finally(() => setCargando(false));
   }, [clinicaId]);
 
   const nivel = data ? nivelAlmacenamiento(data.almacenamiento.espacio_kb) : null;
+  const usoPctSobreCuota = data ? Number(data.almacenamiento.uso_pct || 0) : 0;
+  const usoActualGb = data ? Number(data.almacenamiento.espacio_kb || 0) / 1048576 : 0;
+
+  const guardarCuota = async () => {
+    setError("");
+    const nuevaCuota = Number(cuotaTotalInput);
+    if (!Number.isFinite(nuevaCuota) || nuevaCuota <= 0) {
+      setError("La nueva cuota debe ser un numero mayor que 0.");
+      return;
+    }
+    if (nuevaCuota < usoActualGb) {
+      setError(`La cuota no puede ser menor al uso actual (${usoActualGb.toFixed(2)} GB).`);
+      return;
+    }
+    try {
+      setGuardandoCuota(true);
+      await api.put(`/clinicas/${clinicaId}/storage-quota`, { storage_quota_gb: nuevaCuota });
+      const r = await api.get(`/clinicas/${clinicaId}/detalles`);
+      setData(r.data.data);
+      setCuotaTotalInput(String(r.data.data?.almacenamiento?.cuota_gb ?? ""));
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    } finally {
+      setGuardandoCuota(false);
+    }
+  };
+
+  const guardarPrecio = async () => {
+    setError("");
+    const valor = Number(precioGbInput);
+    if (!Number.isFinite(valor) || valor < 0) {
+      setError("El precio por GB debe ser un nÃºmero vÃ¡lido.");
+      return;
+    }
+    try {
+      setGuardandoPrecio(true);
+      await api.put(`/clinicas/${clinicaId}/storage-pricing`, { storage_price_per_gb_lps: valor });
+      const r = await api.get(`/clinicas/${clinicaId}/detalles`);
+      setData(r.data.data);
+      setPrecioGbInput(String(r.data.data?.almacenamiento?.precio_por_gb_lps ?? ""));
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    } finally {
+      setGuardandoPrecio(false);
+    }
+  };
 
   return (
     <div
@@ -120,7 +174,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
         overflow: "hidden",
       }}>
 
-        {/* ── Header ── */}
+        {/* â”€â”€ Header â”€â”€ */}
         <div style={{
           padding: "20px 28px",
           borderBottom: `1px solid ${C.border}`,
@@ -162,7 +216,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
           </button>
         </div>
 
-        {/* ── Cuerpo ── */}
+        {/* â”€â”€ Cuerpo â”€â”€ */}
         <div style={{ overflowY: "auto", flex: 1, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 24 }}>
 
           {/* Estado de carga */}
@@ -173,7 +227,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                 borderTopColor: C.accent, borderRadius: "50%",
                 animation: "spin .8s linear infinite", margin: "0 auto 14px",
               }} />
-              <span style={{ color: C.muted, fontSize: 14 }}>Cargando estadísticas...</span>
+              <span style={{ color: C.muted, fontSize: 14 }}>Cargando estadÃ­sticas...</span>
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           )}
@@ -191,7 +245,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
 
           {data && !cargando && (
             <>
-              {/* ── Grid de conteos ── */}
+              {/* â”€â”€ Grid de conteos â”€â”€ */}
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase",
                                letterSpacing: ".06em", marginBottom: 12 }}>
@@ -202,15 +256,15 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   <StatCard icon="bi-people-fill"       label="Pacientes"        value={data.conteos.total_pacientes}   color={C.accent} />
                   <StatCard icon="bi-calendar2-check-fill" label="Citas totales"  value={data.conteos.total_citas}        color="#8b5cf6" />
                   <StatCard icon="bi-person-badge-fill"  label="Staff activo"     value={data.conteos.total_usuarios}    color={C.success} />
-                  <StatCard icon="bi-images"             label="Fotos galería"    value={data.conteos.fotos_galeria}     color="#f59e0b"
-                    sub="antes/después" />
+                  <StatCard icon="bi-images"             label="Fotos galerÃ­a"    value={data.conteos.fotos_galeria}     color="#f59e0b"
+                    sub="antes/despuÃ©s" />
                   <StatCard icon="bi-person-circle"      label="Fotos pacientes"  value={data.conteos.fotos_perfil_pacientes} color="#06b6d4"
                     sub="perfil Cloudinary" />
                   <StatCard icon="bi-file-earmark-fill"  label="Documentos"       value={data.conteos.total_documentos}  color="#ec4899" />
                 </div>
               </div>
 
-              {/* ── Almacenamiento en nube ── */}
+              {/* â”€â”€ Almacenamiento en nube â”€â”€ */}
               <div style={{
                 background: C.card,
                 border: `1px solid ${C.border}`,
@@ -226,7 +280,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                     <div style={{ fontSize: 20, fontWeight: 700, color: nivel.color, lineHeight: 1.1 }}>
                       {data.almacenamiento.espacio_legible}
                     </div>
-                    <div style={{ fontSize: 11, color: C.muted }}>estimado · {fmt(data.conteos.total_archivos_nube)} archivos</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>estimado Â· {fmt(data.conteos.total_archivos_nube)} archivos</div>
                   </div>
                 </div>
 
@@ -244,14 +298,136 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   </div>
                   <div style={{ height: 8, background: "rgba(255,255,255,.07)", borderRadius: 6, overflow: "hidden" }}>
                     <div style={{
-                      height: "100%", width: `${nivel.pct}%`,
+                      height: "100%", width: `${Math.min(usoPctSobreCuota, 100)}%`,
                       background: `linear-gradient(90deg, ${nivel.color}, ${nivel.color}88)`,
                       borderRadius: 6, transition: "width .6s ease",
                     }} />
                   </div>
                   <div style={{ display: "flex", justifyContent: "space-between", marginTop: 4 }}>
-                    <span style={{ fontSize: 10, color: C.muted }}>0 KB</span>
-                    <span style={{ fontSize: 10, color: C.muted }}>~500 MB referencia</span>
+                    <span style={{ fontSize: 10, color: C.muted }}>0%</span>
+                    <span style={{ fontSize: 10, color: C.muted }}>
+                      {usoPctSobreCuota.toFixed(1)}% de {data.almacenamiento.cuota_gb} GB
+                    </span>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14, marginBottom: 14 }}>
+                  <div style={{ display: "flex", alignItems: "end", gap: 10, flexWrap: "wrap", marginBottom: 10 }}>
+                    <div style={{ minWidth: 180 }}>
+                      <label style={{ fontSize: 11, color: C.muted, display: "block", marginBottom: 6 }}>
+                        Almacenamiento actual (GB)
+                      </label>
+                      <input
+                        type="text"
+                        value={Number(data.almacenamiento.cuota_gb || 0).toFixed(2)}
+                        readOnly
+                        style={{
+                          width: "100%",
+                          background: "rgba(255,255,255,.03)",
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 8,
+                          color: C.muted,
+                          padding: "8px 10px",
+                        }}
+                      />
+                    </div>
+                    <div style={{ minWidth: 180 }}>
+                      <label style={{ fontSize: 11, color: C.muted, display: "block", marginBottom: 6 }}>
+                        Nueva cuota total (GB)
+                      </label>
+                      <input
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        value={cuotaTotalInput}
+                        onChange={(e) => setCuotaTotalInput(e.target.value)}
+                        style={{
+                          width: "100%",
+                          background: "rgba(255,255,255,.06)",
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 8,
+                          color: C.text,
+                          padding: "8px 10px",
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={guardarCuota}
+                      disabled={guardandoCuota}
+                      style={{
+                        background: "rgba(33,150,243,.18)",
+                        border: "1px solid rgba(33,150,243,.35)",
+                        borderRadius: 8,
+                        color: "#93c5fd",
+                        padding: "8px 12px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: guardandoCuota ? "wait" : "pointer",
+                      }}
+                    >
+                      {guardandoCuota ? "Guardando..." : "Guardar cuota"}
+                    </button>
+                    <div style={{ fontSize: 11, color: C.muted }}>
+                      Limite actual: {data.almacenamiento.cuota_legible}
+                      {Number(cuotaTotalInput || 0) > 0
+                        ? ` | Nueva cuota definida: ${Number(cuotaTotalInput).toFixed(2)} GB`
+                        : ""}
+                      {Number(cuotaTotalInput || 0) > Number(data.almacenamiento.cuota_gb || 0)
+                        ? ` | Accion: aumentar ${(
+                            Number(cuotaTotalInput || 0) - Number(data.almacenamiento.cuota_gb || 0)
+                          ).toFixed(2)} GB`
+                        : ""}
+                      {Number(cuotaTotalInput || 0) < Number(data.almacenamiento.cuota_gb || 0)
+                        ? ` | Accion: reducir ${(
+                            Number(data.almacenamiento.cuota_gb || 0) - Number(cuotaTotalInput || 0)
+                          ).toFixed(2)} GB`
+                        : ""}
+                      {` | Uso real: ${usoActualGb.toFixed(2)} GB`}
+                    </div>
+                  </div>
+
+                  <div style={{ display: "flex", alignItems: "end", gap: 10, flexWrap: "wrap" }}>
+                    <div style={{ minWidth: 170 }}>
+                      <label style={{ fontSize: 11, color: C.muted, display: "block", marginBottom: 6 }}>
+                        Precio por GB (LPS)
+                      </label>
+                      <input
+                        type="number"
+                        min="0"
+                        step="0.01"
+                        value={precioGbInput}
+                        onChange={(e) => setPrecioGbInput(e.target.value)}
+                        style={{
+                          width: "100%",
+                          background: "rgba(255,255,255,.06)",
+                          border: `1px solid ${C.border}`,
+                          borderRadius: 8,
+                          color: C.text,
+                          padding: "8px 10px",
+                        }}
+                      />
+                    </div>
+                    <button
+                      type="button"
+                      onClick={guardarPrecio}
+                      disabled={guardandoPrecio}
+                      style={{
+                        background: "rgba(16,185,129,.18)",
+                        border: "1px solid rgba(16,185,129,.35)",
+                        borderRadius: 8,
+                        color: "#86efac",
+                        padding: "8px 12px",
+                        fontSize: 13,
+                        fontWeight: 600,
+                        cursor: guardandoPrecio ? "wait" : "pointer",
+                      }}
+                    >
+                      {guardandoPrecio ? "Guardando..." : "Guardar precio"}
+                    </button>
+                    <div style={{ fontSize: 11, color: C.muted }}>
+                      Actual: L {Number(data.almacenamiento.precio_por_gb_lps || 0).toFixed(2)} por GB
+                    </div>
                   </div>
                 </div>
 
@@ -262,7 +438,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                     Desglose por tipo
                   </div>
                   <BarraDesglose
-                    icon="bi-images" label="Galería Antes/Después"
+                    icon="bi-images" label="GalerÃ­a Antes/DespuÃ©s"
                     cantidad={data.almacenamiento.desglose.galeria_fotos.cantidad}
                     kb={data.almacenamiento.desglose.galeria_fotos.kb}
                     colorBar="#f59e0b"
@@ -288,14 +464,14 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                 </div>
               </div>
 
-              {/* ── Info de actividad y sugerencia ── */}
+              {/* â”€â”€ Info de actividad y sugerencia â”€â”€ */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 {/* Especialidad */}
                 {(data.clinica.tipo_nombre || data.clinica.es_pediatrica) && (() => {
                   const esPed  = !!data.clinica.es_pediatrica;
                   const label  = data.clinica.tipo_nombre
-                    ? (esPed ? `${data.clinica.tipo_nombre} Pediátrica` : data.clinica.tipo_nombre)
-                    : "Pediátrica";
+                    ? (esPed ? `${data.clinica.tipo_nombre} PediÃ¡trica` : data.clinica.tipo_nombre)
+                    : "PediÃ¡trica";
                   const color  = esPed ? "#9C27B0" : (data.clinica.tipo_color || C.accent);
                   const icon   = esPed ? "bi-balloon-heart-fill" : (data.clinica.tipo_icono || "bi-building-fill");
                   return (
@@ -324,7 +500,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   );
                 })()}
 
-                {/* Última cita */}
+                {/* Ãšltima cita */}
                 <div style={{
                   background: C.card, border: `1px solid ${C.border}`,
                   borderRadius: 12, padding: "16px 18px",
@@ -332,7 +508,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase",
                                  letterSpacing: ".05em", fontWeight: 600, marginBottom: 8 }}>
                     <i className="bi bi-clock-history me-2" style={{ color: C.accent }} />
-                    Última cita
+                    Ãšltima cita
                   </div>
                   <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>
                     {data.ultima_cita
@@ -359,12 +535,12 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                       ? new Date(data.clinica.creado_en).toLocaleDateString("es-PE", {
                           day: "2-digit", month: "long", year: "numeric",
                         })
-                      : "—"}
+                      : "â€”"}
                   </div>
                 </div>
               </div>
 
-              {/* ── Top usuarios activos ── */}
+              {/* â”€â”€ Top usuarios activos â”€â”€ */}
               {data.top_usuarios.length > 0 && (
                 <div style={{
                   background: C.card, border: `1px solid ${C.border}`,
@@ -373,7 +549,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase",
                                  letterSpacing: ".05em", fontWeight: 600, marginBottom: 12 }}>
                     <i className="bi bi-person-lines-fill me-2" style={{ color: "#8b5cf6" }} />
-                    Staff · últimos accesos
+                    Staff Â· Ãºltimos accesos
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {data.top_usuarios.map((u, i) => {
@@ -418,7 +594,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                 </div>
               )}
 
-              {/* ── Nota de estimación ── */}
+              {/* â”€â”€ Nota de estimaciÃ³n â”€â”€ */}
               <div style={{
                 background: "rgba(245,158,11,.06)", border: "1px solid rgba(245,158,11,.2)",
                 borderRadius: 10, padding: "10px 14px",
@@ -426,7 +602,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
               }}>
                 <i className="bi bi-info-circle-fill" style={{ color: "#f59e0b", fontSize: 14, marginTop: 1, flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: "#fbbf24", lineHeight: 1.5 }}>
-                  El espacio estimado se calcula con pesos promedio por tipo de archivo (galería ~900 KB,
+                  El espacio estimado se calcula con pesos promedio por tipo de archivo (galerÃ­a ~900 KB,
                   fotos de perfil ~350 KB, documentos ~400 KB). Para ver el consumo real visita el panel
                   de Cloudinary de la cuenta correspondiente.
                 </span>
@@ -435,7 +611,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
           )}
         </div>
 
-        {/* ── Footer ── */}
+        {/* â”€â”€ Footer â”€â”€ */}
         <div style={{
           padding: "14px 28px", borderTop: `1px solid ${C.border}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -454,7 +630,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
             onMouseLeave={(e) => e.currentTarget.style.background = "linear-gradient(135deg, #8b5cf620, #6d28d920)"}
           >
             <i className="bi bi-journal-text" />
-            Bitácora
+            BitÃ¡cora
           </button>
           <button
             onClick={onClose}
@@ -470,7 +646,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
           </button>
         </div>
 
-      {/* ── Modal Bitácora ── */}
+      {/* â”€â”€ Modal BitÃ¡cora â”€â”€ */}
       {showBitacora && (
         <BitacoraModal
           clinicaId={clinicaId}
@@ -482,3 +658,4 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
     </div>
   );
 }
+

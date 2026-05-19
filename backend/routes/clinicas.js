@@ -6,6 +6,22 @@ const { uploadClinicas } = require("../middlewares/upload");
 const { seedPacienteDemo } = require("../utils/seedPacienteDemo");
 
 let moduloPermisosSchemaReady = false;
+const DEFAULT_STORAGE_QUOTA_GB = 25;
+const DEFAULT_STORAGE_PRICE_PER_GB_LPS = 120;
+
+function getQuotaFromConfigRows(configRows = []) {
+  const raw = configRows.find((r) => r.clave === "storage_quota_gb")?.valor;
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num <= 0) return DEFAULT_STORAGE_QUOTA_GB;
+  return Math.round(num * 100) / 100;
+}
+
+function getPricePerGbFromConfigRows(configRows = []) {
+  const raw = configRows.find((r) => r.clave === "storage_price_per_gb_lps")?.valor;
+  const num = Number(raw);
+  if (!Number.isFinite(num) || num < 0) return DEFAULT_STORAGE_PRICE_PER_GB_LPS;
+  return Math.round(num * 100) / 100;
+}
 
 async function ensureModuloPermisosSchema() {
   if (moduloPermisosSchemaReady) return;
@@ -451,9 +467,12 @@ router.put("/solicitudes-licencia/:id/atender", auth("SUPER_ADMIN"), async (req,
 // ══════════════════════════════════════════════════════════════════════════
 //  GET /api/clinicas/:id/detalles  → estadísticas y consumo de espacio (SUPER_ADMIN)
 // ══════════════════════════════════════════════════════════════════════════
-router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
+router.get("/:id/detalles", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
+    if (!req.user.super && Number(req.user.clinica_id) !== id) {
+      return res.status(403).json({ ok: false, msg: "No autorizado para ver esta clínica" });
+    }
 
     // ── Info base de la clínica ──────────────────────────────
     const [[clinica]] = await pool.query(
@@ -477,6 +496,7 @@ router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
       [[{ total_documentos }]],
       [[{ ultima_cita }]],
       [top_usuarios],
+      [cfgStorage],
     ] = await Promise.all([
       // Pacientes registrados
       pool.query(
@@ -536,6 +556,10 @@ router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
          ORDER BY ultimo_acceso DESC LIMIT 5`,
         [id]
       ),
+      pool.query(
+        "SELECT clave, valor FROM clinica_config WHERE clinica_id = ? AND clave IN ('storage_quota_gb','storage_price_per_gb_lps')",
+        [id]
+      ),
     ]);
 
     // ── Estimación de almacenamiento en nube ─────────────────
@@ -556,6 +580,10 @@ router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
       Number(fotos_perfil_pacientes) * KB_PERF_PAC +
       Number(fotos_perfil_usuarios)  * KB_PERF_USR +
       Number(total_documentos)       * KB_DOC;
+    const cuota_gb = getQuotaFromConfigRows(cfgStorage);
+    const precio_por_gb_lps = getPricePerGbFromConfigRows(cfgStorage);
+    const cuota_kb = cuota_gb * 1024 * 1024;
+    const uso_pct = cuota_kb > 0 ? Math.min((espacio_kb / cuota_kb) * 100, 999.99) : 0;
 
     const formatBytes = (kb) => {
       if (kb < 1024)       return `${kb.toFixed(0)} KB`;
@@ -580,6 +608,11 @@ router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
         almacenamiento: {
           espacio_kb,
           espacio_legible:  formatBytes(espacio_kb),
+          cuota_gb,
+          cuota_kb,
+          cuota_legible: formatBytes(cuota_kb),
+          uso_pct: Number(uso_pct.toFixed(2)),
+          precio_por_gb_lps,
           desglose: {
             galeria_fotos:    { cantidad: Number(fotos_galeria),          kb: Number(fotos_galeria) * KB_GALERIA },
             perfil_pacientes: { cantidad: Number(fotos_perfil_pacientes), kb: Number(fotos_perfil_pacientes) * KB_PERF_PAC },
@@ -591,6 +624,48 @@ router.get("/:id/detalles", auth("SUPER_ADMIN"), async (req, res) => {
         top_usuarios: top_usuarios || [],
       },
     });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// PUT /api/clinicas/:id/storage-pricing -> define precio por GB para ampliaciones
+router.put("/:id/storage-pricing", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const precio = Number(req.body?.storage_price_per_gb_lps);
+    if (!Number.isFinite(precio) || precio < 0 || precio > 100000) {
+      return res.status(400).json({ ok: false, msg: "storage_price_per_gb_lps debe ser un número entre 0 y 100000" });
+    }
+    const normalized = Math.round(precio * 100) / 100;
+    await pool.query(
+      `INSERT INTO clinica_config (clinica_id, clave, valor)
+       VALUES (?, 'storage_price_per_gb_lps', ?)
+       ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
+      [id, String(normalized)]
+    );
+    res.json({ ok: true, data: { storage_price_per_gb_lps: normalized } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// PUT /api/clinicas/:id/storage-quota  -> define cuota de almacenamiento por clínica (GB)
+router.put("/:id/storage-quota", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const id = parseInt(req.params.id, 10);
+    const gb = Number(req.body?.storage_quota_gb);
+    if (!Number.isFinite(gb) || gb <= 0 || gb > 5000) {
+      return res.status(400).json({ ok: false, msg: "storage_quota_gb debe ser un número entre 0.01 y 5000" });
+    }
+    const normalized = Math.round(gb * 100) / 100;
+    await pool.query(
+      `INSERT INTO clinica_config (clinica_id, clave, valor)
+       VALUES (?, 'storage_quota_gb', ?)
+       ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
+      [id, String(normalized)]
+    );
+    res.json({ ok: true, data: { storage_quota_gb: normalized } });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
