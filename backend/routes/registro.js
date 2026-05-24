@@ -594,10 +594,21 @@ router.post("/cita", limiterModerate, async (req, res) => {
       [clinica_id, paciente_id, medico_id, inicio, fin, "CONTROL", motivo || null, "PORTAL"]
     );
 
+    const [[pac]] = await pool.query(
+      "SELECT nombres, apellidos FROM pacientes WHERE id=?",
+      [paciente_id]
+    );
+    const nombrePac = pac ? `${pac.nombres} ${pac.apellidos}` : `Paciente #${paciente_id}`;
+    const horaStr = new Date(inicio).toLocaleString("es-HN", {
+      timeZone: "America/Tegucigalpa",
+      weekday: "short", day: "numeric", month: "short",
+      hour: "2-digit", minute: "2-digit",
+    });
+
     await crearNotificacionesPortal({
       clinicaId: clinica_id,
       tipo: "CITA_AGENDADA_PORTAL",
-      mensaje: "Se agendó cita desde link",
+      mensaje: `${nombrePac} agendó cita para el ${horaStr}`,
       pacienteId: Number(paciente_id),
       citaId: r.insertId,
     });

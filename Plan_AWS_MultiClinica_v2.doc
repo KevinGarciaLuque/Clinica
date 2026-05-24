@@ -1,0 +1,65 @@
+{\rtf1\ansi\deff0
+{\fonttbl{\f0 Calibri;}}
+\fs24
+\b Plan de Infraestructura AWS - Sistema MultiClinica\b0\par
+\par
+Fecha: 20 de mayo de 2026\par
+Proyecto: Clinica (frontend React/Vite + backend Node/Express + MySQL)\par
+\par
+\b 1. Servicios AWS que debes contratar\b0\par
+\b 1.1 Amazon Lightsail (Linux/Unix) - Servidor del backend\b0\par
+- Plan recomendado inicial: 24 USD/mes (4 GB RAM, 2 vCPU, 80 GB SSD, 4 TB transferencia).\par
+- Uso: ejecutar la API Node/Express, tareas programadas (cron), y logica de negocio.\par
+\par
+\b 1.2 Amazon RDS for MySQL - Base de datos gestionada\b0\par
+- Instancia recomendada inicial: db.t4g.micro (2 vCPU, 1 GiB) en Single-AZ.\par
+- Uso: almacenar datos estructurados (pacientes, citas, historias clinicas, usuarios, recetas, inventario).\par
+- Importante: no guardar imagenes o PDFs dentro de la base de datos como binarios pesados.\par
+- Escalado recomendado: subir a db.t4g.small cuando haya saturacion en horas pico.\par
+\par
+\b 1.3 Amazon S3 (clase S3 Standard) - Archivos clinicos\b0\par
+- Uso: guardar imagenes, documentos y adjuntos (fotos, PDFs, resultados).\par
+- En MySQL guardar solo URL/key del archivo y metadatos.\par
+- Clase recomendada inicial: S3 Standard.\par
+- Optimizacion futura: lifecycle a Standard-IA o Intelligent-Tiering.\par
+\par
+\b 1.4 Opcionales\b0\par
+- CloudFront: acelera entrega de archivos.\par
+- Route 53 + ACM: dominio y certificados HTTPS.\par
+\par
+\b 2. Que se guarda en cada servicio\b0\par
+- RDS MySQL: pacientes, citas, usuarios, recetas, historial y datos transaccionales.\par
+- S3: imagenes, PDFs y archivos pesados.\par
+- Lightsail: codigo del backend, runtime Node.js y logs.\par
+\par
+\b 3. Resumen de rendimiento esperado\b0\par
+Escenario: 10 clinicas, uso pequeno/mediano, concurrencia moderada.\par
+- Backend (Lightsail 4 GB): buena estabilidad inicial para API + cron.\par
+- DB (RDS t4g.micro): suficiente para inicio; escalar a small si hay lentitud en picos.\par
+- Archivos (S3): escalado practicamente ilimitado sin llenar disco del servidor.\par
+\par
+\b Indicadores clave a vigilar (CloudWatch)\b0\par
+- RDS CPUUtilization (ideal < 70% sostenido).\par
+- RDS FreeableMemory (evitar cercano a 0).\par
+- RDS DatabaseConnections (controlar picos).\par
+- Latencia API en endpoints criticos (login, pacientes, citas, historias).\par
+\par
+\b Senales de que debes escalar\b0\par
+- Lentitud recurrente en consultas/guardado.\par
+- CPU alta sostenida y memoria baja en RDS.\par
+- Respuestas de API > 1-2 segundos en operaciones comunes.\par
+\par
+\b 4. Estimacion de costos mensuales (referencial)\b0\par
+- Lightsail 4 GB: 24 USD/mes.\par
+- RDS db.t4g.micro: aprox. 12-18 USD/mes (segun configuracion).\par
+- S3 Standard: ~0.023 USD/GB-mes + solicitudes + salida de datos.\par
+- Total inicial esperado: aprox. 40-70 USD/mes (sin Twilio/OpenAI/correos).\par
+\par
+\n\\b Total mensual estimado (USD)\\b0\\par\n- Total base minimo (sin consumo fuerte de S3): 24 + 12 = \\b 36 USD/mes\\b0.\\par\n- Total recomendado realista inicial: 24 + 15 + 1 a 5 = \\b 40 a 44 USD/mes\\b0.\\par\n- Total con margen operativo (trafico/solicitudes S3 variables): \\b 40 a 70 USD/mes\\b0.\\par\n\\b 5. Recomendacion final\b0\par
+- Contratar Lightsail Linux 24 USD para backend.\par
+- Crear RDS MySQL db.t4g.micro (Single-AZ) para iniciar.\par
+- Crear bucket S3 Standard para imagenes/documentos desde el dia 1.\par
+- Guardar en MySQL solo metadatos y URL de archivos.\par
+- Monitorear 2-4 semanas y escalar a db.t4g.small si hay saturacion.\par
+}
+

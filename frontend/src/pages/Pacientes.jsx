@@ -89,7 +89,8 @@ const preloadPerfilPaciente = () => {
 };
 
 export default function Pacientes() {
-  const { user }  = useAuth();
+  const { user, modulos }  = useAuth();
+  const tieneCrecimiento = modulos.some(m => m.clave === "curva_crecimiento");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [q,      setQ]      = useState("");
@@ -825,17 +826,19 @@ export default function Pacientes() {
                           }}>
                           <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"}`} /> Consulta
                         </button>
-                        <Link 
-                          to={`/pacientes/${p.id}/perfil?tab=crecimiento`}
-                          onClick={(e) => { e.stopPropagation(); preloadPerfilPaciente(); }}
-                          onMouseEnter={preloadPerfilPaciente}
-                          style={{
-                            background: "rgba(14,165,233,0.1)", border: "none", borderRadius: 6,
-                            padding: "6px 12px", color: "#0ea5e9", fontSize: 12, fontWeight: 600,
-                            textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
-                          }}>
-                          <i className="bi bi-graph-up-arrow" /> Crecimiento
-                        </Link>
+                        {tieneCrecimiento && (
+                          <Link
+                            to={`/pacientes/${p.id}/perfil?tab=crecimiento`}
+                            onClick={(e) => { e.stopPropagation(); preloadPerfilPaciente(); }}
+                            onMouseEnter={preloadPerfilPaciente}
+                            style={{
+                              background: "rgba(14,165,233,0.1)", border: "none", borderRadius: 6,
+                              padding: "6px 12px", color: "#0ea5e9", fontSize: 12, fontWeight: 600,
+                              textDecoration: "none", display: "flex", alignItems: "center", gap: 4,
+                            }}>
+                            <i className="bi bi-graph-up-arrow" /> Crecimiento
+                          </Link>
+                        )}
                       </div>
                     </td>
                   </tr>

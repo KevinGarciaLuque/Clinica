@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 
@@ -229,7 +230,7 @@ export default function Usuarios() {
       )}
 
       {/* ── Modal nuevo/editar ── */}
-      {showModal && (
+      {showModal && createPortal(
         <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }}>
           <div className="modal-dialog modal-lg">
             <div className="modal-content">
@@ -315,11 +316,12 @@ export default function Usuarios() {
               </form>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal reset contraseña ── */}
-      {resetPass.id && (
+      {resetPass.id && createPortal(
         <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }}>
           <div className="modal-dialog">
             <div className="modal-content">
@@ -351,11 +353,12 @@ export default function Usuarios() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal eliminar con doble confirmación ── */}
-      {deleteConfirm.id && (
+      {deleteConfirm.id && createPortal(
         <div className="modal d-block" style={{ background: "rgba(0,0,0,.6)" }}>
           <div className="modal-dialog">
             <div className="modal-content border-danger">
@@ -396,7 +399,8 @@ export default function Usuarios() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
