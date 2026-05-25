@@ -519,14 +519,28 @@ router.get("/slots", async (req, res) => {
       [clinica_id, medico_id, fecha]
     );
 
-    const pad = n => String(n).padStart(2, "0");
-    const toLocalISO = d =>
-      `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    // Convierte "HH:MM:SS" local de la clínica → Date UTC correcto
+    const localTimeToUTC = (dateStr, timeStr) => {
+      const asUTC    = new Date(`${dateStr}T${timeStr}Z`);
+      const localStr = asUTC.toLocaleString("en-US", { timeZone: tz });
+      const offset   = asUTC.getTime() - new Date(localStr + " UTC").getTime();
+      return new Date(asUTC.getTime() + offset);
+    };
+
+    // Formatea un Date UTC como "HH:MM" en la zona horaria de la clínica
+    const toTZTime = (d) => {
+      const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: tz, hour: "2-digit", minute: "2-digit", hour12: false,
+      }).formatToParts(d);
+      const h = parts.find(p => p.type === "hour")?.value   || "00";
+      const m = parts.find(p => p.type === "minute")?.value || "00";
+      return `${h}:${m}`;
+    };
 
     const slots = [];
     for (const h of horarios) {
-      let cursor = new Date(`${fecha}T${h.hora_inicio}`);
-      const fin  = new Date(`${fecha}T${h.hora_fin}`);
+      let cursor = localTimeToUTC(fecha, h.hora_inicio);
+      const fin  = localTimeToUTC(fecha, h.hora_fin);
       while (cursor < fin) {
         const slotFin = new Date(cursor.getTime() + h.slot_minutos * 60000);
         const ocup = ocupadas.some(
@@ -534,9 +548,9 @@ router.get("/slots", async (req, res) => {
         );
         if (!ocup) {
           slots.push({
-            inicio: toLocalISO(cursor),
-            fin:    toLocalISO(slotFin),
-            label:  cursor.toTimeString().slice(0, 5) + " - " + slotFin.toTimeString().slice(0, 5),
+            inicio: cursor.toISOString(),
+            fin:    slotFin.toISOString(),
+            label:  toTZTime(cursor) + " - " + toTZTime(slotFin),
           });
         }
         cursor = slotFin;
