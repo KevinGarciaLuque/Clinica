@@ -353,4 +353,43 @@ router.delete(
   }
 );
 
+// ── DELETE /api/pacientes/:id ─────────────────────────────
+router.delete(
+  "/:id",
+  auth("ADMIN","SUPER_ADMIN"),
+  async (req, res) => {
+    try {
+      const clinicaId    = req.tenant?.clinica_id;
+      const { id }       = req.params;
+      const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
+
+      let query, params;
+      if (isSuperAdmin) {
+        query  = "SELECT id, foto_cloudinary_id, clinica_id FROM pacientes WHERE id=?";
+        params = [id];
+      } else {
+        query  = "SELECT id, foto_cloudinary_id, clinica_id FROM pacientes WHERE id=? AND clinica_id=?";
+        params = [id, clinicaId];
+      }
+      const [[p]] = await pool.query(query, params);
+      if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+
+      // Eliminar foto de Cloudinary si existe
+      if (p.foto_cloudinary_id) {
+        try { await cloudinary.uploader.destroy(p.foto_cloudinary_id); } catch { /* ignorar */ }
+      }
+
+      const clinicaIdFinal = isSuperAdmin ? p.clinica_id : clinicaId;
+      await pool.query(
+        "DELETE FROM pacientes WHERE id=? AND clinica_id=?",
+        [id, clinicaIdFinal]
+      );
+
+      res.json({ ok: true, msg: "Paciente eliminado correctamente" });
+    } catch (e) {
+      res.status(500).json({ ok: false, msg: e.message });
+    }
+  }
+);
+
 module.exports = router;
