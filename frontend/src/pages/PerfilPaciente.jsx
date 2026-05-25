@@ -68,7 +68,8 @@ export default function PerfilPaciente() {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
 
-  const { modulos } = useAuth();
+  const { modulos, user } = useAuth();
+  const puedeEliminar = ["ADMIN", "MEDICO", "SUPER_ADMIN"].includes(user?.tipo);
   const tieneModulo = (clave) => modulos.some(m => m.clave === clave);
 
   // Estados principales
@@ -734,7 +735,9 @@ export default function PerfilPaciente() {
     ...(tieneModulo("vacunas")
       ? [{ key: "vacunas", label: "Vacunas", short: "Vacunas", icon: "bi-syringe" }]
       : []),
-    { key: "eliminar",    label: "Eliminar Paciente",    short: "Eliminar", icon: "bi-trash", danger: true },
+    ...(puedeEliminar
+      ? [{ key: "eliminar", label: "Eliminar Paciente", short: "Eliminar", icon: "bi-trash", danger: true }]
+      : []),
   ];
 
   return (

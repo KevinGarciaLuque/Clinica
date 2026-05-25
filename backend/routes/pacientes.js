@@ -356,7 +356,7 @@ router.delete(
 // ── DELETE /api/pacientes/:id ─────────────────────────────
 router.delete(
   "/:id",
-  auth("ADMIN","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","SUPER_ADMIN"),
   async (req, res) => {
     try {
       const clinicaId    = req.tenant?.clinica_id;
