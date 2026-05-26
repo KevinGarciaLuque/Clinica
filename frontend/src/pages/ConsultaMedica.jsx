@@ -2119,49 +2119,57 @@ function EstudiosTab({ historiaId, pacienteId, firmada }) {
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h6 className="mb-0">Solicitudes de Estudios</h6>
-        <div className="d-flex gap-2">
-          {list.length > 0 && (
-            <button
-              className="btn btn-outline-secondary btn-sm"
-              onClick={async () => {
-                try {
-                  const params = new URLSearchParams({ paciente_id: pacienteId });
-                  if (historiaId) params.append("historia_id", historiaId);
-                  const r = await api.get(`/estudios/pdf?${params}`, { responseType: "blob" });
-                  const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
-                  window.open(url, "_blank");
-                } catch { alert("Error al generar PDF"); }
-              }}
-            >
-              <i className="bi bi-printer me-1" />Imprimir
-            </button>
-          )}
-          {!firmada && !showForm && (
-            <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Solicitud</button>
-          )}
-        </div>
+        {!firmada && !showForm && (
+          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Solicitud</button>
+        )}
       </div>
 
-      {list.length === 0 && !showForm && <p className="text-muted">Sin solicitudes.</p>}
+      {list.length === 0 && !showForm && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#9ca3af" }}>
+          <i className="bi bi-eyedropper" style={{ fontSize: "2.5rem", opacity: .3 }} />
+          <p className="mt-2 small">Sin solicitudes para esta consulta.</p>
+        </div>
+      )}
+
       {list.map(s => (
-        <div key={s.id} className="card border-0 shadow-sm mb-2">
-          <div className="card-body py-2">
-            <div className="d-flex justify-content-between">
-              <div>
-                <span className={`badge bg-${ESTADO_BADGE[s.estado]} me-2`}>{s.estado}</span>
-                <span className="badge bg-light text-dark border me-2">{s.tipo}</span>
-                {s.urgente === 1 && <span className="badge bg-danger">URGENTE</span>}
-              </div>
-              <small className="text-muted">{dayjs(s.creado_en).format("DD/MM/YYYY")}</small>
+        <div key={s.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#0891b2,#0e7490)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <i className="bi bi-eyedropper" style={{ color: "#fff", fontSize: "0.85rem" }} />
             </div>
-            <p className="mb-0 mt-1 small">{s.descripcion}</p>
+            <div>
+              <span className={`badge me-2 ${
+                s.estado === "COMPLETADO" ? "bg-success" :
+                s.estado === "CANCELADO"  ? "bg-secondary" :
+                s.estado === "EN_PROCESO" ? "bg-info text-dark" :
+                "bg-warning text-dark"
+              }`} style={{ fontSize: "0.68rem" }}>{s.estado}</span>
+              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{s.tipo}</span>
+              {s.urgente === 1 && <span className="badge bg-danger ms-1" style={{ fontSize: "0.65rem" }}>URGENTE</span>}
+              <div style={{ fontSize: "0.78rem", color: "#555", marginTop: 2 }}>{s.descripcion}</div>
+              <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</div>
+            </div>
+          </div>
+          <div className="d-flex gap-1 flex-shrink-0">
             {s.estado === "SOLICITADO" && !firmada && (
-              <button className="btn btn-outline-secondary btn-sm mt-1"
+              <button
+                className="btn btn-outline-success btn-sm"
+                style={{ fontSize: "0.75rem", borderRadius: 7 }}
                 onClick={() => api.patch(`/estudios/${s.id}/estado`, { estado: "EN_PROCESO" })
                   .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, estado: "EN_PROCESO" } : x)))}>
-                → En Proceso
+                <i className="bi bi-arrow-right me-1" />En Proceso
               </button>
             )}
+            <button
+              style={{ background: "transparent", border: "1px solid #3b82f6", borderRadius: 7, color: "#3b82f6", padding: "4px 12px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}
+              onClick={async () => {
+                try {
+                  const r = await api.get(`/estudios/pdf?paciente_id=${pacienteId}${historiaId ? `&historia_id=${historiaId}` : ""}`, { responseType: "blob" });
+                  window.open(URL.createObjectURL(new Blob([r.data], { type: "application/pdf" })), "_blank");
+                } catch { alert("Error al generar PDF"); }
+              }}>
+              <i className="bi bi-printer me-1" />PDF
+            </button>
           </div>
         </div>
       ))}
