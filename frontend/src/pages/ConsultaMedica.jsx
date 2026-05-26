@@ -2119,9 +2119,27 @@ function EstudiosTab({ historiaId, pacienteId, firmada }) {
 
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h6 className="mb-0">Solicitudes de Estudios</h6>
-        {!firmada && !showForm && (
-          <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Solicitud</button>
-        )}
+        <div className="d-flex gap-2">
+          {list.length > 0 && (
+            <button
+              className="btn btn-outline-secondary btn-sm"
+              onClick={async () => {
+                try {
+                  const params = new URLSearchParams({ paciente_id: pacienteId });
+                  if (historiaId) params.append("historia_id", historiaId);
+                  const r = await api.get(`/estudios/pdf?${params}`, { responseType: "blob" });
+                  const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
+                  window.open(url, "_blank");
+                } catch { alert("Error al generar PDF"); }
+              }}
+            >
+              <i className="bi bi-printer me-1" />Imprimir
+            </button>
+          )}
+          {!firmada && !showForm && (
+            <button className="btn btn-primary btn-sm" onClick={() => setShowForm(true)}>+ Nueva Solicitud</button>
+          )}
+        </div>
       </div>
 
       {list.length === 0 && !showForm && <p className="text-muted">Sin solicitudes.</p>}

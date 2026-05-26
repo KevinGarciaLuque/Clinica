@@ -168,6 +168,14 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       );
     }
 
+    // Linkear estudios guardados antes de crear la historia (historia_id = NULL)
+    await pool.query(
+      `UPDATE estudios_solicitudes
+       SET historia_id = ?
+       WHERE clinica_id = ? AND paciente_id = ? AND historia_id IS NULL`,
+      [r.insertId, cid, paciente_id]
+    );
+
     res.json({ ok: true, id: r.insertId });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
