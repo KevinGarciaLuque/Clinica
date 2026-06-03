@@ -868,7 +868,7 @@ export default function Pacientes() {
       </div>}
 
       {/* Modal consulta sin cita agendada */}
-      {showConsultaModal && consultaPaciente && (
+      {showConsultaModal && consultaPaciente && createPortal(
         <ModalConsultaSinCita
           paciente={consultaPaciente}
           onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
@@ -877,12 +877,13 @@ export default function Pacientes() {
             navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
             setConsultaPaciente(null);
           }}
-        />
+        />,
+        document.body
       )}
 
       {/* Modal Webcam */}
-      {showWebcam && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 10000, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      {showWebcam && createPortal(
+        <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "rgba(0,0,0,0.88)", backdropFilter: "blur(6px)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 16, overflow: "hidden", width: "100%", maxWidth: 540, boxShadow: "0 24px 64px rgba(0,0,0,0.55)" }}>
             {/* Header */}
             <div style={{ background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)", padding: "13px 18px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -918,7 +919,8 @@ export default function Pacientes() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Modal para ver foto ampliada */}
