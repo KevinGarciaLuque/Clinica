@@ -426,9 +426,17 @@ export default function Plantillas() {
   const [guardando, setGuardando] = useState(false);
   const [msg,       setMsg]       = useState({ tipo: "", texto: "" });
   const [predeterminada, setPredeterminada] = useState(null);
+  const [isMobile,  setIsMobile]  = useState(window.innerWidth < 768);
+  const [vistaMovil, setVistaMovil] = useState("form"); // "form" | "preview"
   const editorRef = useRef(null);
   const pageRef = useRef(null);
   const dragSelloRef = useRef(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 768);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const getPaper = (size, orientacion) => {
     const s = String(size || "LETTER").toUpperCase();
@@ -600,26 +608,29 @@ export default function Plantillas() {
     <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
 
       {/* HEADER */}
-      <div style={{ background: "linear-gradient(135deg,#1a2744 0%,#243b72 100%)", padding: "16px 24px 0", boxShadow: "0 2px 12px rgba(0,0,0,.18)" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 14 }}>
-          <div style={{ width: 38, height: 38, borderRadius: 10, background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <i className="bi bi-file-earmark-text-fill" style={{ color: "#7dd3fc", fontSize: "1rem" }} />
+      <div style={{ background: "linear-gradient(135deg,#1a2744 0%,#243b72 100%)", padding: isMobile ? "12px 14px 0" : "16px 24px 0", boxShadow: "0 2px 12px rgba(0,0,0,.18)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: isMobile ? 10 : 14 }}>
+          <div style={{ width: 34, height: 34, flexShrink: 0, borderRadius: 10, background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-file-earmark-text-fill" style={{ color: "#7dd3fc", fontSize: "0.9rem" }} />
           </div>
           <div>
-            <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Plantillas de Documentos</div>
-            <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Personaliza el dise\u00f1o de tus documentos m\u00e9dicos</div>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: isMobile ? "0.92rem" : "1.05rem" }}>Plantillas de Documentos</div>
+            {!isMobile && <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Personaliza el dise\u00f1o de tus documentos m\u00e9dicos</div>}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 3, flexWrap: "wrap" }}>
+        {/* Tabs tipo documentos \u2014 scroll horizontal en m\u00f3vil */}
+        <div style={{ display: "flex", gap: 3, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 0 }}>
           {TIPOS.map(({ key, label, icon, color }) => (
-            <button key={key} onClick={() => { setTab(key); setMsg({ tipo: "", texto: "" }); }} style={{ padding: "7px 14px", fontSize: "0.8rem", fontWeight: 600, borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer", background: tab === key ? "#fff" : "rgba(255,255,255,.1)", color: tab === key ? color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 5, transition: "background .15s" }}>
-              <i className={`bi ${icon}`} />{label}
+            <button key={key} onClick={() => { setTab(key); setMsg({ tipo: "", texto: "" }); setVistaMovil("form"); }}
+              style={{ padding: isMobile ? "6px 10px" : "7px 14px", fontSize: isMobile ? "0.72rem" : "0.8rem", fontWeight: 600, borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer", background: tab === key ? "#fff" : "rgba(255,255,255,.1)", color: tab === key ? color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 4, transition: "background .15s", whiteSpace: "nowrap", flexShrink: 0 }}>
+              <i className={`bi ${icon}`} />
+              {isMobile ? label.split(" ")[0] : label}
             </button>
           ))}
         </div>
       </div>
 
-      <div style={{ padding: "16px 24px" }}>
+      <div style={{ padding: isMobile ? "12px" : "16px 24px" }}>
 
         {msg.texto && (
           <div style={{ marginBottom: 14, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem", display: "flex", alignItems: "center", justifyContent: "space-between", background: msg.tipo === "success" ? "#dcfce7" : "#fee2e2", color: msg.tipo === "success" ? "#166534" : "#991b1b", border: `1px solid ${msg.tipo === "success" ? "#bbf7d0" : "#fecaca"}` }}>
@@ -628,11 +639,27 @@ export default function Plantillas() {
           </div>
         )}
 
+        {/* Toggle móvil: Formulario / Vista previa */}
+        {isMobile && (
+          <div style={{ display: "flex", background: "#fff", borderRadius: 10, border: "1px solid #e5e7eb", overflow: "hidden", marginBottom: 12 }}>
+            {[
+              { k: "form",    label: "Formulario", icon: "bi-sliders" },
+              { k: "preview", label: "Vista previa", icon: "bi-eye-fill" },
+            ].map(v => (
+              <button key={v.k} onClick={() => setVistaMovil(v.k)}
+                style={{ flex: 1, padding: "9px 0", border: "none", cursor: "pointer", fontWeight: 700, fontSize: "0.82rem", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, background: vistaMovil === v.k ? "#1a2744" : "transparent", color: vistaMovil === v.k ? "#fff" : "#6b7280", transition: "all .15s" }}>
+                <i className={`bi ${v.icon}`} />{v.label}
+              </button>
+            ))}
+          </div>
+        )}
+
         {/* LAYOUT: form + preview */}
-        <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
+        <div style={{ display: "flex", flexDirection: isMobile ? "column" : "row", gap: 16, alignItems: "flex-start" }}>
 
           {/* PANEL IZQUIERDO: Formulario */}
-          <div style={{ flex: "0 0 360px", background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", padding: "20px", display: "flex", flexDirection: "column", gap: 18 }}>
+          {(!isMobile || vistaMovil === "form") && (
+          <div style={{ flex: isMobile ? "1 1 100%" : "0 0 360px", width: isMobile ? "100%" : undefined, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", padding: isMobile ? "16px" : "20px", display: "flex", flexDirection: "column", gap: 16 }}>
 
             <div style={{ display: "flex", alignItems: "center", gap: 8, borderBottom: "1px solid #f0f0f0", paddingBottom: 12 }}>
               <i className={`bi ${tipoActivo?.icon}`} style={{ color: tipoActivo?.color, fontSize: "1.2rem" }} />
@@ -962,9 +989,11 @@ export default function Plantillas() {
               {guardando ? "Guardando..." : `Guardar plantilla de ${tipoActivo?.label}`}
             </button>
           </div>
+          )} {/* fin panel izquierdo condicional */}
 
           {/* PANEL DERECHO: Vista previa */}
-          <div style={{ flex: 1, minWidth: 0, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+          {(!isMobile || vistaMovil === "preview") && (
+          <div style={{ flex: 1, minWidth: 0, width: isMobile ? "100%" : undefined, background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
             <div style={{ background: "#f8f9fa", borderBottom: "1px solid #e9ecef", padding: "11px 18px", display: "flex", alignItems: "center", gap: 8 }}>
               <i className="bi bi-eye-fill" style={{ color: tipoActivo?.color }} />
               <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1a2744" }}>Vista previa</span>
@@ -1083,6 +1112,7 @@ export default function Plantillas() {
               ))}
             </div>
           </div>
+          )} {/* fin panel derecho condicional */}
 
         </div>
       </div>
