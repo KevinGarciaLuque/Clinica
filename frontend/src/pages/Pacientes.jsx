@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
@@ -921,7 +922,7 @@ export default function Pacientes() {
       )}
 
       {/* Modal para ver foto ampliada */}
-      {modalFoto && (
+      {modalFoto && createPortal(
         <div
           onClick={() => setModalFoto(null)}
           style={{
@@ -956,7 +957,8 @@ export default function Pacientes() {
               onClick={(e) => e.stopPropagation()}
             />
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       <AnimatedFeedbackModal

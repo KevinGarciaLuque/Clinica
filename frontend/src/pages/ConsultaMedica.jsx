@@ -20,6 +20,7 @@ const VITALS_FIELDS = [
   { key: "talla", label: "Talla",  placeholder: "Ej: 170",    unit: "cm"   },
   { key: "spo2",  label: "SpO₂",   placeholder: "Ej: 98",     unit: "%"    },
   { key: "imc",   label: "IMC",    placeholder: "Auto",       unit: "kg/m²", readOnly: true },
+  { key: "pc",    label: "Per. Cefálico", placeholder: "Ej: 45", unit: "cm", pediatricOnly: true },
 ];
 
 function calcIMC(peso, talla) {
@@ -40,7 +41,7 @@ function parseDerma(raw) {
 export default function Consulta() {
   const [params]   = useSearchParams();
   const navigate   = useNavigate();
-  const { modulos } = useAuth();
+  const { modulos, user } = useAuth();
   const pacId      = params.get("paciente_id");
   const citaId     = params.get("cita_id");
   const historiaId = params.get("historia_id");
@@ -67,6 +68,9 @@ export default function Consulta() {
     diagnosticos_secundarios: [],
   });
   const [vitals, setVitals] = useState({});
+  const [registrarCurva, setRegistrarCurva] = useState(false);
+  const [usarFirmaDigital, setUsarFirmaDigital] = useState(false);
+  const [showModalSinFirma, setShowModalSinFirma] = useState(false);
 
   // Campos específicos dermatología
   const [datosDerma, setDatosDerma] = useState({});
@@ -181,12 +185,29 @@ export default function Consulta() {
           setAlertMsg({ type: "success", msg: "Historia creada." });
         }
       }
+      // Registrar curva de crecimiento si el switch está activo
+      if (registrarCurva) {
+        const fnac = paciente?.fecha_nacimiento;
+        const pid  = paciente?.id || pacId;
+        const edadAnios = fnac ? dayjs().diff(dayjs(fnac), "year") : 99;
+        if (pid && fnac && edadAnios < 19 && (vitals.peso || vitals.talla)) {
+          const edadMeses = dayjs().diff(dayjs(fnac), "month");
+          await api.post(`/crecimiento/${pid}`, {
+            fecha_medicion:          dayjs().format("YYYY-MM-DD"),
+            edad_meses:              edadMeses,
+            peso_kg:                 vitals.peso  || null,
+            talla_cm:                vitals.talla || null,
+            perimetro_cefalico_cm:   vitals.pc    || null,
+            notas:                   "Registrado desde consulta médica",
+          }).catch(() => {}); // silencioso; no bloquea el guardado
+        }
+      }
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error al guardar" });
     } finally {
       setSaving(false);
     }
-  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma]);
+  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, registrarCurva]);
 
   // ── UI ───────────────────────────────────────────────────────────────────────
   const edad = paciente?.fecha_nacimiento
@@ -252,7 +273,41 @@ export default function Consulta() {
           </div>
         </div>
         {!soloLectura && (
-          <div className="d-flex gap-2">
+          <div className="d-flex align-items-center gap-2 flex-wrap">
+            {/* Switch firma digital — solo si no está firmada */}
+            {!firmada && (
+              <div style={{ display: "flex", alignItems: "center", gap: 7, background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.15)", borderRadius: 8, padding: "5px 10px" }}>
+                <i className="bi bi-pen-fill" style={{ color: usarFirmaDigital ? "#86efac" : "rgba(255,255,255,.45)", fontSize: "0.78rem" }} />
+                <span style={{ fontSize: "0.73rem", color: usarFirmaDigital ? "#86efac" : "rgba(255,255,255,.6)", fontWeight: 500, whiteSpace: "nowrap" }}>
+                  Firma digital
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!usarFirmaDigital && !user?.firma_url) {
+                      setShowModalSinFirma(true);
+                    } else {
+                      setUsarFirmaDigital(v => !v);
+                    }
+                  }}
+                  style={{
+                    width: 38, height: 22, borderRadius: 11, flexShrink: 0,
+                    background: usarFirmaDigital ? "#22c55e" : "rgba(255,255,255,.2)",
+                    border: "none", padding: 0, cursor: "pointer",
+                    position: "relative", transition: "background .2s",
+                  }}
+                >
+                  <div style={{
+                    width: 16, height: 16, borderRadius: "50%", background: "#fff",
+                    position: "absolute", top: 3,
+                    left: usarFirmaDigital ? 19 : 3,
+                    transition: "left .2s cubic-bezier(.4,0,.2,1)",
+                    boxShadow: "0 1px 3px rgba(0,0,0,.3)",
+                  }} />
+                </button>
+              </div>
+            )}
+
             {firmada ? (
               <button
                 onClick={() => setShowConfirmSignedEditSave(true)}
@@ -408,6 +463,9 @@ export default function Consulta() {
               soap={soap} setSoap={setSoap}
               vitals={vitals} setVitals={setVitals}
               firmada={soloLectura}
+              paciente={paciente}
+              registrarCurva={registrarCurva}
+              setRegistrarCurva={setRegistrarCurva}
             />
           )}
 
@@ -454,7 +512,7 @@ export default function Consulta() {
       </div>{/* /px-3 */}
 
       {/* Modal consulta sin cita agendada */}
-      {showConsultaModal && consultaPaciente && (
+      {showConsultaModal && consultaPaciente && createPortal(
         <ModalConsultaSinCita
           paciente={consultaPaciente}
           onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
@@ -463,10 +521,11 @@ export default function Consulta() {
             navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
             setConsultaPaciente(null);
           }}
-        />
+        />,
+        document.body
       )}
 
-      {showSignedModal && (
+      {showSignedModal && createPortal(
         <ModalHistoriaFirmada
           paciente={paciente}
           onClose={() => setShowSignedModal(false)}
@@ -474,10 +533,11 @@ export default function Consulta() {
             setShowSignedModal(false);
             if (paciente?.id) navigate(`/pacientes/${paciente.id}/perfil?tab=historial`);
           }}
-        />
+        />,
+        document.body
       )}
 
-      {showConfirmSignedEditSave && (
+      {showConfirmSignedEditSave && createPortal(
         <ModalConfirmarEdicionFirmada
           onCancel={() => setShowConfirmSignedEditSave(false)}
           onConfirm={async () => {
@@ -485,13 +545,23 @@ export default function Consulta() {
             await handleSave(false);
           }}
           saving={saving}
-        />
+        />,
+        document.body
       )}
 
-      {showSavedChangesModal && (
+      {showSavedChangesModal && createPortal(
         <ModalCambiosGuardados
           onClose={() => setShowSavedChangesModal(false)}
-        />
+        />,
+        document.body
+      )}
+
+      {showModalSinFirma && createPortal(
+        <ModalSinFirma
+          onClose={() => setShowModalSinFirma(false)}
+          onIrAPerfil={() => { setShowModalSinFirma(false); navigate("/perfil"); }}
+        />,
+        document.body
       )}
     </div>
   );
@@ -688,6 +758,60 @@ function ModalCambiosGuardados({ onClose }) {
         <button className="btn btn-success btn-sm" onClick={onClose}>
           Aceptar
         </button>
+      </div>
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// Modal: Sin firma digital configurada
+// ══════════════════════════════════════════════════════════════════════
+function ModalSinFirma({ onClose, onIrAPerfil }) {
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 9999,
+      background: "rgba(15,23,42,.6)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        background: "#fff", borderRadius: 16, maxWidth: 420, width: "100%",
+        boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden",
+      }}>
+        {/* Header */}
+        <div style={{ background: "linear-gradient(135deg,#1a2744,#243b72)", padding: "18px 22px", display: "flex", alignItems: "center", gap: 12 }}>
+          <div style={{ width: 40, height: 40, borderRadius: 10, background: "rgba(255,255,255,.15)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-pen-fill" style={{ color: "#fff", fontSize: "1.1rem" }} />
+          </div>
+          <div style={{ flex: 1 }}>
+            <div style={{ color: "#fff", fontWeight: 700, fontSize: "0.97rem" }}>Firma digital no configurada</div>
+            <div style={{ color: "rgba(255,255,255,.55)", fontSize: "0.75rem", marginTop: 1 }}>Configura tu firma para usarla en consultas</div>
+          </div>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,.12)", border: "none", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <i className="bi bi-x" style={{ fontSize: 16 }} />
+          </button>
+        </div>
+        {/* Body */}
+        <div style={{ padding: "22px 24px" }}>
+          <div style={{ display: "flex", gap: 12, marginBottom: 20 }}>
+            <div style={{ width: 44, height: 44, borderRadius: 12, background: "#fef9c3", border: "1px solid #fde68a", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <i className="bi bi-exclamation-triangle-fill" style={{ color: "#d97706", fontSize: "1.2rem" }} />
+            </div>
+            <p style={{ margin: 0, fontSize: "0.87rem", color: "#374151", lineHeight: 1.6 }}>
+              Aún no tienes una firma digital guardada en tu perfil. <br />
+              Puedes <strong>dibujarla</strong> o <strong>subir una imagen</strong> desde la sección <em>Mi Perfil</em>.
+            </p>
+          </div>
+          <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
+            <button onClick={onClose}
+              style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: "0.85rem" }}>
+              Cancelar
+            </button>
+            <button onClick={onIrAPerfil}
+              style={{ padding: "8px 20px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#1a2744,#243b72)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.85rem", display: "flex", alignItems: "center", gap: 7 }}>
+              <i className="bi bi-person-badge-fill" /> Ir a Mi Perfil
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1107,7 +1231,7 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
 // ══════════════════════════════════════════════════════════════════════
 // TAB: SOAP
 // ══════════════════════════════════════════════════════════════════════
-function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
+function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registrarCurva, setRegistrarCurva }) {
   const { user } = useAuth();
   const especialidad = user?.especialidad || "Medicina General";
   const cie10Ref = useRef(null);
@@ -1162,6 +1286,11 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
     }));
   };
 
+  // Mostrar switch solo para pacientes pediátricos (< 19 años)
+  const esPediatrico = paciente?.fecha_nacimiento
+    ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") < 19
+    : false;
+
   return (
     <div className="row g-3">
       <style>{`
@@ -1173,6 +1302,12 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
           color: #8b95a1 !important;
           font-style: italic;
         }
+        .curva-switch-track {
+          transition: background 0.22s;
+        }
+        .curva-switch-thumb {
+          transition: left 0.22s cubic-bezier(.4,0,.2,1);
+        }
       `}</style>
       {/* Signos vitales */}
       <div className="col-12">
@@ -1182,9 +1317,40 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada }) {
               <i className="bi bi-heart-pulse-fill" style={{ color: "#fff", fontSize: "0.75rem" }}></i>
             </div>
             <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>Signos Vitales</span>
+            {/* Switch curva de crecimiento — solo pacientes < 19 años */}
+            {esPediatrico && !firmada && (
+              <div className="d-flex align-items-center gap-2 ms-auto">
+                <i className="bi bi-graph-up-arrow" style={{ color: registrarCurva ? "#16a34a" : "#9ca3af", fontSize: "0.82rem" }}></i>
+                <span style={{ fontSize: "0.75rem", color: registrarCurva ? "#15803d" : "#6b7280", fontWeight: registrarCurva ? 600 : 400, whiteSpace: "nowrap" }}>
+                  Registrar curva de crecimiento
+                </span>
+                <button
+                  type="button"
+                  title={registrarCurva ? "Desactivar registro en curva de crecimiento" : "Activar registro en curva de crecimiento"}
+                  onClick={() => setRegistrarCurva(v => !v)}
+                  className="curva-switch-track"
+                  style={{
+                    width: 44, height: 26, borderRadius: 13, flexShrink: 0,
+                    background: registrarCurva ? "#22c55e" : "#d1d5db",
+                    border: "none", padding: 0, cursor: "pointer",
+                    position: "relative", boxShadow: "inset 0 1px 3px rgba(0,0,0,.15)",
+                  }}
+                >
+                  <div
+                    className="curva-switch-thumb"
+                    style={{
+                      width: 20, height: 20, borderRadius: "50%", background: "#fff",
+                      position: "absolute", top: 3,
+                      left: registrarCurva ? 21 : 3,
+                      boxShadow: "0 1px 4px rgba(0,0,0,.28)",
+                    }}
+                  />
+                </button>
+              </div>
+            )}
           </div>
           <div className="row g-2">
-            {VITALS_FIELDS.map(f => (
+            {VITALS_FIELDS.filter(f => !f.pediatricOnly || esPediatrico).map(f => (
               <div key={f.key} className="col-6 col-md-3">
                 <div style={{ background: "#f8fafc", borderRadius: 8, padding: "8px 10px", border: "1px solid #e5e7eb" }}>
                   <div style={{ fontSize: "0.68rem", color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>

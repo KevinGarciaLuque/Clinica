@@ -76,7 +76,7 @@ router.post("/", auth("ADMIN", "SUPER_ADMIN", "MEDICO"), async (req, res) => {
 });
 
 /**
- * PUT /api/catalogos-estudios/:id
+ 
  */
 router.put("/:id", auth("ADMIN", "SUPER_ADMIN", "MEDICO"), async (req, res) => {
   try {

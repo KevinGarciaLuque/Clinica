@@ -4,18 +4,26 @@
  * Pestañas: Carnet | Registro de Vacunas | Suplementación Vitamina A | Guía de Vacunación
  */
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import api from "../api/api";
 
 // ══════════════════════════════════════════════════════════
 // COLORES PAI Honduras (Pantone)
 // ══════════════════════════════════════════════════════════
 const PAI = {
-  amarillo: "#FFD100",     // Pantone 109 C
-  azulOscuro: "#1D2087",  // Pantone 273 C
-  azulClaro: "#99BFFF",   // C-40 M-25 Y-0 K-0
+  amarillo:   "#91b3a3",
+  azulOscuro: "#608CA5",
+  azulClaro:  "#c5d8e4",
   blanco: "#FFFFFF",
   gris: "#f2f2f2",
 };
+
+const PRESETS_COLORES = [
+  { nombre: "Verde Salud", principal: "#608CA5", secundario: "#91b3a3", claro: "#c5d8e4" },
+  { nombre: "Honduras PAI", principal: "#1D2087", secundario: "#FFD100", claro: "#99BFFF" },
+  { nombre: "Verde Bosque", principal: "#2e7d32", secundario: "#81c784", claro: "#c8e6c9" },
+  { nombre: "Azul Marino",  principal: "#1a3a5c", secundario: "#4a90c4", claro: "#bfd7ed" },
+];
 
 // ══════════════════════════════════════════════════════════
 // CATÁLOGO COMPLETO DE VACUNAS (igual al carnet físico)
@@ -300,11 +308,12 @@ function encontrarVitamina(registros, edad_rango, tipo_dosis) {
 // ══════════════════════════════════════════════════════════
 // MODAL PARA REGISTRAR / EDITAR VACUNA
 // ══════════════════════════════════════════════════════════
-function ModalVacuna({ datos, onClose, onGuardar, cargando }) {
+function ModalVacuna({ datos, onClose, onGuardar, cargando, pal = PAI }) {
+  const hoy = new Date();
   const [form, setForm] = useState({
-    fecha_dia: datos?.registro?.fecha_dia || "",
-    fecha_mes: datos?.registro?.fecha_mes || "",
-    fecha_ano: datos?.registro?.fecha_ano || "",
+    fecha_dia: datos?.registro?.fecha_dia || hoy.getDate(),
+    fecha_mes: datos?.registro?.fecha_mes || (hoy.getMonth() + 1),
+    fecha_ano: datos?.registro?.fecha_ano || hoy.getFullYear(),
     proxima_cita: datos?.registro?.proxima_cita || "",
     nombre_vacunador: datos?.registro?.nombre_vacunador || "",
     lote: datos?.registro?.lote || "",
@@ -318,93 +327,109 @@ function ModalVacuna({ datos, onClose, onGuardar, cargando }) {
     onGuardar({ ...form });
   };
 
-  return (
-    <div className="modal d-block" style={{ background: "rgba(0,0,0,0.5)", zIndex: 1055 }}>
-      <div className="modal-dialog modal-md">
-        <div className="modal-content">
-          <div className="modal-header" style={{ background: PAI.azulOscuro, color: PAI.blanco }}>
-            <h5 className="modal-title">
-              <i className="bi bi-syringe me-2" />
+  return createPortal(
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,.55)", backdropFilter: "blur(3px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "16px",
+      }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 14, width: "100%", maxWidth: 480,
+        boxShadow: "0 20px 60px rgba(0,0,0,.28)", overflow: "hidden",
+        maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column",
+      }}>
+        {/* Header */}
+        <div style={{ background: pal.azulOscuro, color: pal.blanco, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <i className="bi bi-syringe" style={{ fontSize: "1rem" }} />
+            <span style={{ fontWeight: 700, fontSize: "0.97rem" }}>
               {datos?.registro ? "Editar" : "Registrar"} Vacuna
-            </h5>
-            <button className="btn-close btn-close-white" onClick={onClose} />
+            </span>
           </div>
-          <div className="modal-body">
-            <p className="fw-bold mb-1" style={{ color: PAI.azulOscuro }}>
-              {datos?.vacunaNombre}
-            </p>
-            <p className="text-muted small mb-3">Dosis: {datos?.dosisLabel}</p>
+          <button onClick={onClose} style={{ background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+            <i className="bi bi-x" />
+          </button>
+        </div>
 
-            <form onSubmit={handleSubmit}>
-              <div className="row g-2 mb-3">
-                <div className="col-3">
-                  <label className="form-label small fw-semibold">Día</label>
+        {/* Body */}
+        <div style={{ padding: "16px 18px", overflowY: "auto" }}>
+          <p className="fw-bold mb-1" style={{ color: pal.azulOscuro, fontSize: "0.9rem" }}>{datos?.vacunaNombre}</p>
+          <p className="text-muted small mb-3">Dosis: {datos?.dosisLabel}</p>
+
+          <form onSubmit={handleSubmit}>
+            {/* Fecha */}
+            <div style={{ marginBottom: 12 }}>
+              <label className="form-label small fw-semibold">Fecha de aplicación</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
                   <input name="fecha_dia" type="number" min="1" max="31" className="form-control form-control-sm"
                     value={form.fecha_dia} onChange={handleChange} placeholder="DD" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Día</div>
                 </div>
-                <div className="col-3">
-                  <label className="form-label small fw-semibold">Mes</label>
+                <div style={{ flex: 1 }}>
                   <input name="fecha_mes" type="number" min="1" max="12" className="form-control form-control-sm"
                     value={form.fecha_mes} onChange={handleChange} placeholder="MM" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Mes</div>
                 </div>
-                <div className="col-6">
-                  <label className="form-label small fw-semibold">Año</label>
+                <div style={{ flex: 2 }}>
                   <input name="fecha_ano" type="number" min="2000" max="2100" className="form-control form-control-sm"
                     value={form.fecha_ano} onChange={handleChange} placeholder="AAAA" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Año</div>
                 </div>
               </div>
+            </div>
 
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Próxima Cita</label>
-                <input name="proxima_cita" className="form-control form-control-sm"
-                  value={form.proxima_cita} onChange={handleChange}
-                  placeholder="Ej: 6 meses, 12/2026, etc." />
-              </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Próxima Cita</label>
+              <input name="proxima_cita" className="form-control form-control-sm"
+                value={form.proxima_cita} onChange={handleChange} placeholder="Ej: 6 meses, 12/2026, etc." />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Nombre del Vacunador</label>
+              <input name="nombre_vacunador" className="form-control form-control-sm"
+                value={form.nombre_vacunador} onChange={handleChange} />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Lote <span style={{ color: "#9ca3af", fontWeight: 400 }}>(opcional)</span></label>
+              <input name="lote" className="form-control form-control-sm" value={form.lote} onChange={handleChange} />
+            </div>
+            <div className="mb-4">
+              <label className="form-label small fw-semibold">Observaciones</label>
+              <textarea name="observaciones" className="form-control form-control-sm" rows={2}
+                value={form.observaciones} onChange={handleChange} />
+            </div>
 
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Nombre del Vacunador</label>
-                <input name="nombre_vacunador" className="form-control form-control-sm"
-                  value={form.nombre_vacunador} onChange={handleChange} />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Lote (opcional)</label>
-                <input name="lote" className="form-control form-control-sm"
-                  value={form.lote} onChange={handleChange} />
-              </div>
-
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Observaciones</label>
-                <textarea name="observaciones" className="form-control form-control-sm" rows={2}
-                  value={form.observaciones} onChange={handleChange} />
-              </div>
-
-              <div className="d-flex gap-2 justify-content-end">
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
-                <button type="submit" className="btn btn-sm text-white" disabled={cargando}
-                  style={{ background: PAI.azulOscuro }}>
-                  {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-check-lg me-1" />}
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
+              <button type="submit" className="btn btn-sm text-white" disabled={cargando}
+                style={{ background: pal.azulOscuro, minWidth: 90 }}>
+                {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-check-lg me-1" />}
+                Guardar
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // ══════════════════════════════════════════════════════════
 // MODAL PARA OTRAS VACUNAS / JORNADAS (nombre libre)
 // ══════════════════════════════════════════════════════════
-function ModalOtraVacuna({ datos, onClose, onGuardar, onEliminar, cargando }) {
+function ModalOtraVacuna({ datos, onClose, onGuardar, onEliminar, cargando, pal = PAI }) {
+  const hoy = new Date();
   const [form, setForm] = useState({
     vacuna_nombre: datos?.registro?.vacuna_nombre || "",
     dosis_nombre:  datos?.registro?.dosis_nombre  || "",
-    fecha_dia:     datos?.registro?.fecha_dia      || "",
-    fecha_mes:     datos?.registro?.fecha_mes      || "",
-    fecha_ano:     datos?.registro?.fecha_ano      || "",
+    fecha_dia:     datos?.registro?.fecha_dia      || hoy.getDate(),
+    fecha_mes:     datos?.registro?.fecha_mes      || (hoy.getMonth() + 1),
+    fecha_ano:     datos?.registro?.fecha_ano      || hoy.getFullYear(),
     proxima_cita:  datos?.registro?.proxima_cita   || "",
     nombre_vacunador: datos?.registro?.nombre_vacunador || "",
     lote:          datos?.registro?.lote           || "",
@@ -416,165 +441,205 @@ function ModalOtraVacuna({ datos, onClose, onGuardar, onEliminar, cargando }) {
   const titulo = datos?.seccion === "OTRAS" ? "Otra Vacuna" : "Vacuna Jornada / Campaña";
   const esEdicion = !!datos?.registro;
 
-  return (
-    <div className="modal d-block" style={{ background: "rgba(0,0,0,0.5)", zIndex: 1055 }}>
-      <div className="modal-dialog modal-md">
-        <div className="modal-content">
-          <div className="modal-header" style={{ background: PAI.amarillo }}>
-            <h5 className="modal-title fw-bold" style={{ color: "#000" }}>
-              <i className="bi bi-syringe me-2" />
+  return createPortal(
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,.55)", backdropFilter: "blur(3px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "16px",
+      }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 14, width: "100%", maxWidth: 480,
+        boxShadow: "0 20px 60px rgba(0,0,0,.28)", overflow: "hidden",
+        maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column",
+      }}>
+        {/* Header */}
+        <div style={{ background: pal.amarillo, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <i className="bi bi-syringe" style={{ fontSize: "1rem" }} />
+            <span style={{ fontWeight: 700, fontSize: "0.97rem", color: "#000" }}>
               {esEdicion ? "Editar" : "Registrar"} — {titulo}
-            </h5>
-            <button className="btn-close" onClick={onClose} />
+            </span>
           </div>
-          <div className="modal-body">
-            <form onSubmit={e => { e.preventDefault(); onGuardar(form); }}>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Nombre de la Vacuna <span className="text-danger">*</span></label>
-                <input
-                  name="vacuna_nombre"
-                  className="form-control form-control-sm"
-                  value={form.vacuna_nombre}
-                  onChange={handleChange}
-                  placeholder="Ej: Hepatitis A, Fiebre Tifoidea, COVID-19..."
-                  required
-                />
-              </div>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Dosis</label>
-                <input
-                  name="dosis_nombre"
-                  className="form-control form-control-sm"
-                  value={form.dosis_nombre}
-                  onChange={handleChange}
-                  placeholder="Ej: Primera, Única, Refuerzo..."
-                />
-              </div>
-              <div className="row g-2 mb-3">
-                <div className="col-3">
-                  <label className="form-label small fw-semibold">Día</label>
+          <button onClick={onClose} style={{ background: "rgba(0,0,0,.1)", border: "1px solid rgba(0,0,0,.15)", borderRadius: "50%", width: 28, height: 28, cursor: "pointer", color: "#000", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>
+            <i className="bi bi-x" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "16px 18px", overflowY: "auto" }}>
+          <form onSubmit={e => { e.preventDefault(); onGuardar(form); }}>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Nombre de la Vacuna <span className="text-danger">*</span></label>
+              <input name="vacuna_nombre" className="form-control form-control-sm"
+                value={form.vacuna_nombre} onChange={handleChange}
+                placeholder="Ej: Hepatitis A, Fiebre Tifoidea, COVID-19..." required />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Dosis</label>
+              <input name="dosis_nombre" className="form-control form-control-sm"
+                value={form.dosis_nombre} onChange={handleChange} placeholder="Ej: Primera, Única, Refuerzo..." />
+            </div>
+
+            {/* Fecha */}
+            <div style={{ marginBottom: 12 }}>
+              <label className="form-label small fw-semibold">Fecha de aplicación</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
                   <input name="fecha_dia" type="number" min="1" max="31" className="form-control form-control-sm"
                     value={form.fecha_dia} onChange={handleChange} placeholder="DD" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Día</div>
                 </div>
-                <div className="col-3">
-                  <label className="form-label small fw-semibold">Mes</label>
+                <div style={{ flex: 1 }}>
                   <input name="fecha_mes" type="number" min="1" max="12" className="form-control form-control-sm"
                     value={form.fecha_mes} onChange={handleChange} placeholder="MM" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Mes</div>
                 </div>
-                <div className="col-6">
-                  <label className="form-label small fw-semibold">Año</label>
+                <div style={{ flex: 2 }}>
                   <input name="fecha_ano" type="number" min="2000" max="2100" className="form-control form-control-sm"
                     value={form.fecha_ano} onChange={handleChange} placeholder="AAAA" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Año</div>
                 </div>
               </div>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Próxima Cita</label>
-                <input name="proxima_cita" className="form-control form-control-sm"
-                  value={form.proxima_cita} onChange={handleChange} placeholder="Ej: 6 meses, 03/2027..." />
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Próxima Cita</label>
+              <input name="proxima_cita" className="form-control form-control-sm"
+                value={form.proxima_cita} onChange={handleChange} placeholder="Ej: 6 meses, 03/2027..." />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Nombre del Vacunador</label>
+              <input name="nombre_vacunador" className="form-control form-control-sm"
+                value={form.nombre_vacunador} onChange={handleChange} />
+            </div>
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Lote <span style={{ color: "#9ca3af", fontWeight: 400 }}>(opcional)</span></label>
+              <input name="lote" className="form-control form-control-sm" value={form.lote} onChange={handleChange} />
+            </div>
+            <div className="mb-4">
+              <label className="form-label small fw-semibold">Observaciones</label>
+              <textarea name="observaciones" className="form-control form-control-sm" rows={2}
+                value={form.observaciones} onChange={handleChange} />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "space-between", alignItems: "center" }}>
+              {esEdicion && (
+                <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onEliminar(datos.registro.id)}>
+                  <i className="bi bi-trash me-1" />Eliminar
+                </button>
+              )}
+              <div style={{ display: "flex", gap: 8, marginLeft: "auto" }}>
+                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
+                <button type="submit" className="btn btn-sm fw-bold text-dark" disabled={cargando}
+                  style={{ background: pal.amarillo, minWidth: 90 }}>
+                  {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-check-lg me-1" />}
+                  Guardar
+                </button>
               </div>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Nombre del Vacunador</label>
-                <input name="nombre_vacunador" className="form-control form-control-sm"
-                  value={form.nombre_vacunador} onChange={handleChange} />
-              </div>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Lote (opcional)</label>
-                <input name="lote" className="form-control form-control-sm"
-                  value={form.lote} onChange={handleChange} />
-              </div>
-              <div className="mb-3">
-                <label className="form-label small fw-semibold">Observaciones</label>
-                <textarea name="observaciones" className="form-control form-control-sm" rows={2}
-                  value={form.observaciones} onChange={handleChange} />
-              </div>
-              <div className="d-flex gap-2 justify-content-between align-items-center">
-                {esEdicion && (
-                  <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onEliminar(datos.registro.id)}>
-                    <i className="bi bi-trash me-1" />Eliminar
-                  </button>
-                )}
-                <div className="d-flex gap-2 ms-auto">
-                  <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
-                  <button type="submit" className="btn btn-sm fw-bold text-dark" disabled={cargando}
-                    style={{ background: PAI.amarillo }}>
-                    {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-check-lg me-1" />}
-                    Guardar
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
+            </div>
+          </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
 // ══════════════════════════════════════════════════════════
 // MODAL PARA VITAMINA A
 // ══════════════════════════════════════════════════════════
-function ModalVitaminaA({ datos, onClose, onGuardar, cargando }) {
+function ModalVitaminaA({ datos, onClose, onGuardar, cargando, pal = PAI }) {
+  const hoy = new Date();
   const [form, setForm] = useState({
-    fecha_dia: datos?.registro?.fecha_dia || "",
-    fecha_mes: datos?.registro?.fecha_mes || "",
-    fecha_ano: datos?.registro?.fecha_ano || "",
+    fecha_dia: datos?.registro?.fecha_dia || hoy.getDate(),
+    fecha_mes: datos?.registro?.fecha_mes || (hoy.getMonth() + 1),
+    fecha_ano: datos?.registro?.fecha_ano || hoy.getFullYear(),
     nombre_vacunador: datos?.registro?.nombre_vacunador || "",
     observaciones: datos?.registro?.observaciones || "",
   });
 
   const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
-  return (
-    <div className="modal d-block" style={{ background: "rgba(0,0,0,0.5)", zIndex: 1055 }}>
-      <div className="modal-dialog  modal-sm">
-        <div className="modal-content">
-          <div className="modal-header" style={{ background: PAI.amarillo }}>
-            <h6 className="modal-title fw-bold">Vitamina A — {datos?.edadLabel} — {datos?.dosisLabel}</h6>
-            <button className="btn-close" onClick={onClose} />
-          </div>
-          <div className="modal-body">
-            <form onSubmit={e => { e.preventDefault(); onGuardar(form); }}>
-              <p className="small text-muted mb-2">Dosis: {datos?.dosis_ui?.toLocaleString()} UI</p>
-              <div className="row g-2 mb-2">
-                <div className="col-3">
-                  <label className="form-label small">Día</label>
+  return createPortal(
+    <div
+      onClick={e => e.target === e.currentTarget && onClose()}
+      style={{
+        position: "fixed", inset: 0, zIndex: 9999,
+        background: "rgba(0,0,0,.55)", backdropFilter: "blur(3px)",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        padding: "16px",
+      }}
+    >
+      <div style={{
+        background: "#fff", borderRadius: 14, width: "100%", maxWidth: 400,
+        boxShadow: "0 20px 60px rgba(0,0,0,.28)", overflow: "hidden",
+        maxHeight: "calc(100vh - 32px)", display: "flex", flexDirection: "column",
+      }}>
+        {/* Header */}
+        <div style={{ background: pal.amarillo, padding: "12px 16px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
+          <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#000" }}>
+            Vitamina A — {datos?.edadLabel} — {datos?.dosisLabel}
+          </span>
+          <button onClick={onClose} style={{ background: "rgba(0,0,0,.1)", border: "none", borderRadius: "50%", width: 26, height: 26, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 15 }}>
+            <i className="bi bi-x" />
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ padding: "16px", overflowY: "auto" }}>
+          <form onSubmit={e => { e.preventDefault(); onGuardar(form); }}>
+            <p className="small text-muted mb-3">Dosis: <strong>{datos?.dosis_ui?.toLocaleString()} UI</strong></p>
+
+            {/* Fecha */}
+            <div style={{ marginBottom: 12 }}>
+              <label className="form-label small fw-semibold">Fecha de aplicación</label>
+              <div style={{ display: "flex", gap: 8 }}>
+                <div style={{ flex: 1 }}>
                   <input name="fecha_dia" type="number" min="1" max="31" className="form-control form-control-sm"
                     value={form.fecha_dia} onChange={handleChange} placeholder="DD" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Día</div>
                 </div>
-                <div className="col-3">
-                  <label className="form-label small">Mes</label>
+                <div style={{ flex: 1 }}>
                   <input name="fecha_mes" type="number" min="1" max="12" className="form-control form-control-sm"
                     value={form.fecha_mes} onChange={handleChange} placeholder="MM" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Mes</div>
                 </div>
-                <div className="col-6">
-                  <label className="form-label small">Año</label>
+                <div style={{ flex: 2 }}>
                   <input name="fecha_ano" type="number" min="2000" max="2100" className="form-control form-control-sm"
                     value={form.fecha_ano} onChange={handleChange} placeholder="AAAA" />
+                  <div style={{ fontSize: 10, color: "#9ca3af", marginTop: 2, textAlign: "center" }}>Año</div>
                 </div>
               </div>
-              <div className="mb-2">
-                <label className="form-label small">Nombre del Vacunador</label>
-                <input name="nombre_vacunador" className="form-control form-control-sm"
-                  value={form.nombre_vacunador} onChange={handleChange} />
-              </div>
-              <div className="mb-3">
-                <label className="form-label small">Observaciones</label>
-                <textarea name="observaciones" className="form-control form-control-sm" rows={2}
-                  value={form.observaciones} onChange={handleChange} />
-              </div>
-              <div className="d-flex gap-2 justify-content-end">
-                <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
-                <button type="submit" className="btn btn-sm fw-bold" disabled={cargando}
-                  style={{ background: PAI.amarillo }}>
-                  {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : null}
-                  Guardar
-                </button>
-              </div>
-            </form>
-          </div>
+            </div>
+
+            <div className="mb-3">
+              <label className="form-label small fw-semibold">Nombre del Vacunador</label>
+              <input name="nombre_vacunador" className="form-control form-control-sm"
+                value={form.nombre_vacunador} onChange={handleChange} />
+            </div>
+            <div className="mb-4">
+              <label className="form-label small fw-semibold">Observaciones</label>
+              <textarea name="observaciones" className="form-control form-control-sm" rows={2}
+                value={form.observaciones} onChange={handleChange} />
+            </div>
+
+            <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+              <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Cancelar</button>
+              <button type="submit" className="btn btn-sm fw-bold" disabled={cargando}
+                style={{ background: pal.amarillo, minWidth: 80 }}>
+                {cargando ? <span className="spinner-border spinner-border-sm me-1" /> : <i className="bi bi-check-lg me-1" />}
+                Guardar
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 
@@ -641,7 +706,7 @@ function CeldaVacuna({ registro, onClickCelda, editable }) {
 // ══════════════════════════════════════════════════════════
 // FUNCIÓN DE IMPRESIÓN DEL CARNET
 // ══════════════════════════════════════════════════════════
-function imprimirCarnet(paciente, registros, vitaminaRegistros) {
+function imprimirCarnet(paciente, registros, vitaminaRegistros, pal = PAI) {
   const calcEdad = () => {
     if (!paciente?.fecha_nacimiento) return "";
     const hoy = new Date();
@@ -679,15 +744,15 @@ function imprimirCarnet(paciente, registros, vitaminaRegistros) {
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; font-size: 11px; color: #111; padding: 16px; }
-  h1 { font-size: 18px; color: ${PAI.azulOscuro}; text-align:center; margin-bottom: 4px; }
-  h2 { font-size: 14px; color: ${PAI.azulOscuro}; margin: 10px 0 4px; }
-  .header { background: ${PAI.azulOscuro}; color: #fff; padding: 10px 16px; margin-bottom: 12px; border-radius: 4px; }
+  h1 { font-size: 18px; color: ${pal.azulOscuro}; text-align:center; margin-bottom: 4px; }
+  h2 { font-size: 14px; color: ${pal.azulOscuro}; margin: 10px 0 4px; }
+  .header { background: ${pal.azulOscuro}; color: #fff; padding: 10px 16px; margin-bottom: 12px; border-radius: 4px; }
   .header h1 { color: #fff; }
   .datos { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 20px; margin-bottom: 12px; }
   .dato { display: flex; gap: 6px; border-bottom: 1px solid #ddd; padding: 2px 0; }
-  .dato .etiqueta { font-weight: bold; min-width: 110px; color: ${PAI.azulOscuro}; }
+  .dato .etiqueta { font-weight: bold; min-width: 110px; color: ${pal.azulOscuro}; }
   table { width: 100%; border-collapse: collapse; margin-bottom: 12px; font-size: 10px; }
-  th { background: ${PAI.azulOscuro}; color: #fff; padding: 4px; border: 1px solid #999; }
+  th { background: ${pal.azulOscuro}; color: #fff; padding: 4px; border: 1px solid #999; }
   @media print { body { padding: 8px; } }
 </style></head><body>
 <div class="header">
@@ -731,12 +796,42 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
   const [registros, setRegistros] = useState([]);
   const [vitaminaRegs, setVitaminaRegs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null);      // { tipo: 'vacuna'|'vitamina', datos: {...} }
+  const [modal, setModal] = useState(null);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState("");
+  const [showColorPanel, setShowColorPanel] = useState(false);
 
-  // Paginación para tabla de registro (mostrar por bloques si es muchas vacunas)
-  const editable = true; // Siempre editable para el médico
+  // ── Colores personalizables (persistidos en localStorage) ──────────────
+  const [colores, setColores] = useState(() => {
+    try {
+      const saved = localStorage.getItem("vacunas_colores");
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { principal: PAI.azulOscuro, secundario: PAI.amarillo, claro: PAI.azulClaro };
+  });
+
+  const pal = {
+    ...PAI,
+    azulOscuro: colores.principal,
+    amarillo:   colores.secundario,
+    azulClaro:  colores.claro,
+  };
+
+  const actualizarColor = (campo, valor) => {
+    setColores(c => {
+      const nuevo = { ...c, [campo]: valor };
+      try { localStorage.setItem("vacunas_colores", JSON.stringify(nuevo)); } catch {}
+      return nuevo;
+    });
+  };
+
+  const aplicarPreset = (preset) => {
+    const nuevo = { principal: preset.principal, secundario: preset.secundario, claro: preset.claro };
+    setColores(nuevo);
+    try { localStorage.setItem("vacunas_colores", JSON.stringify(nuevo)); } catch {}
+  };
+
+  const editable = true;
 
   // ── Carga de datos ─────────────────────────────────────
   const cargarDatos = useCallback(async () => {
@@ -907,8 +1002,8 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
   const renderTablaRegistro = (vacunasList, titulo) => (
     <div className="mb-0">
       <div style={{
-        background: PAI.azulOscuro,
-        color: PAI.blanco,
+        background: pal.azulOscuro,
+        color: pal.blanco,
         textAlign: "center",
         fontWeight: "bold",
         fontSize: 13,
@@ -934,30 +1029,30 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
         </colgroup>
         <thead>
           <tr>
-            <th style={{ background: PAI.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 11 }}>
+            <th style={{ background: pal.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 11 }}>
               Vacuna / Enfermedad que protege
             </th>
-            <th style={{ background: PAI.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 11 }}>
+            <th style={{ background: pal.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 11 }}>
               Dosis
             </th>
-            <th colSpan={3} style={{ background: PAI.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", textAlign: "center", fontSize: 11 }}>
+            <th colSpan={3} style={{ background: pal.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", textAlign: "center", fontSize: 11 }}>
               Fecha de aplicación
             </th>
-            <th style={{ background: PAI.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 10, textAlign: "center" }}>
+            <th style={{ background: pal.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 10, textAlign: "center" }}>
               Próxima cita
             </th>
-            <th style={{ background: PAI.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 11 }}>
+            <th style={{ background: pal.amarillo, color: "#000", border: "1px solid #999", padding: "4px 6px", fontSize: 11 }}>
               Nombre del vacunador
             </th>
           </tr>
           <tr>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Día</th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10, whiteSpace: "nowrap" }}>Mes</th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Año</th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>(Día, nombre del mes y año)</th>
-            <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Día</th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10, whiteSpace: "nowrap" }}>Mes</th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>Año</th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px", textAlign: "center", fontSize: 10 }}>(Día, nombre del mes y año)</th>
+            <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "2px 4px" }}></th>
           </tr>
         </thead>
         <tbody>
@@ -1061,13 +1156,13 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
     const filasVacias = Math.max(n - filasRegistro.length, 1);
 
     const tdStyle = { border: "1px solid #ccc", padding: "5px 4px", fontSize: 11, verticalAlign: "middle" };
-    const thStyle = { background: PAI.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 };
+    const thStyle = { background: pal.amarillo, border: "1px solid #999", padding: "3px 4px", fontSize: 10 };
 
     return (
       <div className="mb-1">
         {/* Encabezado con botón agregar */}
         <div style={{
-          background: PAI.amarillo,
+          background: pal.amarillo,
           fontWeight: "bold",
           fontSize: 11,
           padding: "3px 8px",
@@ -1079,7 +1174,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
           <span>{seccion === "OTRAS" ? "OTRAS VACUNAS:" : "VACUNAS APLICADAS EN JORNADAS / CAMPAÑAS:"}</span>
           <button
             className="btn btn-sm py-0 px-2"
-            style={{ background: PAI.azulOscuro, color: "#fff", fontSize: 10, lineHeight: 1.4 }}
+            style={{ background: pal.azulOscuro, color: "#fff", fontSize: 10, lineHeight: 1.4 }}
             onClick={() => abrirModalOtraVacuna(seccion)}
             title="Agregar vacuna"
           >
@@ -1166,7 +1261,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
   if (loading) {
     return (
       <div className="d-flex justify-content-center align-items-center py-5">
-        <div className="spinner-border" style={{ color: PAI.azulOscuro }} />
+        <div className="spinner-border" style={{ color: pal.azulOscuro }} />
         <span className="ms-3">Cargando carnet de vacunación...</span>
       </div>
     );
@@ -1182,36 +1277,118 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
       )}
 
       {/* Sub-pestañas del módulo */}
-      <ul className="nav nav-tabs mb-0" style={{ borderBottom: `3px solid ${PAI.azulOscuro}` }}>
-        {[
-          { key: "carnet",   label: "Carnet",           icon: "bi-person-vcard" },
-          { key: "registro", label: "Registro Vacunas", icon: "bi-syringe" },
-          { key: "vitamina", label: "Supl. Vitamina A", icon: "bi-capsule" },
-          { key: "guia",     label: "Guía de Vacunación", icon: "bi-journal-medical" },
-        ].map(t => (
-          <li key={t.key} className="nav-item">
-            <button
-              className={`nav-link ${subTab === t.key ? "active fw-bold" : ""}`}
-              style={subTab === t.key
-                ? { background: PAI.azulOscuro, color: PAI.blanco, borderColor: PAI.azulOscuro }
-                : { color: PAI.azulOscuro }
-              }
-              onClick={() => setSubTab(t.key)}
-            >
-              <i className={`bi ${t.icon} me-1`} />{t.label}
-            </button>
-          </li>
-        ))}
-      </ul>
+      <div style={{ display: "flex", alignItems: "center", borderBottom: `3px solid ${pal.azulOscuro}` }}>
+        <ul className="nav nav-tabs mb-0 flex-grow-1" style={{ borderBottom: "none" }}>
+          {[
+            { key: "carnet",   label: "Carnet",             icon: "bi-person-vcard" },
+            { key: "registro", label: "Registro Vacunas",   icon: "bi-syringe" },
+            { key: "vitamina", label: "Supl. Vitamina A",   icon: "bi-capsule" },
+            { key: "guia",     label: "Guía de Vacunación", icon: "bi-journal-medical" },
+          ].map(t => (
+            <li key={t.key} className="nav-item">
+              <button
+                className={`nav-link ${subTab === t.key ? "active fw-bold" : ""}`}
+                style={subTab === t.key
+                  ? { background: pal.azulOscuro, color: pal.blanco, borderColor: pal.azulOscuro }
+                  : { color: pal.azulOscuro }
+                }
+                onClick={() => setSubTab(t.key)}
+              >
+                <i className={`bi ${t.icon} me-1`} />{t.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+
+        {/* Botón personalizar colores */}
+        <button
+          title="Personalizar colores del carnet"
+          onClick={() => setShowColorPanel(v => !v)}
+          style={{
+            background: showColorPanel ? pal.azulOscuro : "transparent",
+            border: `1px solid ${pal.azulOscuro}`,
+            borderRadius: 6, padding: "4px 10px", marginRight: 4,
+            color: showColorPanel ? "#fff" : pal.azulOscuro,
+            cursor: "pointer", fontSize: 13, display: "flex", alignItems: "center", gap: 5,
+            transition: "all .15s",
+          }}
+        >
+          <i className="bi bi-palette-fill" /> Colores
+        </button>
+      </div>
+
+      {/* Panel de personalización de colores */}
+      {showColorPanel && (
+        <div style={{
+          background: "#f8fafc", border: `1px solid ${pal.azulOscuro}33`,
+          borderTop: "none", padding: "12px 16px",
+          display: "flex", flexWrap: "wrap", gap: 16, alignItems: "flex-end",
+        }}>
+          {/* Pickers */}
+          {[
+            { campo: "principal",  label: "Color principal",    valor: colores.principal },
+            { campo: "secundario", label: "Color secundario",   valor: colores.secundario },
+            { campo: "claro",      label: "Color encabezados",  valor: colores.claro },
+          ].map(({ campo, label, valor }) => (
+            <div key={campo}>
+              <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>{label}</div>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <input
+                  type="color"
+                  value={valor}
+                  onChange={e => actualizarColor(campo, e.target.value)}
+                  style={{ width: 36, height: 28, border: "1px solid #d1d5db", borderRadius: 5, cursor: "pointer", padding: 2 }}
+                />
+                <span style={{ fontSize: 11, color: "#374151", fontFamily: "monospace" }}>{valor}</span>
+              </div>
+            </div>
+          ))}
+
+          {/* Separador */}
+          <div style={{ width: 1, background: "#e5e7eb", alignSelf: "stretch", margin: "0 4px" }} />
+
+          {/* Presets */}
+          <div>
+            <div style={{ fontSize: 10, fontWeight: 600, color: "#6b7280", marginBottom: 4 }}>Presets</div>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+              {PRESETS_COLORES.map(p => (
+                <button
+                  key={p.nombre}
+                  onClick={() => aplicarPreset(p)}
+                  title={p.nombre}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 5,
+                    border: "1px solid #d1d5db", borderRadius: 6,
+                    padding: "4px 10px", cursor: "pointer",
+                    background: "#fff", fontSize: 11, fontWeight: 500,
+                    transition: "border-color .15s",
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = p.principal}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = "#d1d5db"}
+                >
+                  <span style={{
+                    display: "inline-flex", gap: 2,
+                  }}>
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: p.principal, display: "inline-block" }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: p.secundario, display: "inline-block" }} />
+                    <span style={{ width: 10, height: 10, borderRadius: 2, background: p.claro, display: "inline-block" }} />
+                  </span>
+                  {p.nombre}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ════════════════════════════════ */}
       {/* TAB: CARNET */}
       {/* ════════════════════════════════ */}
       {subTab === "carnet" && (
-        <div className="card shadow-sm border-0 mt-0" style={{ borderTop: `3px solid ${PAI.azulOscuro}` }}>
+        <div className="card shadow-sm border-0 mt-0" style={{ borderTop: `3px solid ${pal.azulOscuro}` }}>
           {/* Header amarillo */}
           <div style={{
-            background: PAI.amarillo,
+            background: pal.amarillo,
             padding: "8px 20px",
             display: "flex",
             justifyContent: "space-between",
@@ -1222,8 +1399,8 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
             </div>
             <button
               className="btn btn-sm"
-              style={{ background: PAI.azulOscuro, color: "#fff", fontSize: 12 }}
-              onClick={() => imprimirCarnet(paciente, registros, vitaminaRegs)}
+              style={{ background: pal.azulOscuro, color: "#fff", fontSize: 12 }}
+              onClick={() => imprimirCarnet(paciente, registros, vitaminaRegs, pal)}
             >
               <i className="bi bi-printer me-1" />Imprimir Carnet
             </button>
@@ -1233,57 +1410,57 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
             <div className="row">
               {/* Datos del paciente */}
               <div className="col-md-8">
-                <h6 className="fw-bold mb-3" style={{ color: PAI.azulOscuro }}>
+                <h6 className="fw-bold mb-3" style={{ color: pal.azulOscuro }}>
                   <i className="bi bi-person-fill me-2" />Datos del Paciente
                 </h6>
                 <table className="table table-sm table-bordered" style={{ fontSize: 13 }}>
                   <tbody>
                     <tr>
-                      <th style={{ background: PAI.azulClaro, width: "30%" }}>Nombre</th>
+                      <th style={{ background: pal.azulClaro, width: "30%" }}>Nombre</th>
                       <td>{paciente?.nombres} {paciente?.apellidos}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>No. Identidad (DNI)</th>
+                      <th style={{ background: pal.azulClaro }}>No. Identidad (DNI)</th>
                       <td>{paciente?.dni || <span className="text-muted fst-italic">No registrado</span>}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Fecha de Nacimiento</th>
+                      <th style={{ background: pal.azulClaro }}>Fecha de Nacimiento</th>
                       <td>{paciente?.fecha_nacimiento || "—"}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Sexo</th>
+                      <th style={{ background: pal.azulClaro }}>Sexo</th>
                       <td>{paciente?.sexo || "—"}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Edad Actual</th>
+                      <th style={{ background: pal.azulClaro }}>Edad Actual</th>
                       <td>{calcEdad()}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>No. en el LINVI</th>
+                      <th style={{ background: pal.azulClaro }}>No. en el LINVI</th>
                       <td className="text-muted">&nbsp;</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Dirección de Residencia</th>
+                      <th style={{ background: pal.azulClaro }}>Dirección de Residencia</th>
                       <td>{paciente?.direccion || paciente?.ciudad || "—"}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Responsable o Tutor</th>
+                      <th style={{ background: pal.azulClaro }}>Responsable o Tutor</th>
                       <td>{paciente?.responsable_nombre || "—"}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Teléfono / Celular</th>
+                      <th style={{ background: pal.azulClaro }}>Teléfono / Celular</th>
                       <td>{paciente?.telefono || "—"}</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Nombre del Establecimiento</th>
+                      <th style={{ background: pal.azulClaro }}>Nombre del Establecimiento</th>
                       <td className="text-muted">&nbsp;</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Código Establecimiento</th>
+                      <th style={{ background: pal.azulClaro }}>Código Establecimiento</th>
                       <td className="text-muted">&nbsp;</td>
                     </tr>
                     <tr>
-                      <th style={{ background: PAI.azulClaro }}>Dirección y Teléfono del Establecimiento</th>
+                      <th style={{ background: pal.azulClaro }}>Dirección y Teléfono del Establecimiento</th>
                       <td className="text-muted">&nbsp;</td>
                     </tr>
                   </tbody>
@@ -1292,12 +1469,12 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
 
               {/* Resumen de vacunas aplicadas */}
               <div className="col-md-4">
-                <h6 className="fw-bold mb-3" style={{ color: PAI.azulOscuro }}>
+                <h6 className="fw-bold mb-3" style={{ color: pal.azulOscuro }}>
                   <i className="bi bi-bar-chart-fill me-2" />Resumen
                 </h6>
-                <div className="card text-center mb-3" style={{ border: `2px solid ${PAI.azulOscuro}` }}>
+                <div className="card text-center mb-3" style={{ border: `2px solid ${pal.azulOscuro}` }}>
                   <div className="card-body py-3">
-                    <div style={{ fontSize: 36, fontWeight: "bold", color: PAI.azulOscuro }}>
+                    <div style={{ fontSize: 36, fontWeight: "bold", color: pal.azulOscuro }}>
                       {registros.length}
                     </div>
                     <div className="text-muted" style={{ fontSize: 13 }}>Vacunas registradas</div>
@@ -1307,7 +1484,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 {/* Últimas vacunas */}
                 {registros.length > 0 && (
                   <div>
-                    <p className="small fw-bold mb-2" style={{ color: PAI.azulOscuro }}>Últimas aplicadas:</p>
+                    <p className="small fw-bold mb-2" style={{ color: pal.azulOscuro }}>Últimas aplicadas:</p>
                     {registros.slice(-5).reverse().map(r => (
                       <div key={r.id} className="d-flex justify-content-between align-items-center mb-1 p-1 rounded"
                         style={{ background: "#e8f5e9", fontSize: 11 }}>
@@ -1321,7 +1498,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 )}
 
                 {/* Frase motivacional */}
-                <div className="mt-3 p-3 text-center rounded" style={{ background: PAI.amarillo }}>
+                <div className="mt-3 p-3 text-center rounded" style={{ background: pal.amarillo }}>
                   <p className="fw-bold mb-1" style={{ fontSize: 13, color: "#000" }}>
                     "Por nuestras familias,<br />vacunemos hoy"
                   </p>
@@ -1341,8 +1518,8 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
       {subTab === "registro" && (
         <div className="card shadow-sm border-0 mt-0">
           <div style={{
-            background: PAI.azulOscuro,
-            color: PAI.blanco,
+            background: pal.azulOscuro,
+            color: pal.blanco,
             padding: "10px 20px",
             display: "flex",
             justifyContent: "space-between",
@@ -1363,7 +1540,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 {renderTablaRegistro(VACUNAS_IZQUIERDA, "REGISTRO DE VACUNAS APLICADAS")}
               </div>
               {/* Columna derecha */}
-              <div style={{ borderLeft: `3px solid ${PAI.azulOscuro}` }}>
+              <div style={{ borderLeft: `3px solid ${pal.azulOscuro}` }}>
                 {renderTablaRegistro(VACUNAS_DERECHA, "REGISTRO DE VACUNAS APLICADAS")}
                 {/* Otras vacunas */}
                 {renderFilasAbiertas("OTRAS", OTRAS_VACUNAS_ROWS)}
@@ -1373,7 +1550,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
             </div>
 
             {/* Notas al pie */}
-            <div style={{ background: "#f0f4ff", borderTop: `2px solid ${PAI.azulOscuro}`, padding: "8px 16px", fontSize: 10, color: "#333" }}>
+            <div style={{ background: "#f0f4ff", borderTop: `2px solid ${pal.azulOscuro}`, padding: "8px 16px", fontSize: 10, color: "#333" }}>
               <p>* Solo aplica para inmunosuprimidos.</p>
               <p>** Solo aplica para sector privado.</p>
               <p>*** Solo aplica para pacientes de diálisis y víctimas de agresión sexual.</p>
@@ -1392,8 +1569,8 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
       {subTab === "vitamina" && (
         <div className="card shadow-sm border-0 mt-0">
           <div style={{
-            background: PAI.azulOscuro,
-            color: PAI.blanco,
+            background: pal.azulOscuro,
+            color: pal.blanco,
             padding: "10px 20px",
             fontWeight: "bold",
             fontSize: 14,
@@ -1418,20 +1595,20 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 <thead>
                   <tr>
                     <th rowSpan={2} style={{
-                      background: PAI.azulOscuro, color: PAI.blanco,
+                      background: pal.azulOscuro, color: pal.blanco,
                       border: "1px solid #999", padding: "8px 12px",
                       textAlign: "left", verticalAlign: "middle",
                     }}>
                     </th>
                     <th style={{
-                      background: PAI.amarillo, color: "#000", fontWeight: "bold",
+                      background: pal.amarillo, color: "#000", fontWeight: "bold",
                       border: "1px solid #999", padding: "6px 10px",
                       textAlign: "center",
                     }}>
                       Dar 100.000 UI
                     </th>
                     <th colSpan={4} style={{
-                      background: PAI.amarillo, color: "#000", fontWeight: "bold",
+                      background: pal.amarillo, color: "#000", fontWeight: "bold",
                       border: "1px solid #999", padding: "6px 10px",
                       textAlign: "center",
                     }}>
@@ -1441,7 +1618,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                   <tr>
                     {EDADES_VITAMINA.map(e => (
                       <th key={e.rango} style={{
-                        background: PAI.azulClaro, color: "#000",
+                        background: pal.azulClaro, color: "#000",
                         border: "1px solid #999", padding: "5px 8px",
                         textAlign: "center", fontWeight: "bold",
                         minWidth: 80,
@@ -1455,7 +1632,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                   {VITAMINA_A_ESTRUCTURA.map((fila) => (
                     <tr key={fila.tipo_dosis}>
                       <td style={{
-                        background: PAI.azulOscuro, color: PAI.blanco,
+                        background: pal.azulOscuro, color: pal.blanco,
                         border: "1px solid #999", padding: "8px 12px",
                         fontWeight: "bold", fontSize: 12,
                       }}>
@@ -1547,8 +1724,8 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
       {subTab === "guia" && (
         <div className="card shadow-sm border-0 mt-0">
           <div style={{
-            background: PAI.azulOscuro,
-            color: PAI.blanco,
+            background: pal.azulOscuro,
+            color: pal.blanco,
             padding: "10px 20px",
             fontWeight: "bold",
             fontSize: 14,
@@ -1568,14 +1745,14 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 <thead>
                   <tr>
                     <th style={{
-                      background: PAI.azulOscuro, color: PAI.blanco,
+                      background: pal.azulOscuro, color: pal.blanco,
                       border: "1px solid #999", padding: "8px 12px",
                       textAlign: "center",
                     }}>
                       Vacuna
                     </th>
                     <th colSpan={2} style={{
-                      background: PAI.amarillo, color: "#000",
+                      background: pal.amarillo, color: "#000",
                       border: "1px solid #999", padding: "8px 12px",
                       textAlign: "center", fontWeight: "bold",
                     }}>
@@ -1583,11 +1760,11 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                     </th>
                   </tr>
                   <tr>
-                    <th style={{ background: PAI.azulOscuro, color: PAI.blanco, border: "1px solid #999", padding: "6px 12px" }}></th>
-                    <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "6px 12px", textAlign: "center" }}>
+                    <th style={{ background: pal.azulOscuro, color: pal.blanco, border: "1px solid #999", padding: "6px 12px" }}></th>
+                    <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "6px 12px", textAlign: "center" }}>
                       Grupo de población
                     </th>
-                    <th style={{ background: PAI.azulClaro, border: "1px solid #999", padding: "6px 12px", textAlign: "center" }}>
+                    <th style={{ background: pal.azulClaro, border: "1px solid #999", padding: "6px 12px", textAlign: "center" }}>
                       Edad recomendada
                     </th>
                   </tr>
@@ -1597,7 +1774,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                     <tr key={i} style={{ background: i % 2 === 0 ? "#f9fbff" : "#ffffff" }}>
                       <td style={{
                         border: "1px solid #ccc", padding: "6px 12px",
-                        fontWeight: "bold", color: PAI.azulOscuro,
+                        fontWeight: "bold", color: pal.azulOscuro,
                         verticalAlign: "middle",
                       }}>
                         {g.vacuna}
@@ -1615,8 +1792,8 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
             </div>
 
             {/* Notas PAI */}
-            <div style={{ background: "#fff9e6", borderTop: `2px solid ${PAI.amarillo}`, padding: "12px 16px", fontSize: 11 }}>
-              <p className="fw-bold mb-2" style={{ color: PAI.azulOscuro }}>Notas importantes:</p>
+            <div style={{ background: "#fff9e6", borderTop: `2px solid ${pal.amarillo}`, padding: "12px 16px", fontSize: 11 }}>
+              <p className="fw-bold mb-2" style={{ color: pal.azulOscuro }}>Notas importantes:</p>
               <ul className="mb-0" style={{ paddingLeft: 16 }}>
                 <li>* Solo aplica para inmunosuprimidos.</li>
                 <li>** Solo aplica para sector privado.</li>
@@ -1624,7 +1801,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 <li>**** Solo aplica para pacientes de diálisis y víctimas de agresión sexual.</li>
                 <li>***** Solo aplica para mayores de cinco años.</li>
               </ul>
-              <div className="mt-3 p-2 text-center rounded" style={{ background: PAI.amarillo }}>
+              <div className="mt-3 p-2 text-center rounded" style={{ background: pal.amarillo }}>
                 <p className="fw-bold mb-0" style={{ fontSize: 13 }}>
                   "Por nuestras familias, vacunemos hoy"
                 </p>
@@ -1650,6 +1827,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
           onClose={() => setModal(null)}
           onGuardar={handleGuardarVacuna}
           cargando={guardando}
+          pal={pal}
         />
       )}
       {modal?.tipo === "vitamina" && (
@@ -1658,6 +1836,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
           onClose={() => setModal(null)}
           onGuardar={handleGuardarVitamina}
           cargando={guardando}
+          pal={pal}
         />
       )}
       {modal?.tipo === "otra" && (
@@ -1667,6 +1846,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
           onGuardar={handleGuardarOtraVacuna}
           onEliminar={handleEliminarOtraVacuna}
           cargando={guardando}
+          pal={pal}
         />
       )}
     </div>

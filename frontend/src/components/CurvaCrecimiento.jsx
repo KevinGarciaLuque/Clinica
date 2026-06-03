@@ -350,7 +350,8 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const [showForm, setShowForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
-  const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
+  const [isMobile,  setIsMobile]  = useState(window.innerWidth < 640);
+  const [isTablet,  setIsTablet]  = useState(window.innerWidth < 960);
 
   // estados para reporte consolidado
   const [todasCurvas,        setTodasCurvas]        = useState({});
@@ -363,7 +364,10 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const [rango, setRango] = useState("0_5");
 
   useEffect(() => {
-    const onResize = () => setIsMobile(window.innerWidth < 768);
+    const onResize = () => {
+      setIsMobile(window.innerWidth < 640);
+      setIsTablet(window.innerWidth < 960);
+    };
     window.addEventListener("resize", onResize);
     return () => window.removeEventListener("resize", onResize);
   }, []);
@@ -665,11 +669,10 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
       {/* HEADER + SELECTOR DE INDICADOR                       */}
       {/* ══════════════════════════════════════════════════════ */}
       <div style={{
-        display: "flex", flexDirection: isMobile ? "column" : "row",
-        justifyContent: "space-between", alignItems: isMobile ? "stretch" : "center",
-        gap: isMobile ? 10 : 12, marginBottom: isMobile ? 14 : 20,
+        display: "flex", flexDirection: "column",
+        gap: 10, marginBottom: isMobile ? 14 : 20,
       }}>
-        {/* Tabs indicadores + switch de rango */}
+        {/* Fila 1: Tabs indicadores + switch de rango */}
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           <div style={{
             display: "flex", gap: 4, overflowX: "auto", WebkitOverflowScrolling: "touch",
@@ -738,15 +741,16 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             )}
           </div>
         </div>
-        {/* Botones acción */}
+
+        {/* Fila 2: Botones acción — siempre en fila, scrollable en móvil */}
         <div style={{
           display: "flex", gap: 8, alignItems: "center",
-          justifyContent: isMobile ? "flex-start" : "flex-end",
-          width: isMobile ? "100%" : "auto",
+          overflowX: "auto", WebkitOverflowScrolling: "touch",
+          paddingBottom: 2,
         }}>
 
           {/* ── Botón IMPRIMIR con dropdown ── */}
-          <div style={{ position: "relative", flex: isMobile ? 1 : "none" }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ position: "relative", flexShrink: 0 }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", width: "100%" }}>
               <button
                 onClick={handlePrint}
@@ -813,7 +817,7 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
           </div>
 
           {/* ── Botón DESCARGAR con dropdown ── */}
-          <div style={{ position: "relative", flex: isMobile ? 1 : "none" }} onMouseDown={e => e.stopPropagation()}>
+          <div style={{ position: "relative", flexShrink: 0 }} onMouseDown={e => e.stopPropagation()}>
             <div style={{ display: "flex", border: `1px solid ${C.border}`, borderRadius: 10, overflow: "hidden", width: "100%" }}>
               <button
                 onClick={handleDescargarActual}
@@ -887,12 +891,12 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
               border: "none", borderRadius: 10, padding: isMobile ? "9px 12px" : "10px 20px",
               color: "#fff", fontWeight: 700, fontSize: isMobile ? 12 : 14, cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-              boxShadow: "0 4px 14px rgba(13,110,253,.3)", flex: isMobile ? 2 : "none",
+              boxShadow: "0 4px 14px rgba(13,110,253,.3)", flexShrink: 0,
               whiteSpace: "nowrap",
             }}
           >
             <i className={`bi ${showForm ? "bi-x-lg" : "bi-plus-circle"}`} />
-            {showForm ? "Cancelar" : (isMobile ? "Nueva" : "Nueva medición")}
+            {showForm ? "Cancelar" : "Nueva medición"}
           </button>
         </div>
       </div>

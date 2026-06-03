@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import mammoth from "mammoth/mammoth.browser";
 
 const STORAGE_KEY = "documentos_clinicos_archivos";
@@ -437,8 +438,8 @@ export default function DocumentosClinicos() {
         </div>
       </div>
 
-      {previewDoc && (
-        <div className="modal d-block" style={{ background: "rgba(15,23,42,.55)", zIndex: 1060, overflowY: "auto" }}>
+      {previewDoc && createPortal(
+        <div className="modal d-block" style={{ background: "rgba(15,23,42,.55)", zIndex: 9999, overflowY: "auto" }}>
           <div className="modal-dialog modal-xl modal-dialog-centered">
             <div className="modal-content" style={{ border: "none", borderRadius: 12, overflow: "hidden" }}>
               <div className="modal-header" style={{ background: "#0f3d7a", color: "#fff" }}>
@@ -499,11 +500,12 @@ export default function DocumentosClinicos() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
-      {deleteDoc && (
-        <div className="modal d-block" style={{ background: "rgba(15,23,42,.55)", zIndex: 1065, overflowY: "auto" }}>
+      {deleteDoc && createPortal(
+        <div className="modal d-block" style={{ background: "rgba(15,23,42,.55)", zIndex: 9999, overflowY: "auto" }}>
           <div className="modal-dialog modal-dialog-centered">
             <div className="modal-content" style={{ border: "none", borderRadius: 12, overflow: "hidden" }}>
               <div className="modal-header" style={{ background: "#dc2626", color: "#fff" }}>
@@ -528,7 +530,8 @@ export default function DocumentosClinicos() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

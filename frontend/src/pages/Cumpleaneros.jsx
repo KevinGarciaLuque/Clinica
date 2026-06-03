@@ -271,7 +271,14 @@ export default function Cumpleaneros() {
   const [diaSelec,  setDiaSelec]  = useState(dayjs().date());
   const [mesSelec,  setMesSelec]  = useState(dayjs().startOf("month"));
   const [modalPac,  setModalPac]  = useState(null);
+  const [isMobile,  setIsMobile]  = useState(window.innerWidth < 640);
   const panelRef = useRef(null);
+
+  useEffect(() => {
+    const onResize = () => setIsMobile(window.innerWidth < 640);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
 
   const cargar = async () => {
     setCargando(true);
@@ -365,36 +372,45 @@ export default function Cumpleaneros() {
       </div>
 
       {/* ── Contenido ── */}
-      <div style={{ padding: "20px 24px", display: "flex", gap: 20, alignItems: "flex-start", flexWrap: "wrap" }}>
+      <div style={{
+        padding: isMobile ? "12px" : "20px 24px",
+        display: "flex", gap: isMobile ? 12 : 20,
+        alignItems: "flex-start", flexWrap: "wrap",
+      }}>
 
         {/* ── Calendario ── */}
         <div style={{
-          flex: "1 1 380px", background: "#fff", borderRadius: 16,
+          flex: "1 1 280px", minWidth: 0, background: "#fff", borderRadius: 14,
           boxShadow: "0 2px 12px rgba(0,0,0,.07)", overflow: "hidden",
         }}>
           {/* Navegación de mes */}
           <div style={{
             background: "linear-gradient(135deg,#7c3aed,#6d28d9)",
-            padding: "16px 20px",
+            padding: isMobile ? "10px 12px" : "14px 18px",
             display: "flex", alignItems: "center", justifyContent: "space-between",
           }}>
             <button
               onClick={() => setMesActual(m => m.subtract(1, "month"))}
               style={{
                 background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)",
-                borderRadius: 8, width: 34, height: 34, cursor: "pointer", color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+                borderRadius: 7, width: isMobile ? 28 : 32, height: isMobile ? 28 : 32,
+                cursor: "pointer", color: "#fff", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: isMobile ? 13 : 15,
               }}
             >
               <i className="bi bi-chevron-left" />
             </button>
 
             <div style={{ textAlign: "center" }}>
-              <div style={{ color: "#fff", fontWeight: 800, fontSize: "1.1rem", textTransform: "capitalize" }}>
+              <div style={{
+                color: "#fff", fontWeight: 800, textTransform: "capitalize",
+                fontSize: isMobile ? "0.9rem" : "1rem",
+              }}>
                 {mesActual.format("MMMM YYYY")}
               </div>
               {totalMes > 0 && (
-                <div style={{ color: "rgba(255,255,255,.7)", fontSize: 11, marginTop: 2 }}>
+                <div style={{ color: "rgba(255,255,255,.7)", fontSize: 10, marginTop: 1 }}>
                   🎂 {totalMes} cumpleaño{totalMes !== 1 ? "s" : ""} este mes
                 </div>
               )}
@@ -404,35 +420,37 @@ export default function Cumpleaneros() {
               onClick={() => setMesActual(m => m.add(1, "month"))}
               style={{
                 background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.25)",
-                borderRadius: 8, width: 34, height: 34, cursor: "pointer", color: "#fff",
-                display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16,
+                borderRadius: 7, width: isMobile ? 28 : 32, height: isMobile ? 28 : 32,
+                cursor: "pointer", color: "#fff", flexShrink: 0,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: isMobile ? 13 : 15,
               }}
             >
               <i className="bi bi-chevron-right" />
             </button>
           </div>
 
-          <div style={{ padding: "16px" }}>
+          <div style={{ padding: isMobile ? "10px" : "14px" }}>
             {/* Encabezados de día */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 8 }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", marginBottom: 4 }}>
               {DIAS_SEM.map(d => (
                 <div key={d} style={{
-                  textAlign: "center", fontSize: 11, fontWeight: 700,
-                  color: d === "Dom" ? "#ef4444" : C.muted, padding: "4px 0",
+                  textAlign: "center", fontSize: isMobile ? 9 : 10, fontWeight: 700,
+                  color: d === "Dom" ? "#ef4444" : C.muted, padding: "3px 0",
                 }}>
-                  {d}
+                  {isMobile ? d.charAt(0) : d}
                 </div>
               ))}
             </div>
 
             {/* Celdas */}
             {cargando ? (
-              <div style={{ textAlign: "center", padding: "40px 0", color: C.muted }}>
-                <i className="bi bi-hourglass-split" style={{ fontSize: 24, display: "block", marginBottom: 8 }} />
+              <div style={{ textAlign: "center", padding: "30px 0", color: C.muted }}>
+                <i className="bi bi-hourglass-split" style={{ fontSize: 20, display: "block", marginBottom: 8 }} />
                 Cargando...
               </div>
             ) : (
-              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: 3 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(7,1fr)", gap: isMobile ? 2 : 3 }}>
                 {celdas.map((dia, i) => {
                   const pacs   = pacsDelDia(mesActual, dia);
                   const tieneB = pacs.length > 0;
@@ -446,10 +464,10 @@ export default function Cumpleaneros() {
                       onClick={() => tieneB && seleccionarDia(dia)}
                       style={{
                         aspectRatio: "1",
-                        borderRadius: 10,
+                        borderRadius: isMobile ? 7 : 9,
                         display: "flex", flexDirection: "column",
                         alignItems: "center", justifyContent: "center",
-                        gap: 2,
+                        gap: 1,
                         cursor: tieneB ? "pointer" : "default",
                         background: esSelD
                           ? "linear-gradient(135deg,#7c3aed,#db2777)"
@@ -462,7 +480,6 @@ export default function Cumpleaneros() {
                           ? "2px solid rgba(37,99,235,.4)"
                           : "2px solid transparent",
                         transition: "all .15s",
-                        position: "relative",
                       }}
                       onMouseEnter={e => { if (tieneB && !esSelD) e.currentTarget.style.background = "rgba(124,58,237,.15)"; }}
                       onMouseLeave={e => { if (tieneB && !esSelD) e.currentTarget.style.background = esHoyD ? "rgba(37,99,235,.08)" : "rgba(124,58,237,.05)"; }}
@@ -470,7 +487,7 @@ export default function Cumpleaneros() {
                       {dia && (
                         <>
                           <span style={{
-                            fontSize: 13,
+                            fontSize: isMobile ? 11 : 13,
                             fontWeight: esSelD || esHoyD ? 800 : tieneB ? 700 : 400,
                             color: esSelD ? "#fff" : esDom ? "#ef4444" : esHoyD ? "#2563eb" : C.text,
                             lineHeight: 1,
@@ -478,16 +495,17 @@ export default function Cumpleaneros() {
                             {dia}
                           </span>
                           {tieneB && (
-                            <div style={{ display: "flex", gap: 2, justifyContent: "center" }}>
-                              {pacs.slice(0, 3).map((_, pi) => (
+                            <div style={{ display: "flex", gap: 1, justifyContent: "center" }}>
+                              {pacs.slice(0, isMobile ? 1 : 3).map((_, pi) => (
                                 <div key={pi} style={{
-                                  width: 5, height: 5, borderRadius: "50%",
+                                  width: isMobile ? 4 : 5, height: isMobile ? 4 : 5,
+                                  borderRadius: "50%",
                                   background: esSelD ? "rgba(255,255,255,.9)" : "#7c3aed",
                                 }} />
                               ))}
-                              {pacs.length > 3 && (
-                                <span style={{ fontSize: 8, color: esSelD ? "#fff" : "#7c3aed", fontWeight: 700 }}>
-                                  +{pacs.length - 3}
+                              {pacs.length > (isMobile ? 1 : 3) && (
+                                <span style={{ fontSize: 7, color: esSelD ? "#fff" : "#7c3aed", fontWeight: 700 }}>
+                                  +{pacs.length - (isMobile ? 1 : 3)}
                                 </span>
                               )}
                             </div>
@@ -501,18 +519,20 @@ export default function Cumpleaneros() {
             )}
 
             {/* Leyenda */}
-            <div style={{ marginTop: 14, paddingTop: 12, borderTop: "1px solid #f3f4f6",
-                          display: "flex", gap: 16, flexWrap: "wrap" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.muted }}>
-                <div style={{ width: 10, height: 10, borderRadius: "50%", background: "#7c3aed" }} />
+            <div style={{
+              marginTop: 10, paddingTop: 10, borderTop: "1px solid #f3f4f6",
+              display: "flex", gap: 12, flexWrap: "wrap",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                <div style={{ width: 8, height: 8, borderRadius: "50%", background: "#7c3aed" }} />
                 Cumpleaños
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.muted }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, border: "2px solid rgba(37,99,235,.4)", background: "rgba(37,99,235,.08)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                <div style={{ width: 10, height: 10, borderRadius: 3, border: "2px solid rgba(37,99,235,.4)", background: "rgba(37,99,235,.08)" }} />
                 Hoy
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.muted }}>
-                <div style={{ width: 12, height: 12, borderRadius: 3, background: "linear-gradient(135deg,#7c3aed,#db2777)" }} />
+              <div style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.muted }}>
+                <div style={{ width: 10, height: 10, borderRadius: 3, background: "linear-gradient(135deg,#7c3aed,#db2777)" }} />
                 Seleccionado
               </div>
             </div>
@@ -520,7 +540,7 @@ export default function Cumpleaneros() {
         </div>
 
         {/* ── Panel lateral: Tarjetas del día ── */}
-        <div ref={panelRef} style={{ flex: "0 1 340px", display: "flex", flexDirection: "column", gap: 14, minWidth: 280 }}>
+        <div ref={panelRef} style={{ flex: "1 1 260px", minWidth: 0, display: "flex", flexDirection: "column", gap: 12 }}>
           {cargando ? null : pacanesDiaSelec.length === 0 ? (
             <div style={{
               background: "#fff", borderRadius: 16, padding: "40px 20px",

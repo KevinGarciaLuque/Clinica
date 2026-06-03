@@ -169,7 +169,7 @@ router.get("/me", auth(), async (req, res) => {
   try {
     const [rows] = await pool.query(
       `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono,
-              numero_colegiatura, especialidad_id, foto_url,
+              numero_colegiatura, especialidad_id, foto_url, firma_url,
               (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
        FROM usuarios u WHERE u.id=? LIMIT 1`,
       [req.user.uid]
@@ -184,7 +184,7 @@ router.get("/me", auth(), async (req, res) => {
 // ── PUT /api/auth/me  → actualizar propio perfil ──────────────────────────────
 router.put("/me", auth(), async (req, res) => {
   try {
-    const { nombres, apellidos, telefono, foto_url, password_actual, password_nuevo } = req.body;
+    const { nombres, apellidos, telefono, foto_url, firma_url, numero_colegiatura, password_actual, password_nuevo } = req.body;
 
     // Si quiere cambiar contraseña, verificar la actual
     let passwordHash;
@@ -207,8 +207,10 @@ router.put("/me", auth(), async (req, res) => {
     if (nombres    !== undefined) { fields.push("nombres=?");   values.push(nombres || null); }
     if (apellidos  !== undefined) { fields.push("apellidos=?"); values.push(apellidos || null); }
     if (telefono   !== undefined) { fields.push("telefono=?");  values.push(telefono || null); }
-    if (foto_url   !== undefined) { fields.push("foto_url=?");  values.push(foto_url || null); }
-    if (passwordHash)             { fields.push("password_hash=?"); values.push(passwordHash); }
+    if (foto_url           !== undefined) { fields.push("foto_url=?");           values.push(foto_url || null); }
+    if (firma_url          !== undefined) { fields.push("firma_url=?");          values.push(firma_url || null); }
+    if (numero_colegiatura !== undefined) { fields.push("numero_colegiatura=?"); values.push(numero_colegiatura || null); }
+    if (passwordHash)                     { fields.push("password_hash=?");      values.push(passwordHash); }
 
     if (fields.length) {
       values.push(req.user.uid);
@@ -281,6 +283,45 @@ router.post("/me/foto", auth(), uploadFoto.single("foto"), async (req, res) => {
     );
 
     res.json({ ok: true, foto_url });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── POST /api/auth/me/firma  → subir imagen de firma digital ─────────────────
+router.post("/me/firma", auth(), uploadFoto.single("firma"), async (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
+
+    const [[u]] = await pool.query("SELECT firma_url FROM usuarios WHERE id=?", [req.user.uid]);
+
+    let firma_url;
+
+    if (USE_CLOUDINARY) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "firmas", format: "png", quality: 90 },
+          (err, r) => err ? reject(err) : resolve(r)
+        );
+        stream.end(req.file.buffer);
+      });
+      firma_url = result.secure_url;
+    } else {
+      const dir = path.join(__dirname, "../uploads/firmas");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+      const filename = `firma-${req.user.uid}-${Date.now()}.png`;
+      const filepath  = path.join(dir, filename);
+      if (u?.firma_url && u.firma_url.includes("/uploads/firmas/")) {
+        const oldFile = path.join(__dirname, "..", u.firma_url.replace(/^\//, ""));
+        try { if (fs.existsSync(oldFile)) fs.unlinkSync(oldFile); } catch { /* ignorar */ }
+      }
+      const baseUrl = process.env.API_BASE_URL || `http://localhost:${process.env.PORT || 5000}`;
+      fs.writeFileSync(filepath, req.file.buffer);
+      firma_url = `${baseUrl}/uploads/firmas/${filename}`;
+    }
+
+    await pool.query("UPDATE usuarios SET firma_url=? WHERE id=?", [firma_url, req.user.uid]);
+    res.json({ ok: true, firma_url });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
