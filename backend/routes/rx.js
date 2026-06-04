@@ -1,15 +1,36 @@
 /**
  * GET /rx/:codigo  — Verificación pública de receta (sin auth)
  * Devuelve datos seguros de la prescripción para mostrar al paciente/farmacia.
+ *
+ * Seguridad aplicada:
+ *  - Rate limiting: 30 consultas / 10 min por IP (evita enumeración)
+ *  - Validación de formato del código (hex 16 chars)
+ *  - Expiración: recetas mayores a RX_EXPIRY_DAYS días devuelven 410 Gone
+ *  - Solo se exponen campos seguros (sin IDs internos de clínica, sin datos privados)
  */
-const express = require("express");
-const router  = express.Router();
-const pool    = require("../db");
+const express   = require("express");
+const router    = express.Router();
+const pool      = require("../db");
+const rateLimit = require("express-rate-limit");
 
-router.get("/:codigo", async (req, res) => {
+const RX_EXPIRY_DAYS = parseInt(process.env.RX_EXPIRY_DAYS || "365", 10);
+
+// 30 peticiones por IP cada 10 minutos
+const rxLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, msg: "Demasiadas solicitudes. Intenta en unos minutos." },
+  keyGenerator: (req) => req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.ip,
+});
+
+router.get("/:codigo", rxLimiter, async (req, res) => {
   try {
     const { codigo } = req.params;
-    if (!codigo || codigo.length < 8) {
+
+    // Validar formato: exactamente 16 caracteres hexadecimales en mayúscula
+    if (!codigo || !/^[0-9A-F]{16}$/.test(codigo)) {
       return res.status(400).json({ ok: false, msg: "Código inválido" });
     }
 
@@ -34,6 +55,15 @@ router.get("/:codigo", async (req, res) => {
 
     if (!pr) {
       return res.status(404).json({ ok: false, msg: "Receta no encontrada" });
+    }
+
+    // Verificar expiración
+    const diasTranscurridos = (Date.now() - new Date(pr.creado_en).getTime()) / (1000 * 60 * 60 * 24);
+    if (diasTranscurridos > RX_EXPIRY_DAYS) {
+      return res.status(410).json({
+        ok: false,
+        msg: `Esta receta expiró (válida por ${RX_EXPIRY_DAYS} días desde su emisión).`,
+      });
     }
 
     const [items] = await pool.query(

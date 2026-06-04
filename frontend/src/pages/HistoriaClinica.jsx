@@ -3,6 +3,7 @@
  * URL: /historia/:paciente_id
  */
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
@@ -914,8 +915,8 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     }
   };
 
-  return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 9998 }}>
+  return createPortal(
+    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 99999 }}>
       <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: modo === "seleccionar" ? 600 : 500 }}>
         <div className="modal-content">
           <div className="modal-header" style={{ background: "#673ab7", color: "#fff" }}>
@@ -1057,6 +1058,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
           )}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

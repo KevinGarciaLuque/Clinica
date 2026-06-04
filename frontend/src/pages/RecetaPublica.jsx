@@ -24,12 +24,14 @@ export default function RecetaPublica() {
 
   useEffect(() => {
     fetch(`${API_URL}/rx/${codigo}`)
-      .then(r => r.json())
-      .then(r => {
-        if (r.ok) setData(r.data);
-        else setError(r.msg || "Receta no encontrada");
+      .then(async r => {
+        const body = await r.json();
+        if (r.ok && body.ok) setData(body.data);
+        else if (r.status === 410) setError({ expired: true, msg: body.msg });
+        else if (r.status === 429) setError({ msg: "Demasiadas solicitudes. Espera unos minutos e intenta de nuevo." });
+        else setError({ msg: body.msg || "Receta no encontrada" });
       })
-      .catch(() => setError("No se pudo conectar con el servidor"))
+      .catch(() => setError({ msg: "No se pudo conectar con el servidor" }))
       .finally(() => setCargando(false));
   }, [codigo]);
 
@@ -42,9 +44,11 @@ export default function RecetaPublica() {
 
   if (error) return (
     <div style={styles.centrado}>
-      <div style={{ fontSize: "3rem", marginBottom: 12 }}>❌</div>
-      <h2 style={{ color: "#991b1b", margin: 0, fontSize: "1.1rem" }}>Receta no válida</h2>
-      <p style={{ color: "#6b7280", fontSize: "0.87rem", marginTop: 8 }}>{error}</p>
+      <div style={{ fontSize: "3rem", marginBottom: 12 }}>{error.expired ? "⏰" : "❌"}</div>
+      <h2 style={{ color: error.expired ? "#92400e" : "#991b1b", margin: 0, fontSize: "1.1rem" }}>
+        {error.expired ? "Receta expirada" : "Receta no válida"}
+      </h2>
+      <p style={{ color: "#6b7280", fontSize: "0.87rem", marginTop: 8 }}>{error.msg}</p>
     </div>
   );
 

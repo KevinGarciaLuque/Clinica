@@ -662,7 +662,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
 
     // Número de receta (arriba a la derecha)
     doc.fillColor("#333").fontSize(8).font("Helvetica-Bold")
-       .text(`Receta #${pr.id}`, marginL + pageW - 130, recetaInfoY, { width: 130, align: "right" });
+       .text(`Receta #${pr.id}`, marginL + pageW - 130, recetaInfoY + 5, { width: 130, align: "right" });
 
     // Fila 1: Paciente
     doc.fillColor("#333").fontSize(10).font("Helvetica-Bold")

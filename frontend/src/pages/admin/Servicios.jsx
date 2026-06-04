@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import api from "../../api/api";
 
 const CATEGORIAS = ["consulta", "procedimiento", "examen", "vacuna", "otro"];
@@ -225,7 +226,7 @@ export default function Servicios() {
       </div>
 
       {/* ═══ MODAL ═══ */}
-      {showModal && (
+      {showModal && createPortal(
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9998, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
           <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 500, boxShadow: "0 8px 32px rgba(0,0,0,.2)", overflow: "hidden" }}>
             {/* Modal header */}
@@ -313,7 +314,7 @@ export default function Servicios() {
             </form>
           </div>
         </div>
-      )}
+      , document.body)}
     </div>
   );
 }

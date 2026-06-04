@@ -410,23 +410,36 @@ export default function Pacientes() {
         </div>
       )}
 
-      {/* Formulario nuevo paciente */}
-      {showForm && (
-        <div style={{ padding: "20px 24px 0" }}>
-        <div style={{
-          background: "#fff", border: "1px solid #e5e7eb",
-          borderRadius: 12, padding: "20px 24px",
-          boxShadow: "0 2px 8px rgba(0,0,0,.06)",
-        }}>
-          <div style={{
-            display: "flex", alignItems: "center", gap: 10, marginBottom: 20,
-            paddingBottom: 16, borderBottom: "1px solid #e5e7eb",
-          }}>
-            <i className={`bi ${editandoId ? "bi-pencil-square" : "bi-person-plus-fill"}`} style={{ color: "#2563eb", fontSize: 16 }} />
-            <h6 style={{ margin: 0, fontWeight: 700, fontSize: "1rem", color: "#111827" }}>
-              {editandoId ? "Editar paciente" : "Nuevo paciente"}
-            </h6>
-          </div>
+      {/* Formulario nuevo / editar paciente — modal portal compacto */}
+      {showForm && createPortal(
+        <div
+          onClick={() => { setShowForm(false); setEditandoId(null); setForm(FORM_VACIO); setFotoFile(null); setFotoPreview(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff", borderRadius: 16, width: "100%", maxWidth: 720,
+              maxHeight: "92vh", display: "flex", flexDirection: "column",
+              boxShadow: "0 24px 64px rgba(0,0,0,0.28)", overflow: "hidden",
+            }}>
+            {/* Header del modal */}
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "16px 20px", borderBottom: "1px solid #e5e7eb", background: "#f8fafc", flexShrink: 0 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <i className={`bi ${editandoId ? "bi-pencil-square" : "bi-person-plus-fill"}`} style={{ color: "#2563eb", fontSize: 17 }} />
+                <span style={{ fontWeight: 700, fontSize: "1rem", color: "#111827" }}>
+                  {editandoId ? "Editar paciente" : "Nuevo paciente"}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => { setShowForm(false); setEditandoId(null); setForm(FORM_VACIO); setFotoFile(null); setFotoPreview(null); }}
+                style={{ background: "transparent", border: "none", cursor: "pointer", color: "#6b7280", fontSize: 20, lineHeight: 1, padding: 4, borderRadius: 6 }}>
+                ✕
+              </button>
+            </div>
+            {/* Body scrollable */}
+            <div style={{ overflowY: "auto", padding: "20px" }}>
+            <div>
           <form onSubmit={guardarPaciente}>
             {/* Helper para etiquetas de sección */}
             {/* ── Identificación ── */}
@@ -641,13 +654,16 @@ export default function Pacientes() {
                 <i className="bi bi-floppy" /> {editandoId ? "Actualizar" : "Guardar"} paciente
               </button>
             </div>
-          </form>
-        </div>
-        </div>
+            </form>
+            </div>
+            </div>
+          </div>
+        </div>,
+        document.body
       )}
 
-      {/* Búsqueda + tabla — solo cuando no se está registrando un nuevo paciente */}
-      {!(showForm && !editandoId) && <div style={{ padding: "20px 24px" }}>
+      {/* Búsqueda + tabla */}
+      {true && <div style={{ padding: "20px 24px" }}>
       <div style={{
         background: "#fff", borderRadius: 12, overflow: "hidden",
         boxShadow: "0 2px 8px rgba(0,0,0,.06)",

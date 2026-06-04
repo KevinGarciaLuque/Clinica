@@ -1610,6 +1610,13 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   const [savingFav,      setSavingFav]      = useState(false);
   const [alertMsg,       setAlertMsg]       = useState(null);
   const [showRxSuccess,  setShowRxSuccess]  = useState(false);
+
+  useEffect(() => {
+    if (!showRxSuccess) return;
+    const onKey = (e) => { if (e.key === "Enter" || e.key === "Escape") setShowRxSuccess(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showRxSuccess]);
   const [medSearch, setMedSearch] = useState(null);
   const [showSaveFav, setShowSaveFav] = useState(false);
   const [favNombre, setFavNombre] = useState("");
@@ -1733,11 +1740,11 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   return (
     <div>
       {/* Modal de éxito al crear receta */}
-      {showRxSuccess && (
+      {showRxSuccess && createPortal(
         <div
           onClick={() => setShowRxSuccess(false)}
           style={{
-            position: "fixed", inset: 0, zIndex: 9999,
+            position: "fixed", inset: 0, zIndex: 99999,
             background: "rgba(0,0,0,0.45)",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
@@ -1791,7 +1798,8 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
               Aceptar
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {alertMsg && (
@@ -2278,8 +2286,16 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
   const [list,     setList]     = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form,     setForm]     = useState({ tipo: "LABORATORIO", descripcion: "", urgente: false });
-  const [saving,   setSaving]   = useState(false);
-  const [alertEstudios, setAlertEstudios] = useState(null);
+  const [saving,            setSaving]            = useState(false);
+  const [alertEstudios,     setAlertEstudios]     = useState(null);
+  const [showEstSuccess,    setShowEstSuccess]    = useState(false);
+
+  useEffect(() => {
+    if (!showEstSuccess) return;
+    const onKey = (e) => { if (e.key === "Enter" || e.key === "Escape") setShowEstSuccess(false); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [showEstSuccess]);
 
   // ── Catálogo de estudios ──
   const [catEstQuery, setCatEstQuery] = useState("");
@@ -2334,7 +2350,7 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
       setList(r.data.data || []);
       setShowForm(false);
       setForm({ tipo: "LABORATORIO", descripcion: "", urgente: false });
-      setAlertEstudios({ type: "success", msg: "Solicitud creada" });
+      setShowEstSuccess(true);
     } catch (e) {
       setAlertEstudios({ type: "danger", msg: e.response?.data?.msg || "Error" });
     } finally {
@@ -2344,6 +2360,54 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
 
   return (
     <div>
+      {/* Modal de éxito al crear solicitud de estudio */}
+      {showEstSuccess && createPortal(
+        <div
+          onClick={() => setShowEstSuccess(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 99999,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff", borderRadius: 20, padding: "40px 48px",
+              textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              minWidth: 280,
+              animation: "rxModalIn 0.3s cubic-bezier(.34,1.56,.64,1)",
+            }}>
+            <svg width="90" height="90" viewBox="0 0 90 90" style={{ display: "block", margin: "0 auto 18px" }}>
+              <circle cx="45" cy="45" r="42"
+                fill="#f0fdf4" stroke="#22c55e" strokeWidth="3"
+                style={{ animation: "rxCirclePop 0.4s cubic-bezier(.34,1.56,.64,1) both" }} />
+              <polyline points="24,47 38,61 66,31"
+                fill="none" stroke="#22c55e" strokeWidth="5"
+                strokeLinecap="round" strokeLinejoin="round"
+                strokeDasharray="80" strokeDashoffset="0"
+                style={{ animation: "rxCheckDraw 0.45s ease 0.2s both" }} />
+            </svg>
+            <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#111827", marginBottom: 6 }}>
+              ¡Solicitud creada!
+            </div>
+            <div style={{ fontSize: "0.88rem", color: "#6b7280", marginBottom: 24 }}>
+              El estudio fue registrado exitosamente.
+            </div>
+            <button
+              onClick={() => setShowEstSuccess(false)}
+              style={{
+                background: "linear-gradient(135deg,#22c55e,#16a34a)", border: "none",
+                borderRadius: 10, color: "#fff", padding: "10px 32px",
+                fontSize: "0.9rem", fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(34,197,94,.35)",
+              }}>
+              Aceptar
+            </button>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {alertEstudios && (
         <div className={`alert alert-${alertEstudios.type} py-2 alert-dismissible mb-3`}>
           {alertEstudios.msg} <button className="btn-close" onClick={() => setAlertEstudios(null)} />
