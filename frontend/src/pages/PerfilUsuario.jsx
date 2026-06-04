@@ -130,13 +130,22 @@ export default function PerfilUsuario() {
   };
 
   // ── Canvas de firma ───────────────────────────────────────────────────────
+  const getCanvasPos = (canvas, e) => {
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top)  * scaleY,
+    };
+  };
+
   const iniciarDibujo = useCallback((e) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
-    lastPos.current = { x, y };
+    lastPos.current = getCanvasPos(canvas, e);
     setDibujando(true);
   }, []);
 
@@ -146,18 +155,16 @@ export default function PerfilUsuario() {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
-    const rect = canvas.getBoundingClientRect();
-    const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
-    const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    const pos = getCanvasPos(canvas, e);
     ctx.beginPath();
     ctx.moveTo(lastPos.current.x, lastPos.current.y);
-    ctx.lineTo(x, y);
+    ctx.lineTo(pos.x, pos.y);
     ctx.strokeStyle = "#1a2744";
     ctx.lineWidth = 2.5;
     ctx.lineCap = "round";
     ctx.lineJoin = "round";
     ctx.stroke();
-    lastPos.current = { x, y };
+    lastPos.current = pos;
   }, [dibujando]);
 
   const terminarDibujo = useCallback(() => setDibujando(false), []);

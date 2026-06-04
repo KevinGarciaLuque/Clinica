@@ -345,7 +345,7 @@ function ModalVacuna({ datos, onClose, onGuardar, cargando, pal = PAI }) {
         {/* Header */}
         <div style={{ background: pal.azulOscuro, color: pal.blanco, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="bi bi-syringe" style={{ fontSize: "1rem" }} />
+            <i className="bi bi-capsule" style={{ fontSize: "1rem" }} />
             <span style={{ fontWeight: 700, fontSize: "0.97rem" }}>
               {datos?.registro ? "Editar" : "Registrar"} Vacuna
             </span>
@@ -459,7 +459,7 @@ function ModalOtraVacuna({ datos, onClose, onGuardar, onEliminar, cargando, pal 
         {/* Header */}
         <div style={{ background: pal.amarillo, padding: "14px 18px", display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <i className="bi bi-syringe" style={{ fontSize: "1rem" }} />
+            <i className="bi bi-capsule" style={{ fontSize: "1rem" }} />
             <span style={{ fontWeight: 700, fontSize: "0.97rem", color: "#000" }}>
               {esEdicion ? "Editar" : "Registrar"} — {titulo}
             </span>
@@ -1281,7 +1281,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
         <ul className="nav nav-tabs mb-0 flex-grow-1" style={{ borderBottom: "none" }}>
           {[
             { key: "carnet",   label: "Carnet",             icon: "bi-person-vcard" },
-            { key: "registro", label: "Registro Vacunas",   icon: "bi-syringe" },
+            { key: "registro", label: "Registro Vacunas",   icon: "bi-capsule" },
             { key: "vitamina", label: "Supl. Vitamina A",   icon: "bi-capsule" },
             { key: "guia",     label: "Guía de Vacunación", icon: "bi-journal-medical" },
           ].map(t => (
@@ -1526,7 +1526,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
             alignItems: "center",
           }}>
             <span className="fw-bold">
-              <i className="bi bi-syringe me-2" />REGISTRO DE VACUNAS APLICADAS
+              <i className="bi bi-capsule me-2" />REGISTRO DE VACUNAS APLICADAS
             </span>
             <span style={{ fontSize: 12, opacity: 0.85 }}>
               Haga clic en cualquier celda para registrar o editar

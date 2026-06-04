@@ -161,7 +161,7 @@ export default function Consulta() {
           : `/historias/${hid}`;
         await api.put(putUrl, payload);
         if (sign) {
-          await api.post(`/historias/${hid}/firmar`);
+          await api.post(`/historias/${hid}/firmar`, usarFirmaDigital && user?.firma_url ? { firma_digital_url: user.firma_url, colegiatura_firmante: user.numero_colegiatura || null } : {});
           setFirmada(true);
           setAlertMsg(null);
           setShowSignedModal(true);
@@ -478,6 +478,7 @@ export default function Consulta() {
               firmada={soloLectura}
               diagnosticoCie={soap.diagnostico_cie}
               diagnosticoDesc={soap.diagnostico_desc}
+              firmaDigitalUrl={usarFirmaDigital ? user?.firma_url || null : null}
             />
           )}
 
@@ -487,6 +488,7 @@ export default function Consulta() {
               historiaId={hid}
               pacienteId={paciente?.id || pacId}
               firmada={soloLectura}
+              firmaDigitalUrl={usarFirmaDigital ? user?.firma_url || null : null}
             />
           )}
 
@@ -1543,7 +1545,7 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
 // ══════════════════════════════════════════════════════════════════════
 // TAB: Prescripción (con sub-tabs)
 // ══════════════════════════════════════════════════════════════════════
-function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoCie, diagnosticoDesc }) {
+function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoCie, diagnosticoDesc, firmaDigitalUrl }) {
   const [subTab, setSubTab] = useState("receta");
   const [pendingSugItems, setPendingSugItems] = useState([]);
 
@@ -1583,7 +1585,7 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoC
         ))}
       </div>
 
-      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} pendingSugItems={pendingSugItems} onClearPending={() => setPendingSugItems([])} />}
+      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} pendingSugItems={pendingSugItems} onClearPending={() => setPendingSugItems([])} firmaDigitalUrl={firmaDigitalUrl} />}
       {subTab === "historial" && <SubHistorialPaciente pacienteId={pacienteId} />}
       {subTab === "sugeridas" && <SubSugeridadCie diagnosticoCie={diagnosticoCie} diagnosticoDesc={diagnosticoDesc} onAgregar={handleAgregar} />}
       {subTab === "favoritas" && <SubFavoritas firmada={firmada} />}
@@ -1592,7 +1594,7 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoC
 }
 
 // ── Sub-tab: Receta de esta consulta ──────────────────────────────────────────
-function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugItems = [], onClearPending }) {
+function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugItems = [], onClearPending, firmaDigitalUrl }) {
   const [list,      setList]      = useState([]);
   const [showForm,  setShowForm]  = useState(false);
   const [items,     setItems]     = useState([newRxItem()]);
@@ -1691,6 +1693,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
         cita_id: citaId || null,
         paciente_id: pacienteId,
         notas,
+        firma_digital_url: firmaDigitalUrl || null,
         items: items.filter(it => it.medicamento_texto || it.medicamento_id),
       });
       const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
@@ -2208,7 +2211,7 @@ const ESTADO_BADGE = {
   CANCELADO:   "secondary",
 };
 
-function EstudiosTab({ historiaId, pacienteId, firmada }) {
+function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
   const [list,     setList]     = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form,     setForm]     = useState({ tipo: "LABORATORIO", descripcion: "", urgente: false });
@@ -2261,6 +2264,7 @@ function EstudiosTab({ historiaId, pacienteId, firmada }) {
         tipo:        form.tipo,
         descripcion: form.descripcion,
         urgente:     form.urgente ? 1 : 0,
+        firma_digital_url: firmaDigitalUrl || null,
       });
       const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
       const r = await api.get("/estudios", { params });

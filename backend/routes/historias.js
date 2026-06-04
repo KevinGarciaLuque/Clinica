@@ -30,7 +30,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
     let sql = `
       SELECT h.id, h.cita_id, h.estado, h.creado_en,
              h.subjetivo, h.objetivo, h.diagnostico_cie, h.plan, h.examen_fisico,
-             h.diagnosticos_secundarios,
+             h.diagnosticos_secundarios, h.firma_digital_url, h.colegiatura_firmante,
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
       FROM historias_clinicas h
@@ -242,6 +242,7 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { id } = req.params;
+    const { firma_digital_url, colegiatura_firmante } = req.body || {};
 
     const [[h]] = await pool.query(
       "SELECT estado, medico_id, cita_id FROM historias_clinicas WHERE id=? AND clinica_id=?",
@@ -252,8 +253,12 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
 
     if (!yaFirmada) {
       await pool.query(
-        "UPDATE historias_clinicas SET estado='FIRMADA' WHERE id=? AND clinica_id=?",
-        [id, cid]
+        `UPDATE historias_clinicas
+         SET estado='FIRMADA',
+             firma_digital_url = COALESCE(?, firma_digital_url),
+             colegiatura_firmante = COALESCE(?, colegiatura_firmante)
+         WHERE id=? AND clinica_id=?`,
+        [firma_digital_url || null, colegiatura_firmante || null, id, cid]
       );
     }
 

@@ -366,8 +366,10 @@ export default function PerfilPaciente() {
     .badge-cie { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; margin-right: 6px; }
     .firma { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ccc; display: flex; justify-content: flex-end; }
     .firma-box { text-align: center; }
+    .firma-img { max-height: 80px; max-width: 220px; object-fit: contain; display: block; margin: 0 auto 4px; }
     .firma-box .linea { width: 200px; border-top: 1px solid #333; margin: 0 auto 4px; }
     .firma-box p { font-size: 12px; color: #444; }
+    .firma-digital-badge { display: inline-block; background: #1a2744; color: #fff; border-radius: 4px; padding: 2px 8px; font-size: 10px; font-weight: 700; letter-spacing: .04em; margin-bottom: 4px; }
     @media print { body { padding: 12px 20px; } }
   </style>
 </head>
@@ -399,7 +401,17 @@ export default function PerfilPaciente() {
   ${det.examen_fisico ? `<div class="section"><div class="section-title">Examen Físico</div><pre>${det.examen_fisico}</pre></div>` : ""}
   ${det.plan ? `<div class="section"><div class="section-title">Plan de tratamiento</div><pre>${det.plan}</pre></div>` : ""}
   ${prescHtml}${estudiosHtml}
-  <div class="firma"><div class="firma-box"><div class="linea"></div><p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>${det.especialidad ? `<p>${det.especialidad}</p>` : ""}</div></div>
+  <div class="firma">
+    <div class="firma-box">
+      ${det.firma_digital_url
+        ? `<span class="firma-digital-badge">✍ FIRMA DIGITAL</span>
+           <img class="firma-img" src="${det.firma_digital_url}" alt="Firma digital" />`
+        : `<div class="linea"></div>`}
+      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>
+      ${det.especialidad ? `<p>${det.especialidad}</p>` : ""}
+      ${det.colegiatura_firmante ? `<p>Col. ${det.colegiatura_firmante}</p>` : ""}
+    </div>
+  </div>
 </body></html>`;
     const win = window.open("", "_blank", "width=800,height=900");
     if (!win) {
@@ -1618,9 +1630,14 @@ export default function PerfilPaciente() {
                                 <div className="card-body py-2">
                                   <div className="d-flex justify-content-between align-items-start flex-wrap gap-1">
                                     <div>
-                                      <span className={`badge bg-${ESTADO_BADGE_PP[h.estado]?.split(" ")[0]} ${ESTADO_BADGE_PP[h.estado]?.split(" ")[1] || ""} me-2`}>
+                                      <span className={`badge bg-${ESTADO_BADGE_PP[h.estado]?.split(" ")[0]} ${ESTADO_BADGE_PP[h.estado]?.split(" ")[1] || ""} me-1`}>
                                         {h.estado}
                                       </span>
+                                      {h.firma_digital_url && (
+                                        <span style={{ background: "#1a2744", color: "#fff", borderRadius: 4, padding: "2px 7px", fontSize: "0.68rem", fontWeight: 700, letterSpacing: ".04em", marginRight: 6 }}>
+                                          ✍ FIRMA DIGITAL
+                                        </span>
+                                      )}
                                       <strong className="small">Dr. {h.med_apellidos}, {h.med_nombres}</strong>
                                       {h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
                                     </div>

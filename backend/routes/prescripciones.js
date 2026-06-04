@@ -7,10 +7,20 @@ const auth    = require("../middlewares/auth");
 const crypto  = require("crypto");
 const fs      = require("fs");
 const path    = require("path");
+const https   = require("https");
+const http    = require("http");
 const PDFDoc  = require("pdfkit");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+
+let prescripcionesHasFirmaCol;
+const hasPrescripcionesFirmaCol = async () => {
+  if (prescripcionesHasFirmaCol !== undefined) return prescripcionesHasFirmaCol;
+  const [rows] = await pool.query("SHOW COLUMNS FROM prescripciones LIKE 'firma_digital_url'");
+  prescripcionesHasFirmaCol = rows.length > 0;
+  return prescripcionesHasFirmaCol;
+};
 
 /**
  * GET /api/prescripciones?paciente_id=&historia_id=
@@ -225,7 +235,7 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 
 /**
  * POST /api/prescripciones
- * Body: { historia_id?, cita_id?, paciente_id, notas?, items: [{medicamento_id?, medicamento_texto?, dosis, duracion, cantidad, instrucciones}] }
+ * Body: { historia_id?, cita_id?, paciente_id, notas?, firma_digital_url?, items: [{medicamento_id?, medicamento_texto?, dosis, duracion, cantidad, instrucciones}] }
  */
 router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   const conn = await pool.getConnection();
@@ -233,7 +243,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     await conn.beginTransaction();
     let cid = clinicaOf(req);
 
-    const { historia_id, cita_id, paciente_id, notas, items = [] } = req.body;
+    const { historia_id, cita_id, paciente_id, notas, firma_digital_url, items = [] } = req.body;
     if (!paciente_id) throw new Error("paciente_id requerido");
     if (!items.length)  throw new Error("Debe incluir al menos un medicamento");
 
@@ -246,11 +256,17 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     const codigo_qr = crypto.randomBytes(8).toString("hex").toUpperCase();
 
-    const [r] = await conn.query(
-      `INSERT INTO prescripciones (clinica_id, historia_id, cita_id, paciente_id, medico_id, codigo_qr, notas)
-       VALUES (?,?,?,?,?,?,?)`,
-      [cid, historia_id || null, cita_id || null, paciente_id, req.user.id, codigo_qr, notas || null]
-    );
+    const hasFirmaCol = await hasPrescripcionesFirmaCol();
+    const insertSql = hasFirmaCol
+      ? `INSERT INTO prescripciones (clinica_id, historia_id, cita_id, paciente_id, medico_id, codigo_qr, notas, firma_digital_url)
+         VALUES (?,?,?,?,?,?,?,?)`
+      : `INSERT INTO prescripciones (clinica_id, historia_id, cita_id, paciente_id, medico_id, codigo_qr, notas)
+         VALUES (?,?,?,?,?,?,?)`;
+    const insertParams = hasFirmaCol
+      ? [cid, historia_id || null, cita_id || null, paciente_id, req.user.id, codigo_qr, notas || null, firma_digital_url || null]
+      : [cid, historia_id || null, cita_id || null, paciente_id, req.user.id, codigo_qr, notas || null];
+
+    const [r] = await conn.query(insertSql, insertParams);
     const prescId = r.insertId;
 
     for (const item of items) {
@@ -331,12 +347,14 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     // 1. Datos de la prescripción, paciente y médico
     const condPdf  = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
     const paramsPdf = cid ? [req.params.id, cid] : [req.params.id];
+    const hasFirmaCol = await hasPrescripcionesFirmaCol();
+    const firmaSelect = hasFirmaCol ? "pr.firma_digital_url AS med_firma_url," : "u.firma_url AS med_firma_url,";
     const [[pr]] = await pool.query(
       `SELECT pr.*,
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
               p.fecha_nacimiento,           p.dni,
               u.nombres   AS med_nombres,   u.apellidos   AS med_apellidos,
-              u.numero_colegiatura,
+              u.numero_colegiatura, ${firmaSelect}
               e.nombre    AS especialidad,
               c.nombre    AS clinica_nombre, c.direccion   AS clinica_direccion,
               c.telefono  AS clinica_telefono
@@ -474,6 +492,29 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       } catch {
         logoBuffer = null;
       }
+    }
+
+    // Imagen de firma digital del médico
+    let firmaBuffer = null;
+    const firmaUrl = pr.med_firma_url || null;
+    if (firmaUrl) {
+      try {
+        if (firmaUrl.startsWith("data:")) {
+          firmaBuffer = Buffer.from(firmaUrl.split(",")[1], "base64");
+        } else if (firmaUrl.startsWith("http")) {
+          const client = firmaUrl.startsWith("https") ? https : http;
+          firmaBuffer = await new Promise(resolve => {
+            client.get(firmaUrl, r => {
+              const chunks = [];
+              r.on("data", c => chunks.push(c));
+              r.on("end", () => resolve(Buffer.concat(chunks)));
+            }).on("error", () => resolve(null));
+          });
+        } else {
+          const localPath = require("path").join(__dirname, "..", firmaUrl.replace(/^\//, ""));
+          firmaBuffer = await require("fs").promises.readFile(localPath).catch(() => null);
+        }
+      } catch { firmaBuffer = null; }
     }
 
     const withDoctorPrefix = (name) => {
@@ -720,13 +761,22 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     // ── Firma ───────────────────────────────────────────────────────
     let firmaBottom = rowY;
     if (tFirma) {
-      const firmaY = rowY + 14;
-      doc.moveTo(marginL + pageW - 160, firmaY).lineTo(marginL + pageW, firmaY).stroke(GRAY);
+      const firmaX = marginL + pageW - 160;
+      const firmaW = 160;
+      let firmaY = rowY + 14;
+      // Imagen de firma digital
+      if (firmaBuffer) {
+        try {
+          doc.image(firmaBuffer, firmaX + 30, firmaY - 10, { width: 100, height: 50, fit: [100, 50] });
+          firmaY += 45;
+        } catch { /* ignorar si imagen inválida */ }
+      }
+      doc.moveTo(firmaX, firmaY).lineTo(firmaX + firmaW, firmaY).stroke(GRAY);
       doc.fillColor(GRAY).fontSize(6.5).font("Helvetica-Bold")
-         .text(tFirmaLabel, marginL + pageW - 160, firmaY + 3, { width: 160, align: "center" })
+         .text(tFirmaLabel, firmaX, firmaY + 3, { width: firmaW, align: "center" });
       if (medicoDisplay) {
         doc.fillColor(GRAY).fontSize(6.5).font("Helvetica")
-           .text(medicoDisplay, marginL + pageW - 160, firmaY + 12, { width: 160, align: "center" });
+           .text(medicoDisplay, firmaX, firmaY + 12, { width: firmaW, align: "center" });
       }
       firmaBottom = firmaY + (medicoDisplay ? 24 : 14);
     }

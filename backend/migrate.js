@@ -1,6 +1,7 @@
 const mysql = require('mysql2/promise');
 const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 require('dotenv').config();
 
 async function runMigrations() {
@@ -58,15 +59,28 @@ async function runMigrations() {
       '038_modulo_inventario.sql',
       '039_plantillas_predeterminada.sql',
       '040_permisos_modulos_clinica_usuario.sql',
+      'run-036.js',
+      'run-041.js',
     ];
 
     for (const migration of migrations) {
       const filePath = path.join(__dirname, 'migrations', migration);
       if (fs.existsSync(filePath)) {
         console.log(`📋 Ejecutando ${migration}...`);
-        const sql = fs.readFileSync(filePath, 'utf8');
         try {
-          await connection.query(sql);
+          if (migration.endsWith('.js')) {
+            const result = spawnSync(process.execPath, [filePath], {
+              cwd: __dirname,
+              stdio: 'inherit',
+              env: process.env,
+            });
+            if (result.status !== 0) {
+              throw new Error(`Migración ${migration} falló con código ${result.status}`);
+            }
+          } else {
+            const sql = fs.readFileSync(filePath, 'utf8');
+            await connection.query(sql);
+          }
           console.log(`✅ ${migration} ejecutado correctamente`);
         } catch (migErr) {
           // Errores no críticos: columna duplicada, tabla ya existe, etc.

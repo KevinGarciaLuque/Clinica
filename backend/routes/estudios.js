@@ -7,9 +7,19 @@ const auth    = require("../middlewares/auth");
 const PDFDoc  = require("pdfkit");
 const https   = require("https");
 const http    = require("http");
+const fs      = require("fs");
+const path    = require("path");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+
+let estudiosHasFirmaCol;
+const hasEstudiosFirmaCol = async () => {
+  if (estudiosHasFirmaCol !== undefined) return estudiosHasFirmaCol;
+  const [rows] = await pool.query("SHOW COLUMNS FROM estudios_solicitudes LIKE 'firma_digital_url'");
+  estudiosHasFirmaCol = rows.length > 0;
+  return estudiosHasFirmaCol;
+};
 
 /**
  * GET /api/estudios?paciente_id=&historia_id=&estado=
@@ -69,7 +79,7 @@ router.get("/pdf", auth(), async (req, res) => {
     );
 
     const [[medico]] = await pool.query(
-      `SELECT u.nombres, u.apellidos, u.numero_colegiatura, e.nombre AS especialidad
+      `SELECT u.nombres, u.apellidos, u.numero_colegiatura, u.firma_url, e.nombre AS especialidad
        FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE u.id=?`,
       [req.user.id]
@@ -124,6 +134,33 @@ router.get("/pdf", auth(), async (req, res) => {
           });
         }
       } catch { logoBuffer = null; }
+    }
+
+    // 5b. Imagen de firma digital del médico
+    let firmaBuffer = null;
+    const firmaUrl = [...estudios].reverse().find(s => s.firma_digital_url)?.firma_digital_url || medico?.firma_url || null;
+    if (firmaUrl) {
+      try {
+        if (firmaUrl.startsWith("data:")) {
+          firmaBuffer = Buffer.from(firmaUrl.split(",")[1], "base64");
+        } else if (firmaUrl.startsWith("http")) {
+          const client = firmaUrl.startsWith("https") ? https : http;
+          firmaBuffer = await new Promise(resolve => {
+            client.get(firmaUrl, r => {
+              const chunks = [];
+              r.on("data", c => chunks.push(c));
+              r.on("end", () => resolve(Buffer.concat(chunks)));
+            }).on("error", () => resolve(null));
+          });
+        } else {
+          const localPath = path.isAbsolute(firmaUrl)
+            ? firmaUrl
+            : path.join(process.cwd(), firmaUrl.replace(/^\//, ""));
+          if (fs.existsSync(localPath)) {
+            firmaBuffer = await fs.promises.readFile(localPath);
+          }
+        }
+      } catch { firmaBuffer = null; }
     }
 
     // 6. Fuentes
@@ -239,13 +276,22 @@ router.get("/pdf", auth(), async (req, res) => {
     let rowY = Math.max(bodyY + 10, tituloY + 150);
     let firmaBottom = rowY;
     if (tFirma) {
-      const firmaY = rowY + 14;
-      doc.moveTo(marginL + pageW - 160, firmaY).lineTo(marginL + pageW, firmaY).stroke(GRAY);
+      const firmaX = marginL + pageW - 160;
+      const firmaW = 160;
+      let firmaY = rowY + 14;
+      // Imagen de firma digital
+      if (firmaBuffer) {
+        try {
+          doc.image(firmaBuffer, firmaX + 30, firmaY - 10, { width: 100, height: 50, fit: [100, 50] });
+          firmaY += 45;
+        } catch { /* ignorar si imagen inválida */ }
+      }
+      doc.moveTo(firmaX, firmaY).lineTo(firmaX + firmaW, firmaY).stroke(GRAY);
       doc.fillColor(GRAY).fontSize(6.5).font("Helvetica-Bold")
-         .text(tFirmaLabel, marginL + pageW - 160, firmaY + 3, { width: 160, align: "center" });
+         .text(tFirmaLabel, firmaX, firmaY + 3, { width: firmaW, align: "center" });
       if (tMedico) {
         doc.fillColor(GRAY).fontSize(6.5).font("Helvetica")
-           .text(tMedico, marginL + pageW - 160, firmaY + 12, { width: 160, align: "center" });
+           .text(tMedico, firmaX, firmaY + 12, { width: firmaW, align: "center" });
       }
       firmaBottom = firmaY + (tMedico ? 24 : 14);
     }
@@ -299,23 +345,29 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 
 /**
  * POST /api/estudios
- * Body: { paciente_id, historia_id?, tipo, descripcion, urgente? }
+ * Body: { paciente_id, historia_id?, tipo, descripcion, urgente?, firma_digital_url? }
  */
 router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     if (!cid) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
 
-    const { paciente_id, historia_id, tipo = "LABORATORIO", descripcion, urgente = 0 } = req.body;
+    const { paciente_id, historia_id, tipo = "LABORATORIO", descripcion, urgente = 0, firma_digital_url } = req.body;
     if (!paciente_id || !descripcion) {
       return res.status(400).json({ ok: false, msg: "paciente_id y descripcion son requeridos" });
     }
 
-    const [r] = await pool.query(
-      `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, tipo, descripcion, urgente)
-       VALUES (?,?,?,?,?,?,?)`,
-      [cid, paciente_id, req.user.id, historia_id || null, tipo, descripcion, urgente ? 1 : 0]
-    );
+    const hasFirmaCol = await hasEstudiosFirmaCol();
+    const insertSql = hasFirmaCol
+      ? `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, tipo, descripcion, urgente, firma_digital_url)
+         VALUES (?,?,?,?,?,?,?,?)`
+      : `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, tipo, descripcion, urgente)
+         VALUES (?,?,?,?,?,?,?)`;
+    const insertParams = hasFirmaCol
+      ? [cid, paciente_id, req.user.id, historia_id || null, tipo, descripcion, urgente ? 1 : 0, firma_digital_url || null]
+      : [cid, paciente_id, req.user.id, historia_id || null, tipo, descripcion, urgente ? 1 : 0];
+
+    const [r] = await pool.query(insertSql, insertParams);
     res.json({ ok: true, id: r.insertId });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
