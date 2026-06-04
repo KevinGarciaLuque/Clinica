@@ -177,7 +177,7 @@ export default function Consulta() {
         const r = await api.post("/historias", payload);
         setHid(r.data.id);
         if (sign) {
-          await api.post(`/historias/${r.data.id}/firmar`);
+          await api.post(`/historias/${r.data.id}/firmar`, usarFirmaDigital && user?.firma_url ? { firma_digital_url: user.firma_url, colegiatura_firmante: user.numero_colegiatura || null } : {});
           setFirmada(true);
           setAlertMsg(null);
           setShowSignedModal(true);

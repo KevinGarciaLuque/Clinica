@@ -174,6 +174,7 @@ export default function HistoriaClinica() {
     .badge-cie { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; margin-right: 6px; }
     .firma { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ccc; display: flex; justify-content: flex-end; }
     .firma-box { text-align: center; }
+    .firma-box img { max-width: 160px; max-height: 70px; display: block; margin: 0 auto 4px; }
     .firma-box .linea { width: 200px; border-top: 1px solid #333; margin: 0 auto 4px; }
     .firma-box p { font-size: 12px; color: #444; }
     @media print { body { padding: 12px 20px; } }
@@ -235,6 +236,7 @@ export default function HistoriaClinica() {
 
   <div class="firma">
     <div class="firma-box">
+      ${det.firma_digital_url ? `<img src="${det.firma_digital_url}" alt="Firma digital" />` : ""}
       <div class="linea"></div>
       <p>Dr. ${det.med_nombres} ${det.med_apellidos}</p>
       ${det.especialidad ? `<p>${det.especialidad}</p>` : ""}

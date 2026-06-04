@@ -348,7 +348,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const condPdf  = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
     const paramsPdf = cid ? [req.params.id, cid] : [req.params.id];
     const hasFirmaCol = await hasPrescripcionesFirmaCol();
-    const firmaSelect = hasFirmaCol ? "pr.firma_digital_url AS med_firma_url," : "u.firma_url AS med_firma_url,";
+    const firmaSelect = hasFirmaCol ? "COALESCE(pr.firma_digital_url, u.firma_url) AS med_firma_url," : "u.firma_url AS med_firma_url,";
     const [[pr]] = await pool.query(
       `SELECT pr.*,
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
