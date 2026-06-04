@@ -138,7 +138,7 @@ router.get("/pdf", auth(), async (req, res) => {
 
     // 5b. Imagen de firma digital del médico
     let firmaBuffer = null;
-    const firmaUrl = [...estudios].reverse().find(s => s.firma_digital_url)?.firma_digital_url || medico?.firma_url || null;
+    const firmaUrl = [...estudios].reverse().find(s => s.firma_digital_url)?.firma_digital_url || null;
     if (firmaUrl) {
       try {
         if (firmaUrl.startsWith("data:")) {

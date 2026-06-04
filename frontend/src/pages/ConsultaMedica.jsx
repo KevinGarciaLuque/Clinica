@@ -1606,9 +1606,10 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
     setShowForm(true);
     onClearPending?.();
   }, [pendingSugItems]); // eslint-disable-line react-hooks/exhaustive-deps
-  const [saving,    setSaving]    = useState(false);
-  const [savingFav, setSavingFav] = useState(false);
-  const [alertMsg,  setAlertMsg]  = useState(null);
+  const [saving,         setSaving]         = useState(false);
+  const [savingFav,      setSavingFav]      = useState(false);
+  const [alertMsg,       setAlertMsg]       = useState(null);
+  const [showRxSuccess,  setShowRxSuccess]  = useState(false);
   const [medSearch, setMedSearch] = useState(null);
   const [showSaveFav, setShowSaveFav] = useState(false);
   const [favNombre, setFavNombre] = useState("");
@@ -1702,7 +1703,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
       setShowForm(false);
       setItems([newRxItem()]);
       setNotas("");
-      setAlertMsg({ type: "success", msg: "Receta creada" });
+      setShowRxSuccess(true);
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error" });
     } finally {
@@ -1731,6 +1732,68 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
 
   return (
     <div>
+      {/* Modal de éxito al crear receta */}
+      {showRxSuccess && (
+        <div
+          onClick={() => setShowRxSuccess(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 9999,
+            background: "rgba(0,0,0,0.45)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+          <div
+            onClick={e => e.stopPropagation()}
+            style={{
+              background: "#fff", borderRadius: 20, padding: "40px 48px",
+              textAlign: "center", boxShadow: "0 20px 60px rgba(0,0,0,0.25)",
+              minWidth: 280,
+              animation: "rxModalIn 0.3s cubic-bezier(.34,1.56,.64,1)",
+            }}>
+            <style>{`
+              @keyframes rxModalIn {
+                from { opacity: 0; transform: scale(0.7); }
+                to   { opacity: 1; transform: scale(1); }
+              }
+              @keyframes rxCheckDraw {
+                from { stroke-dashoffset: 80; }
+                to   { stroke-dashoffset: 0; }
+              }
+              @keyframes rxCirclePop {
+                0%   { transform: scale(0); opacity: 0; }
+                60%  { transform: scale(1.1); opacity: 1; }
+                100% { transform: scale(1); opacity: 1; }
+              }
+            `}</style>
+            <svg width="90" height="90" viewBox="0 0 90 90" style={{ display: "block", margin: "0 auto 18px" }}>
+              <circle cx="45" cy="45" r="42"
+                fill="#f0fdf4" stroke="#22c55e" strokeWidth="3"
+                style={{ animation: "rxCirclePop 0.4s cubic-bezier(.34,1.56,.64,1) both" }} />
+              <polyline points="24,47 38,61 66,31"
+                fill="none" stroke="#22c55e" strokeWidth="5"
+                strokeLinecap="round" strokeLinejoin="round"
+                strokeDasharray="80" strokeDashoffset="0"
+                style={{ animation: "rxCheckDraw 0.45s ease 0.2s both" }} />
+            </svg>
+            <div style={{ fontSize: "1.3rem", fontWeight: 800, color: "#111827", marginBottom: 6 }}>
+              ¡Receta creada!
+            </div>
+            <div style={{ fontSize: "0.88rem", color: "#6b7280", marginBottom: 24 }}>
+              La receta fue guardada exitosamente.
+            </div>
+            <button
+              onClick={() => setShowRxSuccess(false)}
+              style={{
+                background: "linear-gradient(135deg,#22c55e,#16a34a)", border: "none",
+                borderRadius: 10, color: "#fff", padding: "10px 32px",
+                fontSize: "0.9rem", fontWeight: 700, cursor: "pointer",
+                boxShadow: "0 4px 14px rgba(34,197,94,.35)",
+              }}>
+              Aceptar
+            </button>
+          </div>
+        </div>
+      )}
+
       {alertMsg && (
         <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
           {alertMsg.msg} <button className="btn-close" onClick={() => setAlertMsg(null)} />
@@ -1756,49 +1819,8 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
         )}
       </div>
 
-      {list.length === 0 && !showForm && (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "#9ca3af" }}>
-          <i className="bi bi-prescription2" style={{ fontSize: "2.5rem", opacity: .3 }}></i>
-          <p className="mt-2 small">Sin recetas para esta consulta.</p>
-        </div>
-      )}
-
-      {list.map(p => (
-        <div key={p.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#3b82f6,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <i className="bi bi-capsule-pill" style={{ color: "#fff", fontSize: "0.85rem" }}></i>
-            </div>
-            <div>
-              <span className={`badge me-2 ${p.estado === "ENTREGADA" ? "bg-success" : p.estado === "CANCELADA" ? "bg-secondary" : "bg-warning text-dark"}`} style={{ fontSize: "0.68rem" }}>{p.estado}</span>
-              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{p.total_items} medicamento(s)</span>
-              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(p.creado_en).format("DD/MM/YYYY HH:mm")}</div>
-            </div>
-          </div>
-          <div className="d-flex gap-1">
-            {p.estado === "ACTIVA" && !firmada && (
-              <button className="btn btn-outline-success btn-sm"
-                style={{ fontSize: "0.75rem", borderRadius: 7 }}
-                onClick={() => api.patch(`/prescripciones/${p.id}/estado`, { estado: "ENTREGADA" })
-                  .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, estado: "ENTREGADA" } : x)))}>
-                <i className="bi bi-check-lg me-1"></i>Entregar
-              </button>
-            )}
-            <button
-              onClick={() => printRx(p.id)}
-              style={{
-                background: "transparent", border: "1px solid #3b82f6",
-                borderRadius: 7, color: "#3b82f6", padding: "4px 12px",
-                fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
-              }}>
-              <i className="bi bi-printer me-1"></i>PDF
-            </button>
-          </div>
-        </div>
-      ))}
-
       {showForm && (
-        <div style={{ border: "1px solid #bfdbfe", borderRadius: 12, marginTop: 12, overflow: "hidden", boxShadow: "0 2px 12px rgba(59,130,246,.1)" }}>
+        <div style={{ border: "1px solid #bfdbfe", borderRadius: 12, marginBottom: 16, overflow: "hidden", boxShadow: "0 2px 12px rgba(59,130,246,.1)" }}>
           <div style={{ background: "linear-gradient(135deg,#eff6ff,#dbeafe)", padding: "12px 18px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
               <i className="bi bi-prescription2" style={{ color: "#3b82f6" }}></i>
@@ -1940,6 +1962,47 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
           </div>
         </div>
       )}
+
+      {list.length === 0 && !showForm && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#9ca3af" }}>
+          <i className="bi bi-prescription2" style={{ fontSize: "2.5rem", opacity: .3 }}></i>
+          <p className="mt-2 small">Sin recetas para esta consulta.</p>
+        </div>
+      )}
+
+      {list.map(p => (
+        <div key={p.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#3b82f6,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <i className="bi bi-capsule-pill" style={{ color: "#fff", fontSize: "0.85rem" }}></i>
+            </div>
+            <div>
+              <span className={`badge me-2 ${p.estado === "ENTREGADA" ? "bg-success" : p.estado === "CANCELADA" ? "bg-secondary" : "bg-warning text-dark"}`} style={{ fontSize: "0.68rem" }}>{p.estado}</span>
+              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{p.total_items} medicamento(s)</span>
+              <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(p.creado_en).format("DD/MM/YYYY HH:mm")}</div>
+            </div>
+          </div>
+          <div className="d-flex gap-1">
+            {p.estado === "ACTIVA" && !firmada && (
+              <button className="btn btn-outline-success btn-sm"
+                style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                onClick={() => api.patch(`/prescripciones/${p.id}/estado`, { estado: "ENTREGADA" })
+                  .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, estado: "ENTREGADA" } : x)))}>
+                <i className="bi bi-check-lg me-1"></i>Entregar
+              </button>
+            )}
+            <button
+              onClick={() => printRx(p.id)}
+              style={{
+                background: "transparent", border: "1px solid #3b82f6",
+                borderRadius: 7, color: "#3b82f6", padding: "4px 12px",
+                fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
+              }}>
+              <i className="bi bi-printer me-1"></i>PDF
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -2294,58 +2357,8 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
         )}
       </div>
 
-      {list.length === 0 && !showForm && (
-        <div style={{ textAlign: "center", padding: "32px 0", color: "#9ca3af" }}>
-          <i className="bi bi-eyedropper" style={{ fontSize: "2.5rem", opacity: .3 }} />
-          <p className="mt-2 small">Sin solicitudes para esta consulta.</p>
-        </div>
-      )}
-
-      {list.map(s => (
-        <div key={s.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#0891b2,#0e7490)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
-              <i className="bi bi-eyedropper" style={{ color: "#fff", fontSize: "0.85rem" }} />
-            </div>
-            <div>
-              <span className={`badge me-2 ${
-                s.estado === "COMPLETADO" ? "bg-success" :
-                s.estado === "CANCELADO"  ? "bg-secondary" :
-                s.estado === "EN_PROCESO" ? "bg-info text-dark" :
-                "bg-warning text-dark"
-              }`} style={{ fontSize: "0.68rem" }}>{s.estado}</span>
-              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{s.tipo}</span>
-              {s.urgente === 1 && <span className="badge bg-danger ms-1" style={{ fontSize: "0.65rem" }}>URGENTE</span>}
-              <div style={{ fontSize: "0.78rem", color: "#555", marginTop: 2 }}>{s.descripcion}</div>
-              <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</div>
-            </div>
-          </div>
-          <div className="d-flex gap-1 flex-shrink-0">
-            {s.estado === "SOLICITADO" && !firmada && (
-              <button
-                className="btn btn-outline-success btn-sm"
-                style={{ fontSize: "0.75rem", borderRadius: 7 }}
-                onClick={() => api.patch(`/estudios/${s.id}/estado`, { estado: "EN_PROCESO" })
-                  .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, estado: "EN_PROCESO" } : x)))}>
-                <i className="bi bi-arrow-right me-1" />En Proceso
-              </button>
-            )}
-            <button
-              style={{ background: "transparent", border: "1px solid #3b82f6", borderRadius: 7, color: "#3b82f6", padding: "4px 12px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}
-              onClick={async () => {
-                try {
-                  const r = await api.get(`/estudios/pdf?paciente_id=${pacienteId}${historiaId ? `&historia_id=${historiaId}` : ""}`, { responseType: "blob" });
-                  window.open(URL.createObjectURL(new Blob([r.data], { type: "application/pdf" })), "_blank");
-                } catch { alert("Error al generar PDF"); }
-              }}>
-              <i className="bi bi-printer me-1" />PDF
-            </button>
-          </div>
-        </div>
-      ))}
-
       {showForm && (
-        <div className="card border-primary shadow-sm mt-3">
+        <div className="card border-primary shadow-sm mb-3">
           <div className="card-header fw-semibold">Nueva Solicitud</div>
           <div className="card-body row g-2">
             {/* Buscador de catálogo de estudios */}
@@ -2404,6 +2417,56 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
           </div>
         </div>
       )}
+
+      {list.length === 0 && !showForm && (
+        <div style={{ textAlign: "center", padding: "32px 0", color: "#9ca3af" }}>
+          <i className="bi bi-eyedropper" style={{ fontSize: "2.5rem", opacity: .3 }} />
+          <p className="mt-2 small">Sin solicitudes para esta consulta.</p>
+        </div>
+      )}
+
+      {list.map(s => (
+        <div key={s.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#0891b2,#0e7490)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+              <i className="bi bi-eyedropper" style={{ color: "#fff", fontSize: "0.85rem" }} />
+            </div>
+            <div>
+              <span className={`badge me-2 ${
+                s.estado === "COMPLETADO" ? "bg-success" :
+                s.estado === "CANCELADO"  ? "bg-secondary" :
+                s.estado === "EN_PROCESO" ? "bg-info text-dark" :
+                "bg-warning text-dark"
+              }`} style={{ fontSize: "0.68rem" }}>{s.estado}</span>
+              <span style={{ fontWeight: 600, fontSize: "0.85rem" }}>{s.tipo}</span>
+              {s.urgente === 1 && <span className="badge bg-danger ms-1" style={{ fontSize: "0.65rem" }}>URGENTE</span>}
+              <div style={{ fontSize: "0.78rem", color: "#555", marginTop: 2 }}>{s.descripcion}</div>
+              <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</div>
+            </div>
+          </div>
+          <div className="d-flex gap-1 flex-shrink-0">
+            {s.estado === "SOLICITADO" && !firmada && (
+              <button
+                className="btn btn-outline-success btn-sm"
+                style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                onClick={() => api.patch(`/estudios/${s.id}/estado`, { estado: "EN_PROCESO" })
+                  .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, estado: "EN_PROCESO" } : x)))}>
+                <i className="bi bi-arrow-right me-1" />En Proceso
+              </button>
+            )}
+            <button
+              style={{ background: "transparent", border: "1px solid #3b82f6", borderRadius: 7, color: "#3b82f6", padding: "4px 12px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}
+              onClick={async () => {
+                try {
+                  const r = await api.get(`/estudios/pdf?paciente_id=${pacienteId}${historiaId ? `&historia_id=${historiaId}` : ""}`, { responseType: "blob" });
+                  window.open(URL.createObjectURL(new Blob([r.data], { type: "application/pdf" })), "_blank");
+                } catch { alert("Error al generar PDF"); }
+              }}>
+              <i className="bi bi-printer me-1" />PDF
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

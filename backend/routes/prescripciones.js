@@ -10,6 +10,7 @@ const path    = require("path");
 const https   = require("https");
 const http    = require("http");
 const PDFDoc  = require("pdfkit");
+const QRCode  = require("qrcode");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
@@ -348,7 +349,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const condPdf  = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
     const paramsPdf = cid ? [req.params.id, cid] : [req.params.id];
     const hasFirmaCol = await hasPrescripcionesFirmaCol();
-    const firmaSelect = hasFirmaCol ? "COALESCE(pr.firma_digital_url, u.firma_url) AS med_firma_url," : "u.firma_url AS med_firma_url,";
+    const firmaSelect = hasFirmaCol ? "pr.firma_digital_url AS med_firma_url," : "u.firma_url AS med_firma_url,";
     const [[pr]] = await pool.query(
       `SELECT pr.*,
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
@@ -557,6 +558,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const pageW = doc.page.width - 100;
     const marginL = 50;
     const GRAY = "#555555";
+    const QR_SIZE = 60;
 
     // ── Encabezado con color del template ──────────────────────────
     const clinicaFonts = getClinicaFont();
@@ -600,8 +602,8 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       textX = marginL + logoSize + 20;
     }
 
-    // Texto del encabezado a la derecha (clínica, médico, credenciales)
-    const textW = marginL + pageW - textX - 10;
+    // Texto del encabezado a la derecha (clínica, médico, credenciales). Reserva espacio para el QR.
+    const textW = marginL + pageW - textX - QR_SIZE - 20;
     const headerTextY = topY + 8;
 
     doc.fillColor(tTextColor)
@@ -623,32 +625,71 @@ router.get("/:id/pdf", auth(), async (req, res) => {
          .text(tCred, textX, credY, { width: textW });
     }
 
-    // En plantilla de receta, el bloque superior no muestra QR.
-    // Se mantiene la generación del código para validaciones públicas.
+    // QR en la esquina superior derecha del encabezado
+    const qrX = marginL + pageW - QR_SIZE - 8;
+    const qrY = topY + (headerH - QR_SIZE) / 2;
+    let qrBuffer = null;
+    if (pr.codigo_qr) {
+      try {
+        const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+        const qrUrl = `${frontendUrl}/rx/${pr.codigo_qr}`;
+        const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 200, margin: 1 });
+        qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");
+      } catch { qrBuffer = null; }
+    }
+    if (qrBuffer) {
+      doc.image(qrBuffer, qrX, qrY, { width: QR_SIZE, height: QR_SIZE });
+    }
+
+    // Número de receta, fecha y datos del paciente
     const recetaInfoY = topY + headerH + 14;
     const pacienteTexto = `${pr.pac_nombres} ${pr.pac_apellidos}`;
     const recetaFecha = new Date(pr.creado_en).toLocaleDateString("es-HN", {
-      day: "numeric",
-      month: "long",
-      year: "numeric",
+      day: "numeric", month: "long", year: "numeric",
     });
 
-    doc.fillColor("#333").fontSize(11).font("Helvetica")
-       .text("Paciente:", marginL + 10, recetaInfoY);
-    doc.fillColor("#333").fontSize(11).font("Helvetica")
-       .text(pacienteTexto, marginL + 70, recetaInfoY, { width: pageW - 80, underline: true });
+    // Calcular edad
+    let edadTexto = "";
+    if (pr.fecha_nacimiento) {
+      const fnac = new Date(pr.fecha_nacimiento);
+      const hoy  = new Date(pr.creado_en);
+      const anios = Math.floor((hoy - fnac) / (365.25 * 24 * 3600 * 1000));
+      const meses = Math.floor((hoy - fnac) / (30.44 * 24 * 3600 * 1000)) % 12;
+      edadTexto = anios > 0
+        ? `${anios} año${anios !== 1 ? "s" : ""}${meses > 0 ? ` ${meses} mes${meses !== 1 ? "es" : ""}` : ""}`
+        : `${Math.floor((hoy - fnac) / (30.44 * 24 * 3600 * 1000))} mes${Math.floor((hoy - fnac) / (30.44 * 24 * 3600 * 1000)) !== 1 ? "es" : ""}`;
+    }
 
-    const fechaY = recetaInfoY;
-    doc.fillColor("#333").fontSize(11).font("Helvetica")
-       .text("Fecha:", marginL + pageW - 220, fechaY);
-    doc.fillColor("#333").fontSize(11).font("Helvetica")
-       .text(recetaFecha, marginL + pageW - 170, fechaY, { width: 150, underline: true });
+    // Número de receta (arriba a la derecha)
+    doc.fillColor("#333").fontSize(8).font("Helvetica-Bold")
+       .text(`Receta #${pr.id}`, marginL + pageW - 130, recetaInfoY, { width: 130, align: "right" });
 
-    const separatorY = fechaY + 24;
+    // Fila 1: Paciente
+    doc.fillColor("#333").fontSize(10).font("Helvetica-Bold")
+       .text("Paciente:", marginL + 10, recetaInfoY + 14);
+    doc.fillColor("#333").fontSize(10).font("Helvetica")
+       .text(pacienteTexto, marginL + 68, recetaInfoY + 14, { underline: true });
+
+    // Fila 2: DNI | Edad | Fecha
+    const fila2Y = recetaInfoY + 28;
+    if (pr.dni) {
+      doc.fillColor("#555").fontSize(9).font("Helvetica-Bold").text("DNI:", marginL + 10, fila2Y);
+      doc.fillColor("#555").fontSize(9).font("Helvetica").text(pr.dni, marginL + 35, fila2Y);
+    }
+    if (edadTexto) {
+      doc.fillColor("#555").fontSize(9).font("Helvetica-Bold").text("Edad:", marginL + 120, fila2Y);
+      doc.fillColor("#555").fontSize(9).font("Helvetica").text(edadTexto, marginL + 148, fila2Y);
+    }
+    doc.fillColor("#555").fontSize(9).font("Helvetica-Bold")
+       .text("Fecha:", marginL + pageW - 220, fila2Y);
+    doc.fillColor("#555").fontSize(9).font("Helvetica")
+       .text(recetaFecha, marginL + pageW - 190, fila2Y, { width: 180 });
+
+    const separatorY = fila2Y + 18;
     doc.strokeColor("#eeeeee").lineWidth(0.8)
        .moveTo(marginL + 10, separatorY).lineTo(marginL + pageW - 10, separatorY).stroke();
 
-    const rxY = separatorY + 18;
+    const rxY = separatorY + 14;
     doc.fillColor("#333").fontSize(30).font("Times-Bold")
        .text("Rx", marginL + 10, rxY);
 
