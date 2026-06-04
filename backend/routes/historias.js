@@ -10,6 +10,14 @@ const auth   = require("../middlewares/auth");
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
 
+let historiasColsCache;
+const getHistoriasCols = async () => {
+  if (historiasColsCache) return historiasColsCache;
+  const [cols] = await pool.query("SHOW COLUMNS FROM historias_clinicas");
+  historiasColsCache = new Set(cols.map(c => c.Field));
+  return historiasColsCache;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // HISTORIAS CLÍNICAS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -22,15 +30,21 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
   try {
     const cid = clinicaOf(req);
     if (!cid) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
+    const cols = await getHistoriasCols();
 
     const { paciente_id, cita_id, page = 1 } = req.query;
     const limit  = 20;
     const offset = (page - 1) * limit;
 
+    const selectExtras = [
+      !cols.has("firma_digital_url") ? "NULL AS firma_digital_url" : null,
+      !cols.has("colegiatura_firmante") ? "NULL AS colegiatura_firmante" : null,
+    ].filter(Boolean).join(", ");
+
     let sql = `
       SELECT h.id, h.cita_id, h.estado, h.creado_en,
              h.subjetivo, h.objetivo, h.diagnostico_cie, h.plan, h.examen_fisico,
-             h.diagnosticos_secundarios, h.firma_digital_url, h.colegiatura_firmante,
+             h.diagnosticos_secundarios${selectExtras ? `, ${selectExtras}` : ""},
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
       FROM historias_clinicas h
@@ -61,9 +75,15 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
   try {
     const cid = clinicaOf(req);
     const { id } = req.params;
+    const cols = await getHistoriasCols();
+
+    const selectExtras = [
+      !cols.has("firma_digital_url") ? "NULL AS firma_digital_url" : null,
+      !cols.has("colegiatura_firmante") ? "NULL AS colegiatura_firmante" : null,
+    ].filter(Boolean).join(", ");
 
     const [[hist]] = await pool.query(
-      `SELECT h.*, h.datos_derma,
+      `SELECT h.*${selectExtras ? `, ${selectExtras}` : ""}, h.datos_derma,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.sexo, p.telefono AS pac_tel, p.email AS pac_email,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
@@ -243,6 +263,7 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
     const cid = clinicaOf(req);
     const { id } = req.params;
     const { firma_digital_url, colegiatura_firmante } = req.body || {};
+    const cols = await getHistoriasCols();
 
     const [[h]] = await pool.query(
       "SELECT estado, medico_id, cita_id FROM historias_clinicas WHERE id=? AND clinica_id=?",
@@ -252,13 +273,22 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
     const yaFirmada = h.estado === "FIRMADA";
 
     if (!yaFirmada) {
+      const updates = ["estado='FIRMADA'"];
+      const params = [];
+      if (cols.has("firma_digital_url")) {
+        updates.push("firma_digital_url = COALESCE(?, firma_digital_url)");
+        params.push(firma_digital_url || null);
+      }
+      if (cols.has("colegiatura_firmante")) {
+        updates.push("colegiatura_firmante = COALESCE(?, colegiatura_firmante)");
+        params.push(colegiatura_firmante || null);
+      }
+      params.push(id, cid);
       await pool.query(
         `UPDATE historias_clinicas
-         SET estado='FIRMADA',
-             firma_digital_url = COALESCE(?, firma_digital_url),
-             colegiatura_firmante = COALESCE(?, colegiatura_firmante)
+         SET ${updates.join(", ")}
          WHERE id=? AND clinica_id=?`,
-        [firma_digital_url || null, colegiatura_firmante || null, id, cid]
+        params
       );
     }
 
