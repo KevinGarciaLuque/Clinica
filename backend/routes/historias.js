@@ -26,7 +26,7 @@ const getHistoriasCols = async () => {
  * GET /api/historias?paciente_id=&cita_id=&page=1
  * Lista de consultas del paciente (timeline)
  */
-router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     if (!cid) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
@@ -71,7 +71,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
  * GET /api/historias/:id
  * Detalle completo de una historia (con prescripciones e items, y estudios)
  */
-router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { id } = req.params;
@@ -310,7 +310,7 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
 // ANTECEDENTES DEL PACIENTE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-router.get("/paciente/:paciente_id/antecedentes", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/paciente/:paciente_id/antecedentes", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const [rows] = await pool.query(
@@ -368,7 +368,7 @@ router.delete("/antecedente/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (r
 // ALERGIAS DEL PACIENTE
 // ═══════════════════════════════════════════════════════════════════════════════
 
-router.get("/paciente/:paciente_id/alergias", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/paciente/:paciente_id/alergias", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const [rows] = await pool.query(
@@ -418,7 +418,7 @@ router.delete("/alergia/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, 
  * firmadas previas y el detalle de la última consulta.
  * exclude_id: historia_id actualmente abierta para no contarla como previa.
  */
-router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { paciente_id } = req.params;

@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 
@@ -16,6 +16,113 @@ function useIsMobile() {
   }, []);
   
   return isMobile;
+}
+
+const DIAS_SEMANA = ["Lu", "Ma", "Mi", "Ju", "Vi", "Sa", "Do"];
+
+function CalendarioPopup({ onClose }) {
+  const [mes, setMes] = useState(dayjs().startOf("month"));
+  const hoy = dayjs();
+
+  const primerDia = mes.day() === 0 ? 6 : mes.day() - 1; // lunes=0
+  const diasEnMes = mes.daysInMonth();
+  const celdas = primerDia + diasEnMes;
+  const totalFilas = Math.ceil(celdas / 7);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: -8, scale: 0.95 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      exit={{ opacity: 0, y: -8, scale: 0.95 }}
+      transition={{ duration: 0.18, type: "spring", stiffness: 300, damping: 24 }}
+      style={{
+        position: "absolute",
+        top: "calc(100% + 10px)",
+        right: 0,
+        zIndex: 9999,
+        background: "linear-gradient(160deg, #1e2d50 0%, #243b72 100%)",
+        border: "1px solid rgba(125,211,252,0.2)",
+        borderRadius: 16,
+        boxShadow: "0 20px 60px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.05)",
+        padding: "18px 20px",
+        width: "min(280px, 90vw)",
+        userSelect: "none",
+      }}
+      onClick={e => e.stopPropagation()}
+    >
+      {/* Cabecera mes */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+        <button
+          onClick={() => setMes(m => m.subtract(1, "month"))}
+          style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", color: "#7dd3fc", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <i className="bi bi-chevron-left" />
+        </button>
+
+        <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.95rem", textTransform: "capitalize" }}>
+          {mes.format("MMMM YYYY")}
+        </span>
+
+        <button
+          onClick={() => setMes(m => m.add(1, "month"))}
+          style={{ background: "rgba(255,255,255,0.1)", border: "none", borderRadius: 8, width: 30, height: 30, cursor: "pointer", color: "#7dd3fc", fontSize: 14, display: "flex", alignItems: "center", justifyContent: "center" }}
+        >
+          <i className="bi bi-chevron-right" />
+        </button>
+      </div>
+
+      {/* Días de semana */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2, marginBottom: 6 }}>
+        {DIAS_SEMANA.map(d => (
+          <div key={d} style={{ textAlign: "center", color: "#7dd3fc", fontSize: "0.7rem", fontWeight: 700, padding: "4px 0" }}>
+            {d}
+          </div>
+        ))}
+      </div>
+
+      {/* Celdas días */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(7, 1fr)", gap: 2 }}>
+        {Array.from({ length: totalFilas * 7 }).map((_, i) => {
+          const dia = i - primerDia + 1;
+          const valido = dia >= 1 && dia <= diasEnMes;
+          const esHoy = valido && mes.year() === hoy.year() && mes.month() === hoy.month() && dia === hoy.date();
+          const esFinde = valido && ((i % 7) === 5 || (i % 7) === 6);
+
+          return (
+            <div
+              key={i}
+              style={{
+                textAlign: "center",
+                padding: "6px 2px",
+                borderRadius: 8,
+                fontSize: "0.82rem",
+                fontWeight: esHoy ? 800 : 400,
+                color: !valido ? "transparent" : esHoy ? "#1e2d50" : esFinde ? "#f87171" : "rgba(255,255,255,0.85)",
+                background: esHoy ? "#7dd3fc" : "transparent",
+                boxShadow: esHoy ? "0 2px 10px rgba(125,211,252,0.4)" : "none",
+                transition: "background 0.15s",
+                cursor: valido ? "default" : "default",
+              }}
+            >
+              {valido ? dia : ""}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Botón volver a hoy */}
+      {!(mes.year() === hoy.year() && mes.month() === hoy.month()) && (
+        <div style={{ textAlign: "center", marginTop: 12 }}>
+          <button
+            onClick={() => setMes(hoy.startOf("month"))}
+            style={{ background: "rgba(125,211,252,0.15)", border: "1px solid rgba(125,211,252,0.3)", borderRadius: 8, color: "#7dd3fc", fontSize: "0.75rem", fontWeight: 600, padding: "5px 14px", cursor: "pointer" }}
+          >
+            Hoy
+          </button>
+        </div>
+      )}
+    </motion.div>
+  );
 }
 
 const ESTADO_COLOR = {
@@ -140,10 +247,19 @@ function KpiCard({ label, value, icon, gradient, sub, delay = 0, isMobile, to, n
 export default function Dashboard() {
   const { user } = useAuth();
   const navigate = useNavigate();
-  const [stats, setStats]   = useState(null);
-  const [sala,  setSala]    = useState([]);
+  const [stats, setStats]     = useState(null);
+  const [sala,  setSala]      = useState([]);
   const [loading, setLoading] = useState(true);
+  const [calOpen, setCalOpen] = useState(false);
+  const calRef                = useRef(null);
   const isMobile = useIsMobile();
+
+  useEffect(() => {
+    if (!calOpen) return;
+    const cerrar = (e) => { if (calRef.current && !calRef.current.contains(e.target)) setCalOpen(false); };
+    document.addEventListener("mousedown", cerrar);
+    return () => document.removeEventListener("mousedown", cerrar);
+  }, [calOpen]);
 
   useEffect(() => {
     Promise.all([
@@ -158,7 +274,10 @@ export default function Dashboard() {
     .finally(() => setLoading(false));
   }, []);
 
-  const hoy = dayjs().format("dddd D [de] MMMM YYYY");
+  const hoy       = dayjs().format("dddd D [de] MMMM YYYY");
+  const diaNombre  = dayjs().format("dddd");
+  const diaNumero  = dayjs().format("D");
+  const mesAnio    = dayjs().format("MMMM YYYY");
 
   const hora = dayjs().hour();
   const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
@@ -211,10 +330,76 @@ export default function Dashboard() {
               <div style={{ color: "#fff", fontWeight: 700, fontSize: isMobile ? "1rem" : "1.05rem" }}>
                 Dashboard
               </div>
-              <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem", textTransform: "capitalize" }}>
-                {hoy}
-              </div>
             </div>
+          </div>
+
+          {/* Fecha grande lado derecho — visible en todos los tamaños */}
+          <div ref={calRef} style={{ position: "relative" }}>
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              onClick={() => setCalOpen(o => !o)}
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: isMobile ? 10 : 16,
+                background: calOpen ? "rgba(125,211,252,0.12)" : "rgba(255,255,255,0.07)",
+                border: `1px solid ${calOpen ? "rgba(125,211,252,0.4)" : "rgba(255,255,255,0.12)"}`,
+                borderRadius: 14,
+                padding: isMobile ? "7px 12px" : "10px 20px",
+                backdropFilter: "blur(10px)",
+                cursor: "pointer",
+                transition: "background 0.2s, border 0.2s",
+              }}
+            >
+              {/* Número del día */}
+              <div style={{
+                fontSize: isMobile ? "2rem" : "3rem",
+                fontWeight: 800,
+                color: "#7dd3fc",
+                lineHeight: 1,
+                fontFamily: "'Inter', sans-serif",
+                letterSpacing: "-2px",
+              }}>
+                {diaNumero}
+              </div>
+
+              {/* Separador */}
+              <div style={{ width: 1, height: isMobile ? 32 : 44, background: "rgba(255,255,255,0.18)" }} />
+
+              {/* Día y mes */}
+              <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{
+                  color: "#fff",
+                  fontWeight: 700,
+                  fontSize: isMobile ? "0.8rem" : "0.95rem",
+                  textTransform: "capitalize",
+                  letterSpacing: "0.02em",
+                }}>
+                  {diaNombre}
+                </span>
+                <span style={{
+                  color: "rgba(255,255,255,0.55)",
+                  fontSize: isMobile ? "0.68rem" : "0.78rem",
+                  textTransform: "capitalize",
+                  fontWeight: 500,
+                }}>
+                  {mesAnio}
+                </span>
+              </div>
+
+              {/* Ícono calendario — solo desktop/tablet */}
+              {!isMobile && (
+                <i className="bi bi-calendar3" style={{ color: "rgba(125,211,252,0.6)", fontSize: "1rem", marginLeft: 4 }} />
+              )}
+            </motion.div>
+
+            <AnimatePresence>
+              {calOpen && <CalendarioPopup onClose={() => setCalOpen(false)} />}
+            </AnimatePresence>
           </div>
         </motion.div>
 

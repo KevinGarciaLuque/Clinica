@@ -76,7 +76,7 @@ router.get("/slots", auth(), async (req, res) => {
 // ──────────────────────────────────────────────
 // GET /api/citas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&medico_id=
 // ──────────────────────────────────────────────
-router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
@@ -119,7 +119,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 // ──────────────────────────────────────────────
 // PATCH /api/citas/:id/estado
 // ──────────────────────────────────────────────
-router.patch("/:id/estado", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.patch("/:id/estado", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId && req.user.super) {
@@ -144,7 +144,7 @@ router.patch("/:id/estado", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","S
 // ──────────────────────────────────────────────
 // PUT /api/citas/:id   → reprogramar (drag & drop)
 // ──────────────────────────────────────────────
-router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.put("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     // SUPER_ADMIN sin tenant: obtener clinica_id de la propia cita
@@ -196,7 +196,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 // ──────────────────────────────────────────────
 // POST /api/citas
 // ──────────────────────────────────────────────
-router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
@@ -236,7 +236,7 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
 // DELETE /api/citas/:id/permanente  → eliminar registro completo
 // ⚠️ DEBE IR ANTES de /:id para que Express lo capture correctamente
 // ──────────────────────────────────────────────
-router.delete("/:id/permanente", auth("ADMIN","MEDICO","SUPER_ADMIN"), async (req, res) => {
+router.delete("/:id/permanente", auth("ADMIN","MEDICO","PSICOLOGO","SUPER_ADMIN"), async (req, res) => {
   try {
     let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId && req.user.super) {
@@ -256,7 +256,7 @@ router.delete("/:id/permanente", auth("ADMIN","MEDICO","SUPER_ADMIN"), async (re
 // ──────────────────────────────────────────────
 // DELETE /api/citas/:id  → cancelar
 // ──────────────────────────────────────────────
-router.delete("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.delete("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId && req.user.super) {
@@ -278,7 +278,7 @@ router.delete("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_A
 // Devuelve el plan de la última consulta + estudios pendientes del paciente
 // (para mostrar en la vista Agenda de la siguiente cita)
 // ──────────────────────────────────────────────
-router.get("/:id/pendientes", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/:id/pendientes", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     let clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId && req.user.super) {

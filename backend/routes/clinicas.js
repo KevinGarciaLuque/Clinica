@@ -49,19 +49,22 @@ async function ensureModuloPermisosSchema() {
 async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   const [[tipo]] = await pool.query("SELECT clave FROM tipos_clinica WHERE id=? LIMIT 1", [tipoId || null]);
   const tipoClave = String(tipo?.clave || "").toLowerCase();
-  const esDerma = tipoClave.includes("derma") || tipoClave.includes("estetica");
-  const esPedia = Boolean(esPediatrica) || tipoClave.includes("pedi");
+  const esDerma  = tipoClave.includes("derma") || tipoClave.includes("estetica");
+  const esPedia  = Boolean(esPediatrica) || tipoClave.includes("pedi");
+  const esPsico  = tipoClave.includes("psico");
 
   const [mods] = await pool.query("SELECT id, clave FROM modulos_sistema WHERE disponible=1");
-  const base = ["dashboard", "pacientes", "citas", "consulta", "historia_clinica", "estudios", "plantillas"];
-  const derma = ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia", "recordatorios"];
-  const pedia = ["curva_crecimiento", "vacunas"];
-  const generalExtras = ["inventario"];
+  const base  = ["dashboard", "pacientes", "citas", "plantillas"];
+  const derma = ["consulta", "historia_clinica", "estudios", "ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia", "recordatorios"];
+  const pedia = ["consulta", "historia_clinica", "estudios", "curva_crecimiento", "vacunas"];
+  const psico = ["consulta_psicologica"];
+  const generalExtras = ["consulta", "historia_clinica", "estudios", "inventario"];
 
   const enabled = new Set(base);
   if (esDerma) derma.forEach((k) => enabled.add(k));
-  if (esPedia) pedia.forEach((k) => enabled.add(k));
-  if (!esDerma && !esPedia) generalExtras.forEach((k) => enabled.add(k));
+  else if (esPedia) pedia.forEach((k) => enabled.add(k));
+  else if (esPsico) psico.forEach((k) => enabled.add(k));
+  else generalExtras.forEach((k) => enabled.add(k));
 
   for (const m of mods) {
     await pool.query(
@@ -76,7 +79,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/tipos  → catálogo de tipos de clínica
 // ──────────────────────────────────────────────
-router.get("/tipos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+router.get("/tipos", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
     const [rows] = await pool.query(
       "SELECT id, clave, nombre, icono, color, descripcion FROM tipos_clinica WHERE activo=1 ORDER BY nombre"
@@ -90,7 +93,7 @@ router.get("/tipos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERM
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/modulos  → módulos activos de la clínica del usuario
 // ──────────────────────────────────────────────
-router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
     await ensureModuloPermisosSchema();
     // SUPER_ADMIN tiene acceso a todos los módulos base
@@ -208,7 +211,7 @@ router.get("/:id/modulos-permisos", auth("SUPER_ADMIN"), async (req, res) => {
       `
       SELECT u.id, u.nombres, u.apellidos, u.tipo, u.email
       FROM usuarios u
-      WHERE u.clinica_id = ? AND u.activo = 1 AND u.tipo IN ('ADMIN','MEDICO','ENFERMERA','RECEPCIONISTA')
+      WHERE u.clinica_id = ? AND u.activo = 1 AND u.tipo IN ('ADMIN','MEDICO','PSICOLOGO','ENFERMERA','RECEPCIONISTA')
       ORDER BY u.tipo, u.apellidos, u.nombres
       `,
       [clinicaId]
@@ -371,7 +374,7 @@ router.put("/modulos/:id/configuracion", auth("SUPER_ADMIN"), async (req, res) =
 // ──────────────────────────────────────────────
 //  GET /api/clinicas  → lista (SUPER_ADMIN ve todas; ADMIN ve la suya)
 // ──────────────────────────────────────────────
-router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
     if (req.user.super) {
       const [rows] = await pool.query(`
@@ -407,7 +410,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA")
 
 // POST /api/clinicas/solicitar-licencia  → clínica pide activación de plan
 router.post("/solicitar-licencia",
-  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   async (req, res) => {
   try {
     const clinica_id = req.user.clinica_id;
@@ -467,7 +470,7 @@ router.put("/solicitudes-licencia/:id/atender", auth("SUPER_ADMIN"), async (req,
 // ══════════════════════════════════════════════════════════════════════════
 //  GET /api/clinicas/:id/detalles  → estadísticas y consumo de espacio (SUPER_ADMIN)
 // ══════════════════════════════════════════════════════════════════════════
-router.get("/:id/detalles", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.get("/:id/detalles", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = parseInt(req.params.id, 10);
     if (!req.user.super && Number(req.user.clinica_id) !== id) {
@@ -672,7 +675,7 @@ router.put("/:id/storage-quota", auth("SUPER_ADMIN"), async (req, res) => {
 });
 
 // GET /api/clinicas/:id
-router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const [rows] = await pool.query(
@@ -747,7 +750,7 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
 });
 
 // PUT /api/clinicas/:id  → SUPER_ADMIN, ADMIN o MEDICO de esa clínica
-router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo } = req.body;
@@ -786,7 +789,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
 });
 
 // PUT /api/clinicas/:id/config  → guardar pares clave-valor de config
-router.put("/:id/config", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.put("/:id/config", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { config } = req.body; // { smtp_host: "...", slot_minutos: "30", ... }
@@ -932,7 +935,7 @@ async function ensurePlantillasPredeterminadaColumn() {
 }
 
 // GET /api/clinicas/:id/plantillas  → obtener todas las plantillas de la clínica
-router.get("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.get("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     await ensurePlantillasPredeterminadaColumn();
@@ -950,7 +953,7 @@ router.get("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, 
 });
 
 // GET /api/clinicas/:id/plantillas/:tipo  → obtener plantilla por tipo
-router.get("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.get("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { tipo } = req.params;
@@ -969,7 +972,7 @@ router.get("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN","MEDICO"), async 
 });
 
 // POST /api/clinicas/:id/plantillas  → crear/actualizar plantilla
-router.post("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.post("/:id/plantillas", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { tipo, nombre, contenido } = req.body;
@@ -1024,7 +1027,7 @@ router.delete("/:id/plantillas/:tipo", auth("SUPER_ADMIN","ADMIN"), async (req, 
 });
 
 // POST /api/clinicas/:id/plantillas/predeterminada  → establecer plantilla predeterminada
-router.post("/:id/plantillas/predeterminada", auth("SUPER_ADMIN","ADMIN","MEDICO"), async (req, res) => {
+router.post("/:id/plantillas/predeterminada", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { tipo } = req.body;
@@ -1067,7 +1070,7 @@ router.post("/:id/plantillas/predeterminada", auth("SUPER_ADMIN","ADMIN","MEDICO
 // ══════════════════════════════════════════════════════════════════════════
 
 // POST /api/clinicas/:id/upload-logo  → subir logo de la clínica
-router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO"), uploadClinicas.single("logo"), async (req, res) => {
+router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), uploadClinicas.single("logo"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });

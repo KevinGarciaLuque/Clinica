@@ -46,10 +46,18 @@ const medicoItems = [
 ];
 
 const superItems = [
-  { to: "/superadmin/clinicas",  label: "Clínicas",       icon: "bi-building-fill" },
-  { to: "/superadmin/reportes",  label: "Reportes",        icon: "bi-bar-chart-line-fill" },
-  { to: "/superadmin/database",  label: "Base de Datos",  icon: "bi-database-fill-gear" },
+  { to: "/superadmin/clinicas",        label: "Clínicas",        icon: "bi-building-fill" },
+  { to: "/superadmin/reportes",        label: "Reportes",         icon: "bi-bar-chart-line-fill" },
+  { to: "/superadmin/database",        label: "Base de Datos",   icon: "bi-database-fill-gear" },
+  { to: "/superadmin/personalizacion", label: "Personalización", icon: "bi-palette-fill" },
 ];
+
+/** Renderiza ícono: Bootstrap Icons (bi-*) o emoji/texto */
+function SidebarIcon({ icon, style }) {
+  if (!icon) return null;
+  if (icon.startsWith("bi-")) return <i className={`bi ${icon}`} style={style} />;
+  return <span style={{ lineHeight: 1, flexShrink: 0, ...style }}>{icon}</span>;
+}
 
 /** Convierte respuesta del API de módulos a items del sidebar */
 function modulosToItems(modulos) {
@@ -63,6 +71,13 @@ function modulosToItems(modulos) {
 function getMenuSections(tipo, modulos) {
   const hasDynamic = modulos && modulos.length > 0;
   let mainItems = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
+
+  // Clínica solo psicológica: ocultar Estudios e Imágenes (no aplica a psicología)
+  const tienePsico    = mainItems.some(m => m.to === "/psicologia/consulta");
+  const tieneConsulta = mainItems.some(m => m.to === "/consulta");
+  if (tienePsico && !tieneConsulta) {
+    mainItems = mainItems.filter(m => m.to !== "/estudios");
+  }
 
   // MEDICO y ADMIN siempre deben ver Consulta (puede no estar en caché)
   if ((tipo === "MEDICO" || tipo === "ADMIN") && !mainItems.some(m => m.to === "/consulta")) {
@@ -203,10 +218,7 @@ function ConsultaExpandable({ collapsed, onNavigate, esteticaItems }) {
                     transition: "background 0.15s, color 0.15s",
                   }}
                 >
-                  <i
-                    className={`bi ${sub.icon}`}
-                    style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#e91e8c" : "inherit" }}
-                  />
+                  <SidebarIcon icon={sub.icon} style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#e91e8c" : "inherit" }} />
                   {sub.label}
                 </NavLink>
               </li>
@@ -291,7 +303,7 @@ function CitasExpandable({ collapsed, onNavigate }) {
                     transition: "background 0.15s, color 0.15s",
                   }}
                 >
-                  <i className={`bi ${sub.icon}`} style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#2196f3" : "inherit" }} />
+                  <SidebarIcon icon={sub.icon} style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#2196f3" : "inherit" }} />
                   {sub.label}
                 </NavLink>
               </li>
@@ -304,18 +316,21 @@ function CitasExpandable({ collapsed, onNavigate }) {
 }
 
 /* ─── Sub-menú expandible para Pacientes ────────────────────────── */
-function PacientesExpandable({ collapsed, onNavigate }) {
+function PacientesExpandable({ collapsed, onNavigate, allItems = [] }) {
   const location = useLocation();
   const isActive = location.pathname.startsWith("/pacientes") || location.pathname.startsWith("/historia") || location.pathname.startsWith("/estudios");
   const [open, setOpen] = useState(isActive);
 
   useEffect(() => { if (isActive) setOpen(true); }, [isActive]);
 
+  const hasHistoria = allItems.some(m => m.to === "/historia");
+  const hasEstudios = allItems.some(m => m.to === "/estudios");
+
   const subItems = [
-    { to: "/pacientes",          label: "Buscar",           icon: "bi-search",              key: "buscar"   },
-    { to: "/pacientes?nuevo=true", label: "Registrar",      icon: "bi-person-plus-fill",    key: "nuevo"    },
-    { to: "/historia",           label: "Historia Clínica", icon: "bi-journal-medical",     key: "historia" },
-    { to: "/estudios",           label: "Estudios e Imágenes", icon: "bi-film",             key: "estudios" },
+    { to: "/pacientes",            label: "Buscar",              icon: "bi-search",           key: "buscar"   },
+    { to: "/pacientes?nuevo=true", label: "Registrar",           icon: "bi-person-plus-fill", key: "nuevo"    },
+    ...(hasHistoria ? [{ to: "/historia", label: "Historia Clínica",     icon: "bi-journal-medical", key: "historia" }] : []),
+    ...(hasEstudios ? [{ to: "/estudios", label: "Estudios e Imágenes",  icon: "bi-film",            key: "estudios" }] : []),
   ];
 
   const showSub = open && isActive && !collapsed;
@@ -371,7 +386,7 @@ function PacientesExpandable({ collapsed, onNavigate }) {
                     transition: "background 0.15s, color 0.15s",
                   }}
                 >
-                  <i className={`bi ${sub.icon}`} style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#2196f3" : "inherit" }} />
+                  <SidebarIcon icon={sub.icon} style={{ fontSize: "0.8rem", width: 14, textAlign: "center", color: subIsActive ? "#2196f3" : "inherit" }} />
                   {sub.label}
                 </NavLink>
               </li>
@@ -420,7 +435,7 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
           item.to === "/citas"
             ? <CitasExpandable key="/citas" collapsed={collapsed} onNavigate={onNavigate} />
             : item.to === "/pacientes"
-            ? <PacientesExpandable key="/pacientes" collapsed={collapsed} onNavigate={onNavigate} />
+            ? <PacientesExpandable key="/pacientes" collapsed={collapsed} onNavigate={onNavigate} allItems={items} />
             : item.to === "/consulta" && esteticaItems.length > 0
             ? <ConsultaExpandable key="/consulta" collapsed={collapsed} onNavigate={onNavigate} esteticaItems={esteticaItems} />
             : (
@@ -443,15 +458,12 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
                 transition: "background 0.18s, color 0.18s, box-shadow 0.18s",
               }}
             >
-              <i
-                className={`bi ${item.icon}`}
-                style={{
-                  fontSize: "1.05rem",
-                  flexShrink: 0,
-                  width: collapsed ? "auto" : 18,
-                  textAlign: "center",
-                }}
-              />
+              <SidebarIcon icon={item.icon} style={{
+                fontSize: "1.05rem",
+                flexShrink: 0,
+                width: collapsed ? "auto" : 18,
+                textAlign: "center",
+              }} />
               {!collapsed && <span style={{ fontWeight: 500 }}>{item.label}</span>}
             </NavLink>
           </li>
@@ -644,7 +656,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           }}>
             <i className="bi bi-shield-fill-check" style={{ color: C.accent, fontSize: "0.75rem" }} />
             <span style={{ color: C.textMuted, fontSize: "0.62rem", letterSpacing: "0.02em" }}>
-              Multi-Clínica v1.0 · 2026
+              KG-Medic v1.0 · 2026
             </span>
           </div>
         )}

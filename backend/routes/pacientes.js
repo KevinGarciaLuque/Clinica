@@ -8,7 +8,7 @@ const fs          = require("fs");
 const path        = require("path");
 
 // GET /api/pacientes
-router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
     const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
@@ -44,7 +44,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 });
 
 // GET /api/pacientes/:id
-router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
     const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
@@ -73,7 +73,7 @@ router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 });
 
 // POST /api/pacientes
-router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
@@ -140,7 +140,7 @@ router.post("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"
 });
 
 // ── PUT /api/pacientes/:id ────────────────────────────────
-router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.put("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
     const { id }    = req.params;
@@ -235,7 +235,7 @@ router.put("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMI
 // ── POST /api/pacientes/:id/foto ─────────────────────────
 router.post(
   "/:id/foto",
-  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   upload.single("foto"),
   async (req, res) => {
     try {
@@ -318,7 +318,7 @@ router.post(
 // ── DELETE /api/pacientes/:id/foto ───────────────────────
 router.delete(
   "/:id/foto",
-  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   async (req, res) => {
     try {
       const clinicaId    = req.tenant?.clinica_id;
@@ -356,7 +356,7 @@ router.delete(
 // ── DELETE /api/pacientes/:id ─────────────────────────────
 router.delete(
   "/:id",
-  auth("ADMIN","MEDICO","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","SUPER_ADMIN"),
   async (req, res) => {
     try {
       const clinicaId    = req.tenant?.clinica_id;

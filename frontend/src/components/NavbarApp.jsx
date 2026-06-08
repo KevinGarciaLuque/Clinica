@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
+import { useConfigSistema } from "../context/ConfigSistemaContext";
 import api from "../api/api";
 import ModalAyudaSoporte from "./ModalAyudaSoporte";
 import { playNotificationSound } from "../utils/notificationSound";
@@ -30,6 +31,7 @@ const PLAN_BADGE = {
 export default function NavbarApp({ onMenuClick }) {
   const { user, logout, licenciaInfo } = useAuth();
   const navigate = useNavigate();
+  const cfg = useConfigSistema();
 
   const salir = () => { logout(); navigate("/login"); };
   const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
@@ -262,44 +264,90 @@ export default function NavbarApp({ onMenuClick }) {
   return (
     <>
     <style>{`
-      @keyframes navline-slide {
-        0%   { background-position: -200% center; }
-        100% { background-position: 300% center; }
-      }
-      @keyframes navline-shine {
-        0%   { transform: translateX(-100%); }
-        100% { transform: translateX(400%); }
-      }
       @keyframes licencia-pulse {
         0%, 100% { box-shadow: 0 0 0 0 rgba(245,158,11,.5); }
         50%       { box-shadow: 0 0 0 5px rgba(245,158,11,0); }
       }
+      @keyframes navbar-logo-glow {
+        0%, 100% { box-shadow: 0 0 0 0 rgba(59,130,246,.3); }
+        50%       { box-shadow: 0 0 12px 3px rgba(59,130,246,.15); }
+      }
+      @keyframes brand-float {
+        0%, 100% { transform: translateY(0px); }
+        50%       { transform: translateY(-3px); }
+      }
+      @keyframes brand-shine {
+        0%   { background-position: -250% center; }
+        100% { background-position: 250% center; }
+      }
     `}</style>
     <nav
-      className="navbar navbar-dark bg-dark px-3 d-flex align-items-center justify-content-between"
-      style={{ height: 56, minHeight: 56 }}
+      className="navbar navbar-dark px-3"
+      style={{
+        height: 60,
+        minHeight: 60,
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        background: "linear-gradient(90deg, #0d1b2e 0%, #0f2040 50%, #0d1b2e 100%)",
+        borderBottom: "1px solid rgba(59,130,246,.18)",
+        boxShadow: "0 2px 20px rgba(0,0,0,.45)",
+      }}
     >
-      {/* Brand + hamburguesa */}
-      <div className="d-flex align-items-center gap-2">
-        {/* Botón hamburguesa solo en móvil */}
+      {/* Izquierda: brand centrado dentro del ancho del sidebar (240px) */}
+      <div style={{
+        width: 240, minWidth: 240, flexShrink: 0,
+        display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+      }}>
+        {/* Hamburguesa solo en móvil, a la izquierda */}
         <button
-          className="btn btn-outline-secondary btn-sm d-lg-none border-0 text-white"
+          className="btn btn-sm d-lg-none border-0"
           onClick={onMenuClick}
           aria-label="Menú"
+          style={{
+            color: "rgba(255,255,255,.7)",
+            background: "rgba(255,255,255,.06)",
+            borderRadius: 8,
+            width: 34, height: 34,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            marginRight: 4,
+          }}
         >
-          <i className="bi bi-list fs-5" />
+          <i className="bi bi-list" style={{ fontSize: 18 }} />
         </button>
-        <span className="navbar-brand mb-0 d-flex align-items-center gap-2" style={{ fontWeight: 700 }}>
-          <div className="d-none d-sm-block" style={{ lineHeight: 1.25 }}>
-            <div style={{ fontSize: "0.9rem", color: "#fff", fontWeight: 700, letterSpacing: "0.03em" }}>
-              Sistema de Gestión Clínica
-            </div>
+
+        {/* Ícono / Logo */}
+        <div style={{
+          width: 46, height: 46, borderRadius: 12, flexShrink: 0,
+          background: cfg.logoUrl ? "transparent" : "linear-gradient(135deg, #1d4ed8, #3b82f6)",
+          display: "flex", alignItems: "center", justifyContent: "center",
+          overflow: "hidden",
+          boxShadow: "0 0 0 1px rgba(59,130,246,.35), 0 4px 12px rgba(29,78,216,.4)",
+          animation: "navbar-logo-glow 4s ease-in-out infinite",
+        }}>
+          {cfg.logoUrl
+            ? <img src={cfg.logoUrl} alt={cfg.nombre_sistema}
+                   style={{ width: "100%", height: "100%", objectFit: "contain" }} />
+            : <i className={`bi ${cfg.icono_bootstrap}-fill`} style={{ color: "#fff", fontSize: 22 }} />
+          }
+        </div>
+
+        {/* Texto de marca */}
+        <div style={{ lineHeight: 1.2, textAlign: "left" }}>
+          <div style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "0.04em" }}>
+            <BrandName name={cfg.nombre_sistema} c1={cfg.color_nombre1} c2={cfg.color_nombre2} />
           </div>
-        </span>
+          <div style={{
+            fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.12em",
+            textTransform: "uppercase", color: "rgba(147,197,253,.6)",
+          }}>
+            {cfg.subtitulo}
+          </div>
+        </div>
       </div>
 
-      {/* Right side: user + logout */}
-      <div className="d-flex align-items-center gap-2 gap-md-3">
+      {/* Derecha: notificaciones + usuario */}
+      <div className="d-flex align-items-center gap-2 gap-md-3" style={{ marginLeft: "auto" }}>
 
         {/* 🔔 Notificaciones — solo SUPER_ADMIN */}
         {user?.super && (
@@ -757,14 +805,26 @@ export default function NavbarApp({ onMenuClick }) {
           <button
             onClick={() => setShowUserMenu(v => !v)}
             style={{
-              background: showUserMenu ? "rgba(255,255,255,.12)" : "rgba(255,255,255,.06)",
-              border: "1px solid rgba(255,255,255,.12)",
-              borderRadius: 10, padding: "4px 10px 4px 6px",
-              display: "flex", alignItems: "center", gap: 8,
-              cursor: "pointer", transition: "background .15s",
+              background: showUserMenu
+                ? "rgba(59,130,246,.15)"
+                : "rgba(255,255,255,.05)",
+              border: `1px solid ${showUserMenu ? "rgba(59,130,246,.35)" : "rgba(255,255,255,.1)"}`,
+              borderRadius: 12, padding: "4px 10px 4px 5px",
+              display: "flex", alignItems: "center", gap: 9,
+              cursor: "pointer", transition: "all .15s ease",
             }}
-            onMouseEnter={e => { if (!showUserMenu) e.currentTarget.style.background = "rgba(255,255,255,.1)"; }}
-            onMouseLeave={e => { if (!showUserMenu) e.currentTarget.style.background = "rgba(255,255,255,.06)"; }}
+            onMouseEnter={e => {
+              if (!showUserMenu) {
+                e.currentTarget.style.background = "rgba(59,130,246,.1)";
+                e.currentTarget.style.borderColor = "rgba(59,130,246,.25)";
+              }
+            }}
+            onMouseLeave={e => {
+              if (!showUserMenu) {
+                e.currentTarget.style.background = "rgba(255,255,255,.05)";
+                e.currentTarget.style.borderColor = "rgba(255,255,255,.1)";
+              }
+            }}
           >
             <div style={{ position: "relative", flexShrink: 0 }}>
               <div style={{
@@ -801,16 +861,18 @@ export default function NavbarApp({ onMenuClick }) {
 
           {showUserMenu && (
             <div style={{
-              position: "absolute", top: 46, right: 0, zIndex: 1200,
-              background: "#1a2744", border: "1px solid rgba(255,255,255,.1)",
-              borderRadius: 14, width: 248, boxShadow: "0 16px 48px rgba(0,0,0,.55)",
+              position: "absolute", top: 50, right: 0, zIndex: 1200,
+              background: "#0f1f3d",
+              border: "1px solid rgba(59,130,246,.18)",
+              borderRadius: 16, width: 260,
+              boxShadow: "0 20px 60px rgba(0,0,0,.6), 0 0 0 1px rgba(59,130,246,.08)",
               overflow: "hidden",
             }}>
               {/* Header con info del usuario */}
               <div style={{
-                padding: "16px",
-                background: "linear-gradient(135deg, #112240, #1a2744)",
-                borderBottom: "1px solid rgba(255,255,255,.07)",
+                padding: "18px 16px",
+                background: "linear-gradient(135deg, #0d1b2e 0%, #112240 60%, #0f2040 100%)",
+                borderBottom: "1px solid rgba(59,130,246,.12)",
               }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
                   <div style={{
@@ -943,6 +1005,28 @@ export default function NavbarApp({ onMenuClick }) {
         onClose={() => setModalFelicitar(null)}
       />
     )}
+    </>
+  );
+}
+
+/* ── Nombre de marca bicolor con destello para navbar oscuro ── */
+function BrandName({ name = "", c1 = "#ffffff", c2 = "#2D6BE8" }) {
+  const idx = name.indexOf("-");
+  const c2Style = {
+    background: `linear-gradient(90deg, ${c2} 20%, #ffffff 45%, #e0f0ff 50%, #ffffff 55%, ${c2} 80%)`,
+    backgroundSize: "250% auto",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    backgroundClip: "text",
+    animation: "brand-shine 7s linear infinite",
+    filter: "brightness(1.9)",
+    display: "inline-block",
+  };
+  if (idx === -1) return <span style={c2Style}>{name}</span>;
+  return (
+    <>
+      <span style={{ color: c1 }}>{name.slice(0, idx + 1)}</span>
+      <span style={c2Style}>{name.slice(idx + 1)}</span>
     </>
   );
 }

@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS especialidades (
 INSERT IGNORE INTO especialidades (nombre) VALUES
   ('Medicina General'),('Pediatría'),('Ginecología'),
   ('Cardiología'),('Dermatología'),('Traumatología'),
-  ('Neurología'),('Psiquiatría'),('Oftalmología'),
+  ('Neurología'),('Psiquiatría'),('Psicología'),('Oftalmología'),
   ('Otorrinolaringología'),('Urología'),('Endocrinología'),
   ('Reumatología'),('Neumología'),('Radiología');
 
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS usuarios (
   apellidos     VARCHAR(100) NOT NULL,
   email         VARCHAR(120) NOT NULL,
   password_hash VARCHAR(255) NOT NULL,
-  tipo          ENUM('SUPER_ADMIN','ADMIN','MEDICO','ENFERMERA','RECEPCIONISTA','PACIENTE_PORTAL')
+  tipo          ENUM('SUPER_ADMIN','ADMIN','MEDICO','PSICOLOGO','ENFERMERA','RECEPCIONISTA','PACIENTE_PORTAL')
                 NOT NULL DEFAULT 'RECEPCIONISTA',
   especialidad_id INT UNSIGNED COMMENT 'Solo para MEDICO',
   firma_url     VARCHAR(300) COMMENT 'Imagen de firma para recetas',

@@ -25,7 +25,7 @@ function decrypt(text) {
  */
 router.get(
   "/",
-  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   async (req, res) => {
     try {
       const clinicaId   = req.tenant?.clinica_id;
@@ -84,7 +84,7 @@ router.get(
  */
 router.post(
   "/felicitar",
-  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   async (req, res) => {
     try {
       const clinicaId    = req.tenant?.clinica_id;

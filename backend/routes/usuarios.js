@@ -124,7 +124,7 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
       return res.status(400).json({ ok: false, msg: "nombres, apellidos, email, password y tipo son obligatorios" });
     }
 
-    const tiposValidos = ["ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA"];
+    const tiposValidos = ["ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"];
     if (!tiposValidos.includes(tipo)) {
       return res.status(400).json({ ok: false, msg: `tipo inválido. Válidos: ${tiposValidos.join(", ")}` });
     }

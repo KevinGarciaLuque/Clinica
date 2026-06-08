@@ -53,6 +53,7 @@ export default function Clinicas() {
   const [error, setError]         = useState("");
   const [showModal, setShowModal] = useState(false);
   const [hovered, setHovered]     = useState(null);
+  const [showAdminPass, setShowAdminPass] = useState(false);
   
   // Modal de confirmación de eliminación
   const [modalEliminar, setModalEliminar] = useState(false);
@@ -976,7 +977,7 @@ export default function Clinicas() {
                                   display: "flex", alignItems: "center", justifyContent: "center",
                                   transition: "background .18s",
                                 }}>
-                                  <i className={`bi ${t.icono}`} style={{ fontSize: 14, color: sel ? "#fff" : t.color }} />
+                                  <i className={`bi ${t.clave === "psicologia" ? "bi-activity" : t.icono}`} style={{ fontSize: 14, color: sel ? "#fff" : t.color }} />
                                 </div>
                                 <div>
                                   <div style={{ fontSize: 12, fontWeight: 700, color: sel ? t.color : C.text, lineHeight: 1.3 }}>{t.nombre}</div>
@@ -1120,10 +1121,24 @@ export default function Clinicas() {
                           onBlur={(e)  => e.target.style.borderColor = C.border} />
                       </Field>
                       <Field label="Contraseña temporal">
-                        <input style={inputSt} type="password" value={form.admin_password}
-                          onChange={(e) => setForm({ ...form, admin_password: e.target.value })}
-                          onFocus={(e) => e.target.style.borderColor = C.accent}
-                          onBlur={(e)  => e.target.style.borderColor = C.border} />
+                        <div style={{ position: "relative" }}>
+                          <input style={{ ...inputSt, paddingRight: 40 }} type={showAdminPass ? "text" : "password"} value={form.admin_password}
+                            onChange={(e) => setForm({ ...form, admin_password: e.target.value })}
+                            onFocus={(e) => e.target.style.borderColor = C.accent}
+                            onBlur={(e)  => e.target.style.borderColor = C.border} />
+                          <button
+                            type="button"
+                            onClick={() => setShowAdminPass(v => !v)}
+                            style={{
+                              position: "absolute", right: 10, top: "50%", transform: "translateY(-50%)",
+                              background: "transparent", border: "none", cursor: "pointer",
+                              color: C.muted, fontSize: 15, padding: 0, lineHeight: 1,
+                            }}
+                            title={showAdminPass ? "Ocultar contraseña" : "Ver contraseña"}
+                          >
+                            <i className={`bi bi-eye${showAdminPass ? "-slash" : ""}`} />
+                          </button>
+                        </div>
                       </Field>
                     </div>
                   </div>

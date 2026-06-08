@@ -24,7 +24,7 @@ const hasEstudiosFirmaCol = async () => {
 /**
  * GET /api/estudios?paciente_id=&historia_id=&estado=
  */
-router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { paciente_id, historia_id, estado, page = 1 } = req.query;
@@ -316,7 +316,7 @@ router.get("/pdf", auth(), async (req, res) => {
 /**
  * GET /api/estudios/:id  — con resultados
  */
-router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
 

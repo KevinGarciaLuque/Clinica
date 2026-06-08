@@ -122,9 +122,11 @@ app.use("/api/crecimiento", require("./routes/crecimiento"));
 app.use("/api/setup",     require("./routes/setup"));
 app.use("/api/reportes",  require("./routes/reportes"));
 app.use("/api/vacunas",    require("./routes/vacunas"));
-app.use("/api/soporte",    require("./routes/soporte"));
-app.use("/api/cumpleanos", require("./routes/cumpleanos"));
-app.use("/rx",            require("./routes/rx"));
+app.use("/api/soporte",        require("./routes/soporte"));
+app.use("/api/cumpleanos",     require("./routes/cumpleanos"));
+app.use("/api/config-sistema", require("./routes/configSistema"));
+app.use("/api/psicologia",     require("./routes/psicologia"));
+app.use("/rx",                 require("./routes/rx"));
 
 // ===== 404 =====
 app.use((req, res) => {

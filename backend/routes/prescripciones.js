@@ -26,7 +26,7 @@ const hasPrescripcionesFirmaCol = async () => {
 /**
  * GET /api/prescripciones?paciente_id=&historia_id=
  */
-router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { paciente_id, historia_id, page = 1 } = req.query;
@@ -61,7 +61,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/prescripciones/sugerencias-cie10?codigo=J06.9
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/sugerencias-cie10", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/sugerencias-cie10", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const { codigo } = req.query;
     if (!codigo) return res.json({ ok: true, data: [] });
@@ -97,7 +97,7 @@ router.get("/sugerencias-cie10", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONIST
 // ─────────────────────────────────────────────────────────────────────────────
 // GET /api/prescripciones/historial-paciente/:pacienteId
 // ─────────────────────────────────────────────────────────────────────────────
-router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     const { pacienteId } = req.params;
@@ -198,7 +198,7 @@ router.delete("/favoritas/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req
 /**
  * GET /api/prescripciones/:id  — con items
  */
-router.get("/:id", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
 

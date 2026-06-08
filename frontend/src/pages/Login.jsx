@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
+import { useConfigSistema } from "../context/ConfigSistemaContext";
 
 export default function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
+  const cfg = useConfigSistema();
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -35,7 +37,7 @@ export default function Login() {
           display: flex;
           align-items: center;
           justify-content: flex-start;
-          background-image: url('https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1920&q=80');
+          background-image: url('${cfg.fondoUrl}');
           background-size: cover;
           background-position: center;
           background-attachment: fixed;
@@ -107,11 +109,17 @@ export default function Login() {
           {/* Logo / encabezado */}
           <div className="text-center mb-4">
             <div className="login-logo mb-2">
-              <i className="bi bi-hospital" />
+              {cfg.logoUrl
+                ? <img src={cfg.logoUrl} alt={cfg.nombre_sistema}
+                       style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 12 }} />
+                : <i className={`bi ${cfg.icono_bootstrap}`} />
+              }
             </div>
-            <h4 className="fw-bold mb-0" style={{ letterSpacing: ".02em" }}>Multi-Clínica</h4>
+            <h4 className="fw-bold mb-0" style={{ letterSpacing: ".02em" }}>
+              <LoginBrandName name={cfg.nombre_sistema} c1={cfg.color_nombre1} c2={cfg.color_nombre2} />
+            </h4>
             <p className="mb-0" style={{ color: "rgba(255,255,255,.55)", fontSize: ".85rem" }}>
-              Sistema de gestión clínica
+              {cfg.subtitulo}
             </p>
           </div>
 
@@ -170,10 +178,21 @@ export default function Login() {
           </form>
 
           <p className="text-center mt-4 mb-0" style={{ color: "rgba(255,255,255,.35)", fontSize: ".75rem" }}>
-            © {new Date().getFullYear()} Multi-Clínica · Todos los derechos reservados <br /> Kevin Garcia
+            © {new Date().getFullYear()} {cfg.copyright_texto}
           </p>
         </div>
       </div>
+    </>
+  );
+}
+
+function LoginBrandName({ name = "", c1 = "#ffffff", c2 = "#2D6BE8" }) {
+  const idx = name.indexOf("-");
+  if (idx === -1) return <span style={{ color: c2 }}>{name}</span>;
+  return (
+    <>
+      <span style={{ color: c1 }}>{name.slice(0, idx + 1)}</span>
+      <span style={{ color: c2 }}>{name.slice(idx + 1)}</span>
     </>
   );
 }

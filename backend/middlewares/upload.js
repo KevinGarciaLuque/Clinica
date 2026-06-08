@@ -11,6 +11,7 @@ function ensureDir(dir) {
 
 ensureDir(path.join(BASE_DIR, "pacientes"));
 ensureDir(path.join(BASE_DIR, "clinicas"));
+ensureDir(path.join(BASE_DIR, "sistema"));
 
 // ── Storage engine para pacientes (memory → Cloudinary) ─────────────────
 const storagePacientes = multer.memoryStorage();
@@ -57,10 +58,31 @@ const uploadPacientes = multer({
 
 const uploadClinicas = multer({
   storage: storageClinicas,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB máximo para logos
+  limits: { fileSize: 2 * 1024 * 1024 },
+  fileFilter: imageFilter,
+});
+
+// ── Storage engine para assets del sistema (logo, fondo login) ────────────
+const storageSistema = multer.diskStorage({
+  destination(req, file, cb) {
+    const dest = path.join(BASE_DIR, "sistema");
+    ensureDir(dest);
+    cb(null, dest);
+  },
+  filename(req, file, cb) {
+    const ext  = path.extname(file.originalname).toLowerCase();
+    const rand = Math.random().toString(36).slice(2, 10);
+    cb(null, `sistema-${Date.now()}-${rand}${ext}`);
+  },
+});
+
+const uploadSistema = multer({
+  storage: storageSistema,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB para fondos/logos
   fileFilter: imageFilter,
 });
 
 module.exports = uploadPacientes;
 module.exports.uploadPacientes = uploadPacientes;
-module.exports.uploadClinicas = uploadClinicas;
+module.exports.uploadClinicas  = uploadClinicas;
+module.exports.uploadSistema   = uploadSistema;

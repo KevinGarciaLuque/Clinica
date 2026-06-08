@@ -6,6 +6,7 @@ import "dayjs/locale/es";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
+import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
 
 dayjs.locale("es");
 
@@ -230,6 +231,10 @@ export default function Pacientes() {
   };
 
   // ── Consulta: verificar si el paciente tiene cita hoy ─────────────────────
+  const tienePsicologia = modulos.some(m => m.clave === "consulta_psicologica");
+  const tieneConsultaMedica = modulos.some(m => m.clave === "consulta");
+  const soloPsicologia = tienePsicologia && !tieneConsultaMedica;
+
   const handleConsultaClick = async (e, paciente) => {
     e.stopPropagation();
     e.preventDefault();
@@ -243,15 +248,16 @@ export default function Pacientes() {
         c => !["CANCELADA", "NO_ASISTIO", "COMPLETADA"].includes(c.estado)
       );
       if (citasHoy.length > 0) {
-        // Tiene cita activa hoy → ir directo a consulta médica
-        navigate(`/consulta-medica?paciente_id=${paciente.id}&cita_id=${citasHoy[0].id}`);
+        if (soloPsicologia) {
+          navigate(`/psicologia/consulta?paciente_id=${paciente.id}&sesion_id=nueva`);
+        } else {
+          navigate(`/consulta-medica?paciente_id=${paciente.id}&cita_id=${citasHoy[0].id}`);
+        }
       } else {
-        // No tiene cita → mostrar modal
         setConsultaPaciente(paciente);
         setShowConsultaModal(true);
       }
     } catch {
-      // En caso de error, mostrar modal de todas formas
       setConsultaPaciente(paciente);
       setShowConsultaModal(true);
     } finally {
@@ -887,10 +893,15 @@ export default function Pacientes() {
       {showConsultaModal && consultaPaciente && createPortal(
         <ModalConsultaSinCita
           paciente={consultaPaciente}
+          psicologia={soloPsicologia}
           onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
           onCreated={(citaId) => {
             setShowConsultaModal(false);
-            navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+            if (soloPsicologia) {
+              navigate(`/psicologia/consulta?paciente_id=${consultaPaciente.id}&sesion_id=nueva`);
+            } else {
+              navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+            }
             setConsultaPaciente(null);
           }}
         />,
@@ -994,9 +1005,10 @@ export default function Pacientes() {
   );
 }
 
-// ─── Modal Consulta Sin Cita Agendada ─────────────────────────────────────────
-function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
-  const [modo, setModo] = useState(null); // null = pregunta inicial, "ahora" = agendar ahora, "seleccionar" = form completo
+// ModalConsultaSinCita se importa de ../components/ModalConsultaSinCita
+// eslint-disable-next-line no-unused-vars
+function _ModalConsultaSinCitaLegacy({ paciente, onClose, onCreated, psicologia = false }) {
+  const [modo, setModo] = useState(null);
   const [medicos, setMedicos] = useState([]);
   const [medicoId, setMedicoId] = useState("");
   const [fechaSel, setFechaSel] = useState(dayjs().format("YYYY-MM-DD"));
@@ -1038,7 +1050,6 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     }
   }, [tiposConsulta, tipo]);
 
-  // Cargar slots cuando se selecciona médico y fecha
   useEffect(() => {
     if (!medicoId || !fechaSel) { setSlots([]); return; }
     api.get("/citas/slots", { params: { medico_id: medicoId, fecha: fechaSel } })
@@ -1055,6 +1066,8 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
   };
 
   const agendarAhora = async () => {
+    // Psicología: no requiere cita médica, ir directo al módulo
+    if (psicologia) { onCreated(null); return; }
     if (!medicoId) { setErr("Selecciona un médico"); return; }
     setSaving(true); setErr("");
     try {
@@ -1064,7 +1077,6 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
         paciente_id: paciente.id, medico_id: medicoId,
         inicio, fin, tipo_consulta: tipo, motivo: motivo || null, canal: "RECEPCION",
       });
-      // Poner en atención directamente
       await api.patch(`/citas/${res.data.id}/estado`, { estado: "EN_ATENCION" });
       onCreated(res.data.id);
     } catch (ex) {
@@ -1075,7 +1087,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
   };
 
   const agendarSeleccionado = async () => {
-    if (!medicoId) { setErr("Selecciona un médico"); return; }
+    if (!medicoId) { setErr(`Selecciona un${psicologia ? " psicólogo/a" : " médico"}`); return; }
     if (!horaInicio || !horaFin) { setErr("Ingresa hora de inicio y fin"); return; }
     const inicio = dayjs(`${fechaSel} ${horaInicio}`);
     const fin = dayjs(`${fechaSel} ${horaFin}`);
@@ -1098,22 +1110,23 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     }
   };
 
+  const headerColor = psicologia ? "#673ab7" : "#0d6efd";
+
   return (
     <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 9998 }}>
       <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: modo === "seleccionar" ? 600 : 500 }}>
         <div className="modal-content">
-          <div className="modal-header" style={{ background: "#673ab7", color: "#fff" }}>
+          <div className="modal-header" style={{ background: headerColor, color: "#fff" }}>
             <h5 className="modal-title">
-              <i className="bi bi-clipboard2-pulse me-2"></i>
-              Nueva Consulta
+              <i className={`bi ${psicologia ? "bi-activity" : "bi-clipboard2-pulse"} me-2`}></i>
+              {psicologia ? "Nueva Sesión Psicológica" : "Nueva Consulta"}
             </h5>
             <button className="btn-close btn-close-white" onClick={onClose} />
           </div>
           <div className="modal-body">
-            {/* Info del paciente */}
             <div className="alert alert-warning py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene consulta agendada para hoy.
+              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene {psicologia ? "sesión" : "consulta"} agendada para hoy.
             </div>
 
             {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}
@@ -1121,28 +1134,27 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
             {/* Pregunta inicial */}
             {!modo && (
               <div className="text-center py-2">
-                <p className="mb-3">¿Desea agendar una consulta?</p>
+                <p className="mb-3">¿Desea {psicologia ? "iniciar una sesión" : "agendar una consulta"}?</p>
                 <div className="d-flex justify-content-center gap-3">
-                  <button className="btn btn-success px-4" onClick={() => setModo("ahora")}>
+                  <button className="btn btn-success px-4" onClick={() => psicologia ? agendarAhora() : setModo("ahora")}>
                     <i className="bi bi-clock-fill me-2"></i>Ahora
                   </button>
                   <button className="btn btn-primary px-4" onClick={() => setModo("seleccionar")}>
-                    <i className="bi bi-calendar-event me-2"></i>Seleccionar
+                    <i className="bi bi-calendar-event me-2"></i>Programar
                   </button>
                 </div>
               </div>
             )}
 
-            {/* Modo AHORA: solo pedir médico */}
-            {modo === "ahora" && (
+            {/* Modo AHORA (solo consulta médica): pedir médico */}
+            {modo === "ahora" && !psicologia && (
               <div>
                 <p className="text-muted small mb-2">
                   Se creará una cita para <strong>ahora ({dayjs().format("h:mm A")})</strong> con duración de 30 minutos.
                 </p>
                 <div className="mb-3">
                   <label className="form-label fw-semibold">Médico</label>
-                  <select className="form-select" value={medicoId}
-                    onChange={e => setMedicoId(e.target.value)}>
+                  <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
                       <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
@@ -1152,11 +1164,8 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                 <div className="row g-2 mb-3">
                   <div className="col-6">
                     <label className="form-label fw-semibold">Tipo</label>
-                    <select className="form-select form-select-sm" value={tipo}
-                      onChange={e => setTipo(e.target.value)}>
-                      {tiposConsulta.map(t => (
-                        <option key={t}>{t}</option>
-                      ))}
+                    <select className="form-select form-select-sm" value={tipo} onChange={e => setTipo(e.target.value)}>
+                      {tiposConsulta.map(t => <option key={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="col-6">
@@ -1168,16 +1177,15 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
               </div>
             )}
 
-            {/* Modo SELECCIONAR: form completo */}
+            {/* Modo PROGRAMAR: form completo (médico o psicólogo) */}
             {modo === "seleccionar" && (
               <div>
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">Médico</label>
-                  <select className="form-select" value={medicoId}
-                    onChange={e => setMedicoId(e.target.value)}>
+                  <label className="form-label fw-semibold">{psicologia ? "Psicólogo/a" : "Médico"}</label>
+                  <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{psicologia ? "" : "Dr. "}{m.nombres} {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}</option>
                     ))}
                   </select>
                 </div>
@@ -1218,11 +1226,8 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                 <div className="row g-2 mb-3">
                   <div className="col-6">
                     <label className="form-label fw-semibold">Tipo</label>
-                    <select className="form-select form-select-sm" value={tipo}
-                      onChange={e => setTipo(e.target.value)}>
-                      {tiposConsulta.map(t => (
-                        <option key={t}>{t}</option>
-                      ))}
+                    <select className="form-select form-select-sm" value={tipo} onChange={e => setTipo(e.target.value)}>
+                      {tiposConsulta.map(t => <option key={t}>{t}</option>)}
                     </select>
                   </div>
                   <div className="col-6">
@@ -1240,7 +1245,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                 <i className="bi bi-arrow-left me-1"></i>Volver
               </button>
               <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-              <button 
+              <button
                 className={`btn ${modo === "ahora" ? "btn-success" : "btn-primary"}`}
                 disabled={saving}
                 onClick={modo === "ahora" ? agendarAhora : agendarSeleccionado}>

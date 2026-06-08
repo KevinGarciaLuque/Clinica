@@ -7,6 +7,7 @@
  * 5. Eliminar Paciente
  */
 import { useEffect, useState, useRef } from "react";
+import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
@@ -18,6 +19,8 @@ const ESTADO_BADGE_PP = { BORRADOR: "warning text-dark", FIRMADA: "success" };
 import CurvaCrecimiento from "../components/CurvaCrecimiento";
 import AntecedentesClinico from "../components/AntecedentesClinico";
 import VacunasCarnet from "../components/VacunasCarnet";
+import HistorialPsicologico from "../components/HistorialPsicologico";
+import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -91,7 +94,7 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const VALID_TABS = ["datos", "historial", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const VALID_TABS = ["datos", "historial", "psicologia", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
   const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
   
@@ -564,6 +567,8 @@ export default function PerfilPaciente() {
   const contarDocumentos = (tipo) => documentos.filter(doc => doc.tipo === tipo).length;
 
   // ── Consulta: mismo flujo que en listado de pacientes ─────────────────────
+  const soloPsicologia = tieneModulo("consulta_psicologica") && !tieneModulo("consulta");
+
   const handleConsultaClick = async (pacienteTarget) => {
     if (!pacienteTarget?.id) return;
     setCheckingCita(true);
@@ -576,7 +581,11 @@ export default function PerfilPaciente() {
         c => !["CANCELADA", "NO_ASISTIO", "COMPLETADA"].includes(c.estado)
       );
       if (citasHoy.length > 0) {
-        navigate(`/consulta-medica?paciente_id=${pacienteTarget.id}&cita_id=${citasHoy[0].id}`);
+        if (soloPsicologia) {
+          navigate(`/psicologia/consulta?paciente_id=${pacienteTarget.id}&sesion_id=nueva`);
+        } else {
+          navigate(`/consulta-medica?paciente_id=${pacienteTarget.id}&cita_id=${citasHoy[0].id}`);
+        }
       } else {
         setConsultaPaciente(pacienteTarget);
         setShowConsultaModal(true);
@@ -733,8 +742,13 @@ export default function PerfilPaciente() {
 
   const TABS_PERFIL = [
     { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
-    { key: "historial",   label: "Historial Clínico",    short: "Historial", icon: "bi-journal-medical",
-      badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" },
+    ...(tieneModulo("consulta")
+      ? [{ key: "historial", label: "Historial Clínico", short: "Historial", icon: "bi-journal-medical",
+          badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" }]
+      : []),
+    ...(tieneModulo("consulta_psicologica")
+      ? [{ key: "psicologia", label: "Historia Psicológica", short: "Psicología", icon: "bi-activity", color: "#673AB7" }]
+      : []),
     { key: "examenes",    label: "Documentos",           short: "Docs.",    icon: "bi-files",
       badge: documentos.length > 0 ? documentos.length : null, badgeColor: "#0891b2" },
     ...(hayEstetica
@@ -890,7 +904,7 @@ export default function PerfilPaciente() {
                   transition: "background .15s",
                   background: isActive ? "#fff" : "rgba(255,255,255,.1)",
                   color: isActive
-                    ? (t.danger ? "#dc2626" : "#1a2744")
+                    ? (t.danger ? "#dc2626" : t.color || "#1a2744")
                     : (t.danger ? "rgba(252,165,165,.9)" : "rgba(255,255,255,.75)"),
                   whiteSpace: "nowrap",
                   display: "flex",
@@ -2078,6 +2092,13 @@ export default function PerfilPaciente() {
       )}
 
       {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: HISTORIA PSICOLÓGICA */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "psicologia" && tieneModulo("consulta_psicologica") && (
+        <HistorialPsicologico pacienteId={id} />
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
       {/* TAB 5: ELIMINAR PACIENTE (Doble confirmación) */}
       {/* ─────────────────────────────────────────────────────── */}
       {tab === "eliminar" && (
@@ -2307,16 +2328,22 @@ export default function PerfilPaciente() {
         </div>
       )}
 
-      {showConsultaModal && consultaPaciente && (
+      {showConsultaModal && consultaPaciente && createPortal(
         <ModalConsultaSinCita
           paciente={consultaPaciente}
+          psicologia={soloPsicologia}
           onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
           onCreated={(citaId) => {
             setShowConsultaModal(false);
-            navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+            if (soloPsicologia) {
+              navigate(`/psicologia/consulta?paciente_id=${consultaPaciente.id}&sesion_id=nueva`);
+            } else {
+              navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+            }
             setConsultaPaciente(null);
           }}
-        />
+        />,
+        document.body
       )}
 
       <AnimatedFeedbackModal
@@ -2373,8 +2400,9 @@ export default function PerfilPaciente() {
   );
 }
 
-// ── Modal: crear cita y lanzar consulta ──────────────────────────────────────
-function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
+// ModalConsultaSinCita se importa de ../components/ModalConsultaSinCita
+// eslint-disable-next-line no-unused-vars
+function _ModalConsultaSinCitaLegacy({ paciente, onClose, onCreated, psicologia = false }) {
   const [modo, setModo] = useState(null);
   const [medicos, setMedicos] = useState([]);
   const [medicoId, setMedicoId] = useState("");
@@ -2408,6 +2436,8 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
   };
 
   const agendarAhora = async () => {
+    // Psicología: ir directo sin cita médica
+    if (psicologia) { onCreated(null); return; }
     if (!medicoId) { setErr("Selecciona un médico"); return; }
     setSaving(true); setErr("");
     try {
@@ -2427,7 +2457,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
   };
 
   const agendarSeleccionado = async () => {
-    if (!medicoId) { setErr("Selecciona un médico"); return; }
+    if (!medicoId) { setErr(`Selecciona un${psicologia ? " psicólogo/a" : " médico"}`); return; }
     if (!horaInicio || !horaFin) { setErr("Ingresa hora de inicio y fin"); return; }
     const inicio = dayjs(`${fechaSel} ${horaInicio}`);
     const fin = dayjs(`${fechaSel} ${horaFin}`);
@@ -2450,38 +2480,42 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
     }
   };
 
+  const headerColor = psicologia ? "#673ab7" : "#0d6efd";
+
   return (
     <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 9998 }}>
       <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: modo === "seleccionar" ? 600 : 500 }}>
         <div className="modal-content">
-          <div className="modal-header" style={{ background: "#673ab7", color: "#fff" }}>
+          <div className="modal-header" style={{ background: headerColor, color: "#fff" }}>
             <h5 className="modal-title">
-              <i className="bi bi-clipboard2-pulse me-2"></i>Nueva Consulta
+              <i className={`bi ${psicologia ? "bi-activity" : "bi-clipboard2-pulse"} me-2`}></i>
+              {psicologia ? "Nueva Sesión Psicológica" : "Nueva Consulta"}
             </h5>
             <button className="btn-close btn-close-white" onClick={onClose} />
           </div>
           <div className="modal-body">
             <div className="alert alert-warning py-2 mb-3">
               <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene consulta agendada para hoy.
+              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene {psicologia ? "sesión" : "consulta"} agendada para hoy.
             </div>
             {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}
 
             {!modo && (
               <div className="text-center py-2">
-                <p className="mb-3">¿Desea agendar una consulta?</p>
+                <p className="mb-3">¿Desea {psicologia ? "iniciar una sesión" : "agendar una consulta"}?</p>
                 <div className="d-flex justify-content-center gap-3">
-                  <button className="btn btn-success px-4" onClick={() => setModo("ahora")}>
+                  <button className="btn btn-success px-4" onClick={() => psicologia ? agendarAhora() : setModo("ahora")}>
                     <i className="bi bi-clock-fill me-2"></i>Ahora
                   </button>
                   <button className="btn btn-primary px-4" onClick={() => setModo("seleccionar")}>
-                    <i className="bi bi-calendar-event me-2"></i>Seleccionar
+                    <i className="bi bi-calendar-event me-2"></i>Programar
                   </button>
                 </div>
               </div>
             )}
 
-            {modo === "ahora" && (
+            {/* Modo AHORA solo para consulta médica */}
+            {modo === "ahora" && !psicologia && (
               <div>
                 <p className="text-muted small mb-2">
                   Se creará una cita para <strong>ahora ({dayjs().format("h:mm A")})</strong> con duración de 30 minutos.
@@ -2511,14 +2545,15 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
               </div>
             )}
 
+            {/* Modo PROGRAMAR (médico o psicólogo) */}
             {modo === "seleccionar" && (
               <div>
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">Médico</label>
+                  <label className="form-label fw-semibold">{psicologia ? "Psicólogo/a" : "Médico"}</label>
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{psicologia ? "" : "Dr. "}{m.nombres} {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}</option>
                     ))}
                   </select>
                 </div>

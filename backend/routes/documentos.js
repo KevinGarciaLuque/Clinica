@@ -21,7 +21,7 @@ async function tablaExiste(nombreTabla) {
 }
 
 // ── GET /api/pacientes/:pacienteId/documentos ─────────────
-router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId   = req.tenant?.clinica_id;
     const pacienteId  = req.params.pacienteId;
@@ -102,7 +102,7 @@ router.get("/", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN")
 // ── POST /api/pacientes/:pacienteId/documentos ────────────
 router.post(
   "/",
-  auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   (req, res, next) => {
     upload.single("archivo")(req, res, (err) => {
       if (err) {
@@ -249,7 +249,7 @@ router.post(
 );
 
 // ── DELETE /api/pacientes/:pacienteId/documentos/:docId ───
-router.delete("/:docId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.delete("/:docId", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId  = req.tenant?.clinica_id;
     const pacienteId = req.params.pacienteId;
@@ -304,7 +304,7 @@ router.delete("/:docId", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPE
 
 // ── GET /api/pacientes/:pacienteId/documentos/:docId/view ─
 // Sirve el archivo (para previsualización)
-router.get("/:docId/view", auth("ADMIN","MEDICO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+router.get("/:docId/view", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId  = req.tenant?.clinica_id;
     const pacienteId = req.params.pacienteId;

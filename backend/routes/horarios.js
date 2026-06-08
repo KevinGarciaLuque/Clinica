@@ -23,7 +23,7 @@ function toMinutes(hora) {
 }
 
 // GET /api/horarios?medico_id=
-router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
     const clinicaId = req.user.super
       ? (req.query.clinica_id || req.tenant?.clinica_id)

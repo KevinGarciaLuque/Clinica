@@ -654,7 +654,7 @@ export default function RegistroPaciente() {
 
       <nav className="navbar navbar-dark bg-dark px-4" style={{ height: 56 }}>
         <span className="navbar-brand mb-0 fw-bold">
-          <i className="bi bi-hospital-fill text-primary me-2" />Multi-Clínica
+          <i className="bi bi-hospital-fill text-primary me-2" />KG-Medic
         </span>
         {tipo && (
           <button

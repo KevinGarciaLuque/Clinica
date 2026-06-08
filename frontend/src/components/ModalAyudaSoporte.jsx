@@ -560,7 +560,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
               background: "rgba(0,0,0,.15)",
             }}>
               <div style={{ color: "rgba(255,255,255,.2)", fontSize: "0.72rem" }}>
-                Multi-Clínica v1.0 · 2026 · Kevin García
+                KG-Medic v1.0 · 2026 · Kevin García
               </div>
               <button
                 onClick={onClose}

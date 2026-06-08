@@ -27,10 +27,11 @@ const ConfigClinica = lazy(() => import("./pages/admin/ConfigClinica"));
 const Plantillas    = lazy(() => import("./pages/admin/Plantillas"));
 
 // Super Admin
-const Clinicas         = lazy(() => import("./pages/superadmin/Clinicas"));
-const Database         = lazy(() => import("./pages/superadmin/Database"));
-const Reportes         = lazy(() => import("./pages/superadmin/Reportes"));
-const SoporteHistorial = lazy(() => import("./pages/superadmin/SoporteHistorial"));
+const Clinicas                 = lazy(() => import("./pages/superadmin/Clinicas"));
+const Database                 = lazy(() => import("./pages/superadmin/Database"));
+const Reportes                 = lazy(() => import("./pages/superadmin/Reportes"));
+const SoporteHistorial         = lazy(() => import("./pages/superadmin/SoporteHistorial"));
+const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdminPersonalizacion"));
 
 // Módulos de Cirugía Estética
 const GaleriaEstetica          = lazy(() => import("./pages/estetica/GaleriaEstetica"));
@@ -39,6 +40,9 @@ const ConsentimientosEsteticos = lazy(() => import("./pages/estetica/Consentimie
 const SeguimientoPostOp        = lazy(() => import("./pages/estetica/SeguimientoPostOp"));
 const FichaEstetica            = lazy(() => import("./pages/estetica/FichaEstetica"));
 const BiopsiaPatologia         = lazy(() => import("./pages/estetica/BiopsiaPatologia"));
+
+// Módulo Psicología
+const ConsultaPsicologia = lazy(() => import("./pages/psicologia/ConsultaPsicologia"));
 
 // Módulos adicionales
 const Recordatorios   = lazy(() => import("./pages/Recordatorios"));
@@ -179,6 +183,20 @@ export default function App() {
         <Route path="/superadmin/soporte" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <SoporteHistorial />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/personalizacion" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <SuperAdminPersonalizacion />
+          </RolRoute>
+        } />
+
+        {/* ── Módulo Psicología ── */}
+        <Route path="/psicologia/consulta" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
+            <Suspense fallback={<PageSkeleton />}>
+              <ConsultaPsicologia />
+            </Suspense>
           </RolRoute>
         } />
 

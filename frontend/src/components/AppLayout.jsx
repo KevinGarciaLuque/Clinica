@@ -119,6 +119,10 @@ export default function AppLayout() {
 
         {/* Estilos responsivos */}
         <style>{`
+          @keyframes navline-shine {
+            0%   { transform: translateX(-150%); }
+            100% { transform: translateX(450%); }
+          }
           @media (max-width: 991.98px) {
             .sidebar-aside {
               position: absolute !important;
@@ -138,10 +142,20 @@ export default function AppLayout() {
         {/* ── Contenido principal ── */}
         <main
           ref={mainRef}
-          className="flex-grow-1 p-3 p-md-4"
-          style={{ overflowY: "auto", background: "#f1f5f9", minWidth: 0, height: "100%" }}
+          className={pathname.startsWith("/psicologia") ? "flex-grow-1" : "flex-grow-1 p-3 p-md-4"}
+          style={{
+            overflowY: "auto",
+            background: pathname.startsWith("/psicologia") ? "#f1f5f9" : "#f1f5f9",
+            minWidth: 0,
+            height: "100%",
+            padding: pathname.startsWith("/psicologia") ? 0 : undefined,
+          }}
         >
-          <div key={pathname} className="route-fade-enter">
+          <div
+            key={pathname}
+            className="route-fade-enter"
+            style={pathname.startsWith("/psicologia") ? { height: "100%" } : {}}
+          >
             <Outlet />
           </div>
         </main>

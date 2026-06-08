@@ -8,6 +8,8 @@ import { useParams, useNavigate, Link } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
 import AntecedentesClinico from "../components/AntecedentesClinico";
+import HistorialPsicologico from "../components/HistorialPsicologico";
+import { useAuth } from "../auth/AuthContext";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE = { BORRADOR: "warning text-dark", FIRMADA: "success" };
@@ -27,6 +29,8 @@ const inputSt = {
 export default function HistoriaClinica() {
   const { paciente_id } = useParams();
   const navigate        = useNavigate();
+  const { modulos }     = useAuth();
+  const tieneModulo     = (clave) => modulos.some(m => m.clave === clave);
 
   const [paciente,     setPaciente]     = useState(null);
   const [historias,    setHistorias]    = useState([]);
@@ -560,23 +564,24 @@ export default function HistoriaClinica() {
           </div>
 
           {/* ── Pestañas ───────────────────────────────────────────── */}
-          <div style={{ display: "flex", gap: 6, marginBottom: 16 }}>
+          <div style={{ display: "flex", gap: 6, marginBottom: 16, flexWrap: "wrap" }}>
             {[
-              { key: "historial", label: `🕐 Historial (${historias.length})` },
-              { key: "alergias",  label: "🩺 Alergias y Antecedentes" },
-            ].map(t => (
+              { key: "historial",  label: `🕐 Historial (${historias.length})`,       show: true },
+              { key: "alergias",   label: "🩺 Alergias y Antecedentes",               show: true },
+              { key: "psicologia", label: "🧠 Historia Psicológica",                  show: tieneModulo("consulta_psicologica"), color: "#673AB7" },
+            ].filter(t => t.show).map(t => (
               <button key={t.key} onClick={() => setActiveTabHist(t.key)} style={{
                 padding: "7px 18px", fontSize: "0.82rem", fontWeight: 600, borderRadius: 8,
                 border: activeTabHist === t.key ? "none" : "1px solid #e5e7eb",
                 cursor: "pointer",
-                background: activeTabHist === t.key ? "#1a2744" : "#fff",
+                background: activeTabHist === t.key ? (t.color || "#1a2744") : "#fff",
                 color: activeTabHist === t.key ? "#fff" : "#6b7280",
-                boxShadow: activeTabHist === t.key ? "0 2px 8px rgba(26,39,68,.2)" : "none",
+                boxShadow: activeTabHist === t.key ? `0 2px 8px ${t.color ? t.color + "40" : "rgba(26,39,68,.2)"}` : "none",
               }}>{t.label}</button>
             ))}
           </div>
 
-          {/* ── Tab 1: Alergias y Antecedentes ───────────────────────── */}
+          {/* ── Tab: Alergias y Antecedentes ─────────────────────────── */}
           {activeTabHist === "alergias" && (
             <AntecedentesClinico
               pacienteId={selPacId || paciente_id}
@@ -584,7 +589,12 @@ export default function HistoriaClinica() {
             />
           )}
 
-          {/* ── Tab 2: Historial de Consultas ────────────────────────── */}
+          {/* ── Tab: Historia Psicológica ─────────────────────────────── */}
+          {activeTabHist === "psicologia" && tieneModulo("consulta_psicologica") && (
+            <HistorialPsicologico pacienteId={selPacId || paciente_id} />
+          )}
+
+          {/* ── Tab: Historial de Consultas ───────────────────────────── */}
           {activeTabHist === "historial" && (() => {
             const historiasFiltradas = historias.filter(h => {
               const fecha = dayjs(h.creado_en);
