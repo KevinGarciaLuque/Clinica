@@ -72,11 +72,16 @@ function getMenuSections(tipo, modulos) {
   const hasDynamic = modulos && modulos.length > 0;
   let mainItems = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
 
-  // Clínica solo psicológica: ocultar Estudios e Imágenes (no aplica a psicología)
-  const tienePsico    = mainItems.some(m => m.to === "/psicologia/consulta");
-  const tieneConsulta = mainItems.some(m => m.to === "/consulta");
+  // Clínica solo psicológica: ocultar Estudios e Imágenes
+  const tienePsico       = mainItems.some(m => m.to === "/psicologia/consulta");
+  const tieneOdonto      = mainItems.some(m => m.to === "/odontologia/consulta");
+  const tieneConsulta    = mainItems.some(m => m.to === "/consulta");
   if (tienePsico && !tieneConsulta) {
     mainItems = mainItems.filter(m => m.to !== "/estudios");
+  }
+  // Clínica dental: ocultar "Consulta" genérica (la reemplaza "Consulta Odontológica")
+  if (tieneOdonto && tieneConsulta) {
+    mainItems = mainItems.filter(m => m.to !== "/consulta");
   }
 
   // MEDICO y ADMIN siempre deben ver Consulta (puede no estar en caché)

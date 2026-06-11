@@ -231,13 +231,19 @@ export default function Pacientes() {
   };
 
   // ── Consulta: verificar si el paciente tiene cita hoy ─────────────────────
-  const tienePsicologia = modulos.some(m => m.clave === "consulta_psicologica");
+  const tienePsicologia  = modulos.some(m => m.clave === "consulta_psicologica");
+  const tieneOdontologia = modulos.some(m => m.clave === "consulta_odontologica");
   const tieneConsultaMedica = modulos.some(m => m.clave === "consulta");
-  const soloPsicologia = tienePsicologia && !tieneConsultaMedica;
+  const soloPsicologia  = tienePsicologia  && !tieneConsultaMedica;
+  const soloOdontologia = tieneOdontologia && !tieneConsultaMedica;
 
   const handleConsultaClick = async (e, paciente) => {
     e.stopPropagation();
     e.preventDefault();
+    if (soloOdontologia) {
+      navigate(`/odontologia/consulta?paciente_id=${paciente.id}`);
+      return;
+    }
     setCheckingCita(true);
     try {
       const hoy = dayjs().format("YYYY-MM-DD");
@@ -899,6 +905,8 @@ export default function Pacientes() {
             setShowConsultaModal(false);
             if (soloPsicologia) {
               navigate(`/psicologia/consulta?paciente_id=${consultaPaciente.id}&sesion_id=nueva`);
+            } else if (soloOdontologia) {
+              navigate(`/odontologia/consulta?paciente_id=${consultaPaciente.id}${citaId ? `&cita_id=${citaId}` : ''}`);
             } else {
               navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
             }

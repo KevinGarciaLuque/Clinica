@@ -567,10 +567,15 @@ export default function PerfilPaciente() {
   const contarDocumentos = (tipo) => documentos.filter(doc => doc.tipo === tipo).length;
 
   // ── Consulta: mismo flujo que en listado de pacientes ─────────────────────
-  const soloPsicologia = tieneModulo("consulta_psicologica") && !tieneModulo("consulta");
+  const soloPsicologia  = tieneModulo("consulta_psicologica") && !tieneModulo("consulta");
+  const soloOdontologia = tieneModulo("consulta_odontologica") && !tieneModulo("consulta");
 
   const handleConsultaClick = async (pacienteTarget) => {
     if (!pacienteTarget?.id) return;
+    if (soloOdontologia) {
+      navigate(`/odontologia/consulta?paciente_id=${pacienteTarget.id}`);
+      return;
+    }
     setCheckingCita(true);
     try {
       const hoy = dayjs().format("YYYY-MM-DD");
@@ -2337,6 +2342,8 @@ export default function PerfilPaciente() {
             setShowConsultaModal(false);
             if (soloPsicologia) {
               navigate(`/psicologia/consulta?paciente_id=${consultaPaciente.id}&sesion_id=nueva`);
+            } else if (soloOdontologia) {
+              navigate(`/odontologia/consulta?paciente_id=${consultaPaciente.id}${citaId ? `&cita_id=${citaId}` : ''}`);
             } else {
               navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
             }

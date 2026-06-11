@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan Semestral</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    width: 1080px;
+    height: 1080px;
+    overflow: hidden;
+    font-family: 'Inter', sans-serif;
+    background: #0a1628;
+  }
+
+  .post {
+    width: 1080px;
+    height: 1080px;
+    position: relative;
+    background: linear-gradient(135deg, #0a1628 0%, #0d2040 40%, #0a3060 100%);
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+
+  /* Decorative circles */
+  .circle-bg {
+    position: absolute;
+    border-radius: 50%;
+    opacity: 0.06;
+  }
+  .c1 { width: 700px; height: 700px; background: #4fc3f7; top: -200px; right: -150px; }
+  .c2 { width: 400px; height: 400px; background: #29b6f6; bottom: -100px; left: -100px; }
+  .c3 { width: 200px; height: 200px; background: #81d4fa; top: 400px; left: 50px; opacity: 0.04; }
+
+  /* Top grid lines */
+  .grid-lines {
+    position: absolute;
+    top: 0; left: 0; right: 0; bottom: 0;
+    background-image:
+      linear-gradient(rgba(79,195,247,0.04) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(79,195,247,0.04) 1px, transparent 1px);
+    background-size: 60px 60px;
+  }
+
+  /* Header */
+  .header {
+    position: relative;
+    z-index: 10;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 38px 60px 0;
+  }
+
+  .logo-area {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 52px; height: 52px;
+    background: linear-gradient(135deg, #29b6f6, #0288d1);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 26px;
+    box-shadow: 0 4px 20px rgba(41,182,246,0.4);
+  }
+
+  .logo-text {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 0.5px;
+  }
+  .logo-text span {
+    color: #29b6f6;
+  }
+
+  .badge-new {
+    background: linear-gradient(135deg, #29b6f6, #0288d1);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 700;
+    padding: 6px 18px;
+    border-radius: 20px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    box-shadow: 0 4px 15px rgba(41,182,246,0.4);
+  }
+
+  /* Plan title area */
+  .plan-hero {
+    position: relative;
+    z-index: 10;
+    margin-top: 36px;
+    text-align: center;
+  }
+
+  .plan-label {
+    font-size: 15px;
+    font-weight: 600;
+    color: #4fc3f7;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+  }
+
+  .plan-name {
+    font-size: 72px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+    letter-spacing: -1px;
+  }
+
+  .plan-name span {
+    color: #29b6f6;
+  }
+
+  .divider-line {
+    width: 80px; height: 4px;
+    background: linear-gradient(90deg, #29b6f6, #0288d1);
+    border-radius: 2px;
+    margin: 16px auto;
+  }
+
+  .plan-sub {
+    font-size: 17px;
+    color: rgba(255,255,255,0.55);
+    font-weight: 400;
+    letter-spacing: 0.5px;
+  }
+
+  /* Price */
+  .price-box {
+    position: relative;
+    z-index: 10;
+    margin-top: 26px;
+    background: linear-gradient(135deg, rgba(41,182,246,0.15), rgba(2,136,209,0.1));
+    border: 1.5px solid rgba(79,195,247,0.25);
+    border-radius: 24px;
+    padding: 22px 60px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    backdrop-filter: blur(10px);
+  }
+
+  .price-amount {
+    font-size: 68px;
+    font-weight: 900;
+    color: #29b6f6;
+    line-height: 1;
+    text-shadow: 0 0 40px rgba(41,182,246,0.5);
+  }
+
+  .price-currency {
+    font-size: 28px;
+    font-weight: 700;
+    color: rgba(79,195,247,0.8);
+    align-self: flex-start;
+    margin-top: 12px;
+  }
+
+  .price-period {
+    font-size: 20px;
+    color: rgba(255,255,255,0.5);
+    font-weight: 500;
+    margin-left: 4px;
+  }
+
+  /* Devices */
+  .devices-strip {
+    position: relative;
+    z-index: 10;
+    margin-top: 20px;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: rgba(255,255,255,0.04);
+    border: 1px solid rgba(255,255,255,0.08);
+    border-radius: 40px;
+    padding: 10px 28px;
+  }
+
+  .device-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: rgba(255,255,255,0.6);
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .device-icon { font-size: 20px; }
+
+  .device-sep {
+    width: 1px; height: 20px;
+    background: rgba(255,255,255,0.12);
+  }
+
+  /* Modules grid */
+  .modules-section {
+    position: relative;
+    z-index: 10;
+    margin-top: 28px;
+    width: 100%;
+    padding: 0 50px;
+  }
+
+  .modules-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.35);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    text-align: center;
+    margin-bottom: 16px;
+  }
+
+  .modules-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+
+  .module-item {
+    background: rgba(255,255,255,0.05);
+    border: 1px solid rgba(79,195,247,0.12);
+    border-radius: 14px;
+    padding: 12px 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 7px;
+    transition: all 0.2s;
+  }
+
+  .module-icon { font-size: 22px; }
+
+  .module-name {
+    font-size: 11px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.75);
+    text-align: center;
+    line-height: 1.3;
+  }
+
+  /* Storage */
+  .storage-row {
+    position: relative;
+    z-index: 10;
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    background: rgba(41,182,246,0.08);
+    border: 1px solid rgba(41,182,246,0.2);
+    border-radius: 16px;
+    padding: 14px 30px;
+  }
+
+  .storage-icon { font-size: 28px; }
+
+  .storage-info { flex: 1; }
+
+  .storage-label {
+    font-size: 12px;
+    color: rgba(255,255,255,0.4);
+    font-weight: 500;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+
+  .storage-value {
+    font-size: 22px;
+    font-weight: 800;
+    color: #4fc3f7;
+  }
+
+  .storage-bar-wrap {
+    width: 180px;
+    height: 6px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 3px;
+    overflow: hidden;
+  }
+
+  .storage-bar-fill {
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(90deg, #29b6f6, #0288d1);
+    border-radius: 3px;
+  }
+
+  /* Footer */
+  .footer {
+    position: relative;
+    z-index: 10;
+    margin-top: auto;
+    padding: 0 60px 36px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .phone-area {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .phone-icon-wrap {
+    width: 40px; height: 40px;
+    background: linear-gradient(135deg, #29b6f6, #0288d1);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+    box-shadow: 0 4px 12px rgba(41,182,246,0.4);
+  }
+
+  .phone-number {
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+  }
+
+  .cta-btn {
+    background: linear-gradient(135deg, #29b6f6, #0288d1);
+    color: #fff;
+    font-size: 16px;
+    font-weight: 700;
+    padding: 14px 34px;
+    border-radius: 30px;
+    letter-spacing: 0.5px;
+    box-shadow: 0 6px 24px rgba(41,182,246,0.4);
+    text-transform: uppercase;
+  }
+
+  /* Glow accent */
+  .glow-accent {
+    position: absolute;
+    width: 300px; height: 300px;
+    background: radial-gradient(circle, rgba(41,182,246,0.12) 0%, transparent 70%);
+    top: 200px; left: -80px;
+    pointer-events: none;
+  }
+
+  .glow-accent2 {
+    position: absolute;
+    width: 400px; height: 400px;
+    background: radial-gradient(circle, rgba(41,182,246,0.08) 0%, transparent 70%);
+    bottom: 100px; right: -100px;
+    pointer-events: none;
+  }
+</style>
+</head>
+<body>
+<div class="post">
+  <!-- Background elements -->
+  <div class="grid-lines"></div>
+  <div class="circle-bg c1"></div>
+  <div class="circle-bg c2"></div>
+  <div class="circle-bg c3"></div>
+  <div class="glow-accent"></div>
+  <div class="glow-accent2"></div>
+
+  <!-- Header -->
+  <div class="header">
+    <div class="logo-area">
+      <div class="logo-icon">🏥</div>
+      <div class="logo-text">Medic<span>-KG</span></div>
+    </div>
+    <div class="badge-new">Software Médico</div>
+  </div>
+
+  <!-- Plan Hero -->
+  <div class="plan-hero">
+    <div class="plan-label">✦ Oferta especial ✦</div>
+    <div class="plan-name">Plan <span>Semestral</span></div>
+    <div class="divider-line"></div>
+    <div class="plan-sub">6 meses de gestión clínica completa</div>
+  </div>
+
+  <!-- Price -->
+  <div class="price-box">
+    <div class="price-currency">L.</div>
+    <div class="price-amount">700</div>
+    <div class="price-period">/ mes</div>
+  </div>
+
+  <!-- Devices -->
+  <div class="devices-strip">
+    <div class="device-item">
+      <span class="device-icon">📱</span>
+      <span>Celular</span>
+    </div>
+    <div class="device-sep"></div>
+    <div class="device-item">
+      <span class="device-icon">📟</span>
+      <span>Tablet</span>
+    </div>
+    <div class="device-sep"></div>
+    <div class="device-item">
+      <span class="device-icon">💻</span>
+      <span>Computadora</span>
+    </div>
+    <div class="device-sep"></div>
+    <div class="device-item">
+      <span class="device-icon">🌐</span>
+      <span>100% en la nube</span>
+    </div>
+  </div>
+
+  <!-- Modules -->
+  <div class="modules-section">
+    <div class="modules-title">Módulos incluidos</div>
+    <div class="modules-grid">
+      <div class="module-item">
+        <span class="module-icon">👥</span>
+        <span class="module-name">Pacientes</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">🩺</span>
+        <span class="module-name">Consultas</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">📋</span>
+        <span class="module-name">Historia Clínica</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">📅</span>
+        <span class="module-name">Citas</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">💊</span>
+        <span class="module-name">Recetas</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">🦷</span>
+        <span class="module-name">Odontología</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">🧠</span>
+        <span class="module-name">Psicología</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">✨</span>
+        <span class="module-name">Estética</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">🔬</span>
+        <span class="module-name">Estudios/RX</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">🤖</span>
+        <span class="module-name">Chat IA</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">💉</span>
+        <span class="module-name">Vacunas</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">📦</span>
+        <span class="module-name">Inventario</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">📊</span>
+        <span class="module-name">Reportes</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">🔔</span>
+        <span class="module-name">Recordatorios</span>
+      </div>
+      <div class="module-item">
+        <span class="module-icon">📄</span>
+        <span class="module-name">Documentos</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Storage -->
+  <div class="storage-row">
+    <span class="storage-icon">☁️</span>
+    <div class="storage-info">
+      <div class="storage-label">Almacenamiento en nube</div>
+      <div class="storage-value">10 GB incluidos</div>
+    </div>
+    <div>
+      <div class="storage-bar-wrap">
+        <div class="storage-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <div class="footer">
+    <div class="phone-area">
+      <div class="phone-icon-wrap">📞</div>
+      <div class="phone-number">+504 9606 5564</div>
+    </div>
+    <div class="cta-btn">¡Contratar ahora!</div>
+  </div>
+</div>
+</body>
+</html>

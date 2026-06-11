@@ -44,6 +44,9 @@ const BiopsiaPatologia         = lazy(() => import("./pages/estetica/BiopsiaPato
 // Módulo Psicología
 const ConsultaPsicologia = lazy(() => import("./pages/psicologia/ConsultaPsicologia"));
 
+// Módulo Odontología
+const ConsultaOdontologia = lazy(() => import("./pages/odontologia/ConsultaOdontologia"));
+
 // Módulos adicionales
 const Recordatorios   = lazy(() => import("./pages/Recordatorios"));
 const PerfilUsuario   = lazy(() => import("./pages/PerfilUsuario"));
@@ -196,6 +199,15 @@ export default function App() {
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Suspense fallback={<PageSkeleton />}>
               <ConsultaPsicologia />
+            </Suspense>
+          </RolRoute>
+        } />
+
+        {/* ── Módulo Odontología ── */}
+        <Route path="/odontologia/consulta" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
+            <Suspense fallback={<PageSkeleton />}>
+              <ConsultaOdontologia />
             </Suspense>
           </RolRoute>
         } />
