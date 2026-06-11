@@ -82,7 +82,15 @@ const uploadSistema = multer({
   fileFilter: imageFilter,
 });
 
+// Memory storage para logo/fondo del sistema → se guarda como base64 en la BD
+const uploadSistemaMemory = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: imageFilter,
+});
+
 module.exports = uploadPacientes;
-module.exports.uploadPacientes = uploadPacientes;
-module.exports.uploadClinicas  = uploadClinicas;
-module.exports.uploadSistema   = uploadSistema;
+module.exports.uploadPacientes     = uploadPacientes;
+module.exports.uploadClinicas      = uploadClinicas;
+module.exports.uploadSistema       = uploadSistema;
+module.exports.uploadSistemaMemory = uploadSistemaMemory;

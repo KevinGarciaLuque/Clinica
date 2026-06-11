@@ -1,9 +1,7 @@
 const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
-const { uploadSistema } = require("../middlewares/upload");
-const path   = require("path");
-const fs     = require("fs");
+const { uploadSistemaMemory } = require("../middlewares/upload");
 
 const DEFAULTS = {
   nombre_sistema:   "KG-Medic",
@@ -23,10 +21,14 @@ async function ensureSchema() {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS config_sistema (
       clave   VARCHAR(80)  NOT NULL PRIMARY KEY,
-      valor   TEXT         NOT NULL,
+      valor   MEDIUMTEXT   NOT NULL,
       updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
   `);
+  // Ampliar columna si la tabla ya existía con TEXT (< 64KB)
+  await pool.query(`
+    ALTER TABLE config_sistema MODIFY COLUMN valor MEDIUMTEXT NOT NULL
+  `).catch(() => {});
   // Insertar defaults si no existen
   for (const [clave, valor] of Object.entries(DEFAULTS)) {
     await pool.query(
@@ -87,18 +89,18 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
 router.post(
   "/upload-logo",
   auth("SUPER_ADMIN"),
-  uploadSistema.single("logo"),
+  uploadSistemaMemory.single("logo"),
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
       await ensureSchema();
-      const url = `/uploads/sistema/${req.file.filename}`;
+      const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
       await pool.query(
         `INSERT INTO config_sistema (clave, valor) VALUES ('logo_url', ?)
          ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
-        [url]
+        [dataUrl]
       );
-      res.json({ ok: true, url });
+      res.json({ ok: true, url: dataUrl });
     } catch (e) {
       console.error("[config-sistema upload-logo]", e);
       res.status(500).json({ ok: false, msg: e.message });
@@ -110,18 +112,18 @@ router.post(
 router.post(
   "/upload-fondo",
   auth("SUPER_ADMIN"),
-  uploadSistema.single("fondo"),
+  uploadSistemaMemory.single("fondo"),
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
       await ensureSchema();
-      const url = `/uploads/sistema/${req.file.filename}`;
+      const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
       await pool.query(
         `INSERT INTO config_sistema (clave, valor) VALUES ('fondo_login_url', ?)
          ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
-        [url]
+        [dataUrl]
       );
-      res.json({ ok: true, url });
+      res.json({ ok: true, url: dataUrl });
     } catch (e) {
       console.error("[config-sistema upload-fondo]", e);
       res.status(500).json({ ok: false, msg: e.message });
@@ -133,12 +135,6 @@ router.post(
 router.delete("/logo", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     await ensureSchema();
-    const [rows] = await pool.query("SELECT valor FROM config_sistema WHERE clave='logo_url'");
-    const oldUrl = rows[0]?.valor || "";
-    if (oldUrl && oldUrl.startsWith("/uploads/sistema/")) {
-      const filePath = path.join(__dirname, "../", oldUrl);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    }
     await pool.query(
       `INSERT INTO config_sistema (clave, valor) VALUES ('logo_url', '')
        ON DUPLICATE KEY UPDATE valor = ''`

@@ -38,14 +38,18 @@ export function ConfigSistemaProvider({ children }) {
 
   const recargar = () => cargar();
 
-  // Resuelve la URL completa del logo
+  // Resuelve la URL completa del logo (soporta base64, http o ruta relativa)
   const logoUrl = config.logo_url
-    ? (config.logo_url.startsWith("http") ? config.logo_url : `${API_URL}${config.logo_url}`)
+    ? (config.logo_url.startsWith("http") || config.logo_url.startsWith("data:")
+        ? config.logo_url
+        : `${API_URL}${config.logo_url}`)
     : null;
 
-  // Resuelve la URL completa del fondo
+  // Resuelve la URL completa del fondo (soporta base64, http o ruta relativa)
   const fondoUrl = config.fondo_login_url
-    ? (config.fondo_login_url.startsWith("http") ? config.fondo_login_url : `${API_URL}${config.fondo_login_url}`)
+    ? (config.fondo_login_url.startsWith("http") || config.fondo_login_url.startsWith("data:")
+        ? config.fondo_login_url
+        : `${API_URL}${config.fondo_login_url}`)
     : DEFAULTS.fondo_login_url;
 
   return (
