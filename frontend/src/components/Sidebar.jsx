@@ -84,8 +84,8 @@ function getMenuSections(tipo, modulos) {
     mainItems = mainItems.filter(m => m.to !== "/consulta");
   }
 
-  // MEDICO y ADMIN siempre deben ver Consulta (puede no estar en caché)
-  if ((tipo === "MEDICO" || tipo === "ADMIN") && !mainItems.some(m => m.to === "/consulta")) {
+  // MEDICO y ADMIN siempre deben ver Consulta (excepto en clínicas exclusivamente de psicología)
+  if ((tipo === "MEDICO" || tipo === "ADMIN") && !tienePsico && !mainItems.some(m => m.to === "/consulta")) {
     const consulta = { to: "/consulta", label: "Consulta", icon: "bi-clipboard2-pulse-fill" };
     const citasIdx = mainItems.findIndex(m => m.to === "/citas");
     mainItems = citasIdx >= 0
