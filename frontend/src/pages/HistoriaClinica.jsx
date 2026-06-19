@@ -705,6 +705,24 @@ export default function HistoriaClinica() {
                       <div style={{ marginTop: 6, display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                         <span style={{ background: "#e0f2fe", color: "#0369a1", border: "1px solid #bae6fd",
                           borderRadius: 5, padding: "2px 8px", fontSize: "0.75rem", fontWeight: 700 }}>CIE: {h.diagnostico_cie}</span>
+                        {docsMap[h.id] > 0 && (
+                          <span
+                            onClick={async (e) => {
+                              e.stopPropagation();
+                              const r = await api.get(`/pacientes/${paciente.id}/documentos`, { params: { historia_id: h.id } }).catch(() => ({ data: { data: [] } }));
+                              setModalDocs({ historiaId: h.id, docs: r.data.data || [] });
+                            }}
+                            title="Ver documentos adjuntos"
+                            style={{
+                              background: "#f0f9ff", color: "#0284c7", border: "1px solid #bae6fd",
+                              borderRadius: 5, padding: "2px 8px", fontSize: "0.75rem", fontWeight: 600,
+                              cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 4,
+                              userSelect: "none",
+                            }}>
+                            <i className="bi bi-paperclip"></i>
+                            {docsMap[h.id]} doc{docsMap[h.id] > 1 ? "s" : ""}
+                          </span>
+                        )}
                         {h.plan && <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>{h.plan.substring(0, 80)}{h.plan.length > 80 ? "…" : ""}</span>}
                       </div>
                     )}
