@@ -6,54 +6,54 @@
 INSERT IGNORE INTO cie10 (codigo, descripcion, categoria) VALUES
 
 -- ─── Síndrome nefrótico (N04) ───────────────────────────────
-('N04.0', 'Síndrome nefrótico con anomalía glomerular menor',                         'Urología'),
-('N04.1', 'Síndrome nefrótico con lesiones glomerulares focales y segmentarias',       'Urología'),
-('N04.2', 'Síndrome nefrótico con glomerulonefritis membranosa',                       'Urología'),
-('N04.3', 'Síndrome nefrótico con glomerulonefritis mesangial proliferativa',          'Urología'),
-('N04.4', 'Síndrome nefrótico con glomerulonefritis endocapilar proliferativa',        'Urología'),
-('N04.5', 'Síndrome nefrótico con glomerulonefritis mesangiocapilar',                  'Urología'),
-('N04.6', 'Síndrome nefrótico con enfermedad de depósitos densos',                     'Urología'),
-('N04.7', 'Síndrome nefrótico con glomerulonefritis difusa en media luna',             'Urología'),
-('N04.8', 'Síndrome nefrótico con otras alteraciones morfológicas (nefropatía por IgA)','Urología'),
-('N04.9', 'Síndrome nefrótico con cambios morfológicos NE',                            'Urología'),
+('N04.0', 'Síndrome nefrótico con anomalía glomerular menor',                         'Nefrología'),
+('N04.1', 'Síndrome nefrótico con lesiones glomerulares focales y segmentarias',       'Nefrología'),
+('N04.2', 'Síndrome nefrótico con glomerulonefritis membranosa',                       'Nefrología'),
+('N04.3', 'Síndrome nefrótico con glomerulonefritis mesangial proliferativa',          'Nefrología'),
+('N04.4', 'Síndrome nefrótico con glomerulonefritis endocapilar proliferativa',        'Nefrología'),
+('N04.5', 'Síndrome nefrótico con glomerulonefritis mesangiocapilar',                  'Nefrología'),
+('N04.6', 'Síndrome nefrótico con enfermedad de depósitos densos',                     'Nefrología'),
+('N04.7', 'Síndrome nefrótico con glomerulonefritis difusa en media luna',             'Nefrología'),
+('N04.8', 'Síndrome nefrótico con otras alteraciones morfológicas (nefropatía por IgA)','Nefrología'),
+('N04.9', 'Síndrome nefrótico con cambios morfológicos NE',                            'Nefrología'),
 
 -- ─── Síndrome nefrítico agudo (N00) ─────────────────────────
-('N00.0', 'Síndrome nefrítico agudo con anomalía glomerular menor',                   'Urología'),
-('N00.1', 'Síndrome nefrítico agudo con lesiones glomerulares focales y segmentarias','Urología'),
-('N00.2', 'Síndrome nefrítico agudo con glomerulonefritis membranosa',                'Urología'),
-('N00.3', 'Síndrome nefrítico agudo con glomerulonefritis mesangial proliferativa',   'Urología'),
-('N00.8', 'Síndrome nefrítico agudo con otras alteraciones morfológicas',              'Urología'),
+('N00.0', 'Síndrome nefrítico agudo con anomalía glomerular menor',                   'Nefrología'),
+('N00.1', 'Síndrome nefrítico agudo con lesiones glomerulares focales y segmentarias','Nefrología'),
+('N00.2', 'Síndrome nefrítico agudo con glomerulonefritis membranosa',                'Nefrología'),
+('N00.3', 'Síndrome nefrítico agudo con glomerulonefritis mesangial proliferativa',   'Nefrología'),
+('N00.8', 'Síndrome nefrítico agudo con otras alteraciones morfológicas',              'Nefrología'),
 
 -- ─── Síndrome nefrítico progresivo rápido (N01) ─────────────
-('N01.9', 'Síndrome nefrítico de progresión rápida NE',                               'Urología'),
+('N01.9', 'Síndrome nefrítico de progresión rápida NE',                               'Nefrología'),
 
 -- ─── Hematuria recurrente y persistente (N02) ───────────────
-('N02.9', 'Hematuria recurrente y persistente NE',                                    'Urología'),
+('N02.9', 'Hematuria recurrente y persistente NE',                                    'Nefrología'),
 
 -- ─── Síndrome nefrítico crónico (N03) ───────────────────────
-('N03.9', 'Síndrome nefrítico crónico NE',                                            'Urología'),
+('N03.9', 'Síndrome nefrítico crónico NE',                                            'Nefrología'),
 
 -- ─── Síndrome nefrótico NE (N05) ────────────────────────────
-('N05.9', 'Síndrome nefrítico no especificado NE',                                    'Urología'),
+('N05.9', 'Síndrome nefrítico no especificado NE',                                    'Nefrología'),
 
 -- ─── Nefropatía hereditaria (N07) ───────────────────────────
-('N07.9', 'Nefropatía hereditaria NE',                                                'Urología'),
+('N07.9', 'Nefropatía hereditaria NE',                                                'Nefrología'),
 
 -- ─── Insuficiencia renal / ERC adicional ────────────────────
-('N18.1', 'Enfermedad renal crónica etapa 1',                                         'Urología'),
-('N18.2', 'Enfermedad renal crónica etapa 2',                                         'Urología'),
-('N18.4', 'Enfermedad renal crónica etapa 4',                                         'Urología'),
-('N18.5', 'Enfermedad renal crónica etapa 5',                                         'Urología'),
-('N19',   'Insuficiencia renal NE',                                                   'Urología'),
+('N18.1', 'Enfermedad renal crónica etapa 1',                                         'Nefrología'),
+('N18.2', 'Enfermedad renal crónica etapa 2',                                         'Nefrología'),
+('N18.4', 'Enfermedad renal crónica etapa 4',                                         'Nefrología'),
+('N18.5', 'Enfermedad renal crónica etapa 5',                                         'Nefrología'),
+('N19',   'Insuficiencia renal NE',                                                   'Nefrología'),
 
 -- ─── Hipertensión renovascular / trastornos tubulares ───────
-('N25.0', 'Osteodistrofia renal',                                                     'Urología'),
-('N25.1', 'Diabetes insípida nefrogénica',                                            'Urología'),
-('N25.9', 'Trastorno resultante de función tubular renal alterada NE',                'Urología'),
-('N26',   'Riñón contraído NE',                                                       'Urología'),
-('N28.0', 'Isquemia e infarto del riñón',                                             'Urología'),
-('N28.1', 'Quiste adquirido del riñón',                                               'Urología'),
-('N28.9', 'Trastorno del riñón y del uréter NE',                                     'Urología'),
+('N25.0', 'Osteodistrofia renal',                                                     'Nefrología'),
+('N25.1', 'Diabetes insípida nefrogénica',                                            'Nefrología'),
+('N25.9', 'Trastorno resultante de función tubular renal alterada NE',                'Nefrología'),
+('N26',   'Riñón contraído NE',                                                       'Nefrología'),
+('N28.0', 'Isquemia e infarto del riñón',                                             'Nefrología'),
+('N28.1', 'Quiste adquirido del riñón',                                               'Nefrología'),
+('N28.9', 'Trastorno del riñón y del uréter NE',                                     'Nefrología'),
 
 -- ─── Infección vías urinarias ────────────────────────────────
 ('N39.0', 'Infección de vías urinarias NE',                                           'Urología'),
@@ -113,8 +113,8 @@ INSERT IGNORE INTO cie10 (codigo, descripcion, categoria) VALUES
 
 -- ─── Hipertensión arterial (pediatría) ───────────────────────
 ('I10',   'Hipertensión esencial primaria',                                           'Cardiología'),
-('I12.9', 'Enfermedad renal hipertensiva sin insuficiencia renal',                    'Urología'),
-('I13.1', 'Enfermedad cardiorrenale hipertensiva sin insuficiencia cardíaca',         'Urología'),
+('I12.9', 'Enfermedad renal hipertensiva sin insuficiencia renal',                    'Nefrología'),
+('I13.1', 'Enfermedad cardiorrenale hipertensiva sin insuficiencia cardíaca',         'Nefrología'),
 
 -- ─── Edema ───────────────────────────────────────────────────
 ('R60.0', 'Edema localizado',                                                         'General'),

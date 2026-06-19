@@ -182,9 +182,11 @@ export default function Consulta() {
           setAlertMsg(null);
           setShowSignedModal(true);
         } else {
-          setAlertMsg({ type: "success", msg: "Historia creada." });
+          setAlertMsg({ type: "success", msg: "Guardado como borrador." });
         }
+        return r.data.id;
       }
+      return hid;
       // Registrar curva de crecimiento si el switch está activo
       if (registrarCurva) {
         const fnac = paciente?.fecha_nacimiento;
@@ -507,6 +509,7 @@ export default function Consulta() {
               historiaId={hid}
               pacienteId={paciente?.id || pacId}
               firmada={soloLectura}
+              onAutoSave={async () => handleSave(false)}
             />
           )}
 
@@ -3483,17 +3486,24 @@ function DocumentosTab({ historiaId, pacienteId, firmada }) {
 
   const subirArchivo = async (file) => {
     if (!file) return;
-    if (!historiaId) {
-      setAlert({ t: "warning", m: "Guarda la consulta primero para poder adjuntar documentos." });
-      return;
-    }
     setUploading(true);
     setAlert(null);
     try {
+      let hId = historiaId;
+      if (!hId) {
+        setAlert({ t: "warning", m: "Guardando consulta como borrador…" });
+        hId = await onAutoSave();
+        if (!hId) {
+          setAlert({ t: "danger", m: "No se pudo guardar la consulta. Intenta de nuevo." });
+          setUploading(false);
+          return;
+        }
+        setAlert(null);
+      }
       const fd = new FormData();
       fd.append("archivo", file);
       fd.append("tipo", tipo);
-      fd.append("historia_id", historiaId);
+      fd.append("historia_id", hId);
       await api.post(`/pacientes/${pacienteId}/documentos`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
       });
@@ -3593,7 +3603,7 @@ function DocumentosTab({ historiaId, pacienteId, firmada }) {
           {!historiaId && (
             <div style={{ marginTop: 8, fontSize: "0.78rem", color: "#9ca3af" }}>
               <i className="bi bi-info-circle me-1"></i>
-              Guarda la consulta (Borrador o Firmar) para poder adjuntar documentos.
+              Al subir un archivo se guardará automáticamente como Borrador.
             </div>
           )}
         </div>
