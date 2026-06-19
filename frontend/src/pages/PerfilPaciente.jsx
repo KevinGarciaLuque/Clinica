@@ -1718,8 +1718,10 @@ export default function PerfilPaciente() {
                                         const tipoLabel = TIPOS_DOC.find(t => t.value === doc.tipo)?.label || "Documento";
                                         const tipoIcon = TIPOS_DOC.find(t => t.value === doc.tipo)?.icon || "bi-file-earmark";
                                         const nombre = doc.nombre?.length > 28 ? doc.nombre.substring(0, 26) + "…" : doc.nombre;
+                                        const token = localStorage.getItem("token") || "";
+                                        const viewUrl = `${API_BASE}/api/pacientes/${id}/documentos/${doc.id}/view?auth_token=${token}`;
                                         return (
-                                          <a href={doc.url} target="_blank" rel="noreferrer" title={doc.nombre} style={chipStyle}>
+                                          <a href={viewUrl} target="_blank" rel="noreferrer" title={doc.nombre} style={chipStyle}>
                                             <i className={`bi ${tipoIcon}`} />
                                             <span style={{ color: "#6b7280", fontWeight: 400 }}>{tipoLabel}:</span>
                                             {nombre}

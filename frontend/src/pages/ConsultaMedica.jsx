@@ -3721,17 +3721,21 @@ function DocumentosTab({ historiaId, pacienteId, firmada, onAutoSave }) {
           position: "fixed", inset: 0, background: "rgba(0,0,0,.85)", zIndex: 9999,
           display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
         }}>
-          {preview.mime_type?.startsWith("image/")
-            ? <img src={preview.ruta_archivo} alt={preview.nombre_original}
-                style={{ maxWidth: "90vw", maxHeight: "88vh", borderRadius: 8, boxShadow: "0 4px 32px rgba(0,0,0,.5)" }}
-                onClick={e => e.stopPropagation()} />
-            : <a href={preview.ruta_archivo} target="_blank" rel="noreferrer"
-                onClick={e => e.stopPropagation()}
-                style={{ background: "#fff", borderRadius: 12, padding: "32px 48px", fontSize: "1rem",
-                  color: "#2563eb", fontWeight: 700, textDecoration: "none" }}>
-                <i className="bi bi-file-earmark-pdf me-2"></i>Abrir PDF
-              </a>
-          }
+          {(() => {
+            const token = localStorage.getItem("token") || "";
+            const apiBase = import.meta.env.VITE_API_URL || "http://localhost:5000";
+            const viewUrl = `${apiBase}/api/pacientes/${pacienteId}/documentos/${preview.id}/view?auth_token=${token}`;
+            return preview.mime_type?.startsWith("image/")
+              ? <img src={preview.ruta_archivo} alt={preview.nombre_original}
+                  style={{ maxWidth: "90vw", maxHeight: "88vh", borderRadius: 8, boxShadow: "0 4px 32px rgba(0,0,0,.5)" }}
+                  onClick={e => e.stopPropagation()} />
+              : <a href={viewUrl} target="_blank" rel="noreferrer"
+                  onClick={e => e.stopPropagation()}
+                  style={{ background: "#fff", borderRadius: 12, padding: "32px 48px", fontSize: "1rem",
+                    color: "#2563eb", fontWeight: 700, textDecoration: "none" }}>
+                  <i className="bi bi-file-earmark-pdf me-2"></i>Abrir PDF
+                </a>;
+          })()}
           <button onClick={() => setPreview(null)} style={{
             position: "absolute", top: 16, right: 20, background: "rgba(255,255,255,.15)",
             border: "none", color: "#fff", fontSize: "1.6rem", cursor: "pointer", borderRadius: 6, lineHeight: 1,

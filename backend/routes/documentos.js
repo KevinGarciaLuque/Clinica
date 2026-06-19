@@ -336,23 +336,44 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPC
     if (!doc.ruta_archivo)
       return res.status(404).json({ ok: false, msg: "Archivo no encontrado" });
 
-    // Si tiene public_id de Cloudinary, generar URL firmada para evitar 401
-    // en PDFs almacenados como resource_type "image" (sube con auto).
+    // Proxy del archivo: descarga desde Cloudinary y lo sirve con nombre original.
+    // Así el PDF abre en el navegador (inline) con el nombre correcto en vez de descargarse
+    // con el nombre random de Cloudinary.
+    let fileUrl = doc.ruta_archivo;
     if (doc.cloudinary_public_id) {
-      // Extraer resource_type real desde la URL almacenada (/image/, /raw/, /video/)
       const match = (doc.ruta_archivo || "").match(/cloudinary\.com\/[^/]+\/(\w+)\/upload/);
-      const resourceType = match?.[1] || "image";
-      const signedUrl = cloudinary.url(doc.cloudinary_public_id, {
+      const resourceType = match?.[1] || "raw";
+      fileUrl = cloudinary.url(doc.cloudinary_public_id, {
         resource_type: resourceType,
         type: "upload",
         sign_url: true,
         expires_at: Math.floor(Date.now() / 1000) + 3600,
       });
-      return res.redirect(signedUrl);
     }
 
-    // Fallback: redirigir a la URL directa (archivos locales u otros)
-    return res.redirect(doc.ruta_archivo);
+    try {
+      const upstream = await fetch(fileUrl);
+      if (!upstream.ok) {
+        return res.status(502).json({ ok: false, msg: `Cloudinary respondió ${upstream.status}` });
+      }
+
+      const mime = doc.mime_type || upstream.headers.get("content-type") || "application/octet-stream";
+      const nombre = doc.nombre_original || "documento";
+      const safeName = nombre.replace(/"/g, "_");
+
+      // PDFs e imágenes → inline (abre en pestaña). Resto → attachment (descarga)
+      const inline = mime === "application/pdf" || mime.startsWith("image/");
+      res.setHeader("Content-Type", mime);
+      res.setHeader("Content-Disposition", `${inline ? "inline" : "attachment"}; filename="${safeName}"`);
+      const cl = upstream.headers.get("content-length");
+      if (cl) res.setHeader("Content-Length", cl);
+
+      const { Readable } = require("stream");
+      Readable.fromWeb(upstream.body).pipe(res);
+    } catch (fetchErr) {
+      console.error("[view] fetch error:", fetchErr.message);
+      return res.redirect(fileUrl);
+    }
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
