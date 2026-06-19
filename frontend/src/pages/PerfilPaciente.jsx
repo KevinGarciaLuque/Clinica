@@ -1666,16 +1666,7 @@ export default function PerfilPaciente() {
                                       <strong className="small">Dr. {h.med_apellidos}, {h.med_nombres}</strong>
                                       {h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
                                     </div>
-                                    <div className="d-flex align-items-center gap-2">
-                                      <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
-                                      {docsPorHistoria[h.id] > 0 && (
-                                        <span title={`${docsPorHistoria[h.id]} documento(s) adjunto(s)`}
-                                          style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 6, padding: "2px 7px", fontSize: "0.68rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
-                                          <i className="bi bi-paperclip" style={{ fontSize: "0.7rem" }} />
-                                          {docsPorHistoria[h.id]}
-                                        </span>
-                                      )}
-                                    </div>
+                                    <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
                                   </div>
                                   {h.diagnostico_cie && (
                                     <div className="small mt-1">
@@ -1697,7 +1688,7 @@ export default function PerfilPaciente() {
                                     </div>
                                   )}
                                   {/* Acciones */}
-                                  <div className="d-flex gap-2 mt-2 flex-wrap">
+                                  <div className="d-flex gap-2 mt-2 flex-wrap align-items-center">
                                     <button className="btn btn-outline-secondary btn-sm"
                                       onClick={() => toggleExpandPP(h.id)}>
                                       {expanded ? "Ocultar detalle" : "Ver detalle"}
@@ -1710,6 +1701,22 @@ export default function PerfilPaciente() {
                                     {h.estado === "FIRMADA" && (
                                       <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-link btn-sm p-0">
                                         Ver completa
+                                      </Link>
+                                    )}
+                                    {docsPorHistoria[h.id] > 0 && (
+                                      <Link
+                                        to={`/consulta-medica?historia_id=${h.id}`}
+                                        title="Ver documentos de esta consulta"
+                                        style={{
+                                          display: "inline-flex", alignItems: "center", gap: 5,
+                                          background: "#eff6ff", color: "#1d4ed8",
+                                          border: "1px solid #bfdbfe", borderRadius: 6,
+                                          padding: "3px 10px", fontSize: "0.78rem", fontWeight: 600,
+                                          textDecoration: "none",
+                                        }}
+                                      >
+                                        <i className="bi bi-paperclip" />
+                                        {docsPorHistoria[h.id]} {docsPorHistoria[h.id] === 1 ? "documento" : "documentos"}
                                       </Link>
                                     )}
                                     <button
