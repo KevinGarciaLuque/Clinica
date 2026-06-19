@@ -3510,7 +3510,7 @@ const TIPOS_DOC = [
   { value: "otro",         label: "Otro" },
 ];
 
-function DocumentosTab({ historiaId, pacienteId, firmada }) {
+function DocumentosTab({ historiaId, pacienteId, firmada, onAutoSave }) {
   const [docs, setDocs]         = useState([]);
   const [loading, setLoading]   = useState(true);
   const [uploading, setUploading] = useState(false);
