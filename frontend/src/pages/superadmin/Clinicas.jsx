@@ -1414,9 +1414,9 @@ export default function Clinicas() {
       )}
 
       {/* ── Modal de Configuración de Módulos por Categoría ───── */}
-      {showModulosModal && (
+      {showModulosModal && createPortal(
         <div style={{
-          position: "fixed", inset: 0, zIndex: 1050,
+          position: "fixed", inset: 0, zIndex: 9000,
           background: "rgba(0,0,0,.65)", backdropFilter: "blur(4px)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         }}>
@@ -1578,13 +1578,14 @@ export default function Clinicas() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal de Gestión de Licencia ────────────────────── */}
-      {showLicenciaModal && clinicaLicencia && (
+      {showLicenciaModal && clinicaLicencia && createPortal(
         <div style={{
-          position: "fixed", inset: 0, zIndex: 1070,
+          position: "fixed", inset: 0, zIndex: 9000,
           background: "rgba(0,0,0,.7)", backdropFilter: "blur(5px)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         }}>
@@ -1772,20 +1773,22 @@ export default function Clinicas() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal de Detalles / Uso de Espacio ────────────── */}
-      {showDetallesModal && clinicaDetalles && (
+      {showDetallesModal && clinicaDetalles && createPortal(
         <ClinicaDetallesModal
           clinicaId={clinicaDetalles.id}
           clinicaNombre={clinicaDetalles.nombre}
           onClose={() => { setShowDetallesModal(false); setClinicaDetalles(null); }}
-        />
+        />,
+        document.body
       )}
 
-      {showPermisosModal && permisosClinica?.clinica && (
-        <div className="modal show d-block" style={{ background: "rgba(0,0,0,.62)" }}>
+      {showPermisosModal && permisosClinica?.clinica && createPortal(
+        <div className="modal show d-block" style={{ background: "rgba(0,0,0,.62)", zIndex: 9000 }}>
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
             <div className="modal-content" style={{ background: C.card, color: C.text, border: `1px solid ${C.border}` }}>
               <div className="modal-header" style={{ borderBottom: `1px solid ${C.border}` }}>
@@ -1874,7 +1877,8 @@ export default function Clinicas() {
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
