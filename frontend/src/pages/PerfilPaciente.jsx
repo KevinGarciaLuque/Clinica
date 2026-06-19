@@ -78,6 +78,7 @@ export default function PerfilPaciente() {
   // Estados principales
   const [paciente, setPaciente] = useState(null);
   const [historias, setHistorias] = useState([]);
+  const [docsPorHistoria, setDocsPorHistoria] = useState({});
   const [documentos, setDocumentos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
@@ -252,10 +253,11 @@ export default function PerfilPaciente() {
       setPaciente(dataPac);
       setForm(dataPac);
       // Cargar datos secundarios en paralelo para reducir espera inicial
-      const [histResult, alergiasResult, docsResult] = await Promise.allSettled([
+      const [histResult, alergiasResult, docsResult, docsPorHistResult] = await Promise.allSettled([
         api.get(`/historias?paciente_id=${id}`),
         api.get(`/historias/paciente/${id}/alergias`),
         api.get(`/pacientes/${id}/documentos`),
+        api.get(`/pacientes/${id}/documentos/por-historia`),
       ]);
 
       if (histResult.status === "fulfilled") {
@@ -276,6 +278,10 @@ export default function PerfilPaciente() {
       } else {
         console.log("No hay documentos");
         setDocumentos([]);
+      }
+
+      if (docsPorHistResult.status === "fulfilled") {
+        setDocsPorHistoria(docsPorHistResult.value.data.data || {});
       }
 } catch (err) {
       setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error cargando paciente" });
@@ -1660,7 +1666,16 @@ export default function PerfilPaciente() {
                                       <strong className="small">Dr. {h.med_apellidos}, {h.med_nombres}</strong>
                                       {h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
                                     </div>
-                                    <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
+                                    <div className="d-flex align-items-center gap-2">
+                                      <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
+                                      {docsPorHistoria[h.id] > 0 && (
+                                        <span title={`${docsPorHistoria[h.id]} documento(s) adjunto(s)`}
+                                          style={{ background: "#e0f2fe", color: "#0369a1", borderRadius: 6, padding: "2px 7px", fontSize: "0.68rem", fontWeight: 600, display: "inline-flex", alignItems: "center", gap: 3 }}>
+                                          <i className="bi bi-paperclip" style={{ fontSize: "0.7rem" }} />
+                                          {docsPorHistoria[h.id]}
+                                        </span>
+                                      )}
+                                    </div>
                                   </div>
                                   {h.diagnostico_cie && (
                                     <div className="small mt-1">
