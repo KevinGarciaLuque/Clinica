@@ -343,20 +343,23 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPC
 });
 
 // ── GET /api/pacientes/:pacienteId/documentos/por-historia
-// Devuelve { historia_id: count } para mostrar badge en historial
+// Devuelve { historia_id: [{ id, tipo, nombre_original, ruta_archivo, mime_type }] }
 router.get("/por-historia", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId  = req.tenant?.clinica_id;
     const pacienteId = req.params.pacienteId;
     const [rows] = await pool.query(
-      `SELECT historia_id, COUNT(*) AS total
+      `SELECT id, historia_id, tipo, nombre_original, ruta_archivo, mime_type
        FROM documentos_paciente
        WHERE paciente_id=? AND clinica_id=? AND historia_id IS NOT NULL
-       GROUP BY historia_id`,
+       ORDER BY creado_en ASC`,
       [pacienteId, clinicaId]
     );
     const map = {};
-    rows.forEach(r => { map[r.historia_id] = r.total; });
+    rows.forEach(r => {
+      if (!map[r.historia_id]) map[r.historia_id] = [];
+      map[r.historia_id].push({ id: r.id, tipo: r.tipo, nombre: r.nombre_original, url: r.ruta_archivo, mime: r.mime_type });
+    });
     res.json({ ok: true, data: map });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

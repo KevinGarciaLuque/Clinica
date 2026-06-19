@@ -1703,22 +1703,36 @@ export default function PerfilPaciente() {
                                         Ver completa
                                       </Link>
                                     )}
-                                    {docsPorHistoria[h.id] > 0 && (
-                                      <Link
-                                        to={`/consulta-medica?historia_id=${h.id}`}
-                                        title="Ver documentos de esta consulta"
-                                        style={{
-                                          display: "inline-flex", alignItems: "center", gap: 5,
-                                          background: "#eff6ff", color: "#1d4ed8",
-                                          border: "1px solid #bfdbfe", borderRadius: 6,
-                                          padding: "3px 10px", fontSize: "0.78rem", fontWeight: 600,
-                                          textDecoration: "none",
-                                        }}
-                                      >
-                                        <i className="bi bi-paperclip" />
-                                        {docsPorHistoria[h.id]} {docsPorHistoria[h.id] === 1 ? "documento" : "documentos"}
-                                      </Link>
-                                    )}
+                                    {(() => {
+                                      const docs = docsPorHistoria[h.id];
+                                      if (!docs?.length) return null;
+                                      const chipStyle = {
+                                        display: "inline-flex", alignItems: "center", gap: 5,
+                                        background: "#eff6ff", color: "#1d4ed8",
+                                        border: "1px solid #bfdbfe", borderRadius: 6,
+                                        padding: "3px 10px", fontSize: "0.78rem", fontWeight: 600,
+                                        textDecoration: "none", cursor: "pointer",
+                                      };
+                                      if (docs.length === 1) {
+                                        const doc = docs[0];
+                                        const tipoLabel = TIPOS_DOC.find(t => t.value === doc.tipo)?.label || "Documento";
+                                        const tipoIcon = TIPOS_DOC.find(t => t.value === doc.tipo)?.icon || "bi-file-earmark";
+                                        const nombre = doc.nombre?.length > 28 ? doc.nombre.substring(0, 26) + "…" : doc.nombre;
+                                        return (
+                                          <a href={doc.url} target="_blank" rel="noreferrer" title={doc.nombre} style={chipStyle}>
+                                            <i className={`bi ${tipoIcon}`} />
+                                            <span style={{ color: "#6b7280", fontWeight: 400 }}>{tipoLabel}:</span>
+                                            {nombre}
+                                          </a>
+                                        );
+                                      }
+                                      return (
+                                        <Link to={`/consulta-medica?historia_id=${h.id}`} title="Ver documentos" style={chipStyle}>
+                                          <i className="bi bi-paperclip" />
+                                          {docs.length} documentos
+                                        </Link>
+                                      );
+                                    })()}
                                     <button
                                       className="btn btn-outline-primary btn-sm ms-auto"
                                       title="Editar consulta"
