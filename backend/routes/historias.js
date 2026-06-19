@@ -161,24 +161,20 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     if (!paciente_id) return res.status(400).json({ ok: false, msg: "paciente_id requerido" });
 
+    const insertCols = await getHistoriasCols();
+    const hasDxDescCol = insertCols.has("diagnostico_desc");
+
+    const insertFields = hasDxDescCol
+      ? "(clinica_id, paciente_id, medico_id, cita_id, subjetivo, objetivo, examen_fisico, diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan, estado, datos_derma)"
+      : "(clinica_id, paciente_id, medico_id, cita_id, subjetivo, objetivo, examen_fisico, diagnostico_cie, diagnosticos_secundarios, plan, estado, datos_derma)";
+    const insertVals = hasDxDescCol
+      ? [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null]
+      : [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null];
+    const placeholders = insertVals.map(() => "?").join(",");
+
     const [r] = await pool.query(
-      `INSERT INTO historias_clinicas
-         (clinica_id, paciente_id, medico_id, cita_id,
-          subjetivo, objetivo, examen_fisico,
-          diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan, estado, datos_derma)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-      [
-        cid, paciente_id, req.user.id, cita_id || null,
-        subjetivo || null,
-        objetivo ? JSON.stringify(objetivo) : null,
-        examen_fisico || null,
-        diagnostico_cie || null,
-        diagnostico_desc || null,
-        diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
-        plan || null,
-        estado,
-        datos_derma ? JSON.stringify(datos_derma) : null,
-      ]
+      `INSERT INTO historias_clinicas ${insertFields} VALUES (${placeholders})`,
+      insertVals
     );
 
     // Si hay cita_id, cambiar estado a EN_ATENCION
@@ -231,24 +227,17 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       datos_derma,
     } = req.body;
 
-    await pool.query(
-      `UPDATE historias_clinicas
-       SET subjetivo=?, objetivo=?, examen_fisico=?,
-           diagnostico_cie=?, diagnostico_desc=?, diagnosticos_secundarios=?, plan=?,
-           datos_derma=?
-       WHERE id=? AND clinica_id=?`,
-      [
-        subjetivo || null,
-        objetivo ? JSON.stringify(objetivo) : null,
-        examen_fisico || null,
-        diagnostico_cie || null,
-        diagnostico_desc || null,
-        diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
-        plan || null,
-        datos_derma ? JSON.stringify(datos_derma) : null,
-        id, cid,
-      ]
-    );
+    const updateCols = await getHistoriasCols();
+    const hasDxDescUpd = updateCols.has("diagnostico_desc");
+
+    const updateSql = hasDxDescUpd
+      ? `UPDATE historias_clinicas SET subjetivo=?, objetivo=?, examen_fisico=?, diagnostico_cie=?, diagnostico_desc=?, diagnosticos_secundarios=?, plan=?, datos_derma=? WHERE id=? AND clinica_id=?`
+      : `UPDATE historias_clinicas SET subjetivo=?, objetivo=?, examen_fisico=?, diagnostico_cie=?, diagnosticos_secundarios=?, plan=?, datos_derma=? WHERE id=? AND clinica_id=?`;
+    const updateVals = hasDxDescUpd
+      ? [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid]
+      : [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid];
+
+    await pool.query(updateSql, updateVals);
 
     res.json({ ok: true });
   } catch (e) {
@@ -436,9 +425,13 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","
       return res.json({ ok: true, data: { es_nuevo: true, total_consultas: 0, ultima_consulta: null } });
     }
 
+    const cols = await getHistoriasCols();
+    const hasDxDesc = cols.has("diagnostico_desc");
+
     // Todas las consultas firmadas previas (excluyendo la actual)
     let listSql = `
-      SELECT h.id, h.creado_en, h.diagnostico_cie, h.diagnostico_desc,
+      SELECT h.id, h.creado_en, h.diagnostico_cie,
+             ${hasDxDesc ? "h.diagnostico_desc," : "NULL AS diagnostico_desc,"}
              h.plan, h.subjetivo,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
              e.nombre AS especialidad,
