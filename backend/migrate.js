@@ -68,6 +68,7 @@ async function runMigrations() {
       '045_cie10_nefrologia_pediatrica.sql',
       '046_documentos_historia_id.sql',
       '047_fix_cie10_nefrologia_categoria.sql',
+      '048_historias_diagnostico_desc.sql',
     ];
 
     for (const migration of migrations) {

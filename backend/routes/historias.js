@@ -154,7 +154,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     const {
       paciente_id, cita_id,
       subjetivo, objetivo, examen_fisico,
-      diagnostico_cie, diagnosticos_secundarios, plan,
+      diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan,
       estado = "BORRADOR",
       datos_derma,
     } = req.body;
@@ -165,14 +165,15 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       `INSERT INTO historias_clinicas
          (clinica_id, paciente_id, medico_id, cita_id,
           subjetivo, objetivo, examen_fisico,
-          diagnostico_cie, diagnosticos_secundarios, plan, estado, datos_derma)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
+          diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan, estado, datos_derma)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         cid, paciente_id, req.user.id, cita_id || null,
         subjetivo || null,
         objetivo ? JSON.stringify(objetivo) : null,
         examen_fisico || null,
         diagnostico_cie || null,
+        diagnostico_desc || null,
         diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
         plan || null,
         estado,
@@ -226,14 +227,14 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     const {
       subjetivo, objetivo, examen_fisico,
-      diagnostico_cie, diagnosticos_secundarios, plan,
+      diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan,
       datos_derma,
     } = req.body;
 
     await pool.query(
       `UPDATE historias_clinicas
        SET subjetivo=?, objetivo=?, examen_fisico=?,
-           diagnostico_cie=?, diagnosticos_secundarios=?, plan=?,
+           diagnostico_cie=?, diagnostico_desc=?, diagnosticos_secundarios=?, plan=?,
            datos_derma=?
        WHERE id=? AND clinica_id=?`,
       [
@@ -241,6 +242,7 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
         objetivo ? JSON.stringify(objetivo) : null,
         examen_fisico || null,
         diagnostico_cie || null,
+        diagnostico_desc || null,
         diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null,
         plan || null,
         datos_derma ? JSON.stringify(datos_derma) : null,
@@ -436,7 +438,7 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","
 
     // Todas las consultas firmadas previas (excluyendo la actual)
     let listSql = `
-      SELECT h.id, h.creado_en, h.diagnostico_cie,
+      SELECT h.id, h.creado_en, h.diagnostico_cie, h.diagnostico_desc,
              h.plan, h.subjetivo,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
              e.nombre AS especialidad,
@@ -478,7 +480,7 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","
       medico:           `${r.med_nombres} ${r.med_apellidos}`,
       especialidad:     r.especialidad || "",
       diagnostico_cie:  r.diagnostico_cie || "",
-      diagnostico_desc: r.cie_desc || "",
+      diagnostico_desc: r.cie_desc || r.diagnostico_desc || "",
       plan:             r.plan || "",
       subjetivo:        r.subjetivo || "",
       medicamentos:     medsByHistoria[r.id] || [],

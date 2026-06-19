@@ -383,10 +383,10 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const indInfo = INDICADORES.find(i => i.key === indicador);
   const isPesoTalla = indicador === "peso-talla";
 
-  // Indicadores sin datos OMS para 5-19 años
+  // Indicadores sin datos OMS para 5-19 años o con datos incompletos
   const INDICADORES_SIN_519 = ["pc-edad", "peso-talla"];
   const handleRangoChange = (nuevoRango) => {
-    if (nuevoRango === "5_19" && INDICADORES_SIN_519.includes(indicador)) {
+    if (nuevoRango === "5_19" && (INDICADORES_SIN_519.includes(indicador) || indicador === "peso-edad")) {
       setIndicador("talla-edad");
     }
     setRango(nuevoRango);
@@ -1050,6 +1050,20 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
             ))}
           </div>
         </div>
+
+        {rango === "5_19" && indicador === "peso-edad" && (
+          <div style={{
+            background: "rgba(251,191,36,0.12)", border: "1px solid rgba(251,191,36,0.4)",
+            borderRadius: 8, padding: "7px 12px", marginBottom: 10,
+            display: "flex", alignItems: "center", gap: 8, fontSize: isMobile ? 11 : 12,
+          }}>
+            <i className="bi bi-info-circle-fill" style={{ color: "#f59e0b", flexShrink: 0 }} />
+            <span style={{ color: "#92400e" }}>
+              La referencia OMS de <strong>Peso/Edad</strong> solo está disponible hasta los <strong>10 años</strong>.
+              Para adolescentes mayores de 10 años usa <strong>IMC/Edad</strong>.
+            </span>
+          </div>
+        )}
 
         <ResponsiveContainer width="100%" height={isMobile ? 280 : 420}>
           <ComposedChart data={chartData} margin={isMobile ? { top: 5, right: 8, left: -10, bottom: 5 } : { top: 10, right: 20, left: 10, bottom: 10 }}>

@@ -98,11 +98,11 @@ export default function Consulta() {
             examen_fisico: h.examen_fisico || "",
             plan:       h.plan || "",
             diagnostico_cie:  h.diagnostico_cie || "",
-            diagnostico_desc: "",
+            diagnostico_desc: h.diagnostico_desc || "",
             diagnosticos_secundarios: secDx,
           }));
-          // recuperar la descripción del código CIE-10 guardado
-          if (h.diagnostico_cie) {
+          // recuperar descripción CIE-10 solo si no viene guardada
+          if (h.diagnostico_cie && !h.diagnostico_desc) {
             api.get("/historias/cie10/buscar", { params: { q: h.diagnostico_cie } })
               .then(r => {
                 const found = r.data.data?.find(x => x.codigo === h.diagnostico_cie);
@@ -149,6 +149,7 @@ export default function Consulta() {
         objetivo:    { ...vitals, imc: undefined },
         examen_fisico: soap.examen_fisico,
         diagnostico_cie: soap.diagnostico_cie || null,
+        diagnostico_desc: soap.diagnostico_desc || null,
         diagnosticos_secundarios: soap.diagnosticos_secundarios,
         plan:        soap.plan,
         estado:      sign ? "FIRMADA" : (firmada ? "FIRMADA" : "BORRADOR"),
@@ -1191,15 +1192,27 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
     setList([]);
   };
 
-  // Chip cuando ya hay un diagnóstico seleccionado
-  if (value) {
+  const selLibre = () => {
+    const texto = q.trim();
+    if (!texto) return;
+    onChange("", texto);
+    setQ("");
+    setList([]);
+  };
+
+  // Chip cuando ya hay un diagnóstico seleccionado (con o sin código CIE)
+  if (value || desc) {
+    const esLibre = !value;
     return (
       <div className="d-flex align-items-center gap-2 px-2 py-2 rounded border"
-        style={{ background: "rgba(25,135,84,0.07)", minHeight: 36 }}>
-        <span className="badge bg-success" style={{ fontFamily: "monospace", fontSize: "0.78rem", letterSpacing: "0.04em" }}>
-          {value}
+        style={{ background: esLibre ? "rgba(107,114,128,0.07)" : "rgba(25,135,84,0.07)", minHeight: 36 }}>
+        {esLibre
+          ? <i className="bi bi-pencil-square" style={{ color: "#6b7280", fontSize: "0.85rem", flexShrink: 0 }}></i>
+          : <span className="badge bg-success" style={{ fontFamily: "monospace", fontSize: "0.78rem", letterSpacing: "0.04em" }}>{value}</span>
+        }
+        <span className="flex-grow-1 small fw-semibold" style={{ color: esLibre ? "#374151" : "#198754" }}>
+          {desc || "…"}
         </span>
-        <span className="flex-grow-1 small fw-semibold text-success">{desc || "…"}</span>
         {!readOnly && (
           <button type="button" className="btn btn-link btn-sm p-0 text-danger lh-1" title="Cambiar diagnóstico"
             onClick={onClear}>
@@ -1221,7 +1234,7 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
           value={q} onChange={e => setQ(e.target.value)}
           autoComplete="off" />
       </div>
-      {list.length > 0 && (
+      {q.length >= 2 && (
         <ul className="list-group position-absolute z-3 shadow"
           style={{ top: "100%", left: 0, right: 0, maxHeight: 230, overflowY: "auto" }}>
           {list.map(c => (
@@ -1237,6 +1250,13 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
               )}
             </li>
           ))}
+          <li className="list-group-item list-group-item-action py-1 px-2"
+            style={{ cursor: "pointer", fontSize: "0.81rem", borderTop: list.length ? "1px solid #e5e7eb" : undefined, background: "#fafafa" }}
+            onMouseDown={selLibre}>
+            <i className="bi bi-pencil-square me-2 text-secondary"></i>
+            <span className="text-secondary">Guardar como diagnóstico libre: </span>
+            <span className="fw-semibold text-dark">"{q.trim()}"</span>
+          </li>
         </ul>
       )}
     </div>
