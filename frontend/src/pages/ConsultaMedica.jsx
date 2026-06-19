@@ -20,6 +20,7 @@ const VITALS_FIELDS = [
   { key: "talla", label: "Talla",  placeholder: "Ej: 170",    unit: "cm"   },
   { key: "spo2",  label: "SpO₂",   placeholder: "Ej: 98",     unit: "%"    },
   { key: "imc",   label: "IMC",    placeholder: "Auto",       unit: "kg/m²", readOnly: true },
+  { key: "sc",    label: "S.C.",   placeholder: "Auto",       unit: "m²",   readOnly: true },
   { key: "pc",    label: "Per. Cefálico", placeholder: "Ej: 45", unit: "cm", pediatricOnly: true },
 ];
 
@@ -27,6 +28,13 @@ function calcIMC(peso, talla) {
   const p = parseFloat(peso), t = parseFloat(talla);
   if (!p || !t) return "";
   return (p / ((t / 100) ** 2)).toFixed(1);
+}
+
+// Superficie corporal — fórmula de Mosteller: √(talla_cm × peso_kg / 3600)
+function calcSC(peso, talla) {
+  const p = parseFloat(peso), t = parseFloat(talla);
+  if (!p || !t) return "";
+  return Math.sqrt((t * p) / 3600).toFixed(2);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -123,9 +131,9 @@ export default function Consulta() {
     }
   }, [hid, pacId]);
 
-  // ── imc automático ───────────────────────────────────────────────────────────
+  // ── imc y sc automáticos ─────────────────────────────────────────────────────
   useEffect(() => {
-    setVitals(v => ({ ...v, imc: calcIMC(v.peso, v.talla) }));
+    setVitals(v => ({ ...v, imc: calcIMC(v.peso, v.talla), sc: calcSC(v.peso, v.talla) }));
   }, [vitals.peso, vitals.talla]);
 
   // ── resumen nuevo / subsecuente ──────────────────────────────────────────────
@@ -146,7 +154,7 @@ export default function Consulta() {
         paciente_id: paciente?.id || pacId,
         cita_id:     citaId || null,
         subjetivo:   soap.subjetivo,
-        objetivo:    { ...vitals, imc: undefined },
+        objetivo:    { ...vitals, imc: undefined, sc: undefined },
         examen_fisico: soap.examen_fisico,
         diagnostico_cie: soap.diagnostico_cie || null,
         diagnostico_desc: soap.diagnostico_desc || null,
@@ -1272,19 +1280,33 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
   const cie10Ref = useRef(null);
 
   // ── Catálogo de diagnósticos frecuentes ──
-  const [catDxQuery, setCatDxQuery] = useState("");
-  const [catDxList, setCatDxList]   = useState([]);
-  const [showCatDx, setShowCatDx]   = useState(false);
+  const [catDxQuery, setCatDxQuery]   = useState("");
+  const [allCatDx,  setAllCatDx]     = useState([]);
+  const [showCatDx, setShowCatDx]    = useState(false);
+  const catDxRef                      = useRef(null);
 
+  // Carga toda la lista al montar (sin query = devuelve hasta 200)
   useEffect(() => {
-    if (!catDxQuery || catDxQuery.length < 2) { setCatDxList([]); return; }
-    const t = setTimeout(() => {
-      api.get("/catalogos-diagnostico", { params: { q: catDxQuery } })
-        .then(r => { setCatDxList(r.data.data || []); setShowCatDx(true); })
-        .catch(() => setCatDxList([]));
-    }, 300);
-    return () => clearTimeout(t);
-  }, [catDxQuery]);
+    api.get("/catalogos-diagnostico")
+      .then(r => setAllCatDx(r.data.data || []))
+      .catch(() => {});
+  }, []);
+
+  // Filtrado client-side
+  const catDxList = catDxQuery.length >= 1
+    ? allCatDx.filter(c =>
+        c.nombre?.toLowerCase().includes(catDxQuery.toLowerCase()) ||
+        c.codigo_cie?.toLowerCase().includes(catDxQuery.toLowerCase()) ||
+        c.descripcion_cie?.toLowerCase().includes(catDxQuery.toLowerCase())
+      )
+    : allCatDx;
+
+  // Cerrar al clic fuera
+  useEffect(() => {
+    const fn = (e) => { if (catDxRef.current && !catDxRef.current.contains(e.target)) setShowCatDx(false); };
+    document.addEventListener("mousedown", fn);
+    return () => document.removeEventListener("mousedown", fn);
+  }, []);
 
   const selCatDx = (cat) => {
     let secArr = [];
@@ -1295,12 +1317,11 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
     } catch { secArr = []; }
     setSoap(s => ({
       ...s,
-      diagnostico_cie: cat.codigo_cie,
-      diagnostico_desc: cat.descripcion_cie,
+      diagnostico_cie:  cat.codigo_cie  || "",
+      diagnostico_desc: cat.descripcion_cie || cat.nombre || "",
       diagnosticos_secundarios: secArr,
     }));
     setCatDxQuery("");
-    setCatDxList([]);
     setShowCatDx(false);
   };
 
@@ -1471,19 +1492,20 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
 
           {/* Catálogo de diagnósticos frecuentes del médico */}
           {!firmada && (
-            <div className="position-relative mb-2">
+            <div className="position-relative mb-2" ref={catDxRef}>
               <div className="input-group input-group-sm">
                 <span className="input-group-text bg-warning bg-opacity-10 text-warning border-end-0">
                   <i className="bi bi-lightning-fill"></i>
                 </span>
-                <input className="form-control border-start-0" placeholder="Mis diagnósticos frecuentes…"
+                <input className="form-control border-start-0"
+                  placeholder={allCatDx.length > 0 ? `Mis diagnósticos (${allCatDx.length})…` : "Mis diagnósticos frecuentes…"}
                   value={catDxQuery}
-                  onChange={e => setCatDxQuery(e.target.value)}
-                  onFocus={() => catDxList.length > 0 && setShowCatDx(true)} />
+                  onChange={e => { setCatDxQuery(e.target.value); setShowCatDx(true); }}
+                  onFocus={() => setShowCatDx(true)} />
               </div>
               {showCatDx && catDxList.length > 0 && (
                 <ul className="list-group position-absolute z-3 shadow"
-                  style={{ top: "100%", left: 0, right: 0, maxHeight: 180, overflowY: "auto" }}>
+                  style={{ top: "100%", left: 0, right: 0, maxHeight: 220, overflowY: "auto" }}>
                   {catDxList.map(c => (
                     <li key={c.id} className="list-group-item list-group-item-action py-1 px-2"
                       style={{ cursor: "pointer", fontSize: "0.82rem" }}
@@ -1495,6 +1517,12 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
                     </li>
                   ))}
                 </ul>
+              )}
+              {showCatDx && catDxList.length === 0 && catDxQuery.length >= 1 && (
+                <div className="position-absolute z-3 bg-white border rounded shadow px-3 py-2 text-muted small"
+                  style={{ top: "100%", left: 0, right: 0 }}>
+                  Sin resultados para "{catDxQuery}"
+                </div>
               )}
             </div>
           )}
