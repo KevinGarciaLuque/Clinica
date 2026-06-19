@@ -125,6 +125,164 @@ function CalendarioPopup({ onClose }) {
   );
 }
 
+function WorldCupBannerAnimation({ isMobile }) {
+  const dur = '6s';
+  const ballSize = isMobile ? 18 : 24;
+
+  return (
+    <>
+      <style>{`
+        @keyframes wc26-move {
+          0%   { left:3%;  top:62%; opacity:1; }
+          10%  { left:15%; top:5%;  }
+          22%  { left:28%; top:64%; }
+          33%  { left:41%; top:7%;  }
+          45%  { left:53%; top:64%; }
+          55%  { left:63%; top:12%; }
+          65%  { left:73%; top:64%; }
+          73%  { left:80%; top:14%; }
+          80%  { left:87%; top:38%; opacity:1; }
+          86%  { left:87%; top:38%; opacity:0; }
+          87%  { left:3%;  top:62%; opacity:0; }
+          90%  { left:3%;  top:62%; opacity:1; }
+          100% { left:3%;  top:62%; opacity:1; }
+        }
+        @keyframes wc26-spin {
+          0%   { transform: rotate(0deg) scale(1); }
+          64%  { transform: rotate(560deg) scale(1); }
+          79%  { transform: rotate(700deg) scale(0.6) scaleX(1.5); }
+          82%  { transform: rotate(720deg) scale(1); }
+          86%  { transform: rotate(730deg) scale(0.05); }
+          87%  { transform: rotate(0deg) scale(0.05); }
+          90%  { transform: rotate(0deg) scale(1); }
+          100% { transform: rotate(0deg) scale(1); }
+        }
+        @keyframes wc26-gol {
+          0%,78%   { opacity:0; transform:scale(0.2) rotate(-15deg); }
+          82%      { opacity:1; transform:scale(1.5) rotate(5deg); }
+          86%      { opacity:1; transform:scale(1.0) rotate(0deg); }
+          93%      { opacity:1; transform:scale(1.0) rotate(0deg); }
+          97%,100% { opacity:0; transform:scale(0.4) rotate(-5deg); }
+        }
+        @keyframes wc26-glow {
+          0%,78%   { filter:none; }
+          82%,93%  { filter:drop-shadow(0 0 8px #fbbf24) drop-shadow(0 0 20px #f59e0b); }
+          97%,100% { filter:none; }
+        }
+        @keyframes wc26-s1 {
+          0%,79%   { opacity:0; transform:translate(0,0) scale(0) rotate(0deg); }
+          83%      { opacity:1; transform:translate(-20px,-25px) scale(1.1) rotate(30deg); }
+          89%      { opacity:0.7; transform:translate(-32px,8px) scale(0.9) rotate(90deg); }
+          94%,100% { opacity:0; transform:translate(-42px,22px) scale(0) rotate(150deg); }
+        }
+        @keyframes wc26-s2 {
+          0%,79%   { opacity:0; transform:translate(0,0) scale(0) rotate(0deg); }
+          83%      { opacity:1; transform:translate(25px,-22px) scale(1.1) rotate(-30deg); }
+          89%      { opacity:0.7; transform:translate(38px,10px) scale(0.9) rotate(-90deg); }
+          94%,100% { opacity:0; transform:translate(48px,24px) scale(0) rotate(-150deg); }
+        }
+        @keyframes wc26-s3 {
+          0%,81%   { opacity:0; transform:translate(0,0) scale(0); }
+          85%      { opacity:1; transform:translate(5px,-32px) scale(1.2); }
+          91%      { opacity:0.6; transform:translate(-5px,-44px) scale(0.8); }
+          95%,100% { opacity:0; transform:translate(-10px,-56px) scale(0); }
+        }
+      `}</style>
+
+      {/* FIFA 2026 watermark izquierda */}
+      <div style={{
+        position:'absolute', left: isMobile ? 6 : 16, top:'50%', transform:'translateY(-50%)',
+        opacity:0.12, pointerEvents:'none', zIndex:0, textAlign:'center', lineHeight:1.15,
+        userSelect:'none',
+      }}>
+        <div style={{fontSize: isMobile ? 7 : 9, fontWeight:900, color:'#0f172a', letterSpacing:'0.1em'}}>FIFA WORLD CUP</div>
+        <div style={{fontSize: isMobile ? 22 : 30, fontWeight:900, color:'#0f172a', letterSpacing:'-0.02em'}}>2026</div>
+      </div>
+
+      {/* Meta derecha */}
+      <div style={{
+        position:'absolute', right: isMobile ? 6 : 22, top:'50%', transform:'translateY(-50%)',
+        animation:`wc26-glow ${dur} ease-in-out infinite`,
+        pointerEvents:'none', zIndex:0,
+      }}>
+        <svg width={isMobile ? 40 : 54} height={isMobile ? 32 : 44} viewBox="0 0 54 44" fill="none">
+          {/* Red de fondo */}
+          <rect x="2" y="5" width="46" height="32" fill="rgba(200,230,255,0.18)" />
+          <line x1="13" y1="5" x2="13" y2="37" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+          <line x1="25" y1="5" x2="25" y2="37" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+          <line x1="37" y1="5" x2="37" y2="37" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+          <line x1="2" y1="17" x2="48" y2="17" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+          <line x1="2" y1="27" x2="48" y2="27" stroke="rgba(255,255,255,0.45)" strokeWidth="0.8"/>
+          {/* Postes */}
+          <rect x="2" y="5" width="2.5" height="33" fill="white" rx="1.2"/>
+          <rect x="49.5" y="5" width="2.5" height="33" fill="white" rx="1.2"/>
+          <rect x="2" y="5" width="50" height="2.5" fill="white" rx="1.2"/>
+          {/* Sombra travesaño */}
+          <rect x="2" y="7.5" width="50" height="1" fill="rgba(0,0,0,0.12)" rx="0.5"/>
+          {/* Suelo verde */}
+          <rect x="0" y="39" width="54" height="3" fill="#4ade80" rx="1.5"/>
+          <rect x="2" y="39" width="2.5" height="5" fill="#16a34a" rx="1"/>
+          <rect x="49.5" y="39" width="2.5" height="5" fill="#16a34a" rx="1"/>
+        </svg>
+      </div>
+
+      {/* Estrellas de celebración */}
+      {[
+        { anim:'wc26-s1', emoji:'⭐' },
+        { anim:'wc26-s2', emoji:'✨' },
+        { anim:'wc26-s3', emoji:'🎊' },
+      ].map(({ anim, emoji }, i) => (
+        <div key={i} style={{
+          position:'absolute',
+          right: isMobile ? 26 : 48,
+          top: '45%',
+          fontSize: isMobile ? 10 : 14,
+          lineHeight: 1,
+          animation: `${anim} ${dur} ease-out infinite`,
+          pointerEvents: 'none',
+          zIndex: 3,
+          userSelect: 'none',
+        }}>{emoji}</div>
+      ))}
+
+      {/* GOL! */}
+      <div style={{
+        position:'absolute',
+        right: isMobile ? 48 : 80,
+        top: '50%',
+        transform: 'translateY(-50%)',
+        animation: `wc26-gol ${dur} ease-in-out infinite`,
+        pointerEvents: 'none',
+        zIndex: 2,
+        fontSize: isMobile ? 14 : 19,
+        fontWeight: 900,
+        color: '#f59e0b',
+        textShadow: '0 2px 12px rgba(245,158,11,0.9), 0 0 24px rgba(245,158,11,0.4)',
+        whiteSpace: 'nowrap',
+        letterSpacing: '0.06em',
+        userSelect: 'none',
+      }}>
+        ¡GOL! 🎉
+      </div>
+
+      {/* Balón */}
+      <div style={{
+        position: 'absolute',
+        left: '3%',
+        top: '62%',
+        fontSize: ballSize,
+        lineHeight: 1,
+        animation: `wc26-move ${dur} cubic-bezier(0.25,0.46,0.45,0.94) infinite, wc26-spin ${dur} linear infinite`,
+        pointerEvents: 'none',
+        zIndex: 1,
+        userSelect: 'none',
+      }}>
+        ⚽
+      </div>
+    </>
+  );
+}
+
 const ESTADO_COLOR = {
   PENDIENTE:    { bg: "linear-gradient(135deg, #ffc107 0%, #ff9800 100%)", fg: "#000", shadow: "rgba(255, 193, 7, 0.3)" },
   CONFIRMADA:   { bg: "linear-gradient(135deg, #0d6efd 0%, #0056b3 100%)", fg: "#fff", shadow: "rgba(13, 110, 253, 0.3)" },
@@ -419,6 +577,7 @@ export default function Dashboard() {
             overflow: "hidden",
           }}
         >
+          <WorldCupBannerAnimation isMobile={isMobile} />
 
           <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
             {/* Emoji saludo animado: flota + saluda continuamente */}
