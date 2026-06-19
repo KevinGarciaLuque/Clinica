@@ -567,9 +567,15 @@ router.get("/slots", async (req, res) => {
 // ══════════════════════════════════════════════════════════
 router.post("/cita", limiterModerate, async (req, res) => {
   try {
-    const { paciente_id, medico_id, inicio, fin, motivo, clinica_id } = req.body;
+    const { paciente_id, medico_id, motivo, clinica_id } = req.body;
+    let { inicio, fin } = req.body;
     if (!paciente_id || !medico_id || !inicio || !fin || !clinica_id)
       return res.status(400).json({ ok: false, msg: "paciente_id, medico_id, inicio, fin, clinica_id son obligatorios" });
+
+    // MySQL DATETIME no acepta la Z de UTC ni milisegundos — convertir a 'YYYY-MM-DD HH:MM:SS'
+    const toMysqlDt = (v) => new Date(v).toISOString().replace("T", " ").substring(0, 19);
+    inicio = toMysqlDt(inicio);
+    fin    = toMysqlDt(fin);
 
     // Validar session token — el paciente_id del token debe coincidir con el del body
     const session = validarSessionToken(req, res);
