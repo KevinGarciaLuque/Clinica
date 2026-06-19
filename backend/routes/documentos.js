@@ -329,19 +329,13 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPC
     if (!doc.ruta_archivo)
       return res.status(404).json({ ok: false, msg: "Archivo no encontrado" });
 
-    // Si tiene public_id de Cloudinary, generar URL firmada temporal (evita 401)
-    if (doc.cloudinary_public_id) {
-      const resourceType = doc.mime_type?.startsWith("image/") ? "image" : "raw";
-      const signedUrl = cloudinary.url(doc.cloudinary_public_id, {
-        resource_type: resourceType,
-        type:          "upload",
-        sign_url:      true,
-        expires_at:    Math.floor(Date.now() / 1000) + 3600,
-      });
-      return res.redirect(signedUrl);
+    // Redirigir a la URL almacenada directamente — ya es la URL correcta de Cloudinary
+    // con el resource_type correcto embebido (/image/upload/ o /raw/upload/)
+    if (doc.ruta_archivo?.startsWith("http")) {
+      return res.redirect(doc.ruta_archivo);
     }
 
-    // Fallback: redirigir a la URL directa (legacy)
+    // Fallback local
     return res.redirect(doc.ruta_archivo);
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
