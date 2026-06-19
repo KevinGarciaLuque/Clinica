@@ -1,4 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
+import { createPortal } from "react-dom";
 import api from "../../api/api";
 import ClinicaDetallesModal from "../../components/ClinicaDetallesModal";
 
@@ -867,8 +868,8 @@ export default function Clinicas() {
         </div>
       )}
 
-      {/* ── Modal ─────────────────────────────────────────────── */}
-      {showModal && (
+      {/* ── Modal (Portal → escapa del stacking context del <main>) ── */}
+      {showModal && createPortal(
         <div style={{
           position: "fixed", inset: 0, zIndex: 9000,
           background: "rgba(0,0,0,.72)", backdropFilter: "blur(6px)",
@@ -1239,13 +1240,14 @@ export default function Clinicas() {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal de confirmación de eliminación ────────────── */}
-      {modalEliminar && clinicaEliminar && (
+      {modalEliminar && clinicaEliminar && createPortal(
         <div style={{
-          position: "fixed", inset: 0, zIndex: 1060,
+          position: "fixed", inset: 0, zIndex: 9000,
           background: "rgba(0,0,0,.75)", backdropFilter: "blur(6px)",
           display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
         }}>
@@ -1407,7 +1409,8 @@ export default function Clinicas() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* ── Modal de Configuración de Módulos por Categoría ───── */}
