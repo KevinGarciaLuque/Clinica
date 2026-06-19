@@ -4,24 +4,31 @@ import { useAuth } from "../auth/AuthContext";
 import api from "../api/api";
 
 const COUNTDOWN_SECS = 60;
+const DEFAULT_MIN    = 20;
 const EVENTS = ["mousemove", "mousedown", "keydown", "touchstart", "scroll", "click"];
 
 export default function InactivityGuard({ children }) {
-  const { logout } = useAuth();
-  const navigate   = useNavigate();
-  const [show, setShow]     = useState(false);
-  const [secs, setSecs]     = useState(COUNTDOWN_SECS);
-  const inactMin  = useRef(20); // default 20 min, se sobreescribe con config
-  const timerRef  = useRef(null);
-  const countRef  = useRef(null);
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+  const [show, setShow] = useState(false);
+  const [secs, setSecs] = useState(COUNTDOWN_SECS);
+  const inactMin = useRef(DEFAULT_MIN);
+  const timerRef = useRef(null);
+  const countRef = useRef(null);
 
-  // Cargar minutos de inactividad desde config del sistema
+  // Cargar minutos de inactividad desde config de la clínica del usuario
   useEffect(() => {
-    api.get("/config-sistema").then(r => {
-      const min = parseInt(r.data?.data?.inactividad_minutos, 10);
-      if (min > 0) inactMin.current = min;
-    }).catch(() => {});
-  }, []);
+    const clinicaId = user?.clinica_id;
+    if (!clinicaId) return;
+    api.get(`/clinicas/${clinicaId}`)
+      .then(r => {
+        const configArr = r.data?.data?.config || [];
+        const entry = configArr.find(c => c.clave === "inactividad_minutos");
+        const min = parseInt(entry?.valor, 10);
+        if (min > 0) inactMin.current = min;
+      })
+      .catch(() => {});
+  }, [user?.clinica_id]);
 
   const startIdleTimer = useCallback(() => {
     clearTimeout(timerRef.current);
@@ -45,7 +52,6 @@ export default function InactivityGuard({ children }) {
     };
   }, [resetTimer, startIdleTimer]);
 
-  // Countdown mientras el modal está visible
   useEffect(() => {
     if (!show) { clearInterval(countRef.current); return; }
     countRef.current = setInterval(() => {
@@ -77,7 +83,6 @@ export default function InactivityGuard({ children }) {
   return (
     <>
       {children}
-
       {show && (
         <div style={{
           position: "fixed", inset: 0, zIndex: 99999,

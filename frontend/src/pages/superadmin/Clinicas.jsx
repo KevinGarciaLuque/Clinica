@@ -136,15 +136,23 @@ export default function Clinicas() {
     setForm({ ...EMPTY_C, ...EMPTY_A }); setEditId(null); setError(""); setShowModal(true);
   };
 
-  const abrirEditar = (c) => {
+  const abrirEditar = async (c) => {
     setForm({ nombre: c.nombre, slug: c.slug,
               tipo_id: c.tipo_id != null ? String(c.tipo_id) : "",
               es_pediatrica: !!c.es_pediatrica,
               email: c.email||"", telefono: c.telefono||"",
               direccion: c.direccion||"", ciudad: c.ciudad||"",
               pais: c.pais||"PE", ruc: c.ruc||"",
+              inactividad_minutos: "20",
               ...EMPTY_A });
     setEditId(c.id); setError(""); setShowModal(true);
+    // Cargar config de la clínica para obtener inactividad_minutos
+    try {
+      const r = await api.get(`/clinicas/${c.id}`);
+      const configArr = r.data?.data?.config || [];
+      const min = configArr.find(x => x.clave === "inactividad_minutos")?.valor || "20";
+      setForm(f => ({ ...f, inactividad_minutos: min }));
+    } catch (_) {}
   };
 
   const guardar = async (e) => {
@@ -152,6 +160,9 @@ export default function Clinicas() {
     try {
       if (editId) {
         await api.put(`/clinicas/${editId}`, form);
+        // Guardar config de inactividad por separado en clinica_config
+        const min = Math.min(120, Math.max(5, parseInt(form.inactividad_minutos) || 20));
+        await api.put(`/clinicas/${editId}/config`, { config: { inactividad_minutos: String(min) } });
       } else {
         await api.post("/clinicas", form);
       }
@@ -1077,6 +1088,46 @@ export default function Clinicas() {
                         onBlur={(e)  => e.target.style.borderColor = C.border} />
                     </Field>
                   </div>
+
+                  {/* Config de sesión — solo visible al editar */}
+                  {editId && (
+                    <div style={{ marginTop: 20 }}>
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 10, marginBottom: 14,
+                      }}>
+                        <div style={{
+                          width: 28, height: 28, borderRadius: 8,
+                          background: "rgba(245,158,11,.1)", border: "1px solid rgba(245,158,11,.25)",
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          <i className="bi bi-shield-lock" style={{ fontSize: 12, color: "#f59e0b" }} />
+                        </div>
+                        <span style={{ fontWeight: 600, fontSize: 13, color: C.text }}>Seguridad de sesión</span>
+                        <div style={{ flex: 1, height: 1, background: C.border }} />
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                        <div>
+                          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 6 }}>
+                            Tiempo de inactividad
+                          </label>
+                          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                            <input
+                              type="number" min={5} max={120}
+                              style={{ ...inputSt, width: 90, textAlign: "center" }}
+                              value={form.inactividad_minutos}
+                              onChange={e => setForm({ ...form, inactividad_minutos: e.target.value })}
+                              onFocus={e => e.target.style.borderColor = C.accent}
+                              onBlur={e  => e.target.style.borderColor = C.border}
+                            />
+                            <span style={{ fontSize: 13, color: C.muted }}>minutos</span>
+                          </div>
+                        </div>
+                        <small style={{ color: C.muted, fontSize: 11, marginTop: 18 }}>
+                          Minutos sin actividad antes de mostrar el aviso de cierre de sesión (5–120).
+                        </small>
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Sección admin inicial */}
