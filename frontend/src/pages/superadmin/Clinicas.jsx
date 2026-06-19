@@ -870,21 +870,25 @@ export default function Clinicas() {
       {/* ── Modal ─────────────────────────────────────────────── */}
       {showModal && (
         <div style={{
-          position: "fixed", inset: 0, zIndex: 1050,
-          background: "rgba(0,0,0,.65)", backdropFilter: "blur(4px)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
-        }}>
+          position: "fixed", inset: 0, zIndex: 9000,
+          background: "rgba(0,0,0,.72)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "flex-start", justifyContent: "center",
+          padding: "16px", overflowY: "auto",
+        }}
+          onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}
+        >
           <div style={{
             background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 18, width: "100%", maxWidth: 680,
-            maxHeight: "90vh", display: "flex", flexDirection: "column",
-            boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+            borderRadius: 18, width: "100%", maxWidth: 700,
+            margin: "auto",
+            display: "flex", flexDirection: "column",
+            boxShadow: "0 24px 80px rgba(0,0,0,.6)",
           }}>
             {/* Header modal */}
             <div style={{
-              padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
-              display: "flex", alignItems: "center", gap: 14,
-              flexShrink: 0,
+              padding: "18px 20px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 12,
+              borderRadius: "18px 18px 0 0",
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 10,
@@ -915,8 +919,8 @@ export default function Clinicas() {
               </button>
             </div>
 
-            <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
-              <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 24, overflowY: "auto", flex: 1 }}>
+            <form onSubmit={guardar} style={{ display: "flex", flexDirection: "column" }}>
+              <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: 20 }}>
 
                 {error && (
                   <div style={{
@@ -943,7 +947,7 @@ export default function Clinicas() {
                     <span style={{ fontWeight: 600, fontSize: 13, color: C.text }}>Datos de la clínica</span>
                     <div style={{ flex: 1, height: 1, background: C.border }} />
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
                     <Field label="Nombre" hint="*">
                       <input style={inputSt} value={form.nombre}
                         onChange={(e) => setForm({ ...form, nombre: e.target.value })}
@@ -1152,7 +1156,7 @@ export default function Clinicas() {
                       }}>opcional</span>
                       <div style={{ flex: 1, height: 1, background: C.border }} />
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
+                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 16 }}>
                       <Field label="Nombres">
                         <input style={inputSt} value={form.admin_nombres}
                           onChange={(e) => setForm({ ...form, admin_nombres: e.target.value })}
@@ -1198,8 +1202,9 @@ export default function Clinicas() {
 
               {/* Footer modal */}
               <div style={{
-                padding: "18px 28px", borderTop: `1px solid ${C.border}`,
+                padding: "16px 20px", borderTop: `1px solid ${C.border}`,
                 display: "flex", justifyContent: "flex-end", gap: 12,
+                flexWrap: "wrap", borderRadius: "0 0 18px 18px",
               }}>
                 <button
                   type="button"
