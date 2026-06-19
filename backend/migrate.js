@@ -61,6 +61,12 @@ async function runMigrations() {
       '040_permisos_modulos_clinica_usuario.sql',
       'run-036.js',
       'run-041.js',
+      '041_modulo_psicologia.sql',
+      '042_add_psicologo_tipo.sql',
+      '043_fix_psicologia_diagnostico_cie.sql',
+      '044_modulo_odontologia.sql',
+      '045_cie10_nefrologia_pediatrica.sql',
+      '046_documentos_historia_id.sql',
     ];
 
     for (const migration of migrations) {

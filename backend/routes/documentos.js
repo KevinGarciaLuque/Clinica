@@ -48,13 +48,14 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     let docs = [];
     if (await tablaExiste("documentos_paciente")) {
       try {
-        const [rows] = await pool.query(
-          `SELECT id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por, creado_en AS subido_en
+        const { historia_id } = req.query;
+        let docsQuery = `SELECT id, tipo, nombre_original, ruta_archivo, mime_type, tamano_bytes, subido_por, historia_id, creado_en AS subido_en
            FROM documentos_paciente
-           WHERE paciente_id=? AND clinica_id=?
-           ORDER BY creado_en DESC`,
-          [pacienteId, clinicaIdFinal]
-        );
+           WHERE paciente_id=? AND clinica_id=?`;
+        const docsParams = [pacienteId, clinicaIdFinal];
+        if (historia_id) { docsQuery += ' AND historia_id=?'; docsParams.push(historia_id); }
+        docsQuery += ' ORDER BY creado_en DESC';
+        const [rows] = await pool.query(docsQuery, docsParams);
         docs = rows;
       } catch (err) {
         // Compatibilidad con esquemas antiguos donde la columna de fecha es subido_en
@@ -127,7 +128,8 @@ router.post(
         return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
 
       const tipo = req.body.tipo || "otro";
-      const tiposValidos = ["dni_frente","dni_reverso","seguro","consentimiento","laboratorio","imagen","radiografia","receta","otro"];
+      const historiaId = req.body.historia_id ? parseInt(req.body.historia_id, 10) : null;
+      const tiposValidos = ["dni_frente","dni_reverso","seguro","consentimiento","laboratorio","imagen","radiografia","resultado","receta","otro"];
       if (!tiposValidos.includes(tipo))
         return res.status(400).json({ ok: false, msg: "Tipo de documento inválido" });
 
@@ -188,10 +190,10 @@ router.post(
         try {
           [r] = await pool.query(
             `INSERT INTO documentos_paciente
-               (paciente_id, clinica_id, tipo, nombre_original, ruta_archivo, cloudinary_public_id, mime_type, tamano_bytes, subido_por)
-             VALUES (?,?,?,?,?,?,?,?,?)`,
+               (paciente_id, historia_id, clinica_id, tipo, nombre_original, ruta_archivo, cloudinary_public_id, mime_type, tamano_bytes, subido_por)
+             VALUES (?,?,?,?,?,?,?,?,?,?)`,
             [
-              pacienteId, clinicaIdFinal,
+              pacienteId, historiaId, clinicaIdFinal,
               tipo,
               req.file.originalname,
               uploadResult.secure_url,
@@ -341,6 +343,27 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPC
 
     // Fallback: redirigir a la URL directa (legacy)
     return res.redirect(doc.ruta_archivo);
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /api/pacientes/:pacienteId/documentos/por-historia
+// Devuelve { historia_id: count } para mostrar badge en historial
+router.get("/por-historia", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId  = req.tenant?.clinica_id;
+    const pacienteId = req.params.pacienteId;
+    const [rows] = await pool.query(
+      `SELECT historia_id, COUNT(*) AS total
+       FROM documentos_paciente
+       WHERE paciente_id=? AND clinica_id=? AND historia_id IS NOT NULL
+       GROUP BY historia_id`,
+      [pacienteId, clinicaId]
+    );
+    const map = {};
+    rows.forEach(r => { map[r.historia_id] = r.total; });
+    res.json({ ok: true, data: map });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

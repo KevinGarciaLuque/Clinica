@@ -48,6 +48,8 @@ export default function HistoriaClinica() {
   const [activeTabHist,      setActiveTabHist]      = useState("historial");
   const [filtroDesde,        setFiltroDesde]        = useState("");
   const [filtroHasta,        setFiltroHasta]        = useState("");
+  const [docsMap,            setDocsMap]            = useState({});   // historia_id → count
+  const [modalDocs,          setModalDocs]          = useState(null); // { historiaId, docs[] }
 
   // ── cargar datos cuando se selecciona paciente ────────────────────────────
   useEffect(() => {
@@ -58,11 +60,13 @@ export default function HistoriaClinica() {
       api.get(`/pacientes/${selPacId}`),
       api.get(`/historias`, { params: { paciente_id: selPacId } }),
       api.get(`/historias/paciente/${selPacId}/alergias`),
+      api.get(`/pacientes/${selPacId}/documentos/por-historia`).catch(() => ({ data: { data: {} } })),
     ])
-    .then(([p, h, al]) => {
+    .then(([p, h, al, dm]) => {
       setPaciente(p.data.data || null);
       setHistorias(h.data.data || []);
       setAlergias(al.data.data || []);
+      setDocsMap(dm.data.data || {});
     })
     .catch(() => {})
     .finally(() => setLoading(false));
@@ -738,6 +742,20 @@ export default function HistoriaClinica() {
                           fontSize: "0.78rem", color: "#2563eb", textDecoration: "none", fontWeight: 500,
                         }}>Ver completa</Link>
                       )}
+                      {/* Botón documentos */}
+                      <button onClick={async () => {
+                        const r = await api.get(`/pacientes/${paciente.id}/documentos`, { params: { historia_id: h.id } }).catch(() => ({ data: { data: [] } }));
+                        setModalDocs({ historiaId: h.id, docs: r.data.data || [] });
+                      }} style={{
+                        background: docsMap[h.id] ? "#eff6ff" : "#f8fafc",
+                        border: `1px solid ${docsMap[h.id] ? "#bfdbfe" : "#e2e8f0"}`,
+                        borderRadius: 6, padding: "4px 12px", fontSize: "0.78rem",
+                        cursor: "pointer", color: docsMap[h.id] ? "#2563eb" : "#9ca3af",
+                        display: "flex", alignItems: "center", gap: 5, fontWeight: docsMap[h.id] ? 600 : 400,
+                      }}>
+                        <i className="bi bi-paperclip"></i>
+                        Docs{docsMap[h.id] ? ` (${docsMap[h.id]})` : ""}
+                      </button>
                       <button onClick={() => imprimirConsulta(h)} style={{
                         marginLeft: "auto", background: "#f1f5f9", border: "1px solid #e2e8f0",
                         borderRadius: 6, padding: "4px 12px", fontSize: "0.78rem", cursor: "pointer", color: "#374151",
@@ -798,6 +816,75 @@ export default function HistoriaClinica() {
             );
           })()}
         </>
+      )}
+
+      {/* Modal documentos de consulta */}
+      {modalDocs && (
+        <div onClick={() => setModalDocs(null)} style={{
+          position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 9990,
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div onClick={e => e.stopPropagation()} style={{
+            background: "#fff", borderRadius: 14, width: "100%", maxWidth: 680,
+            maxHeight: "85vh", display: "flex", flexDirection: "column",
+            boxShadow: "0 8px 40px rgba(0,0,0,.25)",
+          }}>
+            <div style={{
+              padding: "14px 20px", borderBottom: "1px solid #e5e7eb",
+              display: "flex", justifyContent: "space-between", alignItems: "center",
+            }}>
+              <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1a2744" }}>
+                <i className="bi bi-paperclip me-2 text-primary"></i>
+                Documentos de la consulta
+              </span>
+              <button onClick={() => setModalDocs(null)} style={{
+                background: "none", border: "none", fontSize: "1.3rem", cursor: "pointer", color: "#6b7280",
+              }}>×</button>
+            </div>
+            <div style={{ overflowY: "auto", padding: 20, flex: 1 }}>
+              {modalDocs.docs.length === 0 ? (
+                <div style={{ textAlign: "center", padding: 40, color: "#9ca3af" }}>
+                  <i className="bi bi-paperclip" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                  No hay documentos adjuntos en esta consulta.
+                </div>
+              ) : (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12 }}>
+                  {modalDocs.docs.map(d => {
+                    const esImg = d.mime_type?.startsWith("image/");
+                    return (
+                      <a key={d.id} href={d.ruta_archivo} target="_blank" rel="noreferrer"
+                        style={{ textDecoration: "none", color: "inherit" }}>
+                        <div style={{
+                          border: "1px solid #e5e7eb", borderRadius: 10, overflow: "hidden",
+                          boxShadow: "0 1px 4px rgba(0,0,0,.05)", transition: "box-shadow .15s",
+                        }}
+                          onMouseEnter={e => e.currentTarget.style.boxShadow = "0 3px 12px rgba(0,0,0,.12)"}
+                          onMouseLeave={e => e.currentTarget.style.boxShadow = "0 1px 4px rgba(0,0,0,.05)"}>
+                          <div style={{ height: 100, background: "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                            {esImg
+                              ? <img src={d.ruta_archivo} alt={d.nombre_original}
+                                  style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                              : <i className="bi bi-file-earmark-pdf" style={{ fontSize: "2.2rem", color: "#ef4444" }}></i>
+                            }
+                          </div>
+                          <div style={{ padding: "7px 9px", background: "#fff" }}>
+                            <div style={{ fontSize: "0.74rem", fontWeight: 600, color: "#374151",
+                              whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              {d.nombre_original}
+                            </div>
+                            <div style={{ fontSize: "0.68rem", color: "#9ca3af", marginTop: 2 }}>
+                              {d.tipo} · {d.tamano_bytes ? `${(d.tamano_bytes/1024).toFixed(0)} KB` : ""}
+                            </div>
+                          </div>
+                        </div>
+                      </a>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Modal consulta sin cita agendada */}
