@@ -14,14 +14,15 @@ export default function SuperAdminPersonalizacion() {
   const cfg = useConfigSistema();
 
   const [form, setForm] = useState({
-    nombre_sistema:  cfg.nombre_sistema,
-    subtitulo:       cfg.subtitulo,
-    icono_bootstrap: cfg.icono_bootstrap,
-    fondo_login_url: cfg.fondo_login_url,
-    copyright_texto: cfg.copyright_texto,
-    color_primario:  cfg.color_primario,
-    color_nombre1:   cfg.color_nombre1 || "#ffffff",
-    color_nombre2:   cfg.color_nombre2 || "#2D6BE8",
+    nombre_sistema:      cfg.nombre_sistema,
+    subtitulo:           cfg.subtitulo,
+    icono_bootstrap:     cfg.icono_bootstrap,
+    fondo_login_url:     cfg.fondo_login_url,
+    copyright_texto:     cfg.copyright_texto,
+    color_primario:      cfg.color_primario,
+    color_nombre1:       cfg.color_nombre1 || "#ffffff",
+    color_nombre2:       cfg.color_nombre2 || "#2D6BE8",
+    inactividad_minutos: cfg.inactividad_minutos || "20",
   });
 
   // Preview local de logo / fondo
@@ -163,6 +164,19 @@ export default function SuperAdminPersonalizacion() {
                 onChange={e => set("copyright_texto", e.target.value)}
                 placeholder="Ej: Mi Clínica · Todos los derechos reservados"
               />
+            </Field>
+            <Field label="Tiempo de inactividad (minutos)" hint="Minutos sin actividad antes de mostrar el aviso de sesión. Mínimo 5, máximo 120.">
+              <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <input
+                  type="number"
+                  className="form-control"
+                  style={{ maxWidth: 120 }}
+                  min={5} max={120}
+                  value={form.inactividad_minutos}
+                  onChange={e => set("inactividad_minutos", String(Math.min(120, Math.max(5, parseInt(e.target.value) || 20))))}
+                />
+                <span className="text-muted small">minutos</span>
+              </div>
             </Field>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <Field label={`Color primera parte (ej: "KG-")`}>
@@ -530,13 +544,14 @@ function Section({ title, icon, children }) {
   );
 }
 
-function Field({ label, children }) {
+function Field({ label, hint, children }) {
   return (
     <div style={{ marginBottom: 14 }}>
       <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 6 }}>
         {label}
       </label>
       {children}
+      {hint && <small className="text-muted d-block mt-1">{hint}</small>}
     </div>
   );
 }

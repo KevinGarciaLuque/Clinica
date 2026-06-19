@@ -4,15 +4,16 @@ const auth   = require("../middlewares/auth");
 const { uploadSistemaMemory } = require("../middlewares/upload");
 
 const DEFAULTS = {
-  nombre_sistema:   "KG-Medic",
-  subtitulo:        "Sistema de gestión clínica",
-  logo_url:         "",
-  icono_bootstrap:  "bi-hospital",
-  fondo_login_url:  "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1920&q=80",
-  copyright_texto:  "KG-Medic · Todos los derechos reservados",
-  color_primario:   "#3b82f6",
-  color_nombre1:    "#ffffff",
-  color_nombre2:    "#2D6BE8",
+  nombre_sistema:      "KG-Medic",
+  subtitulo:           "Sistema de gestión clínica",
+  logo_url:            "",
+  icono_bootstrap:     "bi-hospital",
+  fondo_login_url:     "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1920&q=80",
+  copyright_texto:     "KG-Medic · Todos los derechos reservados",
+  color_primario:      "#3b82f6",
+  color_nombre1:       "#ffffff",
+  color_nombre2:       "#2D6BE8",
+  inactividad_minutos: "20",
 };
 
 let schemaReady = false;
@@ -66,7 +67,7 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
     const campos = [
       "nombre_sistema", "subtitulo", "icono_bootstrap",
       "fondo_login_url", "copyright_texto", "color_primario",
-      "color_nombre1", "color_nombre2",
+      "color_nombre1", "color_nombre2", "inactividad_minutos",
     ];
     for (const c of campos) {
       if (req.body[c] !== undefined) {
