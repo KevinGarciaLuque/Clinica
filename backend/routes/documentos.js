@@ -158,11 +158,18 @@ router.post(
 
       let uploadResult;
       if (cloudinaryConfigured) {
+        // PDFs y documentos deben subirse como "raw" para ser accesibles públicamente.
+        // Solo imágenes van como "image". Videos como "video".
+        const mime = req.file.mimetype || "";
+        const cloudinaryResourceType = mime.startsWith("image/") ? "image"
+          : mime.startsWith("video/") ? "video"
+          : "raw";
+
         uploadResult = await new Promise((resolve, reject) => {
           const stream = cloudinary.uploader.upload_stream(
             {
               folder:        `clinica/pacientes/${clinicaIdFinal}`,
-              resource_type: "auto",
+              resource_type: cloudinaryResourceType,
               use_filename:  false,
             },
             (err, result) => (err ? reject(err) : resolve(result))
@@ -329,13 +336,22 @@ router.get("/:docId/view", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPC
     if (!doc.ruta_archivo)
       return res.status(404).json({ ok: false, msg: "Archivo no encontrado" });
 
-    // Redirigir a la URL almacenada directamente — ya es la URL correcta de Cloudinary
-    // con el resource_type correcto embebido (/image/upload/ o /raw/upload/)
-    if (doc.ruta_archivo?.startsWith("http")) {
-      return res.redirect(doc.ruta_archivo);
+    // Si tiene public_id de Cloudinary, generar URL firmada para evitar 401
+    // en PDFs almacenados como resource_type "image" (sube con auto).
+    if (doc.cloudinary_public_id) {
+      // Extraer resource_type real desde la URL almacenada (/image/, /raw/, /video/)
+      const match = (doc.ruta_archivo || "").match(/cloudinary\.com\/[^/]+\/(\w+)\/upload/);
+      const resourceType = match?.[1] || "image";
+      const signedUrl = cloudinary.url(doc.cloudinary_public_id, {
+        resource_type: resourceType,
+        type: "upload",
+        sign_url: true,
+        expires_at: Math.floor(Date.now() / 1000) + 3600,
+      });
+      return res.redirect(signedUrl);
     }
 
-    // Fallback local
+    // Fallback: redirigir a la URL directa (archivos locales u otros)
     return res.redirect(doc.ruta_archivo);
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
