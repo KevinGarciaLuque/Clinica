@@ -1173,9 +1173,11 @@ function SoapTextareaIA({ label, sublabel, value, onChange, readOnly, rows = 3, 
 // Componente reutilizable: buscador CIE-10 con chip al seleccionar
 // ══════════════════════════════════════════════════════════════════════
 function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "Buscar código o descripción…" }) {
-  const [q, setQ]       = useState("");
-  const [list, setList] = useState([]);
-  const ref             = useRef(null);
+  const [q, setQ]         = useState("");
+  const [list, setList]   = useState([]);
+  const [openUp, setOpenUp] = useState(false);
+  const ref               = useRef(null);
+  const inputRef          = useRef(null);
 
   // cerrar dropdown al clic fuera
   useEffect(() => {
@@ -1193,6 +1195,13 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
     }, 300);
     return () => clearTimeout(t);
   }, [q]);
+
+  const checkDirection = () => {
+    if (inputRef.current) {
+      const rect = inputRef.current.getBoundingClientRect();
+      setOpenUp(window.innerHeight - rect.bottom < 280);
+    }
+  };
 
   const sel = (item) => {
     onChange(item.codigo, item.descripcion);
@@ -1231,6 +1240,8 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
     );
   }
 
+  const dropPos = openUp ? { bottom: "calc(100% + 2px)" } : { top: "calc(100% + 2px)" };
+
   // Campo de búsqueda cuando no hay nada seleccionado
   return (
     <div className="position-relative" ref={ref}>
@@ -1238,13 +1249,15 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
         <span className="input-group-text text-muted border-end-0 bg-white">
           <i className="bi bi-search" style={{ fontSize: "0.75rem" }}></i>
         </span>
-        <input className="form-control border-start-0" placeholder={placeholder}
-          value={q} onChange={e => setQ(e.target.value)}
+        <input ref={inputRef} className="form-control border-start-0" placeholder={placeholder}
+          value={q}
+          onChange={e => setQ(e.target.value)}
+          onFocus={checkDirection}
           autoComplete="off" />
       </div>
       {q.length >= 2 && (
         <ul className="list-group position-absolute z-3 shadow"
-          style={{ top: "100%", left: 0, right: 0, minWidth: 340, maxHeight: 300, overflowY: "auto" }}>
+          style={{ ...dropPos, left: 0, right: 0, minWidth: 340, maxHeight: 260, overflowY: "auto" }}>
           {list.map(c => (
             <li key={c.codigo} className="list-group-item list-group-item-action px-2 py-1"
               style={{ cursor: "pointer" }}
@@ -1285,7 +1298,16 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
   const [catDxQuery, setCatDxQuery]   = useState("");
   const [allCatDx,  setAllCatDx]     = useState([]);
   const [showCatDx, setShowCatDx]    = useState(false);
+  const [catDxOpenUp, setCatDxOpenUp] = useState(false);
   const catDxRef                      = useRef(null);
+  const catDxInputRef                 = useRef(null);
+
+  const checkCatDxDirection = () => {
+    if (catDxInputRef.current) {
+      const rect = catDxInputRef.current.getBoundingClientRect();
+      setCatDxOpenUp(window.innerHeight - rect.bottom < 280);
+    }
+  };
 
   // Carga toda la lista al montar (sin query = devuelve hasta 200)
   useEffect(() => {
@@ -1499,15 +1521,15 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
                 <span className="input-group-text bg-warning bg-opacity-10 text-warning border-end-0">
                   <i className="bi bi-lightning-fill"></i>
                 </span>
-                <input className="form-control border-start-0"
+                <input ref={catDxInputRef} className="form-control border-start-0"
                   placeholder={allCatDx.length > 0 ? `Mis diagnósticos (${allCatDx.length})…` : "Mis diagnósticos frecuentes…"}
                   value={catDxQuery}
                   onChange={e => { setCatDxQuery(e.target.value); setShowCatDx(true); }}
-                  onFocus={() => setShowCatDx(true)} />
+                  onFocus={() => { checkCatDxDirection(); setShowCatDx(true); }} />
               </div>
               {showCatDx && catDxList.length > 0 && (
                 <ul className="list-group position-absolute z-3 shadow"
-                  style={{ top: "100%", left: 0, right: 0, minWidth: 340, maxHeight: 260, overflowY: "auto" }}>
+                  style={{ ...(catDxOpenUp ? { bottom: "calc(100% + 2px)" } : { top: "calc(100% + 2px)" }), left: 0, right: 0, minWidth: 340, maxHeight: 260, overflowY: "auto" }}>
                   {catDxList.map(c => (
                     <li key={c.id} className="list-group-item list-group-item-action px-2 py-1"
                       style={{ cursor: "pointer" }}
@@ -1524,7 +1546,7 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
               )}
               {showCatDx && catDxList.length === 0 && catDxQuery.length >= 1 && (
                 <div className="position-absolute z-3 bg-white border rounded shadow px-3 py-2 text-muted small"
-                  style={{ top: "100%", left: 0, right: 0 }}>
+                  style={{ ...(catDxOpenUp ? { bottom: "calc(100% + 2px)" } : { top: "calc(100% + 2px)" }), left: 0, right: 0 }}>
                   Sin resultados para "{catDxQuery}"
                 </div>
               )}
