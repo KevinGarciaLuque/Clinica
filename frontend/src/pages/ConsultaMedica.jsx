@@ -1244,18 +1244,20 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
       </div>
       {q.length >= 2 && (
         <ul className="list-group position-absolute z-3 shadow"
-          style={{ top: "100%", left: 0, right: 0, maxHeight: 230, overflowY: "auto" }}>
+          style={{ top: "100%", left: 0, right: 0, minWidth: 340, maxHeight: 300, overflowY: "auto" }}>
           {list.map(c => (
-            <li key={c.codigo} className="list-group-item list-group-item-action py-1 px-2"
-              style={{ cursor: "pointer", fontSize: "0.81rem" }}
+            <li key={c.codigo} className="list-group-item list-group-item-action px-2 py-1"
+              style={{ cursor: "pointer" }}
               onMouseDown={() => sel(c)}>
-              <span className="me-2 fw-bold" style={{ fontFamily: "monospace", color: "#0d6efd" }}>{c.codigo}</span>
-              <span>{c.descripcion}</span>
-              {c.categoria && (
-                <span className="badge ms-2 text-bg-light border" style={{ fontSize: "0.66rem" }}>
-                  {c.categoria}
-                </span>
-              )}
+              <div className="d-flex align-items-center gap-2">
+                <span className="fw-bold flex-shrink-0" style={{ fontFamily: "monospace", color: "#0d6efd", fontSize: "0.78rem" }}>{c.codigo}</span>
+                {c.categoria && (
+                  <span className="badge text-bg-light border flex-shrink-0" style={{ fontSize: "0.63rem" }}>
+                    {c.categoria}
+                  </span>
+                )}
+              </div>
+              <div style={{ fontSize: "0.8rem", color: "#1e293b", lineHeight: 1.3, marginTop: 1 }}>{c.descripcion}</div>
             </li>
           ))}
           <li className="list-group-item list-group-item-action py-1 px-2"
@@ -1505,15 +1507,17 @@ function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registra
               </div>
               {showCatDx && catDxList.length > 0 && (
                 <ul className="list-group position-absolute z-3 shadow"
-                  style={{ top: "100%", left: 0, right: 0, maxHeight: 220, overflowY: "auto" }}>
+                  style={{ top: "100%", left: 0, right: 0, minWidth: 340, maxHeight: 260, overflowY: "auto" }}>
                   {catDxList.map(c => (
-                    <li key={c.id} className="list-group-item list-group-item-action py-1 px-2"
-                      style={{ cursor: "pointer", fontSize: "0.82rem" }}
+                    <li key={c.id} className="list-group-item list-group-item-action px-2 py-1"
+                      style={{ cursor: "pointer" }}
                       onMouseDown={() => selCatDx(c)}>
-                      <i className="bi bi-lightning-fill text-warning me-1"></i>
-                      <strong>{c.nombre}</strong>
-                      {c.codigo_cie && <span className="ms-1 badge text-bg-light border" style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>{c.codigo_cie}</span>}
-                      {c.descripcion_cie && <span className="text-muted ms-1">{c.descripcion_cie}</span>}
+                      <div className="d-flex align-items-center gap-2">
+                        <i className="bi bi-lightning-fill text-warning flex-shrink-0" style={{ fontSize: "0.75rem" }}></i>
+                        <strong style={{ fontSize: "0.82rem" }}>{c.nombre}</strong>
+                        {c.codigo_cie && <span className="badge text-bg-light border flex-shrink-0" style={{ fontFamily: "monospace", fontSize: "0.7rem" }}>{c.codigo_cie}</span>}
+                      </div>
+                      {c.descripcion_cie && <div className="text-muted" style={{ fontSize: "0.77rem", lineHeight: 1.3, marginTop: 1, paddingLeft: 18 }}>{c.descripcion_cie}</div>}
                     </li>
                   ))}
                 </ul>

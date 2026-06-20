@@ -128,6 +128,9 @@ function CalendarioPopup({ onClose }) {
 function WorldCupBannerAnimation({ isMobile }) {
   const dur = '10s';
   const ballSize = isMobile ? 28 : 40;
+  // ancho SVG portería: 110 desktop, 72 mobile
+  const gW = isMobile ? 72 : 110;
+  const gH = isMobile ? 56 : 84;
 
   return (
     <>
@@ -141,8 +144,8 @@ function WorldCupBannerAnimation({ isMobile }) {
           55%  { left:61%; top:10%; }
           65%  { left:71%; top:57%; }
           73%  { left:79%; top:12%; }
-          80%  { left:85%; top:35%; opacity:1; }
-          86%  { left:85%; top:35%; opacity:0; }
+          80%  { left:89%; top:33%; opacity:1; }
+          86%  { left:89%; top:33%; opacity:0; }
           87%  { left:3%;  top:55%; opacity:0; }
           91%  { left:3%;  top:55%; opacity:1; }
           100% { left:3%;  top:55%; opacity:1; }
@@ -167,7 +170,7 @@ function WorldCupBannerAnimation({ isMobile }) {
         }
         @keyframes wc26-glow {
           0%,78%   { filter:none; }
-          82%,93%  { filter:drop-shadow(0 0 12px #fbbf24) drop-shadow(0 0 28px #f59e0b); }
+          82%,93%  { filter:drop-shadow(0 0 14px #fbbf24) drop-shadow(0 0 30px #f59e0b); }
           97%,100% { filter:none; }
         }
         @keyframes wc26-s1 {
@@ -200,30 +203,76 @@ function WorldCupBannerAnimation({ isMobile }) {
         <div style={{fontSize: isMobile ? 28 : 42, fontWeight:900, color:'#1e40af', letterSpacing:'-0.02em'}}>2026</div>
       </div>
 
-      {/* Meta derecha */}
+      {/* Portería 3D perspectiva */}
       <div style={{
-        position:'absolute', right: isMobile ? 8 : 20, top:'50%', transform:'translateY(-50%)',
+        position:'absolute', right: isMobile ? 6 : 16, top:'50%', transform:'translateY(-50%)',
         animation:`wc26-glow ${dur} ease-in-out infinite`,
         pointerEvents:'none', zIndex:0,
       }}>
-        <svg width={isMobile ? 60 : 90} height={isMobile ? 50 : 74} viewBox="0 0 90 74" fill="none">
-          {/* Red de fondo */}
-          <rect x="3" y="8" width="78" height="54" fill="rgba(200,230,255,0.22)" />
-          <line x1="22" y1="8" x2="22" y2="62" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-          <line x1="42" y1="8" x2="42" y2="62" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-          <line x1="62" y1="8" x2="62" y2="62" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-          <line x1="3" y1="28" x2="81" y2="28" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-          <line x1="3" y1="45" x2="81" y2="45" stroke="rgba(255,255,255,0.5)" strokeWidth="1"/>
-          {/* Postes */}
-          <rect x="3" y="8" width="4" height="55" fill="white" rx="2"/>
-          <rect x="83" y="8" width="4" height="55" fill="white" rx="2"/>
-          <rect x="3" y="8" width="84" height="4" fill="white" rx="2"/>
-          {/* Sombra travesaño */}
-          <rect x="3" y="12" width="84" height="2" fill="rgba(0,0,0,0.1)" rx="1"/>
-          {/* Suelo verde */}
-          <rect x="0" y="66" width="90" height="5" fill="#4ade80" rx="2.5"/>
-          <rect x="3" y="66" width="4" height="8" fill="#16a34a" rx="1.5"/>
-          <rect x="83" y="66" width="4" height="8" fill="#16a34a" rx="1.5"/>
+        <svg width={gW} height={gH} viewBox="0 0 110 84" fill="none">
+
+          {/* ── CARA TRASERA (fondo de red) ── */}
+          <rect x="28" y="4" width="72" height="54" fill="rgba(180,215,255,0.10)"/>
+          {/* red vertical trasera */}
+          <line x1="46" y1="4"  x2="46" y2="58" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
+          <line x1="64" y1="4"  x2="64" y2="58" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
+          <line x1="82" y1="4"  x2="82" y2="58" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
+          {/* red horizontal trasera */}
+          <line x1="28" y1="22" x2="100" y2="22" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
+          <line x1="28" y1="38" x2="100" y2="38" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
+
+          {/* ── CARA LATERAL IZQUIERDA ── */}
+          <polygon points="7,14 28,4 28,58 7,68" fill="rgba(160,200,255,0.13)"/>
+          {/* red diagonal izquierda */}
+          <line x1="7"  y1="32" x2="28" y2="23" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8"/>
+          <line x1="7"  y1="50" x2="28" y2="41" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8"/>
+          <line x1="14" y1="14" x2="28" y2="8"  stroke="rgba(255,255,255,0.22)" strokeWidth="0.8"/>
+
+          {/* ── CARA LATERAL DERECHA (visible en perspectiva) ── */}
+          <polygon points="85,14 100,4 100,58 85,68" fill="rgba(140,185,255,0.08)"/>
+
+          {/* ── CARA SUPERIOR (techo de la portería) ── */}
+          <polygon points="7,14 85,14 100,4 28,4" fill="rgba(200,230,255,0.12)"/>
+          <line x1="7"  y1="14" x2="28" y2="4"  stroke="rgba(255,255,255,0.25)" strokeWidth="0.8"/>
+          <line x1="40" y1="14" x2="55" y2="4"  stroke="rgba(255,255,255,0.18)" strokeWidth="0.7"/>
+          <line x1="65" y1="14" x2="77" y2="4"  stroke="rgba(255,255,255,0.18)" strokeWidth="0.7"/>
+
+          {/* ── ARMAZÓN TRASERO (postes grises) ── */}
+          {/* poste izquierdo trasero */}
+          <rect x="26" y="4" width="3" height="55" fill="rgba(210,220,230,0.85)" rx="1.5"/>
+          {/* poste derecho trasero */}
+          <rect x="97" y="4" width="3" height="55" fill="rgba(210,220,230,0.75)" rx="1.5"/>
+          {/* travesaño trasero */}
+          <rect x="26" y="4" width="74" height="3" fill="rgba(210,220,230,0.85)" rx="1.5"/>
+          {/* base trasera */}
+          <rect x="26" y="57" width="74" height="2.5" fill="rgba(210,220,230,0.6)" rx="1.2"/>
+
+          {/* ── CONECTORES DE PROFUNDIDAD ── */}
+          {/* arriba izquierda */}
+          <line x1="7"  y1="14" x2="28" y2="4"  stroke="rgba(190,200,210,0.9)" strokeWidth="2.5" strokeLinecap="round"/>
+          {/* arriba derecha */}
+          <line x1="85" y1="14" x2="100" y2="4" stroke="rgba(190,200,210,0.85)" strokeWidth="2.5" strokeLinecap="round"/>
+          {/* abajo izquierda */}
+          <line x1="7"  y1="68" x2="28" y2="58" stroke="rgba(190,200,210,0.7)" strokeWidth="2" strokeLinecap="round"/>
+          {/* abajo derecha */}
+          <line x1="85" y1="68" x2="100" y2="58" stroke="rgba(190,200,210,0.65)" strokeWidth="2" strokeLinecap="round"/>
+
+          {/* ── MARCO FRONTAL (lo más visible — blanco brillante) ── */}
+          {/* poste izquierdo frontal */}
+          <rect x="5" y="13" width="4.5" height="56" fill="white" rx="2.2"/>
+          {/* poste derecho frontal */}
+          <rect x="82" y="13" width="4.5" height="56" fill="white" rx="2.2"/>
+          {/* travesaño frontal */}
+          <rect x="5" y="13" width="82" height="4.5" fill="white" rx="2.2"/>
+          {/* sombra suave travesaño */}
+          <rect x="5" y="17.5" width="82" height="1.5" fill="rgba(0,0,0,0.12)" rx="0.5"/>
+
+          {/* ── SUELO VERDE ── */}
+          <rect x="0"  y="72" width="110" height="9" fill="#4ade80" rx="3"/>
+          <rect x="5"  y="72" width="4.5" height="7" fill="#16a34a" rx="1.5"/>
+          <rect x="82" y="72" width="4.5" height="7" fill="#16a34a" rx="1.5"/>
+          {/* línea de área */}
+          <rect x="0" y="72" width="110" height="1.5" fill="#22c55e"/>
         </svg>
       </div>
 
@@ -235,7 +284,7 @@ function WorldCupBannerAnimation({ isMobile }) {
       ].map(({ anim, emoji }, i) => (
         <div key={i} style={{
           position:'absolute',
-          right: isMobile ? 40 : 70,
+          right: isMobile ? 44 : 76,
           top: '45%',
           fontSize: isMobile ? 14 : 20,
           lineHeight: 1,
@@ -249,7 +298,7 @@ function WorldCupBannerAnimation({ isMobile }) {
       {/* GOL! */}
       <div style={{
         position:'absolute',
-        right: isMobile ? 70 : 118,
+        right: isMobile ? 80 : 136,
         top: '50%',
         transform: 'translateY(-50%)',
         animation: `wc26-gol ${dur} ease-in-out infinite`,
