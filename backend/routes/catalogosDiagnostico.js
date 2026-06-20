@@ -26,7 +26,7 @@ router.get("/", auth(), async (req, res) => {
       params.push(`%${q}%`, `%${q}%`, `%${q}%`);
     }
 
-    sql += " ORDER BY especialidad ASC, nombre ASC LIMIT 200";
+    sql += " ORDER BY (clinica_id IS NULL) ASC, especialidad ASC, nombre ASC LIMIT 200";
     const [rows] = await pool.query(sql, params);
     res.json({ ok: true, data: rows });
   } catch (e) {
