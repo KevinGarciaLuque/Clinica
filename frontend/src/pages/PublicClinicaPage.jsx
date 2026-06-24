@@ -1,8 +1,27 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import axios from "axios";
+import AgendarModal from "./AgendarModal";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const DEFAULT_COLOR = "#213665";
+
+function hexToRgb(hex) {
+  const r = parseInt(hex.slice(1, 3), 16);
+  const g = parseInt(hex.slice(3, 5), 16);
+  const b = parseInt(hex.slice(5, 7), 16);
+  return `${r}, ${g}, ${b}`;
+}
+
+function darken(hex, amount = 20) {
+  let r = parseInt(hex.slice(1, 3), 16) - amount;
+  let g = parseInt(hex.slice(3, 5), 16) - amount;
+  let b = parseInt(hex.slice(5, 7), 16) - amount;
+  r = Math.max(0, r).toString(16).padStart(2, "0");
+  g = Math.max(0, g).toString(16).padStart(2, "0");
+  b = Math.max(0, b).toString(16).padStart(2, "0");
+  return `#${r}${g}${b}`;
+}
 
 export default function PublicClinicaPage() {
   const { slug } = useParams();
@@ -10,6 +29,8 @@ export default function PublicClinicaPage() {
   const [servicios, setServicios] = useState([]);
   const [cargando, setCargando] = useState(true);
   const [error, setError] = useState(null);
+  const [fotoError, setFotoError] = useState(false);
+  const [showAgendar, setShowAgendar] = useState(false);
 
   useEffect(() => {
     const cargar = async () => {
@@ -31,345 +52,277 @@ export default function PublicClinicaPage() {
 
   if (cargando) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.spinner} />
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f1f5f9" }}>
+        <div style={{
+          width: 44, height: 44,
+          border: `4px solid #e2e8f0`,
+          borderTop: `4px solid ${DEFAULT_COLOR}`,
+          borderRadius: "50%",
+          animation: "spin 0.7s linear infinite",
+        }} />
+        <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
       </div>
     );
   }
 
   if (error || !clinica) {
     return (
-      <div style={styles.loadingContainer}>
-        <div style={styles.errorBox}>
-          <i className="bi bi-exclamation-circle" style={{ fontSize: 48, color: "#d63384", marginBottom: 16 }} />
-          <p style={{ color: "#555", fontSize: 18 }}>{error || "Página no encontrada"}</p>
-        </div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "100vh", background: "#f1f5f9", flexDirection: "column", gap: 16 }}>
+        <i className="bi bi-hospital" style={{ fontSize: 56, color: "#94a3b8" }} />
+        <p style={{ color: "#64748b", fontSize: 17, fontWeight: 500 }}>{error || "Página no encontrada"}</p>
       </div>
     );
   }
 
   const { perfil = {} } = clinica;
-  const logo = clinica.logo_url
-    ? clinica.logo_url.startsWith("http") ? clinica.logo_url : `${API}${clinica.logo_url}`
-    : null;
-  const fotoDr = perfil.perfil_foto_doctor
-    ? perfil.perfil_foto_doctor.startsWith("http") ? perfil.perfil_foto_doctor : `${API}${perfil.perfil_foto_doctor}`
-    : logo;
+  const color     = (perfil.perfil_color_primario || DEFAULT_COLOR).trim();
+  const colorDark = darken(color, 30);
+  const colorRgb  = hexToRgb(color);
 
-  const redesSociales = [
-    { key: "perfil_instagram",   icon: "bi-instagram",  label: "Instagram",  color: "#E1306C", bg: "#fce4ec" },
-    { key: "perfil_tiktok",      icon: "bi-tiktok",     label: "TikTok",     color: "#000000", bg: "#f5f5f5" },
-    { key: "perfil_facebook",    icon: "bi-facebook",   label: "Facebook",   color: "#1877F2", bg: "#e3f2fd" },
-    { key: "perfil_whatsapp",    icon: "bi-whatsapp",   label: "WhatsApp",   color: "#25D366", bg: "#e8f5e9" },
+  const resolveUrl = (url) => {
+    if (!url) return null;
+    return url.startsWith("http") ? url : `${API}${url}`;
+  };
+
+  const fotoDr = fotoError ? null : resolveUrl(perfil.perfil_foto_doctor);
+  const logo   = resolveUrl(clinica.logo_url);
+
+  const redes = [
+    { key: "perfil_instagram", icon: "bi-instagram",  label: "Instagram",  href: v => v.startsWith("http") ? v : `https://instagram.com/${v.replace("@","")}` },
+    { key: "perfil_tiktok",    icon: "bi-tiktok",     label: "TikTok",     href: v => v.startsWith("http") ? v : `https://tiktok.com/@${v.replace("@","")}` },
+    { key: "perfil_facebook",  icon: "bi-facebook",   label: "Facebook",   href: v => v.startsWith("http") ? v : `https://facebook.com/${v}` },
+    { key: "perfil_whatsapp",  icon: "bi-whatsapp",   label: "WhatsApp",   href: v => `https://wa.me/${v.replace(/\D/g,"")}` },
   ].filter(r => perfil[r.key]);
 
+  const currentYear = new Date().getFullYear();
+
   return (
-    <div style={styles.page}>
-      {/* Fondo superior con gradiente */}
-      <div style={styles.hero}>
-        <div style={styles.heroContent}>
-          {/* Logo / Foto */}
-          <div style={styles.avatarWrap}>
-            {fotoDr ? (
-              <img src={fotoDr} alt={clinica.nombre} style={styles.avatar} />
-            ) : (
-              <div style={styles.avatarPlaceholder}>
-                <i className="bi bi-hospital" style={{ fontSize: 36, color: "#9c27b0" }} />
+    <>
+      <style>{`
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(18px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        .pub-btn-agendar { position: relative; overflow: hidden; }
+        .pub-btn-agendar::after { content:""; position:absolute; inset:0; background:rgba(255,255,255,0); transition: background .2s; }
+        .pub-btn-agendar:hover::after { background:rgba(255,255,255,.12); }
+        .pub-btn-agendar:hover { transform: translateY(-3px); box-shadow: 0 14px 36px rgba(${colorRgb},.5) !important; }
+        .pub-btn-agendar:active { transform: translateY(0px); box-shadow: 0 4px 16px rgba(${colorRgb},.3) !important; }
+        .pub-btn-accion:hover  { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(${colorRgb},.18) !important; }
+        .pub-servicio:hover    { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.1) !important; }
+        .pub-red:hover         { transform: scale(1.12); }
+        body { margin: 0; }
+      `}</style>
+
+      <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column" }}>
+
+        {/* ── HERO ── */}
+        <div style={{
+          background: `linear-gradient(160deg, ${color} 0%, ${colorDark} 100%)`,
+          padding: "52px 24px 80px",
+          textAlign: "center",
+          position: "relative",
+          overflow: "hidden",
+        }}>
+          {/* Círculos decorativos de fondo */}
+          <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
+          <div style={{ position: "absolute", bottom: -40, left: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
+
+          <div style={{ maxWidth: 440, margin: "0 auto", position: "relative", animation: "fadeUp .5s ease both" }}>
+            {/* Logo pequeño */}
+            {logo && (
+              <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                <img src={logo} alt="logo" style={{ height: 36, objectFit: "contain", opacity: .85 }} />
               </div>
             )}
+
+            {/* Avatar */}
+            <div style={{ display: "flex", justifyContent: "center", marginBottom: 18 }}>
+              <div style={{
+                width: 110, height: 110, borderRadius: "50%",
+                border: "4px solid rgba(255,255,255,.35)",
+                boxShadow: "0 8px 32px rgba(0,0,0,.25)",
+                overflow: "hidden",
+                background: "rgba(255,255,255,.15)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                {fotoDr ? (
+                  <img
+                    src={fotoDr}
+                    alt="doctor"
+                    style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                    onError={() => setFotoError(true)}
+                  />
+                ) : (
+                  <i className="bi bi-person-fill" style={{ fontSize: 52, color: "rgba(255,255,255,.6)" }} />
+                )}
+              </div>
+            </div>
+
+            <h1 style={{ color: "#fff", fontSize: 26, fontWeight: 800, margin: "0 0 6px", letterSpacing: "-.3px" }}>
+              {perfil.perfil_nombre_doctor || clinica.nombre}
+            </h1>
+
+            {perfil.perfil_titulo_doctor && (
+              <p style={{ color: "rgba(255,255,255,.8)", fontSize: 14, fontWeight: 500, margin: "0 0 12px", letterSpacing: ".2px" }}>
+                {perfil.perfil_titulo_doctor}
+              </p>
+            )}
+
+            {perfil.perfil_descripcion && (
+              <p style={{ color: "rgba(255,255,255,.72)", fontSize: 14, margin: 0, lineHeight: 1.65, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
+                {perfil.perfil_descripcion}
+              </p>
+            )}
+          </div>
+        </div>
+
+        {/* ── BODY ── */}
+        <div style={{ flex: 1, maxWidth: 500, width: "100%", margin: "-32px auto 0", padding: "0 16px 40px", boxSizing: "border-box" }}>
+
+          {/* Botón principal: Agendar Cita */}
+          <button
+            onClick={() => setShowAgendar(true)}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+              background: color, color: "#fff", border: "none", borderRadius: 18,
+              padding: "18px 24px", width: "100%", fontSize: 16, fontWeight: 800,
+              boxShadow: `0 6px 24px rgba(${colorRgb},.35)`,
+              cursor: "pointer", marginBottom: 14,
+              animation: "fadeUp .5s .08s ease both",
+              transition: "transform .18s, box-shadow .18s",
+            }}
+            className="pub-btn-agendar"
+          >
+            <i className="bi bi-calendar2-plus" style={{ fontSize: 20 }} />
+            Agendar una Cita
+          </button>
+
+          {/* Botones de acción */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28, animation: "fadeUp .5s .1s ease both" }}>
+            {perfil.perfil_whatsapp && (
+              <a
+                href={`https://wa.me/${perfil.perfil_whatsapp.replace(/\D/g, "")}`}
+                target="_blank" rel="noopener noreferrer"
+                className="pub-btn-accion"
+                style={{
+                  display: "flex", alignItems: "center", gap: 14,
+                  background: "#fff", borderRadius: 18,
+                  padding: "17px 22px",
+                  textDecoration: "none", color: "#1e293b",
+                  boxShadow: "0 4px 16px rgba(0,0,0,.08)",
+                  border: "1.5px solid rgba(37,211,102,.3)",
+                  transition: "transform .18s, box-shadow .18s",
+                }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#e8fdf0", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <i className="bi bi-whatsapp" style={{ color: "#25D366", fontSize: 20 }} />
+                </div>
+                <span style={{ flex: 1, fontWeight: 700, fontSize: 15 }}>Escríbenos por WhatsApp</span>
+                <i className="bi bi-chevron-right" style={{ color: "#94a3b8" }} />
+              </a>
+            )}
+
+            {perfil.perfil_google_maps && (
+              <a
+                href={perfil.perfil_google_maps}
+                target="_blank" rel="noopener noreferrer"
+                className="pub-btn-accion"
+                style={{
+                  display: "flex", alignItems: "center", gap: 14,
+                  background: "#fff", borderRadius: 18,
+                  padding: "17px 22px",
+                  textDecoration: "none", color: "#1e293b",
+                  boxShadow: "0 4px 16px rgba(0,0,0,.08)",
+                  border: "1.5px solid rgba(66,133,244,.3)",
+                  transition: "transform .18s, box-shadow .18s",
+                }}
+              >
+                <div style={{ width: 42, height: 42, borderRadius: "50%", background: "#eff6ff", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                  <i className="bi bi-geo-alt-fill" style={{ color: "#4285F4", fontSize: 20 }} />
+                </div>
+                <span style={{ flex: 1, fontWeight: 700, fontSize: 15 }}>Encuéntranos en Google</span>
+                <i className="bi bi-chevron-right" style={{ color: "#94a3b8" }} />
+              </a>
+            )}
           </div>
 
-          {/* Nombre y título */}
-          <h1 style={styles.nombreDoctor}>
-            {perfil.perfil_nombre_doctor || clinica.nombre}
-          </h1>
-          {perfil.perfil_titulo_doctor && (
-            <p style={styles.tituloDoctor}>{perfil.perfil_titulo_doctor}</p>
-          )}
-          {perfil.perfil_descripcion && (
-            <p style={styles.descripcion}>{perfil.perfil_descripcion}</p>
-          )}
-        </div>
-      </div>
-
-      {/* Contenido principal */}
-      <div style={styles.body}>
-
-        {/* Botones de acción */}
-        <div style={styles.accionesWrap}>
-          {perfil.perfil_whatsapp && (
-            <a
-              href={`https://wa.me/${perfil.perfil_whatsapp.replace(/\D/g, "")}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...styles.botonAccion, borderColor: "#25D366" }}
-            >
-              <i className="bi bi-whatsapp" style={{ color: "#25D366", fontSize: 22 }} />
-              <span style={styles.botonLabel}>Escríbenos por WhatsApp</span>
-              <i className="bi bi-chevron-right" style={styles.chevron} />
-            </a>
-          )}
-          {perfil.perfil_google_maps && (
-            <a
-              href={perfil.perfil_google_maps}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ ...styles.botonAccion, borderColor: "#4285F4" }}
-            >
-              <i className="bi bi-geo-alt-fill" style={{ color: "#4285F4", fontSize: 22 }} />
-              <span style={styles.botonLabel}>Encuéntranos en Google</span>
-              <i className="bi bi-chevron-right" style={styles.chevron} />
-            </a>
-          )}
-        </div>
-
-        {/* Servicios */}
-        {servicios.length > 0 && (
-          <div style={styles.serviciosSection}>
-            <h2 style={styles.sectionTitle}>Nuestros Servicios</h2>
-            <div style={styles.serviciosList}>
-              {servicios.map((s) => (
-                <div key={s.id} style={styles.servicioCard}>
-                  <div style={styles.servicioInfo}>
-                    <h3 style={styles.servicioNombre}>{s.nombre}</h3>
-                    {s.descripcion && (
-                      <p style={styles.servicioDesc}>{s.descripcion}</p>
-                    )}
-                  </div>
-                  <i className="bi bi-chevron-right" style={{ color: "#9e9e9e", flexShrink: 0 }} />
-                </div>
+          {/* Redes sociales */}
+          {redes.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 20, animation: "fadeUp .5s .3s ease both" }}>
+              {redes.map((r) => (
+                <a
+                  key={r.key}
+                  href={r.href(perfil[r.key])}
+                  target="_blank" rel="noopener noreferrer"
+                  className="pub-red"
+                  title={r.label}
+                  style={{
+                    width: 50, height: 50, borderRadius: "50%",
+                    background: "#fff",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    boxShadow: "0 2px 12px rgba(0,0,0,.1)",
+                    textDecoration: "none",
+                    transition: "transform .18s",
+                    fontSize: 21,
+                    color: "#334155",
+                  }}
+                >
+                  <i className={`bi ${r.icon}`} />
+                </a>
               ))}
             </div>
-          </div>
+          )}
+
+          {/* Info contacto */}
+          {(clinica.ciudad || clinica.telefono) && (
+            <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 16, animation: "fadeUp .5s .35s ease both" }}>
+              {clinica.ciudad && (
+                <span style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <i className="bi bi-geo-alt" />
+                  {clinica.ciudad}{clinica.pais ? `, ${clinica.pais}` : ""}
+                </span>
+              )}
+              {clinica.telefono && (
+                <span style={{ fontSize: 13, color: "#94a3b8", display: "flex", alignItems: "center", gap: 4 }}>
+                  <i className="bi bi-telephone" />
+                  {clinica.telefono}
+                </span>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* ── MODAL AGENDAR ── */}
+        {showAgendar && (
+          <AgendarModal
+            slug={slug}
+            color={color}
+            servicios={servicios}
+            onClose={() => setShowAgendar(false)}
+          />
         )}
 
-        {/* Redes sociales */}
-        {redesSociales.length > 0 && (
-          <div style={styles.redesWrap}>
-            {redesSociales.map((r) => (
-              <a
-                key={r.key}
-                href={perfil[r.key].startsWith("http") ? perfil[r.key] : `https://${perfil[r.key]}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={{ ...styles.redBoton, background: r.bg }}
-                title={r.label}
-              >
-                <i className={`bi ${r.icon}`} style={{ color: r.color, fontSize: 22 }} />
-              </a>
-            ))}
+        {/* ── FOOTER ── */}
+        <footer style={{
+          background: "#0f172a",
+          color: "rgba(255,255,255,.45)",
+          textAlign: "center",
+          padding: "18px 16px",
+          fontSize: 12,
+          letterSpacing: ".2px",
+        }}>
+          <div style={{ marginBottom: 3, fontWeight: 600, color: "rgba(255,255,255,.65)" }}>
+            Medic-KG
           </div>
-        )}
+          <div>
+            Desarrollado por <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 600 }}>Kevin García</span>
+            {" · "}© {currentYear} Todos los derechos reservados
+          </div>
+        </footer>
 
-        {/* Info de contacto */}
-        {(clinica.ciudad || clinica.telefono) && (
-          <div style={styles.contactoInfo}>
-            {clinica.ciudad && (
-              <span style={styles.contactoItem}>
-                <i className="bi bi-geo-alt" style={{ marginRight: 4 }} />
-                {clinica.ciudad}{clinica.pais ? `, ${clinica.pais}` : ""}
-              </span>
-            )}
-            {clinica.telefono && (
-              <span style={styles.contactoItem}>
-                <i className="bi bi-telephone" style={{ marginRight: 4 }} />
-                {clinica.telefono}
-              </span>
-            )}
-          </div>
-        )}
       </div>
-    </div>
+    </>
   );
 }
-
-const PURPLE = "#7c3aed";
-const PURPLE_DARK = "#5b21b6";
-
-const styles = {
-  page: {
-    minHeight: "100vh",
-    background: "#f5f5f5",
-    fontFamily: "'Segoe UI', system-ui, sans-serif",
-  },
-  loadingContainer: {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    minHeight: "100vh",
-    background: "#f5f5f5",
-  },
-  spinner: {
-    width: 40,
-    height: 40,
-    border: `4px solid #e0d7f7`,
-    borderTop: `4px solid ${PURPLE}`,
-    borderRadius: "50%",
-    animation: "spin 0.8s linear infinite",
-  },
-  errorBox: {
-    display: "flex",
-    flexDirection: "column",
-    alignItems: "center",
-    textAlign: "center",
-    padding: 32,
-  },
-  hero: {
-    background: `linear-gradient(145deg, ${PURPLE} 0%, ${PURPLE_DARK} 100%)`,
-    padding: "40px 24px 60px",
-    textAlign: "center",
-  },
-  heroContent: {
-    maxWidth: 480,
-    margin: "0 auto",
-  },
-  avatarWrap: {
-    display: "flex",
-    justifyContent: "center",
-    marginBottom: 16,
-  },
-  avatar: {
-    width: 100,
-    height: 100,
-    borderRadius: "50%",
-    objectFit: "cover",
-    border: "4px solid rgba(255,255,255,0.5)",
-    background: "#fff",
-  },
-  avatarPlaceholder: {
-    width: 100,
-    height: 100,
-    borderRadius: "50%",
-    background: "rgba(255,255,255,0.2)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    border: "4px solid rgba(255,255,255,0.5)",
-  },
-  nombreDoctor: {
-    color: "#fff",
-    fontSize: 24,
-    fontWeight: 700,
-    margin: "0 0 6px",
-    lineHeight: 1.2,
-  },
-  tituloDoctor: {
-    color: "rgba(255,255,255,0.85)",
-    fontSize: 14,
-    margin: "0 0 10px",
-    lineHeight: 1.5,
-  },
-  descripcion: {
-    color: "rgba(255,255,255,0.8)",
-    fontSize: 14,
-    margin: 0,
-    lineHeight: 1.6,
-  },
-  body: {
-    maxWidth: 480,
-    margin: "-24px auto 0",
-    padding: "0 16px 40px",
-    position: "relative",
-  },
-  accionesWrap: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 12,
-    marginBottom: 24,
-  },
-  botonAccion: {
-    display: "flex",
-    alignItems: "center",
-    gap: 14,
-    background: "#fff",
-    border: "2px solid #eee",
-    borderRadius: 16,
-    padding: "16px 20px",
-    textDecoration: "none",
-    color: "#333",
-    boxShadow: "0 2px 12px rgba(0,0,0,0.08)",
-    transition: "transform 0.15s, box-shadow 0.15s",
-  },
-  botonLabel: {
-    flex: 1,
-    fontWeight: 600,
-    fontSize: 15,
-    color: "#333",
-  },
-  chevron: {
-    color: "#bbb",
-  },
-  serviciosSection: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 700,
-    color: "#333",
-    margin: "0 0 12px",
-  },
-  serviciosList: {
-    display: "flex",
-    flexDirection: "column",
-    gap: 10,
-  },
-  servicioCard: {
-    display: "flex",
-    alignItems: "center",
-    gap: 12,
-    background: "#fff",
-    borderRadius: 14,
-    padding: "16px 18px",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)",
-    cursor: "default",
-  },
-  servicioInfo: {
-    flex: 1,
-  },
-  servicioNombre: {
-    fontSize: 15,
-    fontWeight: 600,
-    color: "#222",
-    margin: "0 0 4px",
-    lineHeight: 1.3,
-  },
-  servicioDesc: {
-    fontSize: 13,
-    color: "#666",
-    margin: 0,
-    lineHeight: 1.5,
-    display: "-webkit-box",
-    WebkitLineClamp: 3,
-    WebkitBoxOrient: "vertical",
-    overflow: "hidden",
-  },
-  redesWrap: {
-    display: "flex",
-    justifyContent: "center",
-    gap: 16,
-    marginBottom: 24,
-  },
-  redBoton: {
-    width: 48,
-    height: 48,
-    borderRadius: "50%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.1)",
-    textDecoration: "none",
-    transition: "transform 0.15s",
-  },
-  contactoInfo: {
-    display: "flex",
-    flexWrap: "wrap",
-    justifyContent: "center",
-    gap: 16,
-  },
-  contactoItem: {
-    fontSize: 13,
-    color: "#888",
-    display: "flex",
-    alignItems: "center",
-  },
-};

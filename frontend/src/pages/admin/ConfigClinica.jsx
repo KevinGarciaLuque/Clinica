@@ -57,14 +57,16 @@ export default function ConfigClinica() {
         const cfgMap = {};
         (data.config || []).forEach(r => { cfgMap[r.clave] = r.valor; });
         setFormPerfil({
-          perfil_nombre_doctor:  cfgMap.perfil_nombre_doctor  || "",
-          perfil_titulo_doctor:  cfgMap.perfil_titulo_doctor  || "",
-          perfil_descripcion:    cfgMap.perfil_descripcion    || "",
-          perfil_whatsapp:       cfgMap.perfil_whatsapp       || "",
-          perfil_instagram:      cfgMap.perfil_instagram      || "",
-          perfil_tiktok:         cfgMap.perfil_tiktok         || "",
-          perfil_facebook:       cfgMap.perfil_facebook       || "",
-          perfil_google_maps:    cfgMap.perfil_google_maps    || "",
+          perfil_nombre_doctor:   cfgMap.perfil_nombre_doctor   || "",
+          perfil_titulo_doctor:   cfgMap.perfil_titulo_doctor   || "",
+          perfil_descripcion:     cfgMap.perfil_descripcion     || "",
+          perfil_whatsapp:        cfgMap.perfil_whatsapp        || "",
+          perfil_instagram:       cfgMap.perfil_instagram       || "",
+          perfil_tiktok:          cfgMap.perfil_tiktok          || "",
+          perfil_facebook:        cfgMap.perfil_facebook        || "",
+          perfil_google_maps:     cfgMap.perfil_google_maps     || "",
+          perfil_foto_doctor:     cfgMap.perfil_foto_doctor     || "",
+          perfil_color_primario:  cfgMap.perfil_color_primario  || "#213665",
         });
 
         setStorage(resDetalles.data?.data?.almacenamiento || null);
@@ -422,7 +424,82 @@ export default function ConfigClinica() {
                 </div>
               )}
 
+              {/* Vista previa del color */}
+              <div style={{ display: "flex", gap: 12, alignItems: "center", marginBottom: 20, flexWrap: "wrap" }}>
+                <div style={{ flex: 1, minWidth: 180 }}>
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    <i className="bi bi-palette me-1" />Color principal de la página
+                  </label>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                    <input
+                      type="color"
+                      value={formPerfil.perfil_color_primario || "#213665"}
+                      onChange={e => setFormPerfil({ ...formPerfil, perfil_color_primario: e.target.value })}
+                      style={{ width: 44, height: 38, border: "none", borderRadius: 8, cursor: "pointer", padding: 2 }}
+                    />
+                    <input
+                      className="form-control"
+                      style={{ fontFamily: "monospace", maxWidth: 120 }}
+                      value={formPerfil.perfil_color_primario || "#213665"}
+                      onChange={e => setFormPerfil({ ...formPerfil, perfil_color_primario: e.target.value })}
+                      placeholder="#213665"
+                    />
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {["#213665","#7c3aed","#0e7490","#be185d","#15803d","#b45309"].map(c => (
+                        <button
+                          key={c} type="button"
+                          onClick={() => setFormPerfil({ ...formPerfil, perfil_color_primario: c })}
+                          title={c}
+                          style={{ width: 26, height: 26, borderRadius: 6, border: formPerfil.perfil_color_primario === c ? "3px solid #111" : "2px solid transparent", background: c, cursor: "pointer", flexShrink: 0 }}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+                <div style={{
+                  width: 120, height: 56, borderRadius: 12, flexShrink: 0,
+                  background: `linear-gradient(135deg, ${formPerfil.perfil_color_primario || "#213665"}, #0a1a3a)`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, opacity: .85 }}>Vista previa</span>
+                </div>
+              </div>
+
               <div className="row g-3">
+                {/* Foto del doctor */}
+                <div className="col-12">
+                  <label className="form-label" style={{ fontWeight: 700 }}>
+                    <i className="bi bi-person-circle me-1" />Foto del doctor (pública)
+                  </label>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <div style={{
+                      width: 64, height: 64, borderRadius: "50%", flexShrink: 0,
+                      background: "#f1f5f9", border: "2px solid #e2e8f0",
+                      overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center",
+                    }}>
+                      {formPerfil.perfil_foto_doctor ? (
+                        <img src={formPerfil.perfil_foto_doctor.startsWith("http") ? formPerfil.perfil_foto_doctor : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${formPerfil.perfil_foto_doctor}`}
+                          alt="foto" style={{ width: "100%", height: "100%", objectFit: "cover" }}
+                          onError={e => { e.target.style.display = "none"; }}
+                        />
+                      ) : (
+                        <i className="bi bi-person" style={{ fontSize: 26, color: "#94a3b8" }} />
+                      )}
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <input
+                        className="form-control"
+                        placeholder="URL de la foto (se usa tu foto de perfil si está vacío)"
+                        value={formPerfil.perfil_foto_doctor || ""}
+                        onChange={e => setFormPerfil({ ...formPerfil, perfil_foto_doctor: e.target.value })}
+                      />
+                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                        Si dejas vacío, se usará automáticamente la foto de tu perfil de usuario.
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
                 <div className="col-md-6">
                   <label className="form-label">Nombre del doctor / médico</label>
                   <input
@@ -452,16 +529,17 @@ export default function ConfigClinica() {
                   />
                 </div>
 
-                <div className="col-12 mt-2">
-                  <div style={{ fontWeight: 700, color: "#374151", marginBottom: 8 }}>
+                <div className="col-12 mt-1">
+                  <div style={{ fontWeight: 700, color: "#374151", fontSize: 14 }}>
                     <i className="bi bi-share me-2" />Redes sociales y contacto
                   </div>
+                  <hr style={{ margin: "8px 0 4px" }} />
                 </div>
 
                 <div className="col-md-6">
                   <label className="form-label">
                     <i className="bi bi-whatsapp me-1" style={{ color: "#25D366" }} />
-                    WhatsApp (número con código de país)
+                    WhatsApp (con código de país)
                   </label>
                   <input
                     className="form-control"
