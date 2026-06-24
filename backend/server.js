@@ -128,6 +128,7 @@ app.use("/api/config-sistema", require("./routes/configSistema"));
 app.use("/api/psicologia",     require("./routes/psicologia"));
 app.use("/api/odontologia",    require("./routes/odontologia"));
 app.use("/rx",                 require("./routes/rx"));
+app.use("/api/public",         require("./routes/public"));
 
 // ===== 404 =====
 app.use((req, res) => {

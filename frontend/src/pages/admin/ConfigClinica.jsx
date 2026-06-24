@@ -15,9 +15,11 @@ export default function ConfigClinica() {
 
   const [clinica, setClinica] = useState(null);
   const [form, setForm] = useState({});
+  const [formPerfil, setFormPerfil] = useState({});
   const [tab, setTab] = useState("general");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
+  const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
 
   const [storage, setStorage] = useState(null);
@@ -50,6 +52,19 @@ export default function ConfigClinica() {
           pais: data.pais || "HN",
           ruc: data.ruc || "",
           logo_url: data.logo_url || "",
+        });
+
+        const cfgMap = {};
+        (data.config || []).forEach(r => { cfgMap[r.clave] = r.valor; });
+        setFormPerfil({
+          perfil_nombre_doctor:  cfgMap.perfil_nombre_doctor  || "",
+          perfil_titulo_doctor:  cfgMap.perfil_titulo_doctor  || "",
+          perfil_descripcion:    cfgMap.perfil_descripcion    || "",
+          perfil_whatsapp:       cfgMap.perfil_whatsapp       || "",
+          perfil_instagram:      cfgMap.perfil_instagram      || "",
+          perfil_tiktok:         cfgMap.perfil_tiktok         || "",
+          perfil_facebook:       cfgMap.perfil_facebook       || "",
+          perfil_google_maps:    cfgMap.perfil_google_maps    || "",
         });
 
         setStorage(resDetalles.data?.data?.almacenamiento || null);
@@ -148,9 +163,26 @@ export default function ConfigClinica() {
     }
   };
 
+  const guardarPerfil = async (e) => {
+    e.preventDefault();
+    setGuardandoPerfil(true);
+    setMsg({ tipo: "", texto: "" });
+    try {
+      const config = {};
+      Object.entries(formPerfil).forEach(([k, v]) => { config[k] = v || ""; });
+      await api.put(`/clinicas/${clinicaId}/config`, { config });
+      setMsg({ tipo: "success", texto: "Perfil público guardado correctamente" });
+    } catch (e) {
+      setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
+    } finally {
+      setGuardandoPerfil(false);
+    }
+  };
+
   const tabsVisibles = [
-    { key: "general", label: "Datos generales", icon: "bi-building" },
-    { key: "almacenamiento", label: "Almacenamiento", icon: "bi-hdd-stack" },
+    { key: "general",       label: "Datos generales",  icon: "bi-building"       },
+    { key: "perfil_publico", label: "Perfil público",   icon: "bi-link-45deg"     },
+    { key: "almacenamiento", label: "Almacenamiento",   icon: "bi-hdd-stack"      },
   ];
 
   const usoPct = useMemo(() => pct(storage?.uso_pct), [storage]);
@@ -348,6 +380,161 @@ export default function ConfigClinica() {
               <button type="submit" className="btn btn-primary mt-3" disabled={guardando}>
                 {guardando ? "Guardando..." : "Guardar cambios"}
               </button>
+            </form>
+          )}
+
+          {tab === "perfil_publico" && (
+            <form onSubmit={guardarPerfil}>
+              {/* Link compartible */}
+              {clinica?.slug && (
+                <div
+                  style={{
+                    background: "linear-gradient(135deg,#f5f3ff,#ede9fe)",
+                    border: "1px solid #c4b5fd",
+                    borderRadius: 12,
+                    padding: "14px 16px",
+                    marginBottom: 20,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 12,
+                  }}
+                >
+                  <i className="bi bi-link-45deg" style={{ fontSize: 22, color: "#7c3aed" }} />
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#7c3aed", marginBottom: 2 }}>
+                      LINK PÚBLICO DE TU CLÍNICA
+                    </div>
+                    <div style={{ fontFamily: "monospace", fontSize: 14, color: "#4c1d95", wordBreak: "break-all" }}>
+                      {window.location.origin}/p/{clinica.slug}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm"
+                    style={{ background: "#7c3aed", color: "#fff", borderRadius: 8 }}
+                    onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}/p/${clinica.slug}`);
+                      setMsg({ tipo: "success", texto: "Link copiado al portapapeles" });
+                    }}
+                  >
+                    <i className="bi bi-clipboard" /> Copiar
+                  </button>
+                </div>
+              )}
+
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">Nombre del doctor / médico</label>
+                  <input
+                    className="form-control"
+                    placeholder="Dra. María García"
+                    value={formPerfil.perfil_nombre_doctor || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_nombre_doctor: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Título / Especialidad</label>
+                  <input
+                    className="form-control"
+                    placeholder="Pediatra • Clínica Ejemplo"
+                    value={formPerfil.perfil_titulo_doctor || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_titulo_doctor: e.target.value })}
+                  />
+                </div>
+                <div className="col-12">
+                  <label className="form-label">Descripción pública</label>
+                  <textarea
+                    className="form-control"
+                    rows={3}
+                    placeholder="Texto corto que describe tu clínica o servicio..."
+                    value={formPerfil.perfil_descripcion || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_descripcion: e.target.value })}
+                  />
+                </div>
+
+                <div className="col-12 mt-2">
+                  <div style={{ fontWeight: 700, color: "#374151", marginBottom: 8 }}>
+                    <i className="bi bi-share me-2" />Redes sociales y contacto
+                  </div>
+                </div>
+
+                <div className="col-md-6">
+                  <label className="form-label">
+                    <i className="bi bi-whatsapp me-1" style={{ color: "#25D366" }} />
+                    WhatsApp (número con código de país)
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="+50498765432"
+                    value={formPerfil.perfil_whatsapp || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_whatsapp: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">
+                    <i className="bi bi-instagram me-1" style={{ color: "#E1306C" }} />
+                    Instagram (URL o @usuario)
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="https://instagram.com/tuclinica"
+                    value={formPerfil.perfil_instagram || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_instagram: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">
+                    <i className="bi bi-tiktok me-1" />
+                    TikTok (URL o @usuario)
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="https://tiktok.com/@tuclinica"
+                    value={formPerfil.perfil_tiktok || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_tiktok: e.target.value })}
+                  />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">
+                    <i className="bi bi-facebook me-1" style={{ color: "#1877F2" }} />
+                    Facebook (URL)
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="https://facebook.com/tuclinica"
+                    value={formPerfil.perfil_facebook || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_facebook: e.target.value })}
+                  />
+                </div>
+                <div className="col-12">
+                  <label className="form-label">
+                    <i className="bi bi-geo-alt-fill me-1" style={{ color: "#4285F4" }} />
+                    Link de Google Maps
+                  </label>
+                  <input
+                    className="form-control"
+                    placeholder="https://maps.google.com/..."
+                    value={formPerfil.perfil_google_maps || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_google_maps: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div style={{ marginTop: 20, display: "flex", gap: 10, alignItems: "center" }}>
+                <button type="submit" className="btn btn-primary" disabled={guardandoPerfil}>
+                  {guardandoPerfil ? "Guardando..." : "Guardar perfil público"}
+                </button>
+                {clinica?.slug && (
+                  <a
+                    href={`/p/${clinica.slug}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn btn-outline-secondary"
+                  >
+                    <i className="bi bi-eye me-1" /> Ver página pública
+                  </a>
+                )}
+              </div>
             </form>
           )}
 
