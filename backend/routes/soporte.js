@@ -324,6 +324,70 @@ router.put("/notificaciones-portal/:id/leer", auth(), async (req, res) => {
   }
 });
 
+// ── Aprobar solicitud de cita del portal ─────────────────────────────────────
+router.put("/notificaciones-portal/:id/aprobar-cita", auth(), async (req, res) => {
+  try {
+    const notifId = req.params.id;
+    const [[notif]] = await pool.query(
+      `SELECT cita_id FROM notificaciones_usuario
+       WHERE id = ? AND usuario_id = ? AND leida = 0 LIMIT 1`,
+      [notifId, req.user.id]
+    );
+    if (!notif?.cita_id) return res.status(404).json({ ok: false, msg: "Notificación no encontrada" });
+
+    const [[cita]] = await pool.query(
+      `SELECT id FROM citas WHERE id = ? AND estado = 'PENDIENTE_APROBACION' AND clinica_id = ? LIMIT 1`,
+      [notif.cita_id, req.user.clinica_id]
+    );
+    if (!cita) return res.status(409).json({ ok: false, msg: "La cita ya fue procesada o no existe" });
+
+    await pool.query(
+      `UPDATE citas SET estado = 'PENDIENTE' WHERE id = ?`,
+      [notif.cita_id]
+    );
+    await pool.query(
+      `UPDATE notificaciones_usuario SET leida = 1, leido_en = NOW() WHERE cita_id = ? AND clinica_id = ?`,
+      [notif.cita_id, req.user.clinica_id]
+    );
+
+    res.json({ ok: true, msg: "Cita aprobada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── Rechazar solicitud de cita del portal ────────────────────────────────────
+router.put("/notificaciones-portal/:id/rechazar-cita", auth(), async (req, res) => {
+  try {
+    const notifId = req.params.id;
+    const [[notif]] = await pool.query(
+      `SELECT cita_id FROM notificaciones_usuario
+       WHERE id = ? AND usuario_id = ? AND leida = 0 LIMIT 1`,
+      [notifId, req.user.id]
+    );
+    if (!notif?.cita_id) return res.status(404).json({ ok: false, msg: "Notificación no encontrada" });
+
+    const [[cita]] = await pool.query(
+      `SELECT id FROM citas WHERE id = ? AND estado = 'PENDIENTE_APROBACION' AND clinica_id = ? LIMIT 1`,
+      [notif.cita_id, req.user.clinica_id]
+    );
+    if (!cita) return res.status(409).json({ ok: false, msg: "La cita ya fue procesada o no existe" });
+
+    await pool.query(
+      `UPDATE citas SET estado = 'CANCELADA' WHERE id = ?`,
+      [notif.cita_id]
+    );
+    await pool.query(
+      `UPDATE notificaciones_usuario SET leida = 1, leido_en = NOW() WHERE cita_id = ? AND clinica_id = ?`,
+      [notif.cita_id, req.user.clinica_id]
+    );
+
+    res.json({ ok: true, msg: "Cita rechazada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 router.get("/push/public-key", auth(), async (_req, res) => {
   const key = process.env.VAPID_PUBLIC_KEY || "";
   if (!key || !webPush.isConfigured()) {

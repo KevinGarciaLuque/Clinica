@@ -142,6 +142,20 @@ export default function NavbarApp({ onMenuClick }) {
     return () => { cancelled = true; esRef?.close(); clearInterval(iv); };
   }, [user]);
 
+  const [accionandoNotif, setAccionandoNotif] = useState(null);
+
+  const accionarCitaPortal = async (notifId, accion) => {
+    setAccionandoNotif(notifId);
+    try {
+      await api.put(`/soporte/notificaciones-portal/${notifId}/${accion}-cita`);
+      setNotifsPortal(prev => prev.filter(n => n.id !== notifId));
+      if (notifsPortal.length <= 1 && misRespuestas.length === 0) setShowRespuestasDD(false);
+    } catch {
+    } finally {
+      setAccionandoNotif(null);
+    }
+  };
+
   const marcarRespuestaLeida = async (id) => {
     try {
       await api.put(`/soporte/mis-respuestas/${id}/leer`);
@@ -624,37 +638,78 @@ export default function NavbarApp({ onMenuClick }) {
                     <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#7dd3fc", textTransform: "uppercase", letterSpacing: "0.07em" }}>
                       <i className="bi bi-link-45deg me-1" /> Portal público
                     </div>
-                    {notifsPortal.map((n) => (
-                      <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
-                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-                          <div style={{
-                            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
-                            background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                          }}>
-                            <i className={`bi ${n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`} style={{ color: "#7dd3fc", fontSize: 14 }} />
-                          </div>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 3 }}>
-                              {n.mensaje}
+                    {notifsPortal.map((n) => {
+                      const esSolicitud = n.tipo === "CITA_SOLICITUD_PORTAL";
+                      const cargando    = accionandoNotif === n.id;
+                      return (
+                        <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                            <div style={{
+                              width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                              background: esSolicitud ? "rgba(251,191,36,.15)" : "rgba(125,211,252,.15)",
+                              border: `1px solid ${esSolicitud ? "rgba(251,191,36,.35)" : "rgba(125,211,252,.3)"}`,
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                              <i
+                                className={`bi ${esSolicitud ? "bi-calendar2-plus-fill" : n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`}
+                                style={{ color: esSolicitud ? "#fbbf24" : "#7dd3fc", fontSize: 14 }}
+                              />
                             </div>
-                            <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginBottom: 7 }}>
-                              {new Date(n.creado_en).toLocaleString("es-HN")}
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 3, lineHeight: 1.4 }}>
+                                {n.mensaje}
+                              </div>
+                              <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginBottom: 8 }}>
+                                {new Date(n.creado_en).toLocaleString("es-HN")}
+                              </div>
+                              {esSolicitud ? (
+                                <div style={{ display: "flex", gap: 6 }}>
+                                  <button
+                                    disabled={cargando}
+                                    onClick={() => accionarCitaPortal(n.id, "aprobar")}
+                                    style={{
+                                      background: cargando ? "rgba(16,185,129,.08)" : "rgba(16,185,129,.2)",
+                                      border: "1px solid rgba(16,185,129,.5)",
+                                      borderRadius: 6, padding: "4px 11px", color: "#10b981",
+                                      fontSize: 11, fontWeight: 700, cursor: cargando ? "not-allowed" : "pointer",
+                                      display: "flex", alignItems: "center", gap: 4,
+                                    }}
+                                  >
+                                    {cargando ? <i className="bi bi-hourglass-split" /> : <i className="bi bi-check-lg" />}
+                                    Aceptar
+                                  </button>
+                                  <button
+                                    disabled={cargando}
+                                    onClick={() => accionarCitaPortal(n.id, "rechazar")}
+                                    style={{
+                                      background: cargando ? "rgba(239,68,68,.05)" : "rgba(239,68,68,.15)",
+                                      border: "1px solid rgba(239,68,68,.4)",
+                                      borderRadius: 6, padding: "4px 11px", color: "#f87171",
+                                      fontSize: 11, fontWeight: 700, cursor: cargando ? "not-allowed" : "pointer",
+                                      display: "flex", alignItems: "center", gap: 4,
+                                    }}
+                                  >
+                                    <i className="bi bi-x-lg" />
+                                    Rechazar
+                                  </button>
+                                </div>
+                              ) : (
+                                <button
+                                  onClick={() => { marcarNotifPortalLeida(n.id); if ((misRespuestas.length + notifsPortal.length) <= 1) setShowRespuestasDD(false); }}
+                                  style={{
+                                    background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
+                                    borderRadius: 6, padding: "4px 10px", color: "#7dd3fc",
+                                    fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                  }}
+                                >
+                                  <i className="bi bi-check-lg me-1" />Entendido
+                                </button>
+                              )}
                             </div>
-                            <button
-                              onClick={() => { marcarNotifPortalLeida(n.id); if ((misRespuestas.length + notifsPortal.length) <= 1) setShowRespuestasDD(false); }}
-                              style={{
-                                background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
-                                borderRadius: 6, padding: "4px 10px", color: "#7dd3fc",
-                                fontSize: 10, fontWeight: 700, cursor: "pointer",
-                              }}
-                            >
-                              <i className="bi bi-check-lg me-1" />Entendido
-                            </button>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </>
                 )}
 

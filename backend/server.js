@@ -575,6 +575,25 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] inventario_movimientos OK");
 
+    // Agregar PENDIENTE_APROBACION al ENUM de citas.estado (citas desde portal público)
+    const [colEstado] = await pool.query(`
+      SELECT COLUMN_TYPE FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'citas'
+        AND COLUMN_NAME  = 'estado'
+    `);
+    if (colEstado.length && !colEstado[0].COLUMN_TYPE.includes("PENDIENTE_APROBACION")) {
+      await pool.query(`
+        ALTER TABLE citas
+          MODIFY COLUMN estado
+            ENUM('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION','COMPLETADA','CANCELADA','NO_ASISTIO','PENDIENTE_APROBACION')
+            NOT NULL DEFAULT 'PENDIENTE'
+      `);
+      console.log("✅ [auto-migrate] citas.estado → PENDIENTE_APROBACION agregado");
+    } else {
+      console.log("✅ [auto-migrate] citas.estado OK");
+    }
+
   } catch (e) {
     console.warn("⚠️  [auto-migrate]:", e.message);
   }

@@ -182,22 +182,24 @@ export default function PublicClinicaPage() {
         <div style={{ flex: 1, maxWidth: 500, width: "100%", margin: "-32px auto 0", padding: "0 16px 40px", boxSizing: "border-box" }}>
 
           {/* Botón principal: Agendar Cita */}
-          <button
-            onClick={() => setShowAgendar(true)}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
-              background: color, color: "#fff", border: "none", borderRadius: 18,
-              padding: "18px 24px", width: "100%", fontSize: 16, fontWeight: 800,
-              boxShadow: `0 6px 24px rgba(${colorRgb},.35)`,
-              cursor: "pointer", marginBottom: 14,
-              animation: "fadeUp .5s .08s ease both",
-              transition: "transform .18s, box-shadow .18s",
-            }}
-            className="pub-btn-agendar"
-          >
-            <i className="bi bi-calendar2-plus" style={{ fontSize: 20 }} />
-            Agendar una Cita
-          </button>
+          {perfil.perfil_agendar_activo !== "0" && (
+            <button
+              onClick={() => setShowAgendar(true)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+                background: color, color: "#fff", border: "none", borderRadius: 18,
+                padding: "18px 24px", width: "100%", fontSize: 16, fontWeight: 800,
+                boxShadow: `0 6px 24px rgba(${colorRgb},.35)`,
+                cursor: "pointer", marginBottom: 14,
+                animation: "fadeUp .5s .08s ease both",
+                transition: "transform .18s, box-shadow .18s",
+              }}
+              className="pub-btn-agendar"
+            >
+              <i className="bi bi-calendar2-plus" style={{ fontSize: 20 }} />
+              Agendar una Cita
+            </button>
+          )}
 
           {/* Botones de acción */}
           <div style={{ display: "flex", flexDirection: "column", gap: 12, marginBottom: 28, animation: "fadeUp .5s .1s ease both" }}>

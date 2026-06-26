@@ -1,8 +1,61 @@
-const router = require("express").Router();
-const pool   = require("../db");
+const router    = require("express").Router();
+const pool      = require("../db");
+const rateLimit = require("express-rate-limit");
+const sse       = require("../utils/sseManager");
+const webPush   = require("../utils/webPush");
+
+const publicLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, msg: "Demasiadas solicitudes. Intenta de nuevo en 15 minutos." },
+});
+
+const agendarLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  max: 3,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, msg: "Has enviado demasiadas solicitudes de cita. Intenta más tarde." },
+});
+
+async function notificarSolicitudCita({ clinicaId, pacienteNombre, inicio, citaId }) {
+  try {
+    const [usuarios] = await pool.query(
+      `SELECT id FROM usuarios WHERE clinica_id = ? AND activo = 1 AND tipo <> 'SUPER_ADMIN'`,
+      [clinicaId]
+    );
+    if (!usuarios.length) return;
+
+    const fechaLabel = new Date(inicio).toLocaleString("es-HN", {
+      dateStyle: "medium", timeStyle: "short",
+    });
+    const mensaje = `Nueva solicitud de cita de ${pacienteNombre} para el ${fechaLabel}`;
+    const tipo    = "CITA_SOLICITUD_PORTAL";
+
+    const values = usuarios.map((u) => [u.id, clinicaId, tipo, mensaje, null, citaId]);
+    await pool.query(
+      `INSERT INTO notificaciones_usuario (usuario_id, clinica_id, tipo, mensaje, paciente_id, cita_id) VALUES ?`,
+      [values]
+    );
+
+    for (const u of usuarios) {
+      sse.notifyUser(u.id, "notificacion_portal", { tipo, mensaje, cita_id: citaId });
+    }
+
+    await webPush.sendToUsers(
+      pool,
+      usuarios.map((u) => u.id),
+      { title: "Solicitud de cita", body: mensaje, tag: tipo, data: { tipo, cita_id: citaId, url: "/citas" } }
+    );
+  } catch (e) {
+    console.error("[notificarSolicitudCita]", e.message);
+  }
+}
 
 // ─── GET /api/public/clinica/:slug ──────────────────────────────────────────
-router.get("/clinica/:slug", async (req, res) => {
+router.get("/clinica/:slug", publicLimiter, async (req, res) => {
   try {
     const { slug } = req.params;
     const [[clinica]] = await pool.query(
@@ -18,7 +71,7 @@ router.get("/clinica/:slug", async (req, res) => {
          'perfil_descripcion','perfil_nombre_doctor','perfil_titulo_doctor',
          'perfil_whatsapp','perfil_instagram','perfil_tiktok',
          'perfil_facebook','perfil_google_maps','perfil_foto_doctor',
-         'perfil_color_primario'
+         'perfil_color_primario','perfil_agendar_activo'
        )`,
       [clinica.id]
     );
@@ -43,7 +96,7 @@ router.get("/clinica/:slug", async (req, res) => {
 });
 
 // ─── GET /api/public/clinica/:slug/servicios ────────────────────────────────
-router.get("/clinica/:slug/servicios", async (req, res) => {
+router.get("/clinica/:slug/servicios", publicLimiter, async (req, res) => {
   try {
     const { slug } = req.params;
     const [[clinica]] = await pool.query(
@@ -64,7 +117,7 @@ router.get("/clinica/:slug/servicios", async (req, res) => {
 
 // ─── GET /api/public/clinica/:slug/medicos ──────────────────────────────────
 // Devuelve médicos activos con sus días disponibles
-router.get("/clinica/:slug/medicos", async (req, res) => {
+router.get("/clinica/:slug/medicos", publicLimiter, async (req, res) => {
   try {
     const { slug } = req.params;
     const [[clinica]] = await pool.query(
@@ -107,13 +160,29 @@ router.get("/clinica/:slug/medicos", async (req, res) => {
 });
 
 // ─── GET /api/public/clinica/:slug/slots?medico_id=X&fecha=YYYY-MM-DD ───────
-router.get("/clinica/:slug/slots", async (req, res) => {
+router.get("/clinica/:slug/slots", publicLimiter, async (req, res) => {
   try {
     const { slug } = req.params;
     const { medico_id, fecha } = req.query;
 
     if (!medico_id || !fecha) {
       return res.status(400).json({ ok: false, msg: "medico_id y fecha son obligatorios" });
+    }
+
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+      return res.status(400).json({ ok: false, msg: "Formato de fecha inválido" });
+    }
+
+    const fechaDate = new Date(fecha + "T12:00:00Z");
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    const maxFecha = new Date(); maxFecha.setMonth(maxFecha.getMonth() + 3);
+    if (isNaN(fechaDate) || fechaDate < hoy || fechaDate > maxFecha) {
+      return res.status(400).json({ ok: false, msg: "Fecha fuera del rango permitido" });
+    }
+
+    const medicoIdInt = parseInt(medico_id, 10);
+    if (!medicoIdInt || medicoIdInt <= 0) {
+      return res.status(400).json({ ok: false, msg: "medico_id inválido" });
     }
 
     const [[clinica]] = await pool.query(
@@ -138,15 +207,15 @@ router.get("/clinica/:slug/slots", async (req, res) => {
     const [horarios] = await pool.query(
       `SELECT hora_inicio, hora_fin, slot_minutos FROM horarios_medico
        WHERE medico_id=? AND clinica_id=? AND dia_semana=? AND activo=1`,
-      [medico_id, clinicaId, diaLunes]
+      [medicoIdInt, clinicaId, diaLunes]
     );
     if (!horarios.length) return res.json({ ok: true, data: [] });
 
     const [ocupadas] = await pool.query(
       `SELECT inicio, fin FROM citas
        WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
-         AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
-      [clinicaId, medico_id, fecha]
+         AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION','PENDIENTE_APROBACION')`,
+      [clinicaId, medicoIdInt, fecha]
     );
 
     const toLocalISO = d => {
@@ -181,7 +250,7 @@ router.get("/clinica/:slug/slots", async (req, res) => {
 });
 
 // ─── POST /api/public/clinica/:slug/agendar ─────────────────────────────────
-router.post("/clinica/:slug/agendar", async (req, res) => {
+router.post("/clinica/:slug/agendar", agendarLimiter, async (req, res) => {
   try {
     const { slug } = req.params;
     const { nombres, apellidos, telefono, email, medico_id, inicio, fin, servicio_id, motivo } = req.body;
@@ -190,28 +259,55 @@ router.post("/clinica/:slug/agendar", async (req, res) => {
       return res.status(400).json({ ok: false, msg: "Faltan campos obligatorios" });
     }
 
+    if (String(nombres).length > 80 || String(apellidos).length > 80) {
+      return res.status(400).json({ ok: false, msg: "Nombre o apellido demasiado largo" });
+    }
+    if (String(telefono).length > 20) {
+      return res.status(400).json({ ok: false, msg: "Teléfono inválido" });
+    }
+    if (email && String(email).length > 120) {
+      return res.status(400).json({ ok: false, msg: "Email inválido" });
+    }
+    if (motivo && String(motivo).length > 500) {
+      return res.status(400).json({ ok: false, msg: "El motivo no puede superar 500 caracteres" });
+    }
+
+    const medicoIdInt = parseInt(medico_id, 10);
+    if (!medicoIdInt || medicoIdInt <= 0) {
+      return res.status(400).json({ ok: false, msg: "medico_id inválido" });
+    }
+
     const [[clinica]] = await pool.query(
       "SELECT id FROM clinicas WHERE slug = ? AND activo = 1 LIMIT 1", [slug]
     );
     if (!clinica) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    // Verificar que el perfil público tiene activo el agendado de citas
+    const [[cfgAgendar]] = await pool.query(
+      "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='perfil_agendar_activo' LIMIT 1",
+      [clinica.id]
+    );
+    if (cfgAgendar && cfgAgendar.valor === "0") {
+      return res.status(403).json({ ok: false, msg: "El agendado de citas no está disponible en este momento." });
+    }
 
     const clinicaId = clinica.id;
 
     // Verificar que el médico pertenece a la clínica
     const [[medico]] = await pool.query(
       "SELECT id FROM usuarios WHERE id=? AND clinica_id=? AND activo=1 LIMIT 1",
-      [medico_id, clinicaId]
+      [medicoIdInt, clinicaId]
     );
     if (!medico) return res.status(400).json({ ok: false, msg: "Médico no encontrado" });
 
-    // Verificar que el slot sigue disponible
+    // Verificar que el slot sigue disponible (incluye solicitudes pendientes de aprobación)
     const [solap] = await pool.query(
       `SELECT id FROM citas
        WHERE clinica_id=? AND medico_id=?
-         AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')
+         AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION','PENDIENTE_APROBACION')
          AND NOT (fin <= ? OR inicio >= ?)
        LIMIT 1`,
-      [clinicaId, medico_id, inicio, fin]
+      [clinicaId, medicoIdInt, inicio, fin]
     );
     if (solap.length) {
       return res.status(409).json({ ok: false, msg: "Este horario ya no está disponible. Por favor elige otro." });
@@ -236,15 +332,22 @@ router.post("/clinica/:slug/agendar", async (req, res) => {
       pacienteId = ins.insertId;
     }
 
-    // Crear la cita
+    // Crear la cita en estado PENDIENTE_APROBACION — el doctor debe aceptarla desde la campana
     const [citaRes] = await pool.query(
-      `INSERT INTO citas (clinica_id, paciente_id, medico_id, inicio, fin, tipo_consulta, motivo, canal, servicio_id)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [clinicaId, pacienteId, medico_id, inicio, fin,
-       "CONSULTA", motivo?.trim() || null, "WEB", servicio_id || null]
+      `INSERT INTO citas (clinica_id, paciente_id, medico_id, inicio, fin, tipo_consulta, motivo, canal, servicio_id, estado)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [clinicaId, pacienteId, medicoIdInt, inicio, fin,
+       "CONSULTA", motivo?.trim() || null, "PORTAL", servicio_id || null, "PENDIENTE_APROBACION"]
     );
 
-    res.status(201).json({ ok: true, id: citaRes.insertId, msg: "¡Cita agendada exitosamente!" });
+    await notificarSolicitudCita({
+      clinicaId,
+      pacienteNombre: `${nombres.trim()} ${apellidos.trim()}`,
+      inicio,
+      citaId: citaRes.insertId,
+    });
+
+    res.status(201).json({ ok: true, id: citaRes.insertId, msg: "¡Tu solicitud fue enviada! El doctor confirmará tu cita pronto." });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

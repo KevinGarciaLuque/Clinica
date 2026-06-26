@@ -67,6 +67,7 @@ export default function ConfigClinica() {
           perfil_google_maps:     cfgMap.perfil_google_maps     || "",
           perfil_foto_doctor:     cfgMap.perfil_foto_doctor     || "",
           perfil_color_primario:  cfgMap.perfil_color_primario  || "#213665",
+          perfil_agendar_activo:  cfgMap.perfil_agendar_activo  !== undefined ? cfgMap.perfil_agendar_activo : "1",
         });
 
         setStorage(resDetalles.data?.data?.almacenamiento || null);
@@ -462,6 +463,44 @@ export default function ConfigClinica() {
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
                   <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, opacity: .85 }}>Vista previa</span>
+                </div>
+              </div>
+
+              {/* Switch: Agendar citas */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
+                padding: "14px 18px", marginBottom: 20,
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    <i className="bi bi-calendar2-check me-2" style={{ color: "#213665" }} />
+                    Permitir agendar citas
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                    Si está desactivado, el botón "Agendar una Cita" no aparecerá en tu perfil público.
+                  </div>
+                </div>
+                {/* Toggle estilo iPhone */}
+                <div
+                  onClick={() => setFormPerfil({ ...formPerfil, perfil_agendar_activo: formPerfil.perfil_agendar_activo === "1" ? "0" : "1" })}
+                  style={{
+                    flexShrink: 0, marginLeft: 16,
+                    width: 51, height: 31, borderRadius: 31,
+                    background: formPerfil.perfil_agendar_activo === "1" ? "#34c759" : "#e5e7eb",
+                    position: "relative", cursor: "pointer",
+                    transition: "background .25s cubic-bezier(.4,0,.2,1)",
+                    boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+                  }}
+                >
+                  <div style={{
+                    position: "absolute",
+                    top: 2, left: formPerfil.perfil_agendar_activo === "1" ? 22 : 2,
+                    width: 27, height: 27, borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,.22)",
+                    transition: "left .25s cubic-bezier(.4,0,.2,1)",
+                  }} />
                 </div>
               </div>
 
