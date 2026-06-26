@@ -75,32 +75,47 @@ export default function NavbarApp({ onMenuClick }) {
       .catch(() => {});
 
     // SSE — notificaciones en tiempo real
-    const token = localStorage.getItem("token");
-    const es = new EventSource(`${API_URL}/api/soporte/stream?auth_token=${token}`);
-    es.addEventListener("respuesta_reporte", (e) => {
-      const data = JSON.parse(e.data);
-      setMisRespuestas(prev => {
-        if (prev.find(r => r.id === data.id)) return prev;
-        playNotificationSound();
-        return [data, ...prev];
-      });
-    });
-    es.addEventListener("notificacion_portal", (e) => {
-      const data = JSON.parse(e.data);
-      setNotifsPortal(prev => {
-        playNotificationSound();
-        return [{
-          id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-          tipo: data.tipo,
-          mensaje: data.mensaje,
-          paciente_id: data.paciente_id || null,
-          cita_id: data.cita_id || null,
-          creado_en: new Date().toISOString(),
-          _live: true,
-        }, ...prev];
-      });
-    });
-    es.onerror = () => {}; // reconexión automática del navegador
+    let esRef = null;
+    let cancelled = false;
+
+    const connectSSE = async () => {
+      try {
+        const { data } = await api.post("/soporte/stream-token");
+        if (cancelled) return;
+        const es = new EventSource(`${API_URL}/api/soporte/stream?sse_token=${data.token}`);
+        esRef = es;
+        es.addEventListener("respuesta_reporte", (e) => {
+          const d = JSON.parse(e.data);
+          setMisRespuestas(prev => {
+            if (prev.find(r => r.id === d.id)) return prev;
+            playNotificationSound();
+            return [d, ...prev];
+          });
+        });
+        es.addEventListener("notificacion_portal", (e) => {
+          const d = JSON.parse(e.data);
+          setNotifsPortal(prev => {
+            playNotificationSound();
+            return [{
+              id: `live-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              tipo: d.tipo,
+              mensaje: d.mensaje,
+              paciente_id: d.paciente_id || null,
+              cita_id: d.cita_id || null,
+              creado_en: new Date().toISOString(),
+              _live: true,
+            }, ...prev];
+          });
+        });
+        // Al expirar el token (401) el browser cierra la conexión; reconectar con nuevo token
+        es.onerror = () => {
+          es.close();
+          if (!cancelled) setTimeout(connectSSE, 5000);
+        };
+      } catch { /* sin conectividad — el polling de fallback sigue activo */ }
+    };
+
+    connectSSE();
 
     // Fallback polling cada 60s (por si SSE falla)
     // También reproduce sonido si aparecen respuestas nuevas
@@ -124,7 +139,7 @@ export default function NavbarApp({ onMenuClick }) {
         .catch(() => {});
     }, 60000);
 
-    return () => { es.close(); clearInterval(iv); };
+    return () => { cancelled = true; esRef?.close(); clearInterval(iv); };
   }, [user]);
 
   const marcarRespuestaLeida = async (id) => {
@@ -158,25 +173,38 @@ export default function NavbarApp({ onMenuClick }) {
     fetchTodo();
 
     // SSE — notificaciones en tiempo real para SUPER_ADMIN
-    const token = localStorage.getItem("token");
-    const es = new EventSource(`${API_URL}/api/soporte/stream?auth_token=${token}`);
-    es.addEventListener("nuevo_reporte", () => {
-      // Recarga la lista completa al llegar un nuevo reporte
-      api.get("/soporte/reportes")
-        .then(r => {
-          setReportes(prev => {
-            const nuevos = r.data.data || [];
-            if (nuevos.length > prev.length) playNotificationSound();
-            return nuevos;
-          });
-        })
-        .catch(() => {});
-    });
-    es.onerror = () => {};
+    let esRef2 = null;
+    let cancelled2 = false;
+
+    const connectSSE2 = async () => {
+      try {
+        const { data } = await api.post("/soporte/stream-token");
+        if (cancelled2) return;
+        const es = new EventSource(`${API_URL}/api/soporte/stream?sse_token=${data.token}`);
+        esRef2 = es;
+        es.addEventListener("nuevo_reporte", () => {
+          api.get("/soporte/reportes")
+            .then(r => {
+              setReportes(prev => {
+                const nuevos = r.data.data || [];
+                if (nuevos.length > prev.length) playNotificationSound();
+                return nuevos;
+              });
+            })
+            .catch(() => {});
+        });
+        es.onerror = () => {
+          es.close();
+          if (!cancelled2) setTimeout(connectSSE2, 5000);
+        };
+      } catch { /* sin conectividad */ }
+    };
+
+    connectSSE2();
 
     // Fallback polling cada 30s
     const iv = setInterval(fetchTodo, 30000);
-    return () => { es.close(); clearInterval(iv); };
+    return () => { cancelled2 = true; esRef2?.close(); clearInterval(iv); };
   }, [user]);
 
   useEffect(() => {

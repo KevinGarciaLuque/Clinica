@@ -1,20 +1,64 @@
-const router     = require("express").Router();
-const pool       = require("../db");
-const auth       = require("../middlewares/auth");
-const sse        = require("../utils/sseManager");
-const webPush    = require("../utils/webPush");
+const router        = require("express").Router();
+const pool          = require("../db");
+const auth          = require("../middlewares/auth");
+const sse           = require("../utils/sseManager");
+const webPush       = require("../utils/webPush");
+const { randomUUID } = require("crypto");
+
+// Tokens de corta duración para el canal SSE
+// Clave: uuid  →  Valor: { userId, tipo, expires }
+const sseTokens = new Map();
+
+// Limpieza periódica de tokens expirados (cada minuto)
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of sseTokens) {
+    if (v.expires < now) sseTokens.delete(k);
+  }
+}, 60_000);
 
 // ──────────────────────────────────────────────
-//  GET /api/soporte/stream
+//  POST /api/soporte/stream-token
+//  Emite un UUID de un solo uso (2 min) para abrir el canal SSE.
+//  El frontend lo obtiene con su JWT normal y lo pasa en la URL del EventSource,
+//  evitando que el JWT completo aparezca en logs y en el historial del navegador.
+//  El rate limit de este endpoint se aplica en server.js.
+// ──────────────────────────────────────────────
+router.post("/stream-token", auth(), (req, res) => {
+  const token = randomUUID();
+  sseTokens.set(token, {
+    userId:  req.user.id,
+    tipo:    req.user.tipo,
+    expires: Date.now() + 2 * 60 * 1000, // 2 minutos para abrir el canal
+  });
+  res.json({ ok: true, token });
+});
+
+// ──────────────────────────────────────────────
+//  GET /api/soporte/stream?sse_token=<uuid>
 //  SSE — canal de notificaciones en tiempo real
 // ──────────────────────────────────────────────
-router.get("/stream", auth(), (req, res) => {
-  const userId      = req.user.id;
-  const isSuperAdmin = req.user.tipo === "SUPER_ADMIN";
+router.get("/stream", (req, res) => {
+  const sseToken = req.query.sse_token;
+  if (!sseToken) {
+    return res.status(401).json({ ok: false, msg: "sse_token requerido" });
+  }
 
-  res.setHeader("Content-Type",  "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection",    "keep-alive");
+  const session = sseTokens.get(sseToken);
+
+  // Eliminar siempre (válido o no) para garantizar uso único
+  sseTokens.delete(sseToken);
+
+  if (!session || session.expires < Date.now()) {
+    return res.status(401).json({ ok: false, msg: "Token de stream inválido o expirado" });
+  }
+
+  const userId       = session.userId;
+  const isSuperAdmin = session.tipo === "SUPER_ADMIN";
+
+  res.setHeader("Content-Type",      "text/event-stream");
+  res.setHeader("Cache-Control",     "no-cache");
+  res.setHeader("Connection",        "keep-alive");
   res.setHeader("X-Accel-Buffering", "no"); // Nginx: deshabilitar buffer
   res.flushHeaders();
 

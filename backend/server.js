@@ -1,21 +1,37 @@
-const express = require("express");
-const cors = require("cors");
-const helmet = require("helmet");
-const morgan = require("morgan");
-const path = require("path");
-const cron = require("node-cron");
+const express   = require("express");
+const cors      = require("cors");
+const helmet    = require("helmet");
+const morgan    = require("morgan");
+const path      = require("path");
+const cron      = require("node-cron");
+const rateLimit = require("express-rate-limit");
 require("dotenv").config({ path: path.join(__dirname, ".env") });
 
 const app = express();
 
+// Railway (y la mayoría de PaaS) coloca al cliente real en X-Forwarded-For.
+// Con trust proxy = 1, Express asigna ese valor a req.ip, lo que permite que
+// express-rate-limit identifique correctamente al usuario y no a la IP del proxy.
+app.set("trust proxy", 1);
+
 // ===== CORS =====
-const allowedOrigins = (process.env.CORS_ORIGINS || "")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
+const BASE_ORIGINS = [
+  "https://clinica-nine-xi.vercel.app",
+  "https://medickg.com",
+  "https://www.medickg.com",
+];
+
+const allowedOrigins = [
+  ...BASE_ORIGINS,
+  ...(process.env.CORS_ORIGINS || "").split(",").map((o) => o.trim()).filter(Boolean),
+];
 
 const corsOptions = {
-  origin: true, // TEMPORAL: Permite todos los origins para debug
+  origin: (origin, cb) => {
+    // Permitir peticiones sin origin (mobile apps, curl, server-to-server)
+    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    cb(new Error(`CORS bloqueado: ${origin}`));
+  },
   credentials: true,
   methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   allowedHeaders: [
@@ -27,6 +43,28 @@ const corsOptions = {
   ],
   optionsSuccessStatus: 204,
 };
+
+// ===== Rate limiting =====
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true, // los logins correctos no consumen intentos
+  standardHeaders: true,
+  legacyHeaders: false,
+  // req.ip ya es la IP real del cliente gracias a trust proxy
+  message: {
+    ok: false,
+    msg: "Demasiados intentos de inicio de sesión. Intenta de nuevo en 15 minutos.",
+  },
+});
+
+const streamTokenLimiter = rateLimit({
+  windowMs: 60 * 1000, // 1 minuto
+  max: 20,             // tope razonable; cada reconexión pide un token
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { ok: false, msg: "Demasiadas solicitudes de token SSE. Intenta en un momento." },
+});
 
 app.use(cors(corsOptions));
 app.options("*", cors(corsOptions));
@@ -45,7 +83,13 @@ app.use(
   })
 );
 
-app.use(morgan("dev", {
+// Token personalizado que elimina sse_token de la URL registrada en los logs,
+// evitando que un token de stream temporal quede expuesto aunque sea efímero.
+morgan.token("url-safe", (req) =>
+  (req.originalUrl || req.url).replace(/([?&])sse_token=[^&]*/g, "$1sse_token=[REDACTED]")
+);
+
+app.use(morgan(":method :url-safe :status :res[content-length] - :response-time ms", {
   skip: (req, res) => res.statusCode < 400,
 }));
 app.use(express.json({ limit: "10mb" }));
@@ -94,6 +138,8 @@ app.get("/", (req, res) => {
 });
 
 // ===== Rutas =====
+app.post("/api/auth/login",           loginLimiter);
+app.post("/api/soporte/stream-token", streamTokenLimiter);
 app.use("/api/auth", require("./routes/auth"));
 app.use("/api/clinicas", require("./routes/clinicas"));
 app.use("/api/usuarios", require("./routes/usuarios"));

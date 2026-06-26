@@ -47,13 +47,27 @@ export default function SoporteHistorial() {
     cargar();
 
     // SSE
-    const token = localStorage.getItem("token");
-    const es = new EventSource(`${API_URL}/api/soporte/stream?auth_token=${token}`);
-    es.addEventListener("nuevo_reporte", () => cargar(true));
-    es.onerror = () => {};
+    let esRef = null;
+    let cancelled = false;
+
+    const connectSSE = async () => {
+      try {
+        const { data } = await api.post("/soporte/stream-token");
+        if (cancelled) return;
+        const es = new EventSource(`${API_URL}/api/soporte/stream?sse_token=${data.token}`);
+        esRef = es;
+        es.addEventListener("nuevo_reporte", () => cargar(true));
+        es.onerror = () => {
+          es.close();
+          if (!cancelled) setTimeout(connectSSE, 5000);
+        };
+      } catch { /* sin conectividad */ }
+    };
+
+    connectSSE();
 
     const iv = setInterval(() => cargar(true), 15000);
-    return () => { es.close(); clearInterval(iv); };
+    return () => { cancelled = true; esRef?.close(); clearInterval(iv); };
   }, []);
 
   const filtrados = reportes.filter(r => {
