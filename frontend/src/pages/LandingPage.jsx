@@ -158,6 +158,69 @@ export default function LandingPage() {
           .planes-grid { grid-template-columns: 1fr !important; }
           .features-grid { grid-template-columns: 1fr 1fr !important; }
         }
+        @keyframes waPulse {
+          0%   { box-shadow: 0 0 0 0 rgba(37,211,102,.6), 0 6px 24px rgba(37,211,102,.4); }
+          60%  { box-shadow: 0 0 0 16px rgba(37,211,102,0), 0 6px 24px rgba(37,211,102,.4); }
+          100% { box-shadow: 0 0 0 0 rgba(37,211,102,0), 0 6px 24px rgba(37,211,102,.4); }
+        }
+        @keyframes waRing {
+          0%,100% { transform: rotate(0deg); }
+          10%      { transform: rotate(-12deg); }
+          20%      { transform: rotate(12deg); }
+          30%      { transform: rotate(-10deg); }
+          40%      { transform: rotate(10deg); }
+          50%      { transform: rotate(-6deg); }
+          60%      { transform: rotate(6deg); }
+          70%      { transform: rotate(0deg); }
+        }
+        .wa-float-btn {
+          position: fixed;
+          bottom: 28px;
+          right: 28px;
+          z-index: 9999;
+          width: 60px;
+          height: 60px;
+          border-radius: 50%;
+          background: linear-gradient(135deg, #25d366 0%, #128c7e 100%);
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          text-decoration: none;
+          animation: waPulse 2.2s ease-in-out infinite;
+          transition: transform .2s, width .3s, border-radius .3s, padding .3s;
+          overflow: hidden;
+        }
+        .wa-float-btn i {
+          font-size: 30px;
+          color: #fff;
+          animation: waRing 3.5s ease-in-out infinite;
+          flex-shrink: 0;
+        }
+        .wa-float-label {
+          color: #fff;
+          font-size: 14px;
+          font-weight: 700;
+          white-space: nowrap;
+          max-width: 0;
+          overflow: hidden;
+          opacity: 0;
+          transition: max-width .3s ease, opacity .25s ease, margin-left .3s ease;
+          margin-left: 0;
+        }
+        .wa-float-btn:hover {
+          width: auto;
+          border-radius: 30px;
+          padding: 0 20px;
+          transform: translateY(-3px);
+          animation: none;
+          box-shadow: 0 10px 32px rgba(37,211,102,.5);
+        }
+        .wa-float-btn:hover .wa-float-label {
+          max-width: 160px;
+          opacity: 1;
+          margin-left: 10px;
+        }
+        .wa-float-btn:hover i { animation: none; }
       `}</style>
 
       {/* ── NAVBAR ── */}
@@ -784,6 +847,20 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── BOTÓN FLOTANTE WHATSAPP ── */}
+      {whatsapp && (
+        <a
+          href={`https://wa.me/${whatsapp}?text=Hola, quiero información sobre ${nombre}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="wa-float-btn"
+          title="Escríbenos por WhatsApp"
+        >
+          <i className="bi bi-whatsapp" />
+          <span className="wa-float-label">¡Escríbenos!</span>
+        </a>
+      )}
 
       {/* ── FOOTER ── */}
       <footer style={{ background: "#0f172a", padding: "28px 24px", textAlign: "center" }}>
