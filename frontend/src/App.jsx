@@ -33,6 +33,8 @@ const Database                 = lazy(() => import("./pages/superadmin/Database"
 const Reportes                 = lazy(() => import("./pages/superadmin/Reportes"));
 const SoporteHistorial         = lazy(() => import("./pages/superadmin/SoporteHistorial"));
 const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdminPersonalizacion"));
+const LandingPageAdmin          = lazy(() => import("./pages/superadmin/LandingPageAdmin"));
+const LandingPage               = lazy(() => import("./pages/LandingPage"));
 
 // Módulos de Cirugía Estética
 const GaleriaEstetica          = lazy(() => import("./pages/estetica/GaleriaEstetica"));
@@ -102,6 +104,7 @@ export default function App() {
       <Route path="/verificar-email" element={<VerificarEmail />} />
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
+      <Route path="/inicio"           element={<LandingPage />} />
 
       <Route
         element={
@@ -193,6 +196,11 @@ export default function App() {
         <Route path="/superadmin/personalizacion" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <SuperAdminPersonalizacion />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/landing" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <LandingPageAdmin />
           </RolRoute>
         } />
 

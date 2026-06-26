@@ -50,6 +50,7 @@ const superItems = [
   { to: "/superadmin/reportes",        label: "Reportes",         icon: "bi-bar-chart-line-fill" },
   { to: "/superadmin/database",        label: "Base de Datos",   icon: "bi-database-fill-gear" },
   { to: "/superadmin/personalizacion", label: "Personalización", icon: "bi-palette-fill" },
+  { to: "/superadmin/landing",         label: "Página Pública",  icon: "bi-globe2" },
 ];
 
 /** Renderiza ícono: Bootstrap Icons (bi-*) o emoji/texto */

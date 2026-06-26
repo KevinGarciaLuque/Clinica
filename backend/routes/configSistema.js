@@ -14,6 +14,24 @@ const DEFAULTS = {
   color_nombre1:       "#ffffff",
   color_nombre2:       "#2D6BE8",
   inactividad_minutos: "20",
+  // Landing page pública
+  landing_color_primario:       "#0E1F3C",
+  landing_activo:               "1",
+  landing_tagline:              "Gestión clínica moderna y eficiente",
+  landing_descripcion:          "Plataforma todo-en-uno para administrar tu clínica: citas, pacientes, historias clínicas, facturación y más.",
+  landing_whatsapp:             "",
+  landing_email_contacto:       "",
+  landing_nosotros_texto:       "Somos un equipo apasionado por transformar la gestión médica mediante tecnología accesible y poderosa.",
+  landing_instagram:            "",
+  landing_facebook:             "",
+  landing_tiktok:               "",
+  landing_plan_trial_precio:    "Gratis",
+  landing_plan_trial_duracion:  "30 días",
+  landing_plan_trial_features:  '["Hasta 50 pacientes","Citas y calendario","Historial clínico básico","Soporte por chat"]',
+  landing_plan_semestral_precio:"",
+  landing_plan_semestral_features:'["Pacientes ilimitados","Todos los módulos clínicos","Recordatorios automáticos","Soporte prioritario","Reportes avanzados"]',
+  landing_plan_anual_precio:    "",
+  landing_plan_anual_features:  '["Todo lo del plan Semestral","Módulos especializados","Portal público de citas","Almacenamiento ampliado","Soporte 24/7"]',
 };
 
 let schemaReady = false;

@@ -7,7 +7,7 @@
 ALTER TABLE pacientes
   ADD COLUMN IF NOT EXISTS foto_perfil        VARCHAR(255)   NULL AFTER direccion,
   ADD COLUMN IF NOT EXISTS ciudad             VARCHAR(100)   NULL AFTER foto_perfil,
-  ADD COLUMN IF NOT EXISTS pais               VARCHAR(100)   NULL DEFAULT 'Perú' AFTER ciudad,
+  ADD COLUMN IF NOT EXISTS pais               VARCHAR(100)   NULL DEFAULT 'Honduras' AFTER ciudad,
   ADD COLUMN IF NOT EXISTS grupo_sanguineo    VARCHAR(5)     NULL AFTER pais,
   ADD COLUMN IF NOT EXISTS email_verificado   TINYINT(1)     NOT NULL DEFAULT 0 AFTER grupo_sanguineo,
   ADD COLUMN IF NOT EXISTS registro_self      TINYINT(1)     NOT NULL DEFAULT 0 AFTER email_verificado,

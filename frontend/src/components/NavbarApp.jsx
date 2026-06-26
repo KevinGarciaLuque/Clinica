@@ -150,6 +150,7 @@ export default function NavbarApp({ onMenuClick }) {
       await api.put(`/soporte/notificaciones-portal/${notifId}/${accion}-cita`);
       setNotifsPortal(prev => prev.filter(n => n.id !== notifId));
       if (notifsPortal.length <= 1 && misRespuestas.length === 0) setShowRespuestasDD(false);
+      window.dispatchEvent(new CustomEvent("cita-portal-accionada"));
     } catch {
     } finally {
       setAccionandoNotif(null);

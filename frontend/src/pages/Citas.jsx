@@ -74,6 +74,7 @@ function ChipPacienteCita({ apellidos, nombres, ciudad, departamento, fechaNac, 
 
 // ─── colores por estado ───────────────────────────────────────────────────────
 const ESTADO_COLOR = {
+  PENDIENTE_APROBACION: { bg: "#fff7ed", fg: "#9a3412", dot: "#f97316" },
   PENDIENTE:   { bg: "#fef9c3", fg: "#854d0e", dot: "#eab308" },
   CONFIRMADA:  { bg: "#dbeafe", fg: "#1e40af", dot: "#3b82f6" },
   EN_ESPERA:   { bg: "#ede9fe", fg: "#5b21b6", dot: "#8b5cf6" },
@@ -126,13 +127,15 @@ const FORMATS = {
 };
 
 function buildEvents(citas) {
-  return citas.map(c => ({
-    id: c.id,
-    title: `${c.paciente_nombres} ${c.paciente_apellidos}`,
-    start: new Date(c.inicio),
-    end:   new Date(c.fin),
-    resource: c,
-  }));
+  return citas
+    .filter(c => c.estado !== "CANCELADA" && c.estado !== "NO_ASISTIO")
+    .map(c => ({
+      id: c.id,
+      title: `${c.paciente_nombres} ${c.paciente_apellidos}`,
+      start: new Date(c.inicio),
+      end:   new Date(c.fin),
+      resource: c,
+    }));
 }
 
 // ─── Componente personalizado para la vista Agenda ───────────────────────────
@@ -356,6 +359,13 @@ export default function Citas() {
   }, [date, filterMed]);
 
   useEffect(() => { loadCitas(); }, [loadCitas]);
+
+  // Refrescar cuando el doctor aprueba o rechaza una cita desde la campana de notificaciones
+  useEffect(() => {
+    const handler = () => loadCitas();
+    window.addEventListener("cita-portal-accionada", handler);
+    return () => window.removeEventListener("cita-portal-accionada", handler);
+  }, [loadCitas]);
 
   const loadSalaEspera = useCallback(() => {
     api.get("/dashboard/sala-espera")

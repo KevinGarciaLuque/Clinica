@@ -575,6 +575,15 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] inventario_movimientos OK");
 
+    // Corregir default del país en pacientes: Peru → Honduras
+    await pool.query(`
+      ALTER TABLE pacientes MODIFY COLUMN pais VARCHAR(100) DEFAULT 'Honduras'
+    `);
+    await pool.query(`
+      UPDATE pacientes SET pais = 'Honduras' WHERE pais IN ('Peru','Perú','PE')
+    `);
+    console.log("✅ [auto-migrate] pacientes.pais default → Honduras");
+
     // Agregar PENDIENTE_APROBACION al ENUM de citas.estado (citas desde portal público)
     const [colEstado] = await pool.query(`
       SELECT COLUMN_TYPE FROM information_schema.COLUMNS

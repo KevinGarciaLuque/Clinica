@@ -138,7 +138,7 @@ CREATE TABLE IF NOT EXISTS pacientes (
   direccion        VARCHAR(250),
   foto_perfil      VARCHAR(255),
   ciudad           VARCHAR(100),
-  pais             VARCHAR(100)  DEFAULT 'Peru',
+  pais             VARCHAR(100)  DEFAULT 'Honduras',
   -- Portal self-service
   portal_password_hash VARCHAR(255) COMMENT 'Si el paciente usa el portal web',
   portal_verificado    TINYINT(1)   DEFAULT 0,
