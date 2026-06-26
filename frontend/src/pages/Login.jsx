@@ -101,9 +101,48 @@ export default function Login() {
           border-top: 1px solid rgba(255,255,255,0.15);
           margin: 1.5rem 0;
         }
+        .btn-back-home {
+          display: inline-flex;
+          align-items: center;
+          gap: 0.45rem;
+          background: rgba(255,255,255,0.10);
+          border: 1px solid rgba(255,255,255,0.28);
+          border-radius: 2rem;
+          color: rgba(255,255,255,0.85);
+          font-size: 0.82rem;
+          font-weight: 500;
+          padding: 0.42rem 1rem;
+          text-decoration: none;
+          backdrop-filter: blur(8px);
+          -webkit-backdrop-filter: blur(8px);
+          transition: background .2s, border-color .2s, transform .15s, color .2s;
+          cursor: pointer;
+          position: absolute;
+          top: 1.2rem;
+          left: 50%;
+          transform: translateX(-50%);
+          white-space: nowrap;
+          z-index: 2;
+        }
+        .btn-back-home:hover {
+          background: rgba(255,255,255,0.20);
+          border-color: rgba(255,255,255,0.55);
+          color: #fff;
+          transform: translateX(-50%) translateY(-1px);
+        }
+        .btn-back-home i { font-size: 0.9rem; }
       `}</style>
 
       <div className="login-bg">
+        <button
+          type="button"
+          className="btn-back-home"
+          onClick={() => navigate("/")}
+        >
+          <i className="bi bi-arrow-left-circle" />
+          Volver al inicio
+        </button>
+
         <div className="glass-card">
 
           {/* Logo / encabezado */}
