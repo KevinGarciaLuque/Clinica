@@ -20,7 +20,7 @@ export default function Login() {
     setLoading(true);
     try {
       await login(email, password);
-      navigate("/");
+      navigate("/dashboard");
     } catch (err) {
       setMsg(err?.response?.data?.msg || "Credenciales incorrectas");
     } finally {

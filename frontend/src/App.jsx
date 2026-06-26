@@ -105,6 +105,7 @@ export default function App() {
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
       <Route path="/inicio"           element={<LandingPage />} />
+      <Route path="/"                         element={<LandingPage />} />
 
       <Route
         element={
@@ -114,7 +115,7 @@ export default function App() {
         }
       >
         {/* Rutas generales */}
-        <Route path="/"                       element={<Dashboard />} />
+        <Route path="/dashboard"              element={<Dashboard />} />
         <Route path="/pacientes"              element={<Pacientes />} />
         <Route path="/pacientes/:id/perfil"   element={<Suspense fallback={<PageSkeleton />}><PerfilPaciente /></Suspense>} />
         <Route path="/citas"                  element={<Citas />} />
@@ -231,7 +232,7 @@ export default function App() {
         <Route path="/estetica/biopsias"          element={<BiopsiaPatologia />} />
       </Route>
 
-      <Route path="*" element={<Navigate to="/" />} />
+      <Route path="*" element={<Navigate to="/dashboard" />} />
     </Routes>
     </Suspense>
   );

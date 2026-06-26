@@ -86,6 +86,13 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
       "nombre_sistema", "subtitulo", "icono_bootstrap",
       "fondo_login_url", "copyright_texto", "color_primario",
       "color_nombre1", "color_nombre2", "inactividad_minutos",
+      // Landing page
+      "landing_activo", "landing_color_primario", "landing_tagline", "landing_descripcion",
+      "landing_whatsapp", "landing_email_contacto", "landing_nosotros_texto",
+      "landing_instagram", "landing_facebook", "landing_tiktok",
+      "landing_plan_trial_precio", "landing_plan_trial_duracion", "landing_plan_trial_features",
+      "landing_plan_semestral_precio", "landing_plan_semestral_features",
+      "landing_plan_anual_precio", "landing_plan_anual_features",
     ];
     for (const c of campos) {
       if (req.body[c] !== undefined) {

@@ -18,7 +18,7 @@ export default function LandingPageAdmin() {
 
   useEffect(() => {
     api.get("/config-sistema").then(r => {
-      const c = r.data.config || {};
+      const c = r.data.data || {};
       setForm({
         landing_activo:               c.landing_activo               ?? "1",
         landing_color_primario:       c.landing_color_primario        ?? "#0E1F3C",

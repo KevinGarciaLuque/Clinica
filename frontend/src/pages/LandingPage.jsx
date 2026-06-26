@@ -19,6 +19,45 @@ const FEATURES = [
   { icon: "bi-phone-fill",           label: "Portal Público",        desc: "Página de citas online para tus pacientes." },
 ];
 
+const ESPECIALIDADES = [
+  {
+    icon: "bi-heart-pulse-fill",
+    label: "Medicina General",
+    desc: "Consultas SOAP, signos vitales, diagnósticos CIE-10 y evolución clínica completa.",
+    color: "#3b82f6",
+  },
+  {
+    icon: "bi-balloon-heart-fill",
+    label: "Pediatría",
+    desc: "Curva de crecimiento, carnet de vacunas y seguimiento desde el nacimiento.",
+    color: "#f59e0b",
+  },
+  {
+    icon: "bi-emoji-smile-fill",
+    label: "Odontología",
+    desc: "Odontograma 2D/3D, historial dental por pieza y tratamientos detallados.",
+    color: "#06b6d4",
+  },
+  {
+    icon: "bi-brain",
+    label: "Psicología",
+    desc: "Escalas psicológicas, análisis de bienestar y seguimiento terapéutico.",
+    color: "#8b5cf6",
+  },
+  {
+    icon: "bi-stars",
+    label: "Cirugía Estética",
+    desc: "Galería de resultados, presupuestos, consentimientos y seguimiento postoperatorio.",
+    color: "#ec4899",
+  },
+  {
+    icon: "bi-plus-circle-fill",
+    label: "Múltiples especialidades",
+    desc: "El sistema se adapta a tu flujo de trabajo. Nuevas especialidades disponibles según tu plan.",
+    color: "#10b981",
+  },
+];
+
 export default function LandingPage() {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState(null);
@@ -27,7 +66,7 @@ export default function LandingPage() {
   useEffect(() => {
     fetch(`${API_URL}/api/config-sistema`)
       .then(r => r.json())
-      .then(d => setCfg(d.config || {}))
+      .then(d => setCfg(d.data || {}))
       .catch(() => setCfg({}));
   }, []);
 
@@ -48,7 +87,11 @@ export default function LandingPage() {
   const color    = cfg.landing_color_primario || cfg.color_primario || "#0E1F3C";
   const colorRgb = hexToRgb(color);
   const nombre   = cfg.nombre_sistema || "Medic-KG";
-  const logoUrl  = cfg.logo_url ? (cfg.logo_url.startsWith("http") ? cfg.logo_url : `${API_URL}${cfg.logo_url}`) : null;
+  const logoUrl  = cfg.logo_url
+    ? (cfg.logo_url.startsWith("http") || cfg.logo_url.startsWith("data:")
+        ? cfg.logo_url
+        : `${API_URL}${cfg.logo_url}`)
+    : "/logo.png";
 
   const parsePlanes = () => [
     {
@@ -139,14 +182,13 @@ export default function LandingPage() {
         padding: "0 24px", height: 60,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          {logoUrl
-            ? <img src={logoUrl} alt="logo" style={{ height: 32, objectFit: "contain" }} />
-            : <i className="bi bi-hospital-fill" style={{ color: "#fff", fontSize: 22 }} />}
+          <img src={logoUrl} alt="logo" style={{ height: 32, objectFit: "contain" }} />
           <span style={{ color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: "-.3px" }}>{nombre}</span>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <div className="d-none d-md-flex" style={{ gap: 4 }}>
             <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
+            <button className="nav-link-lp" onClick={() => scrollTo("especialidades")}>Especialidades</button>
             <button className="nav-link-lp" onClick={() => scrollTo("planes")}>Planes</button>
             <button className="nav-link-lp" onClick={() => scrollTo("nosotros")}>Nosotros</button>
             <button className="nav-link-lp" onClick={() => scrollTo("contacto")}>Contacto</button>
@@ -183,7 +225,7 @@ export default function LandingPage() {
           background: darken(color, 20), padding: 16,
           display: "flex", flexDirection: "column", gap: 4,
         }}>
-          {["Características|caracteristicas","Planes|planes","Nosotros|nosotros","Contacto|contacto"].map(item => {
+          {["Características|caracteristicas","Especialidades|especialidades","Planes|planes","Nosotros|nosotros","Contacto|contacto"].map(item => {
             const [label, id] = item.split("|");
             return (
               <button key={id} className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => scrollTo(id)}>
@@ -206,11 +248,9 @@ export default function LandingPage() {
         <div style={{ position: "absolute", bottom: -100, left: -100, width: 340, height: 340, borderRadius: "50%", background: "rgba(255,255,255,.03)", pointerEvents: "none" }} />
 
         <div style={{ maxWidth: 720, animation: "fadeUp .6s ease both", position: "relative" }}>
-          {logoUrl && (
-            <div style={{ marginBottom: 20 }}>
-              <img src={logoUrl} alt="logo" style={{ height: 60, objectFit: "contain", filter: "drop-shadow(0 4px 16px rgba(0,0,0,.3))" }} />
-            </div>
-          )}
+          <div style={{ marginBottom: 20 }}>
+            <img src={logoUrl} alt="logo" style={{ height: 60, objectFit: "contain", filter: "drop-shadow(0 4px 16px rgba(0,0,0,.3))" }} />
+          </div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 7,
             background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)",
@@ -304,8 +344,59 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {/* ── ESPECIALIDADES ── */}
+      <section id="especialidades" style={{ background: "#fff", padding: "80px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 52 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
+              Especialidades
+            </span>
+            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
+              Diseñado para cada área médica
+            </h2>
+            <p style={{ fontSize: 16, color: "#64748b", marginTop: 12, maxWidth: 560, margin: "12px auto 0" }}>
+              Un solo sistema para todas tus especialidades. Pediatría, adultos y más.
+            </p>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+            {ESPECIALIDADES.map((esp, i) => (
+              <div
+                key={i}
+                style={{
+                  background: "#fff",
+                  borderRadius: 18,
+                  padding: "26px 24px",
+                  border: `1px solid ${esp.color}30`,
+                  boxShadow: `0 4px 20px ${esp.color}12`,
+                  display: "flex",
+                  alignItems: "flex-start",
+                  gap: 16,
+                  transition: "transform .2s, box-shadow .2s",
+                  animation: `fadeUp .5s ${i * 0.07}s ease both`,
+                  cursor: "default",
+                }}
+                onMouseOver={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = `0 12px 32px ${esp.color}22`; }}
+                onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = `0 4px 20px ${esp.color}12`; }}
+              >
+                <div style={{
+                  width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+                  background: `${esp.color}15`, border: `1px solid ${esp.color}30`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <i className={`bi ${esp.icon}`} style={{ fontSize: 22, color: esp.color }} />
+                </div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>{esp.label}</div>
+                  <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>{esp.desc}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* ── PLANES ── */}
-      <section id="planes" style={{ background: "#fff", padding: "80px 24px" }}>
+      <section id="planes" style={{ background: "#f8fafc", padding: "80px 24px" }}>
         <div style={{ maxWidth: 1000, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 52 }}>
             <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
@@ -399,21 +490,105 @@ export default function LandingPage() {
       </section>
 
       {/* ── NOSOTROS ── */}
-      {cfg.landing_nosotros_texto && (
-        <section id="nosotros" style={{ background: "#f8fafc", padding: "80px 24px" }}>
-          <div style={{ maxWidth: 720, margin: "0 auto", textAlign: "center" }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
-              Sobre nosotros
-            </span>
-            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", margin: "12px 0 24px" }}>
-              ¿Quiénes somos?
+      <section id="nosotros" style={{ background: "#0f172a", padding: "96px 24px", position: "relative", overflow: "hidden" }}>
+        {/* Decoración de fondo */}
+        <div style={{ position: "absolute", top: -120, right: -120, width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${color}22 0%, transparent 70%)`, pointerEvents: "none" }} />
+        <div style={{ position: "absolute", bottom: -80, left: -80, width: 360, height: 360, borderRadius: "50%", background: `radial-gradient(circle, ${color}15 0%, transparent 70%)`, pointerEvents: "none" }} />
+
+        <div style={{ maxWidth: 1100, margin: "0 auto", position: "relative" }}>
+
+          {/* Encabezado */}
+          <div style={{ textAlign: "center", marginBottom: 64 }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              background: `${color}22`, border: `1px solid ${color}44`,
+              borderRadius: 100, padding: "6px 18px", marginBottom: 20,
+            }}>
+              <i className="bi bi-building-fill-check" style={{ color, fontSize: 14 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1.5px" }}>Sobre nosotros</span>
+            </div>
+            <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", fontWeight: 900, color: "#fff", lineHeight: 1.2, marginBottom: 20 }}>
+              Tecnología al servicio<br />
+              <span style={{ color }}>de la salud</span>
             </h2>
-            <p style={{ fontSize: 17, color: "#475569", lineHeight: 1.8 }}>
-              {cfg.landing_nosotros_texto}
+            <p style={{ fontSize: 17, color: "rgba(255,255,255,.65)", lineHeight: 1.8, maxWidth: 620, margin: "0 auto" }}>
+              {cfg.landing_nosotros_texto ||
+                `${nombre} nació con la misión de digitalizar y simplificar la gestión clínica. Creemos que los médicos deben enfocarse en sus pacientes, no en el papeleo.`}
             </p>
           </div>
-        </section>
-      )}
+
+          {/* Stats */}
+          <div style={{
+            display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
+            gap: 1, background: "rgba(255,255,255,.06)", borderRadius: 20,
+            border: "1px solid rgba(255,255,255,.08)", overflow: "hidden", marginBottom: 64,
+          }}>
+            {[
+              { val: "5+",    label: "Especialidades médicas",  icon: "bi-heart-pulse-fill" },
+              { val: "100%",  label: "En la nube",              icon: "bi-cloud-check-fill" },
+              { val: "24/7",  label: "Acceso disponible",       icon: "bi-clock-fill" },
+              { val: "Multi", label: "Clínica y sedes",         icon: "bi-building-fill" },
+            ].map((s, i) => (
+              <div key={i} style={{
+                padding: "32px 24px", textAlign: "center",
+                background: i % 2 === 0 ? "rgba(255,255,255,.03)" : "transparent",
+                borderRight: i < 3 ? "1px solid rgba(255,255,255,.06)" : "none",
+              }}>
+                <i className={`bi ${s.icon}`} style={{ fontSize: 24, color, display: "block", marginBottom: 12 }} />
+                <div style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.val}</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 8, lineHeight: 1.4 }}>{s.label}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Valores / pilares */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
+            {[
+              {
+                icon: "bi-person-heart",
+                title: "Centrado en el paciente",
+                desc: "Cada funcionalidad está pensada para mejorar la experiencia del médico y del paciente.",
+              },
+              {
+                icon: "bi-lock-fill",
+                title: "Seguridad y privacidad",
+                desc: "Datos cifrados, acceso por roles y auditoría de sesiones para proteger la información médica.",
+              },
+              {
+                icon: "bi-lightning-charge-fill",
+                title: "Fácil de usar",
+                desc: "Interfaz intuitiva que no requiere capacitación extensa. Comienza a usarlo desde el primer día.",
+              },
+              {
+                icon: "bi-headset",
+                title: "Soporte dedicado",
+                desc: "Acompañamiento en la configuración y soporte por WhatsApp para resolver cualquier duda.",
+              },
+            ].map((v, i) => (
+              <div key={i} style={{
+                background: "rgba(255,255,255,.04)",
+                border: "1px solid rgba(255,255,255,.08)",
+                borderRadius: 16, padding: "28px 24px",
+                transition: "background .2s, border-color .2s",
+                animation: `fadeUp .5s ${i * 0.08}s ease both`,
+              }}
+              onMouseOver={e => { e.currentTarget.style.background = "rgba(255,255,255,.08)"; e.currentTarget.style.borderColor = `${color}44`; }}
+              onMouseOut={e  => { e.currentTarget.style.background = "rgba(255,255,255,.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,.08)"; }}
+              >
+                <div style={{
+                  width: 46, height: 46, borderRadius: 12, marginBottom: 18,
+                  background: `${color}20`, border: `1px solid ${color}40`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <i className={`bi ${v.icon}`} style={{ fontSize: 20, color }} />
+                </div>
+                <div style={{ fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 10 }}>{v.title}</div>
+                <div style={{ fontSize: 13, color: "rgba(255,255,255,.55)", lineHeight: 1.7 }}>{v.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
 
       {/* ── CONTACTO ── */}
       <section id="contacto" style={{ background: `linear-gradient(135deg, ${color} 0%, ${darken(color, 30)} 100%)`, padding: "80px 24px" }}>
@@ -500,9 +675,7 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer style={{ background: "#0f172a", padding: "28px 24px", textAlign: "center" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 10 }}>
-          {logoUrl
-            ? <img src={logoUrl} alt="logo" style={{ height: 24, objectFit: "contain", opacity: .8 }} />
-            : <i className="bi bi-hospital-fill" style={{ color: "#475569", fontSize: 18 }} />}
+          <img src={logoUrl} alt="logo" style={{ height: 24, objectFit: "contain", opacity: .8 }} />
           <span style={{ color: "#475569", fontWeight: 700, fontSize: 15 }}>{nombre}</span>
         </div>
         <p style={{ color: "#334155", fontSize: 13, margin: 0 }}>
