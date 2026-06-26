@@ -25,13 +25,13 @@ const DEFAULTS = {
   landing_instagram:            "",
   landing_facebook:             "",
   landing_tiktok:               "",
-  landing_plan_trial_precio:    "Gratis",
-  landing_plan_trial_duracion:  "30 días",
-  landing_plan_trial_features:  '["Hasta 50 pacientes","Citas y calendario","Historial clínico básico","Soporte por chat"]',
+  landing_plan_trial_precio:    "",
+  landing_plan_trial_duracion:  "Semestral / Anual",
+  landing_plan_trial_features:  '["Hasta 2 usuarios: 1 médico + 1 recepcionista","Pacientes ilimitados con expediente digital","Agenda médica: vista diaria y semanal","Historia clínica en formato SOAP","Recetas digitales con QR verificable","Solicitud y registro de estudios","10 GB de almacenamiento","Soporte por WhatsApp en horario hábil"]',
   landing_plan_semestral_precio:"",
-  landing_plan_semestral_features:'["Pacientes ilimitados","Todos los módulos clínicos","Recordatorios automáticos","Soporte prioritario","Reportes avanzados"]',
+  landing_plan_semestral_features:'["Hasta 3 usuarios (Médico, Enfermera, Recepcionista)","Pacientes ilimitados con expediente completo","Agenda avanzada con sala de espera y recordatorios","Historia clínica SOAP + diagnósticos CIE-10","Recetas, constancias y documentos clínicos con firma digital","Reportes de citas, pacientes y consultas","Módulos opcionales: pediatría, psicología, estética u odontología","20 GB de almacenamiento","Soporte por WhatsApp + asistencia en configuración"]',
   landing_plan_anual_precio:    "",
-  landing_plan_anual_features:  '["Todo lo del plan Semestral","Módulos especializados","Portal público de citas","Almacenamiento ampliado","Soporte 24/7"]',
+  landing_plan_anual_features:  '["Desde 4 usuarios con roles configurables","Pacientes ilimitados con expediente avanzado","Agenda por médico, especialidad o consultorio","Historia clínica completa con plantillas por especialidad","Recetas, documentos, incapacidades y referencias médicas","Reportes por médico, especialidad y área","Múltiples especialidades y módulos personalizados","Portal público de citas online para pacientes","30 GB de almacenamiento","Soporte prioritario + capacitación del personal","Felicitaciones automáticas al paciente en su cumpleaños"]',
 };
 
 let schemaReady = false;

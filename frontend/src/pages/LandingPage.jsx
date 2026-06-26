@@ -20,42 +20,26 @@ const FEATURES = [
 ];
 
 const ESPECIALIDADES = [
-  {
-    icon: "bi-heart-pulse-fill",
-    label: "Medicina General",
-    desc: "Consultas SOAP, signos vitales, diagnósticos CIE-10 y evolución clínica completa.",
-    color: "#3b82f6",
-  },
-  {
-    icon: "bi-balloon-heart-fill",
-    label: "Pediatría",
-    desc: "Curva de crecimiento, carnet de vacunas y seguimiento desde el nacimiento.",
-    color: "#f59e0b",
-  },
-  {
-    icon: "bi-emoji-smile-fill",
-    label: "Odontología",
-    desc: "Odontograma 2D/3D, historial dental por pieza y tratamientos detallados.",
-    color: "#06b6d4",
-  },
-  {
-    icon: "bi-chat-heart-fill",
-    label: "Psicología",
-    desc: "Escalas psicológicas, análisis de bienestar y seguimiento terapéutico.",
-    color: "#8b5cf6",
-  },
-  {
-    icon: "bi-stars",
-    label: "Cirugía Estética",
-    desc: "Galería de resultados, presupuestos, consentimientos y seguimiento postoperatorio.",
-    color: "#ec4899",
-  },
-  {
-    icon: "bi-plus-circle-fill",
-    label: "Múltiples especialidades",
-    desc: "El sistema se adapta a tu flujo de trabajo. Nuevas especialidades disponibles según tu plan.",
-    color: "#10b981",
-  },
+  { icon: "bi-heart-pulse-fill",       label: "Medicina General",        desc: "Consultas SOAP, signos vitales, diagnósticos CIE-10 y evolución clínica.",           color: "#3b82f6" },
+  { icon: "bi-balloon-heart-fill",     label: "Pediatría",               desc: "Curva de crecimiento, carnet de vacunas y seguimiento desde el nacimiento.",          color: "#f59e0b" },
+  { icon: "bi-emoji-smile-fill",       label: "Odontología",             desc: "Odontograma 2D/3D, historial dental por pieza y tratamientos detallados.",            color: "#06b6d4" },
+  { icon: "bi-chat-heart-fill",        label: "Psicología",              desc: "Escalas psicológicas, análisis de bienestar y seguimiento terapéutico.",              color: "#8b5cf6" },
+  { icon: "bi-stars",                  label: "Cirugía Estética",        desc: "Galería de resultados, presupuestos, consentimientos y seguimiento postoperatorio.",  color: "#ec4899" },
+  { icon: "bi-gender-female",          label: "Ginecología",             desc: "Control prenatal, consultas ginecológicas y seguimiento obstétrico.",                 color: "#f43f5e" },
+  { icon: "bi-heart-fill",             label: "Cardiología",             desc: "Historial cardiovascular, ECG adjunto y control de factores de riesgo.",              color: "#ef4444" },
+  { icon: "bi-droplet-fill",           label: "Dermatología",            desc: "Registro de lesiones, seguimiento fotográfico y tratamientos dermatológicos.",        color: "#fb923c" },
+  { icon: "bi-bandaid-fill",           label: "Traumatología",           desc: "Manejo de lesiones, imágenes adjuntas y seguimiento de recuperación.",                color: "#84cc16" },
+  { icon: "bi-lightning-charge-fill",  label: "Neurología",              desc: "Evaluaciones neurológicas, escala de síntomas y seguimiento clínico.",               color: "#a855f7" },
+  { icon: "bi-eye-fill",               label: "Oftalmología",            desc: "Agudeza visual, historial ocular y control de patologías refractivas.",              color: "#14b8a6" },
+  { icon: "bi-ear-fill",               label: "Otorrinolaringología",    desc: "Evaluación auditiva, nasal y laríngea con historial completo.",                       color: "#f97316" },
+  { icon: "bi-apple",                  label: "Nutrición",               desc: "Seguimiento nutricional, planes alimentarios y control de peso corporal.",           color: "#22c55e" },
+  { icon: "bi-person-walking",         label: "Fisioterapia",            desc: "Plan de rehabilitación, sesiones de tratamiento y seguimiento funcional.",           color: "#0ea5e9" },
+  { icon: "bi-clipboard2-pulse-fill",  label: "Medicina Interna",        desc: "Manejo integral del paciente adulto con múltiples patologías crónicas.",             color: "#6366f1" },
+  { icon: "bi-flask-fill",             label: "Endocrinología",          desc: "Control hormonal, diabetes, tiroides y seguimiento metabólico.",                     color: "#d946ef" },
+  { icon: "bi-activity",               label: "Gastroenterología",       desc: "Historial digestivo, adjuntos de endoscopía y seguimiento de patologías.",           color: "#78716c" },
+  { icon: "bi-droplet-half",           label: "Urología",                desc: "Consultas urológicas, estudios adjuntos y manejo de patologías del tracto.",         color: "#2563eb" },
+  { icon: "bi-bicycle",                label: "Medicina Deportiva",      desc: "Evaluación de rendimiento, lesiones deportivas y plan de retorno al deporte.",       color: "#10b981" },
+  { icon: "bi-plus-circle-fill",       label: "Y más especialidades",    desc: "El sistema se adapta a cualquier área médica según las necesidades de tu clínica.",  color: "#64748b" },
 ];
 
 export default function LandingPage() {
@@ -96,34 +80,37 @@ export default function LandingPage() {
   const parsePlanes = () => [
     {
       id: "trial",
-      label: "Trial",
+      label: "Básico",
       badge: null,
-      precio: cfg.landing_plan_trial_precio || "Gratis",
-      duracion: cfg.landing_plan_trial_duracion || "30 días",
+      subtitulo: "Ideal para médico independiente o consultorio pequeño",
+      precio: cfg.landing_plan_trial_precio || "Consultar",
+      duracion: cfg.landing_plan_trial_duracion || "Semestral / Anual",
       features: tryParse(cfg.landing_plan_trial_features),
-      icon: "bi-clock-history",
-      color: "#f59e0b",
+      icon: "bi-person-badge-fill",
+      color: "#3b82f6",
       highlight: false,
     },
     {
       id: "semestral",
-      label: "Semestral",
+      label: "Avanzado",
       badge: "Popular",
+      subtitulo: "Ideal para clínicas pequeñas con mayor flujo de pacientes",
       precio: cfg.landing_plan_semestral_precio || "Consultar",
-      duracion: "6 meses",
+      duracion: "Semestral / Anual",
       features: tryParse(cfg.landing_plan_semestral_features),
-      icon: "bi-calendar2-check",
+      icon: "bi-building-fill",
       color,
       highlight: true,
     },
     {
       id: "anual",
-      label: "Anual",
-      badge: "Mejor valor",
+      label: "Empresarial",
+      badge: "Completo",
+      subtitulo: "Ideal para clínicas, centros médicos y consultorios multi-área",
       precio: cfg.landing_plan_anual_precio || "Consultar",
-      duracion: "12 meses",
+      duracion: "Semestral / Anual",
       features: tryParse(cfg.landing_plan_anual_features),
-      icon: "bi-award-fill",
+      icon: "bi-buildings-fill",
       color: "#10b981",
       highlight: false,
     },
@@ -358,7 +345,7 @@ export default function LandingPage() {
               Un solo sistema para todas tus especialidades. Pediatría, adultos y más.
             </p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 20 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
             {ESPECIALIDADES.map((esp, i) => (
               <div
                 key={i}
@@ -437,14 +424,19 @@ export default function LandingPage() {
                   <i className={`bi ${plan.icon}`} style={{ fontSize: 22, color: plan.color }} />
                 </div>
                 <div style={{ fontSize: 13, fontWeight: 700, color: plan.color, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>
-                  {plan.label}
+                  Plan {plan.label}
                 </div>
                 <div style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>
                   {plan.precio}
                 </div>
-                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 22, marginTop: 4 }}>
+                <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8, marginTop: 4 }}>
                   {plan.duracion}
                 </div>
+                {plan.subtitulo && (
+                  <div style={{ fontSize: 12, color: "#64748b", marginBottom: 18, lineHeight: 1.5, background: `${plan.color}0d`, borderRadius: 8, padding: "6px 10px" }}>
+                    {plan.subtitulo}
+                  </div>
+                )}
                 <ul style={{ listStyle: "none", padding: 0, margin: "0 0 28px", display: "flex", flexDirection: "column", gap: 10 }}>
                   {plan.features.map((f, i) => (
                     <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: 8, fontSize: 14, color: "#475569" }}>
