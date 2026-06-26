@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import api from "../../api/api";
 
 const TABS = [
@@ -11,14 +11,22 @@ const TABS = [
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 export default function LandingPageAdmin() {
-  const [tab,       setTab]       = useState("hero");
-  const [form,      setForm]      = useState(null);
+  const [tab,           setTab]           = useState("hero");
+  const [form,          setForm]          = useState(null);
+  const [logoPreview,   setLogoPreview]   = useState(null);
+  const [subiendoLogo,  setSubiendoLogo]  = useState(false);
+  const logoInputRef = useRef();
   const [guardando, setGuardando] = useState(false);
   const [msg,       setMsg]       = useState(null);
 
   useEffect(() => {
     api.get("/config-sistema").then(r => {
       const c = r.data.data || {};
+      if (c.logo_url) setLogoPreview(
+        c.logo_url.startsWith("data:") || c.logo_url.startsWith("http")
+          ? c.logo_url
+          : `${API_URL}${c.logo_url}`
+      );
       setForm({
         landing_activo:               c.landing_activo               ?? "1",
         landing_color_primario:       c.landing_color_primario        ?? "#0E1F3C",
@@ -42,6 +50,37 @@ export default function LandingPageAdmin() {
   }, []);
 
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  const subirLogo = async (file) => {
+    if (!file) return;
+    setSubiendoLogo(true);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("logo", file);
+      const r = await api.post("/config-sistema/upload-logo", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setLogoPreview(r.data.url);
+      setMsg({ ok: true, text: "Logo actualizado correctamente" });
+    } catch (e) {
+      setMsg({ ok: false, text: e.response?.data?.msg || "Error al subir logo" });
+    } finally {
+      setSubiendoLogo(false);
+      setTimeout(() => setMsg(null), 3500);
+    }
+  };
+
+  const eliminarLogo = async () => {
+    try {
+      await api.delete("/config-sistema/logo");
+      setLogoPreview(null);
+      setMsg({ ok: true, text: "Logo eliminado" });
+      setTimeout(() => setMsg(null), 3000);
+    } catch {
+      setMsg({ ok: false, text: "Error al eliminar logo" });
+    }
+  };
 
   const guardar = async () => {
     setGuardando(true);
@@ -188,11 +227,131 @@ export default function LandingPageAdmin() {
       {tab === "hero" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
           <div className="row g-3">
+
+            {/* ── Logo ── */}
+            <div className="col-12">
+              <label className="form-label fw-bold">
+                <i className="bi bi-image-fill me-1" />Logo de la página
+              </label>
+              <div style={{
+                display: "flex", alignItems: "center", gap: 20,
+                background: "#f8fafc", border: "2px dashed #e2e8f0",
+                borderRadius: 16, padding: "20px 24px",
+              }}>
+                {/* Preview actual */}
+                <div style={{
+                  width: 110, height: 110, borderRadius: 14, flexShrink: 0,
+                  background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center",
+                  border: "1px solid #334155", overflow: "hidden",
+                }}>
+                  {logoPreview
+                    ? <img src={logoPreview} alt="logo" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} />
+                    : <i className="bi bi-image" style={{ fontSize: 32, color: "#475569" }} />}
+                </div>
+
+                <div style={{ flex: 1 }}>
+                  <p style={{ fontWeight: 600, color: "#1e293b", marginBottom: 6, fontSize: 14 }}>
+                    {logoPreview ? "Logo actual" : "Sin logo configurado"}
+                  </p>
+                  <p style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
+                    Formatos: PNG, JPG, SVG. Recomendado: fondo transparente (PNG).
+                  </p>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                    <input
+                      ref={logoInputRef}
+                      type="file"
+                      accept="image/*"
+                      style={{ display: "none" }}
+                      onChange={e => subirLogo(e.target.files[0])}
+                    />
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={subiendoLogo}
+                      style={{ borderRadius: 8, fontWeight: 600 }}
+                    >
+                      {subiendoLogo
+                        ? <><span className="spinner-border spinner-border-sm me-1" />Subiendo...</>
+                        : <><i className="bi bi-upload me-1" />{logoPreview ? "Cambiar logo" : "Subir logo"}</>}
+                    </button>
+                    {logoPreview && (
+                      <button
+                        type="button"
+                        className="btn btn-outline-danger btn-sm"
+                        onClick={eliminarLogo}
+                        style={{ borderRadius: 8, fontWeight: 600 }}
+                      >
+                        <i className="bi bi-trash me-1" />Eliminar
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
             {/* Color de la landing */}
             <div className="col-12">
               <label className="form-label fw-bold">
                 <i className="bi bi-palette-fill me-1" />Color principal de la landing
               </label>
+
+              {/* Paletas predefinidas */}
+              <div style={{ marginBottom: 14 }}>
+                <p style={{ fontSize: 12, color: "#94a3b8", fontWeight: 600, textTransform: "uppercase", letterSpacing: "1px", marginBottom: 10 }}>
+                  Paletas profesionales
+                </p>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: 10 }}>
+                  {[
+                    {
+                      name: "Azul Marino",
+                      color: "#0E1F3C",
+                      preview: ["#0E1F3C", "#1e3a5f", "#3b82f6"],
+                      desc: "Clásico y profesional",
+                    },
+                    {
+                      name: "Verde Salud",
+                      color: "#064e3b",
+                      preview: ["#064e3b", "#065f46", "#10b981"],
+                      desc: "Vitalidad y bienestar",
+                    },
+                    {
+                      name: "Violeta Premium",
+                      color: "#3b0764",
+                      preview: ["#3b0764", "#581c87", "#8b5cf6"],
+                      desc: "Elegante y moderno",
+                    },
+                    {
+                      name: "Azul Acero",
+                      color: "#0c4a6e",
+                      preview: ["#0c4a6e", "#075985", "#0ea5e9"],
+                      desc: "Tecnología y confianza",
+                    },
+                  ].map(p => (
+                    <button
+                      key={p.name} type="button"
+                      onClick={() => set("landing_color_primario", p.color)}
+                      style={{
+                        border: form.landing_color_primario === p.color ? "2px solid #3b82f6" : "2px solid #e2e8f0",
+                        borderRadius: 12, background: "#fff", cursor: "pointer",
+                        padding: "10px 12px", textAlign: "left",
+                        boxShadow: form.landing_color_primario === p.color ? "0 0 0 3px rgba(59,130,246,.2)" : "none",
+                        transition: "border-color .15s, box-shadow .15s",
+                      }}
+                    >
+                      <div style={{ display: "flex", gap: 5, marginBottom: 8 }}>
+                        {p.preview.map(c => (
+                          <div key={c} style={{ flex: 1, height: 22, borderRadius: 6, background: c }} />
+                        ))}
+                      </div>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#1e293b" }}>{p.name}</div>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{p.desc}</div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Color personalizado */}
               <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
                 <input
                   type="color"
@@ -202,31 +361,20 @@ export default function LandingPageAdmin() {
                 />
                 <input
                   className="form-control"
-                  style={{ fontFamily: "monospace", maxWidth: 120 }}
+                  style={{ fontFamily: "monospace", maxWidth: 130 }}
                   value={form.landing_color_primario}
                   onChange={e => set("landing_color_primario", e.target.value)}
                   placeholder="#0E1F3C"
                 />
-                <div style={{ display: "flex", gap: 6 }}>
-                  {["#0E1F3C","#1e3a5f","#213665","#1a1a2e","#0f172a","#18181b"].map(c => (
-                    <button
-                      key={c} type="button"
-                      onClick={() => set("landing_color_primario", c)}
-                      title={c}
-                      style={{
-                        width: 26, height: 26, borderRadius: 6, border: form.landing_color_primario === c ? "3px solid #111" : "2px solid #e2e8f0",
-                        background: c, cursor: "pointer", flexShrink: 0,
-                      }}
-                    />
-                  ))}
-                </div>
-                {/* Preview */}
                 <div style={{
-                  width: 90, height: 38, borderRadius: 10, flexShrink: 0,
-                  background: `linear-gradient(135deg, ${form.landing_color_primario}, #000)`,
+                  flex: 1, minWidth: 120, height: 38, borderRadius: 10,
+                  background: `linear-gradient(135deg, ${form.landing_color_primario} 0%, #000 100%)`,
                   display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,.2)",
                 }}>
-                  <span style={{ color: "#fff", fontSize: 10, fontWeight: 700, opacity: .85 }}>Vista previa</span>
+                  <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, opacity: .9, letterSpacing: ".5px" }}>
+                    Vista previa
+                  </span>
                 </div>
               </div>
             </div>

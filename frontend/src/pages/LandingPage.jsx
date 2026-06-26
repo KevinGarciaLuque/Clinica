@@ -39,7 +39,7 @@ const ESPECIALIDADES = [
     color: "#06b6d4",
   },
   {
-    icon: "bi-brain",
+    icon: "bi-chat-heart-fill",
     label: "Psicología",
     desc: "Escalas psicológicas, análisis de bienestar y seguimiento terapéutico.",
     color: "#8b5cf6",
@@ -248,8 +248,8 @@ export default function LandingPage() {
         <div style={{ position: "absolute", bottom: -100, left: -100, width: 340, height: 340, borderRadius: "50%", background: "rgba(255,255,255,.03)", pointerEvents: "none" }} />
 
         <div style={{ maxWidth: 720, animation: "fadeUp .6s ease both", position: "relative" }}>
-          <div style={{ marginBottom: 20 }}>
-            <img src={logoUrl} alt="logo" style={{ height: 60, objectFit: "contain", filter: "drop-shadow(0 4px 16px rgba(0,0,0,.3))" }} />
+          <div style={{ marginBottom: 24 }}>
+            <img src={logoUrl} alt="logo" style={{ height: 100, objectFit: "contain", filter: "drop-shadow(0 6px 24px rgba(0,0,0,.4))" }} />
           </div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 7,
@@ -309,7 +309,7 @@ export default function LandingPage() {
       <section id="caracteristicas" style={{ background: "#f8fafc", padding: "80px 24px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
           <div style={{ textAlign: "center", marginBottom: 52 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
+            <span style={{ fontSize: 16, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
               ¿Qué incluye?
             </span>
             <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
@@ -591,84 +591,205 @@ export default function LandingPage() {
       </section>
 
       {/* ── CONTACTO ── */}
-      <section id="contacto" style={{ background: `linear-gradient(135deg, ${color} 0%, ${darken(color, 30)} 100%)`, padding: "80px 24px" }}>
-        <div style={{ maxWidth: 640, margin: "0 auto", textAlign: "center" }}>
-          <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#fff", marginBottom: 14 }}>
-            ¿Listo para empezar?
-          </h2>
-          <p style={{ color: "rgba(255,255,255,.78)", fontSize: 16, marginBottom: 36 }}>
-            Contáctanos y te ayudaremos a configurar tu clínica en minutos.
-          </p>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 14, justifyContent: "center" }}>
+      <section id="contacto" style={{ background: "#f8fafc", padding: "96px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+
+          {/* Encabezado */}
+          <div style={{ textAlign: "center", marginBottom: 56 }}>
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 8,
+              background: `${color}15`, border: `1px solid ${color}30`,
+              borderRadius: 100, padding: "6px 18px", marginBottom: 16,
+            }}>
+              <i className="bi bi-envelope-heart-fill" style={{ color, fontSize: 13 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1.5px" }}>Contacto</span>
+            </div>
+            <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.6rem)", fontWeight: 900, color: "#0f172a", marginBottom: 14 }}>
+              Estamos aquí para ayudarte
+            </h2>
+            <p style={{ fontSize: 16, color: "#64748b", maxWidth: 520, margin: "0 auto" }}>
+              Escríbenos por WhatsApp o redes sociales. Te respondemos rápido y te ayudamos a configurar tu clínica.
+            </p>
+          </div>
+
+          {/* Tarjetas de contacto principal */}
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20, marginBottom: 40 }}>
             {whatsapp && (
               <a
-                href={`https://wa.me/${whatsapp}`}
+                href={`https://wa.me/${whatsapp}?text=Hola, quiero información sobre ${nombre}`}
                 target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 10,
-                  background: "#25d366", color: "#fff", textDecoration: "none",
-                  padding: "14px 28px", borderRadius: 14, fontWeight: 700, fontSize: 15,
-                  boxShadow: "0 6px 20px rgba(0,0,0,.2)", transition: "transform .18s",
-                }}
-                onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
-                onMouseOut={e  => e.currentTarget.style.transform = "translateY(0)"}
+                style={{ textDecoration: "none" }}
               >
-                <i className="bi bi-whatsapp" style={{ fontSize: 20 }} />WhatsApp
+                <div style={{
+                  background: "#fff", borderRadius: 20, padding: "28px 24px",
+                  border: "1px solid #dcfce7", boxShadow: "0 4px 24px rgba(37,211,102,.1)",
+                  display: "flex", alignItems: "center", gap: 18,
+                  transition: "transform .2s, box-shadow .2s",
+                }}
+                onMouseOver={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 36px rgba(37,211,102,.18)"; }}
+                onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 24px rgba(37,211,102,.1)"; }}
+                >
+                  <div style={{ width: 56, height: 56, borderRadius: 16, background: "#25d366", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <i className="bi bi-whatsapp" style={{ fontSize: 26, color: "#fff" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: "#0f172a", marginBottom: 4 }}>WhatsApp</div>
+                    <div style={{ fontSize: 13, color: "#64748b" }}>Respuesta rápida</div>
+                    <div style={{ fontSize: 13, color: "#25d366", fontWeight: 600, marginTop: 2 }}>{cfg.landing_whatsapp || "Contáctanos"}</div>
+                  </div>
+                  <i className="bi bi-arrow-right" style={{ marginLeft: "auto", color: "#25d366", fontSize: 18 }} />
+                </div>
               </a>
             )}
+
             {cfg.landing_email_contacto && (
-              <a
-                href={`mailto:${cfg.landing_email_contacto}`}
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 10,
-                  background: "rgba(255,255,255,.15)", border: "2px solid rgba(255,255,255,.4)",
-                  color: "#fff", textDecoration: "none",
-                  padding: "14px 28px", borderRadius: 14, fontWeight: 700, fontSize: 15,
-                  transition: "background .18s",
+              <a href={`mailto:${cfg.landing_email_contacto}`} style={{ textDecoration: "none" }}>
+                <div style={{
+                  background: "#fff", borderRadius: 20, padding: "28px 24px",
+                  border: "1px solid #fee2e2", boxShadow: "0 4px 24px rgba(239,68,68,.08)",
+                  display: "flex", alignItems: "center", gap: 18,
+                  transition: "transform .2s, box-shadow .2s",
                 }}
-                onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.25)"}
-                onMouseOut={e  => e.currentTarget.style.background = "rgba(255,255,255,.15)"}
-              >
-                <i className="bi bi-envelope-fill" style={{ fontSize: 18 }} />{cfg.landing_email_contacto}
+                onMouseOver={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 36px rgba(239,68,68,.14)"; }}
+                onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 24px rgba(239,68,68,.08)"; }}
+                >
+                  <div style={{ width: 56, height: 56, borderRadius: 16, background: "#ef4444", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                    <i className="bi bi-envelope-fill" style={{ fontSize: 24, color: "#fff" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 800, fontSize: 16, color: "#0f172a", marginBottom: 4 }}>Correo</div>
+                    <div style={{ fontSize: 13, color: "#64748b" }}>Escríbenos por email</div>
+                    <div style={{ fontSize: 13, color: "#ef4444", fontWeight: 600, marginTop: 2 }}>{cfg.landing_email_contacto}</div>
+                  </div>
+                  <i className="bi bi-arrow-right" style={{ marginLeft: "auto", color: "#ef4444", fontSize: 18 }} />
+                </div>
               </a>
             )}
           </div>
 
           {/* Redes sociales */}
           {(cfg.landing_instagram || cfg.landing_facebook || cfg.landing_tiktok) && (
-            <div style={{ marginTop: 40, display: "flex", gap: 16, justifyContent: "center" }}>
-              {cfg.landing_instagram && (
-                <a href={cfg.landing_instagram.startsWith("http") ? cfg.landing_instagram : `https://instagram.com/${cfg.landing_instagram.replace("@","")}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 20, textDecoration: "none", transition: "background .15s" }}
-                  onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.28)"}
-                  onMouseOut={e  => e.currentTarget.style.background = "rgba(255,255,255,.15)"}
-                >
-                  <i className="bi bi-instagram" />
-                </a>
-              )}
-              {cfg.landing_facebook && (
-                <a href={cfg.landing_facebook.startsWith("http") ? cfg.landing_facebook : `https://facebook.com/${cfg.landing_facebook}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 20, textDecoration: "none", transition: "background .15s" }}
-                  onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.28)"}
-                  onMouseOut={e  => e.currentTarget.style.background = "rgba(255,255,255,.15)"}
-                >
-                  <i className="bi bi-facebook" />
-                </a>
-              )}
-              {cfg.landing_tiktok && (
-                <a href={cfg.landing_tiktok.startsWith("http") ? cfg.landing_tiktok : `https://tiktok.com/@${cfg.landing_tiktok.replace("@","")}`}
-                  target="_blank" rel="noopener noreferrer"
-                  style={{ width: 44, height: 44, borderRadius: "50%", background: "rgba(255,255,255,.15)", border: "1px solid rgba(255,255,255,.3)", display: "flex", alignItems: "center", justifyContent: "center", color: "#fff", fontSize: 20, textDecoration: "none", transition: "background .15s" }}
-                  onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.28)"}
-                  onMouseOut={e  => e.currentTarget.style.background = "rgba(255,255,255,.15)"}
-                >
-                  <i className="bi bi-tiktok" />
-                </a>
-              )}
+            <div style={{
+              background: "#fff", borderRadius: 24, padding: "32px 36px",
+              border: "1px solid #e2e8f0", boxShadow: "0 2px 16px rgba(0,0,0,.05)",
+            }}>
+              <p style={{ fontSize: 13, fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "1px", marginBottom: 20 }}>
+                Síguenos en redes
+              </p>
+              <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+                {cfg.landing_instagram && (
+                  <a
+                    href={cfg.landing_instagram.startsWith("http") ? cfg.landing_instagram : `https://instagram.com/${cfg.landing_instagram.replace("@","")}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 10,
+                      background: "linear-gradient(135deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)",
+                      color: "#fff", borderRadius: 14, padding: "12px 20px",
+                      fontWeight: 700, fontSize: 14, transition: "transform .18s, box-shadow .18s",
+                      boxShadow: "0 4px 16px rgba(220,39,67,.25)",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(220,39,67,.35)"; }}
+                    onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 16px rgba(220,39,67,.25)"; }}
+                    >
+                      <i className="bi bi-instagram" style={{ fontSize: 18 }} />
+                      Instagram
+                    </div>
+                  </a>
+                )}
+                {cfg.landing_facebook && (
+                  <a
+                    href={cfg.landing_facebook.startsWith("http") ? cfg.landing_facebook : `https://facebook.com/${cfg.landing_facebook}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 10,
+                      background: "#1877f2", color: "#fff", borderRadius: 14, padding: "12px 20px",
+                      fontWeight: 700, fontSize: 14, transition: "transform .18s, box-shadow .18s",
+                      boxShadow: "0 4px 16px rgba(24,119,242,.3)",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(24,119,242,.4)"; }}
+                    onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 16px rgba(24,119,242,.3)"; }}
+                    >
+                      <i className="bi bi-facebook" style={{ fontSize: 18 }} />
+                      Facebook
+                    </div>
+                  </a>
+                )}
+                {cfg.landing_tiktok && (
+                  <a
+                    href={cfg.landing_tiktok.startsWith("http") ? cfg.landing_tiktok : `https://tiktok.com/@${cfg.landing_tiktok.replace("@","")}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 10,
+                      background: "#010101", color: "#fff", borderRadius: 14, padding: "12px 20px",
+                      fontWeight: 700, fontSize: 14, transition: "transform .18s, box-shadow .18s",
+                      boxShadow: "0 4px 16px rgba(0,0,0,.2)",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(0,0,0,.3)"; }}
+                    onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,.2)"; }}
+                    >
+                      <i className="bi bi-tiktok" style={{ fontSize: 18 }} />
+                      TikTok
+                    </div>
+                  </a>
+                )}
+              </div>
             </div>
           )}
+
+          {/* CTA final */}
+          <div style={{
+            marginTop: 40, borderRadius: 24,
+            background: `linear-gradient(135deg, ${color} 0%, ${darken(color, 28)} 100%)`,
+            padding: "40px 36px", display: "flex", alignItems: "center", justifyContent: "space-between",
+            flexWrap: "wrap", gap: 20,
+          }}>
+            <div>
+              <h3 style={{ color: "#fff", fontWeight: 900, fontSize: "clamp(1.2rem, 2.5vw, 1.6rem)", margin: "0 0 8px" }}>
+                ¿Listo para digitalizar tu clínica?
+              </h3>
+              <p style={{ color: "rgba(255,255,255,.75)", margin: 0, fontSize: 15 }}>
+                Empieza hoy. Sin complicaciones, sin papeleo.
+              </p>
+            </div>
+            <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
+              {whatsapp && (
+                <a
+                  href={`https://wa.me/${whatsapp}?text=Hola, quiero comenzar con ${nombre}`}
+                  target="_blank" rel="noopener noreferrer"
+                  style={{
+                    display: "inline-flex", alignItems: "center", gap: 8,
+                    background: "#25d366", color: "#fff", textDecoration: "none",
+                    padding: "13px 24px", borderRadius: 12, fontWeight: 700, fontSize: 14,
+                    boxShadow: "0 4px 16px rgba(0,0,0,.2)", transition: "transform .18s",
+                  }}
+                  onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"}
+                  onMouseOut={e  => e.currentTarget.style.transform = "translateY(0)"}
+                >
+                  <i className="bi bi-whatsapp" style={{ fontSize: 17 }} />Comenzar ahora
+                </a>
+              )}
+              <button
+                onClick={() => navigate("/login")}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 8,
+                  background: "rgba(255,255,255,.15)", border: "2px solid rgba(255,255,255,.4)",
+                  color: "#fff", padding: "13px 24px", borderRadius: 12,
+                  fontWeight: 700, fontSize: 14, cursor: "pointer",
+                  transition: "background .18s",
+                }}
+                onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.25)"}
+                onMouseOut={e  => e.currentTarget.style.background = "rgba(255,255,255,.15)"}
+              >
+                <i className="bi bi-box-arrow-in-right" style={{ fontSize: 16 }} />Iniciar sesión
+              </button>
+            </div>
+          </div>
         </div>
       </section>
 
