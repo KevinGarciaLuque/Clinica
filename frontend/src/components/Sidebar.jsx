@@ -661,7 +661,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           }}>
             <i className="bi bi-shield-fill-check" style={{ color: C.accent, fontSize: "0.75rem" }} />
             <span style={{ color: C.textMuted, fontSize: "0.62rem", letterSpacing: "0.02em" }}>
-              KG-Medic v1.0 · 2026
+              Medic-KG v1.0 · 2026
             </span>
           </div>
         )}

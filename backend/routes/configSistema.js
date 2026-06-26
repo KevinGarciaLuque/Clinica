@@ -4,12 +4,12 @@ const auth   = require("../middlewares/auth");
 const { uploadSistemaMemory } = require("../middlewares/upload");
 
 const DEFAULTS = {
-  nombre_sistema:      "KG-Medic",
+  nombre_sistema:      "Medic-KG",
   subtitulo:           "Sistema de gestión clínica",
   logo_url:            "",
   icono_bootstrap:     "bi-hospital",
   fondo_login_url:     "https://images.unsplash.com/photo-1519494026892-80bbd2d6fd0d?auto=format&fit=crop&w=1920&q=80",
-  copyright_texto:     "KG-Medic · Todos los derechos reservados",
+  copyright_texto:     "Medic-KG · Todos los derechos reservados",
   color_primario:      "#3b82f6",
   color_nombre1:       "#ffffff",
   color_nombre2:       "#2D6BE8",
