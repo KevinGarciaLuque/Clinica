@@ -50,6 +50,12 @@ const ConsultaPsicologia = lazy(() => import("./pages/psicologia/ConsultaPsicolo
 // Módulo Odontología
 const ConsultaOdontologia = lazy(() => import("./pages/odontologia/ConsultaOdontologia"));
 
+// Módulo Endocrinología
+const ConsultaEndocrinologia = lazy(() => import("./pages/endocrinologia/ConsultaEndocrinologia"));
+
+// Módulo Educación en Diabetes
+const ConsultaEducacion = lazy(() => import("./pages/educacion/ConsultaEducacion"));
+
 // Módulos adicionales
 const Recordatorios   = lazy(() => import("./pages/Recordatorios"));
 const PerfilUsuario   = lazy(() => import("./pages/PerfilUsuario"));
@@ -219,6 +225,24 @@ export default function App() {
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Suspense fallback={<PageSkeleton />}>
               <ConsultaOdontologia />
+            </Suspense>
+          </RolRoute>
+        } />
+
+        {/* ── Módulo Endocrinología ── */}
+        <Route path="/endocrinologia/seguimiento" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
+            <Suspense fallback={<PageSkeleton />}>
+              <ConsultaEndocrinologia />
+            </Suspense>
+          </RolRoute>
+        } />
+
+        {/* ── Módulo Educación en Diabetes ── */}
+        <Route path="/educacion/consulta" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO","ENFERMERA"]}>
+            <Suspense fallback={<PageSkeleton />}>
+              <ConsultaEducacion />
             </Suspense>
           </RolRoute>
         } />

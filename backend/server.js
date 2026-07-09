@@ -173,6 +173,8 @@ app.use("/api/cumpleanos",     require("./routes/cumpleanos"));
 app.use("/api/config-sistema", require("./routes/configSistema"));
 app.use("/api/psicologia",     require("./routes/psicologia"));
 app.use("/api/odontologia",    require("./routes/odontologia"));
+app.use("/api/endocrinologia", require("./routes/endocrinologia"));
+app.use("/api/educacion-diabetes", require("./routes/educacionDiabetes"));
 app.use("/rx",                 require("./routes/rx"));
 app.use("/api/public",         require("./routes/public"));
 

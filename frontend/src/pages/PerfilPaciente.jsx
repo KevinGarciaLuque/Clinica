@@ -20,6 +20,9 @@ import CurvaCrecimiento from "../components/CurvaCrecimiento";
 import AntecedentesClinico from "../components/AntecedentesClinico";
 import VacunasCarnet from "../components/VacunasCarnet";
 import HistorialPsicologico from "../components/HistorialPsicologico";
+import HistoriaEndocrinologiaTab from "../components/HistoriaEndocrinologiaTab";
+import SeguimientosEndocrinologia from "../components/SeguimientosEndocrinologia";
+import EducacionDiabetesTab from "../components/EducacionDiabetesTab";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
@@ -95,7 +98,7 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const VALID_TABS = ["datos", "historial", "psicologia", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "psicologia", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
   const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
   
@@ -753,6 +756,15 @@ export default function PerfilPaciente() {
 
   const TABS_PERFIL = [
     { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
+    ...(tieneModulo("control_seguimiento_dm1")
+      ? [
+          { key: "endo_historia", label: "Historia Clínica", short: "Hist. Endo", icon: "bi-file-earmark-medical", color: "#ea580c" },
+          { key: "endo_seguimientos", label: "Seguimientos", short: "Seguimiento", icon: "bi-graph-up-arrow", color: "#ea580c" },
+        ]
+      : []),
+    ...(tieneModulo("educacion_diabetes")
+      ? [{ key: "educacion", label: "Educación en Diabetes", short: "Educación", icon: "bi-mortarboard", color: "#0d9488" }]
+      : []),
     ...(tieneModulo("consulta")
       ? [{ key: "historial", label: "Historial Clínico", short: "Historial", icon: "bi-journal-medical",
           badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" }]
@@ -2139,6 +2151,27 @@ export default function PerfilPaciente() {
       {/* ─────────────────────────────────────────────────────── */}
       {tab === "psicologia" && tieneModulo("consulta_psicologica") && (
         <HistorialPsicologico pacienteId={id} />
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: HISTORIA CLÍNICA — ENDOCRINOLOGÍA */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "endo_historia" && tieneModulo("control_seguimiento_dm1") && (
+        <HistoriaEndocrinologiaTab paciente={paciente} pacienteId={id} />
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: SEGUIMIENTOS — ENDOCRINOLOGÍA */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "endo_seguimientos" && tieneModulo("control_seguimiento_dm1") && (
+        <SeguimientosEndocrinologia pacienteId={id} />
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: EDUCACIÓN EN DIABETES */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "educacion" && tieneModulo("educacion_diabetes") && (
+        <EducacionDiabetesTab pacienteId={id} />
       )}
 
       {/* ─────────────────────────────────────────────────────── */}

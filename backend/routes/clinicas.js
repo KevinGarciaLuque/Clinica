@@ -53,6 +53,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   const esPedia  = Boolean(esPediatrica) || tipoClave.includes("pedi");
   const esPsico  = tipoClave.includes("psico");
   const esDental = tipoClave.includes("dental") || tipoClave.includes("odonto");
+  const esEndo   = tipoClave.includes("endocrino");
 
   const [mods] = await pool.query("SELECT id, clave FROM modulos_sistema WHERE disponible=1");
   const base  = ["dashboard", "pacientes", "citas", "plantillas"];
@@ -60,6 +61,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   const pedia = ["consulta", "historia_clinica", "estudios", "curva_crecimiento", "vacunas"];
   const psico = ["consulta_psicologica"];
   const dental = ["consulta_odontologica", "historia_clinica", "estudios", "inventario", "recordatorios"];
+  const endocrino = ["consulta", "historia_clinica", "estudios", "control_seguimiento_dm1", "educacion_diabetes", "recordatorios"];
   const generalExtras = ["consulta", "historia_clinica", "estudios", "inventario"];
 
   const enabled = new Set(base);
@@ -67,6 +69,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   else if (esPedia)  pedia.forEach((k) => enabled.add(k));
   else if (esPsico)  psico.forEach((k) => enabled.add(k));
   else if (esDental) dental.forEach((k) => enabled.add(k));
+  else if (esEndo)   endocrino.forEach((k) => enabled.add(k));
   else               generalExtras.forEach((k) => enabled.add(k));
 
   for (const m of mods) {

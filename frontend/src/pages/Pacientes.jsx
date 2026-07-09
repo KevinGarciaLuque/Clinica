@@ -199,30 +199,39 @@ export default function Pacientes() {
     }
   };
   
-  const abrirEditar = (p) => {
+  const abrirEditar = async (p) => {
+    // El listado de pacientes no trae todas las columnas (sexo, dirección,
+    // grupo sanguíneo, etc.) — se pide el expediente completo para no
+    // sobrescribir esos datos con vacíos al guardar.
+    let full = p;
+    try {
+      const r = await api.get(`/pacientes/${p.id}`);
+      full = r.data.data || p;
+    } catch { /* si falla, se sigue con los datos parciales de la lista */ }
+
     setForm({
-      nombres: p.nombres || "",
-      apellidos: p.apellidos || "",
-      dni: p.dni || "",
-      fecha_nacimiento: p.fecha_nacimiento ? p.fecha_nacimiento.split("T")[0] : "",
-      sexo: p.sexo || "",
-      telefono: p.telefono || "",
-      email: p.email || "",
-      direccion: p.direccion || "",
-      departamento: "",
-      ciudad: p.ciudad || "",
-      pais: p.pais || "Honduras",
-      grupo_sanguineo: p.grupo_sanguineo || "",
-      estado_civil: p.estado_civil || "",
-      ocupacion: p.ocupacion || "",
-      escolaridad: p.escolaridad || "",
-      religion: p.religion || "",
-      nacionalidad: p.nacionalidad || "Hondureña",
+      nombres: full.nombres || "",
+      apellidos: full.apellidos || "",
+      dni: full.dni || "",
+      fecha_nacimiento: full.fecha_nacimiento ? full.fecha_nacimiento.split("T")[0] : "",
+      sexo: full.sexo || "",
+      telefono: full.telefono || "",
+      email: full.email || "",
+      direccion: full.direccion || "",
+      departamento: full.departamento || "",
+      ciudad: full.ciudad || "",
+      pais: full.pais || "Honduras",
+      grupo_sanguineo: full.grupo_sanguineo || "",
+      estado_civil: full.estado_civil || "",
+      ocupacion: full.ocupacion || "",
+      escolaridad: full.escolaridad || "",
+      religion: full.religion || "",
+      nacionalidad: full.nacionalidad || "Hondureña",
     });
-    setEditandoId(p.id);
+    setEditandoId(full.id);
     setFotoFile(null);
-    if (p.foto_perfil) {
-      setFotoPreview(fotoUrl(p.foto_perfil));
+    if (full.foto_perfil) {
+      setFotoPreview(fotoUrl(full.foto_perfil));
     } else {
       setFotoPreview(null);
     }
