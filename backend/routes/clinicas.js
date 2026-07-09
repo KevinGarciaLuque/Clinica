@@ -4,6 +4,22 @@ const auth   = require("../middlewares/auth");
 const argon2 = require("argon2");
 const { uploadClinicas } = require("../middlewares/upload");
 const { seedPacienteDemo } = require("../utils/seedPacienteDemo");
+const cloudinary  = require("../utils/cloudinary");
+const multer      = require("multer");
+const streamifier = require("streamifier");
+const fs          = require("fs");
+const path        = require("path");
+
+const USE_CLOUDINARY = !!(process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL);
+
+const uploadFotoDoctor = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => {
+    if (["image/jpeg","image/png","image/webp"].includes(file.mimetype)) return cb(null, true);
+    cb(Object.assign(new Error("Solo JPG, PNG o WEBP"), { code: "WRONG_TYPE" }));
+  },
+});
 
 let moduloPermisosSchemaReady = false;
 const DEFAULT_STORAGE_QUOTA_GB = 25;
@@ -1102,14 +1118,37 @@ router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO")
 });
 
 // POST /api/clinicas/:id/upload-foto-doctor  → subir foto pública del doctor
-router.post("/:id/upload-foto-doctor", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), uploadClinicas.single("foto"), async (req, res) => {
+// Producción (CLOUDINARY_CLOUD_NAME definido): sube a Cloudinary (persiste entre despliegues)
+// Desarrollo  (sin credenciales):              guarda en uploads/clinicas/
+router.post("/:id/upload-foto-doctor", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), uploadFotoDoctor.single("foto"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
     }
 
     const id = req.user.super ? req.params.id : req.user.clinica_id;
-    const fotoUrl = `/uploads/clinicas/${req.file.filename}`;
+    let fotoUrl;
+
+    if (USE_CLOUDINARY) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "clinica/clinicas/perfil-doctor", resource_type: "image",
+            transformation: [{ width: 500, height: 500, crop: "fill", gravity: "face" }] },
+          (err, r) => (err ? reject(err) : resolve(r))
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+      fotoUrl = result.secure_url;
+    } else {
+      const dir = path.join(__dirname, "../uploads/clinicas");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      const ext = req.file.mimetype === "image/png" ? ".png"
+                : req.file.mimetype === "image/webp" ? ".webp" : ".jpg";
+      const filename = `doctor-${id}-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(dir, filename), req.file.buffer);
+      fotoUrl = `/uploads/clinicas/${filename}`;
+    }
 
     await pool.query(
       `INSERT INTO clinica_config (clinica_id, clave, valor) VALUES (?,'perfil_foto_doctor',?)
