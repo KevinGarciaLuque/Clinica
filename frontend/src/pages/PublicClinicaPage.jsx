@@ -87,6 +87,11 @@ export default function PublicClinicaPage() {
   const fotoDr = fotoError ? null : resolveUrl(perfil.perfil_foto_doctor);
   const logo   = resolveUrl(clinica.logo_url);
 
+  const descripcionLineas = (perfil.perfil_descripcion || "")
+    .split("\n")
+    .map(l => l.trim().replace(/^[-•]\s*/, ""))
+    .filter(Boolean);
+
   const redes = [
     { key: "perfil_instagram", icon: "bi-instagram",  label: "Instagram",  href: v => v.startsWith("http") ? v : `https://instagram.com/${v.replace("@","")}` },
     { key: "perfil_tiktok",    icon: "bi-tiktok",     label: "TikTok",     href: v => v.startsWith("http") ? v : `https://tiktok.com/@${v.replace("@","")}` },
@@ -113,6 +118,9 @@ export default function PublicClinicaPage() {
         .pub-servicio:hover    { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.1) !important; }
         .pub-red:hover         { transform: scale(1.12); }
         body { margin: 0; }
+        @media (max-width: 360px) {
+          .pub-desc-grid { grid-template-columns: 1fr !important; }
+        }
       `}</style>
 
       <div style={{ minHeight: "100vh", background: "#f1f5f9", fontFamily: "'Segoe UI', system-ui, -apple-system, sans-serif", display: "flex", flexDirection: "column" }}>
@@ -170,13 +178,21 @@ export default function PublicClinicaPage() {
               </p>
             )}
 
-            {perfil.perfil_descripcion && (
-              <p style={{
-                color: "rgba(255,255,255,.72)", fontSize: 14, margin: 0, lineHeight: 1.7,
-                maxWidth: 380, marginLeft: "auto", marginRight: "auto",
-                whiteSpace: "pre-line", textAlign: "left",
+            {descripcionLineas.length > 1 ? (
+              <div className="pub-desc-grid" style={{
+                display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: "6px 16px",
+                maxWidth: 380, margin: "0 auto", textAlign: "left",
               }}>
-                {perfil.perfil_descripcion}
+                {descripcionLineas.map((linea, i) => (
+                  <div key={i} style={{ display: "flex", alignItems: "flex-start", gap: 6, color: "rgba(255,255,255,.78)", fontSize: 13.5, lineHeight: 1.5 }}>
+                    <i className="bi bi-check-circle-fill" style={{ fontSize: 12, marginTop: 3, flexShrink: 0, color: "rgba(255,255,255,.55)" }} />
+                    <span>{linea}</span>
+                  </div>
+                ))}
+              </div>
+            ) : descripcionLineas.length === 1 && (
+              <p style={{ color: "rgba(255,255,255,.72)", fontSize: 14, margin: 0, lineHeight: 1.65, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
+                {descripcionLineas[0]}
               </p>
             )}
           </div>
