@@ -19,7 +19,7 @@ const C = {
 
 /* ─── Módulos base de reserva (si aún no se cargaron del API) ─────── */
 const BASE_FALLBACK = [
-  { to: "/",          label: "Dashboard",        icon: "bi-speedometer2" },
+  { to: "/dashboard", label: "Dashboard",        icon: "bi-speedometer2" },
   { to: "/pacientes", label: "Pacientes",         icon: "bi-people-fill" },
   { to: "/citas",     label: "Citas",             icon: "bi-calendar-check-fill" },
   { to: "/historia",  label: "Historia Clínica",  icon: "bi-journal-medical" },

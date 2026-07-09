@@ -449,7 +449,7 @@ export default function Usuarios() {
                       icon="bi-telephone"
                     />
                   </FieldGroup>
-                  {form.tipo === "MEDICO" || form.tipo === "PSICOLOGO" && (
+                  {(form.tipo === "MEDICO" || form.tipo === "PSICOLOGO") && (
                     <FieldGroup label="Nº Colegiatura">
                       <StyledInput
                         value={form.numero_colegiatura} placeholder="CMH-0000"
@@ -526,7 +526,7 @@ export default function Usuarios() {
                   })}
                 </div>
 
-                {form.tipo === "MEDICO" || form.tipo === "PSICOLOGO" && (
+                {(form.tipo === "MEDICO" || form.tipo === "PSICOLOGO") && (
                   <FieldGroup label="Especialidad">
                     <div style={{ position: "relative" }}>
                       <i className="bi bi-hospital" style={{

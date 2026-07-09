@@ -74,7 +74,7 @@ INSERT IGNORE INTO tipos_clinica (clave, nombre, icono, color, descripcion) VALU
 --  SEEDS - Módulos del Sistema
 -- ================================================================
 INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, descripcion) VALUES
-  ('dashboard',              'Dashboard',                 'bi-speedometer2',          '/',                          'Panel principal con estadísticas'),
+  ('dashboard',              'Dashboard',                 'bi-speedometer2',          '/dashboard',                 'Panel principal con estadísticas'),
   ('pacientes',              'Pacientes',                 'bi-people-fill',            '/pacientes',                 'Gestión de expedientes de pacientes'),
   ('citas',                  'Citas',                     'bi-calendar-check-fill',    '/citas',                     'Agendamiento y gestión de citas'),
   ('historia_clinica',       'Historia Clínica',          'bi-journal-medical',        '/historia',                  'HCE con metodología SOAP'),
