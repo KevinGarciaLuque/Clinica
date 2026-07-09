@@ -19,6 +19,7 @@ const RegistroPaciente  = lazy(() => import("./pages/RegistroPaciente"));
 const VerificarEmail    = lazy(() => import("./pages/VerificarEmail"));
 const RecetaPublica     = lazy(() => import("./pages/RecetaPublica"));
 const PublicClinicaPage = lazy(() => import("./pages/PublicClinicaPage"));
+const DirectorioMedicos = lazy(() => import("./pages/DirectorioMedicos"));
 
 // Admin
 const Usuarios     = lazy(() => import("./pages/admin/Usuarios"));
@@ -110,6 +111,7 @@ export default function App() {
       <Route path="/verificar-email" element={<VerificarEmail />} />
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
+      <Route path="/agenda-tu-consulta" element={<DirectorioMedicos />} />
       <Route path="/inicio"           element={<LandingPage />} />
       <Route path="/"                         element={<LandingPage />} />
 

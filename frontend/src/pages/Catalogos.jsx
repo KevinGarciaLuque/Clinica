@@ -1,11 +1,16 @@
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useSearchParams } from "react-router-dom";
 import api from "../api/api";
+
+const TABS_VALIDAS = ["medicamentos", "diagnosticos", "estudios", "procedimientos", "tipos_cita"];
 
 // ═════════════════════════════════════════════════════════════════════
 // Página Catálogos: Diagnósticos + Medicamentos
 // ═════════════════════════════════════════════════════════════════════
 export default function Catalogos() {
-  const [tab, setTab] = useState("medicamentos");
+  const [searchParams] = useSearchParams();
+  const tabInicial = searchParams.get("tab");
+  const [tab, setTab] = useState(TABS_VALIDAS.includes(tabInicial) ? tabInicial : "medicamentos");
 
   return (
     <>

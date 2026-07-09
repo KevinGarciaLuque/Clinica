@@ -6,7 +6,7 @@ const webPush   = require("../utils/webPush");
 
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
-  max: 30,
+  max: 120,
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, msg: "Demasiadas solicitudes. Intenta de nuevo en 15 minutos." },
@@ -90,6 +90,34 @@ router.get("/clinica/:slug", publicLimiter, async (req, res) => {
     }
 
     res.json({ ok: true, data: { ...clinica, perfil: cfg } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ─── GET /api/public/directorio ─────────────────────────────────────────────
+// Lista de médicos que optaron por aparecer en el directorio de medickg.com
+router.get("/directorio", publicLimiter, async (req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT c.slug, c.ciudad, c.pais,
+              MAX(CASE WHEN cc.clave='perfil_nombre_doctor'  THEN cc.valor END) AS nombre_doctor,
+              MAX(CASE WHEN cc.clave='perfil_titulo_doctor'  THEN cc.valor END) AS titulo_doctor,
+              MAX(CASE WHEN cc.clave='perfil_descripcion'    THEN cc.valor END) AS descripcion,
+              MAX(CASE WHEN cc.clave='perfil_foto_doctor'    THEN cc.valor END) AS foto_doctor,
+              MAX(CASE WHEN cc.clave='perfil_color_primario' THEN cc.valor END) AS color_primario
+       FROM clinicas c
+       JOIN clinica_config cc ON cc.clinica_id = c.id
+       WHERE c.activo = 1
+         AND c.id IN (
+           SELECT clinica_id FROM clinica_config
+           WHERE clave = 'perfil_mostrar_directorio' AND valor = '1'
+         )
+       GROUP BY c.id
+       ORDER BY nombre_doctor ASC`
+    );
+
+    res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

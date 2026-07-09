@@ -1101,6 +1101,32 @@ router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO")
   }
 });
 
+// POST /api/clinicas/:id/upload-foto-doctor  → subir foto pública del doctor
+router.post("/:id/upload-foto-doctor", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), uploadClinicas.single("foto"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
+    }
+
+    const id = req.user.super ? req.params.id : req.user.clinica_id;
+    const fotoUrl = `/uploads/clinicas/${req.file.filename}`;
+
+    await pool.query(
+      `INSERT INTO clinica_config (clinica_id, clave, valor) VALUES (?,'perfil_foto_doctor',?)
+       ON DUPLICATE KEY UPDATE valor=VALUES(valor)`,
+      [id, fotoUrl]
+    );
+
+    res.json({
+      ok: true,
+      foto_url: fotoUrl,
+      msg: "Foto subida correctamente",
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/:id/bitacora  → accesos registrados (solo SUPER_ADMIN)
 //  Query params: pagina (default 1), limite (default 50), tipo, exito, busqueda

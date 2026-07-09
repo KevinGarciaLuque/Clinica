@@ -250,6 +250,31 @@ export default function PublicClinicaPage() {
             )}
           </div>
 
+          {/* Servicios */}
+          {servicios.length > 0 && (
+            <div style={{ marginBottom: 24, animation: "fadeUp .5s .22s ease both" }}>
+              <h2 style={{ fontSize: 13, fontWeight: 800, color: "#94a3b8", textTransform: "uppercase", letterSpacing: ".6px", marginBottom: 10, textAlign: "center" }}>
+                Servicios
+              </h2>
+              <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 8 }}>
+                {servicios.map(s => (
+                  <span
+                    key={s.id}
+                    title={s.descripcion || ""}
+                    className="pub-servicio"
+                    style={{
+                      background: "#fff", border: `1.5px solid rgba(${colorRgb},.25)`, borderRadius: 20,
+                      padding: "7px 16px", fontSize: 13, fontWeight: 700, color,
+                      boxShadow: "0 2px 10px rgba(0,0,0,.05)", transition: "transform .18s, box-shadow .18s",
+                    }}
+                  >
+                    {s.nombre}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Redes sociales */}
           {redes.length > 0 && (
             <div style={{ display: "flex", justifyContent: "center", gap: 14, marginBottom: 20, animation: "fadeUp .5s .3s ease both" }}>

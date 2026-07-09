@@ -237,6 +237,7 @@ export default function LandingPage() {
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
           <div className="d-none d-md-flex" style={{ gap: 4 }}>
+            <button className="nav-link-lp" onClick={() => navigate("/agenda-tu-consulta")}>Agenda tu consulta médica</button>
             <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
             <button className="nav-link-lp" onClick={() => scrollTo("especialidades")}>Especialidades</button>
             <button className="nav-link-lp" onClick={() => scrollTo("planes")}>Planes</button>
@@ -275,6 +276,9 @@ export default function LandingPage() {
           background: darken(color, 20), padding: 16,
           display: "flex", flexDirection: "column", gap: 4,
         }}>
+          <button className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => { setMenuOpen(false); navigate("/agenda-tu-consulta"); }}>
+            Agenda tu consulta médica
+          </button>
           {["Características|caracteristicas","Especialidades|especialidades","Planes|planes","Nosotros|nosotros","Contacto|contacto"].map(item => {
             const [label, id] = item.split("|");
             return (
@@ -321,6 +325,13 @@ export default function LandingPage() {
           <div className="hero-btns" style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
             <button className="lp-btn-primary" onClick={() => scrollTo("planes")}>
               <i className="bi bi-rocket-takeoff-fill me-2" />Ver planes
+            </button>
+            <button
+              className="lp-btn-outline"
+              onClick={() => navigate("/agenda-tu-consulta")}
+              style={{ background: "rgba(255,255,255,.12)", border: "2px solid rgba(255,255,255,.4)", color: "#fff" }}
+            >
+              <i className="bi bi-calendar2-heart me-2" />Agenda tu consulta médica
             </button>
             {whatsapp && (
               <a

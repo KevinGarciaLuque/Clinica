@@ -1,4 +1,5 @@
 ﻿import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
@@ -11,11 +12,13 @@ function pct(value) {
 
 export default function ConfigClinica() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID;
 
   const [clinica, setClinica] = useState(null);
   const [form, setForm] = useState({});
   const [formPerfil, setFormPerfil] = useState({});
+  const [servicios, setServicios] = useState([]);
   const [tab, setTab] = useState("general");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -36,10 +39,12 @@ export default function ConfigClinica() {
       }
 
       try {
-        const [resClinica, resDetalles] = await Promise.all([
+        const [resClinica, resDetalles, resServicios] = await Promise.all([
           api.get(`/clinicas/${clinicaId}`),
           api.get(`/clinicas/${clinicaId}/detalles`),
+          api.get("/catalogos-tipos-cita").catch(() => ({ data: { data: [] } })),
         ]);
+        setServicios(resServicios.data?.data || []);
 
         const data = resClinica.data?.data || {};
         setClinica(data);
@@ -68,6 +73,7 @@ export default function ConfigClinica() {
           perfil_foto_doctor:     cfgMap.perfil_foto_doctor     || "",
           perfil_color_primario:  cfgMap.perfil_color_primario  || "#213665",
           perfil_agendar_activo:  cfgMap.perfil_agendar_activo  !== undefined ? cfgMap.perfil_agendar_activo : "1",
+          perfil_mostrar_directorio: cfgMap.perfil_mostrar_directorio || "0",
         });
 
         setStorage(resDetalles.data?.data?.almacenamiento || null);
@@ -128,6 +134,29 @@ export default function ConfigClinica() {
       setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
     } finally {
       setGuardando(false);
+    }
+  };
+
+  const subirFotoDoctor = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setGuardandoPerfil(true);
+    setMsg({ tipo: "", texto: "" });
+    try {
+      const formData = new FormData();
+      formData.append("foto", file);
+
+      const res = await api.post(`/clinicas/${clinicaId}/upload-foto-doctor`, formData, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+
+      setFormPerfil((prev) => ({ ...prev, perfil_foto_doctor: res.data.foto_url }));
+      setMsg({ tipo: "success", texto: "Foto del doctor actualizada correctamente" });
+    } catch (e) {
+      setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
+    } finally {
+      setGuardandoPerfil(false);
     }
   };
 
@@ -504,6 +533,43 @@ export default function ConfigClinica() {
                 </div>
               </div>
 
+              {/* Switch: Mostrar en directorio medickg.com */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
+                padding: "14px 18px", marginBottom: 20,
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    <i className="bi bi-globe2 me-2" style={{ color: "#213665" }} />
+                    Mostrar en medickg.com para agendar
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                    Tu perfil aparecerá como card en el directorio público "Agenda tu consulta médica" para que nuevos pacientes te encuentren.
+                  </div>
+                </div>
+                <div
+                  onClick={() => setFormPerfil({ ...formPerfil, perfil_mostrar_directorio: formPerfil.perfil_mostrar_directorio === "1" ? "0" : "1" })}
+                  style={{
+                    flexShrink: 0, marginLeft: 16,
+                    width: 51, height: 31, borderRadius: 31,
+                    background: formPerfil.perfil_mostrar_directorio === "1" ? "#34c759" : "#e5e7eb",
+                    position: "relative", cursor: "pointer",
+                    transition: "background .25s cubic-bezier(.4,0,.2,1)",
+                    boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+                  }}
+                >
+                  <div style={{
+                    position: "absolute",
+                    top: 2, left: formPerfil.perfil_mostrar_directorio === "1" ? 22 : 2,
+                    width: 27, height: 27, borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,.22)",
+                    transition: "left .25s cubic-bezier(.4,0,.2,1)",
+                  }} />
+                </div>
+              </div>
+
               <div className="row g-3">
                 {/* Foto del doctor */}
                 <div className="col-12">
@@ -526,14 +592,22 @@ export default function ConfigClinica() {
                       )}
                     </div>
                     <div style={{ flex: 1 }}>
-                      <input
-                        className="form-control"
-                        placeholder="URL de la foto (se usa tu foto de perfil si está vacío)"
-                        value={formPerfil.perfil_foto_doctor || ""}
-                        onChange={e => setFormPerfil({ ...formPerfil, perfil_foto_doctor: e.target.value })}
-                      />
+                      <div className="d-flex gap-2 align-items-start">
+                        <div className="flex-grow-1">
+                          <input
+                            className="form-control"
+                            placeholder="URL de la foto o sube un archivo"
+                            value={formPerfil.perfil_foto_doctor || ""}
+                            onChange={e => setFormPerfil({ ...formPerfil, perfil_foto_doctor: e.target.value })}
+                          />
+                        </div>
+                        <label className="btn btn-outline-primary mb-0" style={{ cursor: "pointer" }}>
+                          <i className="bi bi-upload me-1" /> Subir
+                          <input type="file" accept="image/*" onChange={subirFotoDoctor} style={{ display: "none" }} />
+                        </label>
+                      </div>
                       <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
-                        Si dejas vacío, se usará automáticamente la foto de tu perfil de usuario.
+                        Esta foto es independiente de tu foto de perfil de usuario y se sube directamente para tu perfil público.
                       </div>
                     </div>
                   </div>
@@ -635,6 +709,43 @@ export default function ConfigClinica() {
                     onChange={e => setFormPerfil({ ...formPerfil, perfil_google_maps: e.target.value })}
                   />
                 </div>
+              </div>
+
+              {/* Servicios que ofreces */}
+              <div style={{
+                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
+                padding: "16px 18px", marginTop: 20,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: servicios.length ? 12 : 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    <i className="bi bi-clipboard2-pulse me-2" style={{ color: "#213665" }} />
+                    Servicios que ofreces
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-sm btn-outline-primary"
+                    onClick={() => navigate("/catalogos?tab=tipos_cita")}
+                  >
+                    <i className="bi bi-pencil-square me-1" />
+                    {servicios.length ? "Gestionar servicios" : "Agregar servicios"}
+                  </button>
+                </div>
+                {servicios.length > 0 ? (
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+                    {servicios.map(s => (
+                      <span key={s.id} style={{
+                        background: "#fff", border: "1px solid #e2e8f0", borderRadius: 20,
+                        padding: "5px 14px", fontSize: 12.5, fontWeight: 600, color: "#334155",
+                      }}>
+                        {s.nombre}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ fontSize: 12, color: "#64748b" }}>
+                    Aún no has configurado servicios. Agrégalos para que los pacientes los vean en tu perfil público y al agendar una cita.
+                  </div>
+                )}
               </div>
 
               <div style={{ marginTop: 20, display: "flex", gap: 10, alignItems: "center" }}>
