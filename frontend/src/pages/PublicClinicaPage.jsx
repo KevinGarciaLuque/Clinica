@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import AgendarModal from "./AgendarModal";
 
@@ -25,6 +25,7 @@ function darken(hex, amount = 20) {
 
 export default function PublicClinicaPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
   const [clinica, setClinica] = useState(null);
   const [servicios, setServicios] = useState([]);
   const [cargando, setCargando] = useState(true);
@@ -117,6 +118,7 @@ export default function PublicClinicaPage() {
         .pub-btn-accion:hover  { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(${colorRgb},.18) !important; }
         .pub-servicio:hover    { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(0,0,0,.1) !important; }
         .pub-red:hover         { transform: scale(1.12); }
+        .pub-back:hover        { background: rgba(255,255,255,.18) !important; }
         body { margin: 0; }
         @media (max-width: 360px) {
           .pub-desc-grid { grid-template-columns: 1fr !important; }
@@ -136,6 +138,20 @@ export default function PublicClinicaPage() {
           {/* Círculos decorativos de fondo */}
           <div style={{ position: "absolute", top: -60, right: -60, width: 240, height: 240, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
           <div style={{ position: "absolute", bottom: -40, left: -40, width: 180, height: 180, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
+
+          <button
+            className="pub-back"
+            onClick={() => navigate("/")}
+            style={{
+              position: "absolute", top: 20, left: 20, zIndex: 1,
+              background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.25)",
+              color: "#fff", borderRadius: 10, padding: "8px 16px",
+              fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .15s",
+              display: "flex", alignItems: "center", gap: 6,
+            }}
+          >
+            <i className="bi bi-arrow-left" /> Inicio
+          </button>
 
           <div style={{ maxWidth: 440, margin: "0 auto", position: "relative", animation: "fadeUp .5s ease both" }}>
             {/* Logo pequeño */}
