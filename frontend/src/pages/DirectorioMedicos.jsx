@@ -84,6 +84,7 @@ function DoctorCard({ medico, index, onSelect }) {
         <p style={{
           fontSize: 12.5, color: "#64748b", lineHeight: 1.6, margin: "0 0 16px",
           display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+          whiteSpace: "pre-line", textAlign: "left",
         }}>
           {medico.descripcion}
         </p>

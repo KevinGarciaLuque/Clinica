@@ -635,11 +635,14 @@ export default function ConfigClinica() {
                   <label className="form-label">Descripción pública</label>
                   <textarea
                     className="form-control"
-                    rows={3}
-                    placeholder="Texto corto que describe tu clínica o servicio..."
+                    rows={4}
+                    placeholder={"Texto corto que describe tu clínica o servicio...\nCada línea aparece separada en tu perfil público."}
                     value={formPerfil.perfil_descripcion || ""}
                     onChange={e => setFormPerfil({ ...formPerfil, perfil_descripcion: e.target.value })}
                   />
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                    Cada línea que escribas aquí se muestra en su propia línea en tu perfil público (útil para listas).
+                  </div>
                 </div>
 
                 <div className="col-12 mt-1">

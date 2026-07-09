@@ -171,7 +171,11 @@ export default function PublicClinicaPage() {
             )}
 
             {perfil.perfil_descripcion && (
-              <p style={{ color: "rgba(255,255,255,.72)", fontSize: 14, margin: 0, lineHeight: 1.65, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
+              <p style={{
+                color: "rgba(255,255,255,.72)", fontSize: 14, margin: 0, lineHeight: 1.7,
+                maxWidth: 380, marginLeft: "auto", marginRight: "auto",
+                whiteSpace: "pre-line", textAlign: "left",
+              }}>
                 {perfil.perfil_descripcion}
               </p>
             )}
