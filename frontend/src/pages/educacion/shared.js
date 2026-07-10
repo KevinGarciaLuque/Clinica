@@ -98,7 +98,8 @@ export function ultimaSeccionConDatos(sesiones, key) {
 }
 
 // Alertas de seguridad / prioridad a partir de los datos capturados
-export function calcularAlertas({ monitoreo, actividad_fisica, alimentacion, educacion_previa } = {}) {
+export function calcularAlertas(datos) {
+  const { monitoreo, actividad_fisica, alimentacion, educacion_previa } = datos || {};
   const alertas = [];
   if (monitoreo?.hipoglucemias === "SI" && monitoreo?.reconoce_sintomas === "NO") {
     alertas.push({ nivel: "alto", texto: "Presenta hipoglucemias y no reconoce los síntomas — riesgo de seguridad." });

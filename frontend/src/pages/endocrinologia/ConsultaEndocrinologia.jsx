@@ -720,7 +720,7 @@ export default function ConsultaEndocrinologia() {
 
               {tab === "seguimientos" && !seguimientoActivo && (
                 <TabListaSeguimientos seguimientos={seguimientos} onNuevo={() => nuevoSeguimiento(seguimientos.length === 0)} onVer={cargarSeguimiento} onEliminar={eliminarSeguimiento}
-                  onImprimir={(s) => { setSeguimientoActivo(s); setMostrarPrint(true); }} />
+                  onImprimir={(s) => { setSeguimientoActivo(s); setFormSeguimiento(deepMerge(emptySeccion, s)); setMostrarPrint(true); }} />
               )}
 
               {tab === "seguimientos" && seguimientoActivo && (
@@ -734,7 +734,7 @@ export default function ConsultaEndocrinologia() {
 
               {tab === "planes" && !planActivo && (
                 <TabListaPlanes planes={planes} onNuevo={nuevoPlan} onVer={cargarPlan} onEliminar={eliminarPlan}
-                  onImprimir={(p) => { setPlanActivo(p); setMostrarPrintPlan(true); }} />
+                  onImprimir={(p) => { setPlanActivo(p); setFormPlan(deepMerge(emptyPlanTratamiento, p.plan || {})); setMostrarPrintPlan(true); }} />
               )}
 
               {tab === "planes" && planActivo && (

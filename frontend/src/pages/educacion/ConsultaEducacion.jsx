@@ -392,7 +392,7 @@ export default function ConsultaEducacion() {
 
               {!sesionActiva && (
                 <TabListaSesiones sesiones={sesiones} onNuevo={nuevaSesion} onVer={cargarSesion} onEliminar={eliminarSesion}
-                  onImprimir={(s) => { setSesionActiva(s); setMostrarPrint(true); }} />
+                  onImprimir={(s) => { setSesionActiva(s); setFormSesion(deepMerge(emptySesion, s)); setMostrarPrint(true); }} />
               )}
 
               {sesionActiva && (
