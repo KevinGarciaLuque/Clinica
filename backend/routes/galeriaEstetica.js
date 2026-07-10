@@ -4,6 +4,10 @@ const multer  = require("multer");
 const path    = require("path");
 const fs      = require("fs");
 const db      = require("../db");
+const auth    = require("../middlewares/auth");
+
+const ROLES           = ["SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA"];
+const ROLES_ESCRITURA = ["SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA"];
 
 // Carpeta de uploads
 const storage = multer.diskStorage({
@@ -19,22 +23,21 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
 
-// GET sesiones: todas o de un paciente específico
-router.get("/sesiones", async (req, res) => {
+// GET sesiones: todas o de un paciente específico (siempre dentro de la clínica del usuario)
+router.get("/sesiones", auth(...ROLES), async (req, res) => {
   try {
+    const cid = req.user.clinica_id;
     const { paciente_id } = req.query;
-    
+
     if (paciente_id) {
-      // Sesiones de un paciente específico
       const [rows] = await db.query(
-        "SELECT * FROM galeria_sesiones WHERE paciente_id = ? ORDER BY fecha DESC, id DESC",
-        [paciente_id]
+        "SELECT * FROM galeria_sesiones WHERE paciente_id = ? AND clinica_id = ? ORDER BY fecha DESC, id DESC",
+        [paciente_id, cid]
       );
       res.json({ data: rows });
     } else {
-      // Todas las sesiones con datos del paciente
       const [rows] = await db.query(`
-        SELECT 
+        SELECT
           gs.*,
           p.nombres as paciente_nombres,
           p.apellidos as paciente_apellidos,
@@ -42,8 +45,9 @@ router.get("/sesiones", async (req, res) => {
           p.fecha_nacimiento as paciente_fecha_nacimiento
         FROM galeria_sesiones gs
         INNER JOIN pacientes p ON gs.paciente_id = p.id
+        WHERE gs.clinica_id = ?
         ORDER BY gs.fecha DESC, gs.id DESC
-      `);
+      `, [cid]);
       res.json({ data: rows });
     }
   } catch (e) {
@@ -52,12 +56,17 @@ router.get("/sesiones", async (req, res) => {
 });
 
 // POST crear sesión
-router.post("/sesiones", async (req, res) => {
+router.post("/sesiones", auth(...ROLES_ESCRITURA), async (req, res) => {
   try {
+    const cid = req.user.clinica_id;
     const { paciente_id, nombre, fecha } = req.body;
+
+    const [[paciente]] = await db.query("SELECT id FROM pacientes WHERE id=? AND clinica_id=?", [paciente_id, cid]);
+    if (!paciente) return res.status(403).json({ message: "El paciente no pertenece a tu clínica" });
+
     const [r] = await db.query(
-      "INSERT INTO galeria_sesiones (paciente_id, nombre, fecha) VALUES (?,?,?)",
-      [paciente_id, nombre, fecha]
+      "INSERT INTO galeria_sesiones (clinica_id, paciente_id, nombre, fecha) VALUES (?,?,?,?)",
+      [cid, paciente_id, nombre, fecha]
     );
     const [rows] = await db.query("SELECT * FROM galeria_sesiones WHERE id = ?", [r.insertId]);
     res.json({ data: rows[0] });
@@ -67,8 +76,12 @@ router.post("/sesiones", async (req, res) => {
 });
 
 // PUT editar sesión
-router.put("/sesiones/:id", async (req, res) => {
+router.put("/sesiones/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
   try {
+    const cid = req.user.clinica_id;
+    const [[sesion]] = await db.query("SELECT id FROM galeria_sesiones WHERE id=? AND clinica_id=?", [req.params.id, cid]);
+    if (!sesion) return res.status(404).json({ message: "Sesión no encontrada" });
+
     const { nombre, fecha } = req.body;
     await db.query(
       "UPDATE galeria_sesiones SET nombre = ?, fecha = ? WHERE id = ?",
@@ -82,8 +95,12 @@ router.put("/sesiones/:id", async (req, res) => {
 });
 
 // DELETE eliminar sesión (y sus fotos)
-router.delete("/sesiones/:id", async (req, res) => {
+router.delete("/sesiones/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
   try {
+    const cid = req.user.clinica_id;
+    const [[sesion]] = await db.query("SELECT id FROM galeria_sesiones WHERE id=? AND clinica_id=?", [req.params.id, cid]);
+    if (!sesion) return res.status(404).json({ message: "Sesión no encontrada" });
+
     // Obtener todas las fotos de la sesión para borrar archivos
     const [fotos] = await db.query("SELECT archivo_nombre FROM galeria_fotos WHERE sesion_id = ?", [req.params.id]);
     // Borrar archivos del sistema
@@ -102,12 +119,13 @@ router.delete("/sesiones/:id", async (req, res) => {
 });
 
 // GET fotos de una sesión
-router.get("/fotos", async (req, res) => {
+router.get("/fotos", auth(...ROLES), async (req, res) => {
   try {
+    const cid = req.user.clinica_id;
     const { sesion_id } = req.query;
     const [rows] = await db.query(
-      "SELECT * FROM galeria_fotos WHERE sesion_id = ? ORDER BY momento, pose",
-      [sesion_id]
+      "SELECT * FROM galeria_fotos WHERE sesion_id = ? AND clinica_id = ? ORDER BY momento, pose",
+      [sesion_id, cid]
     );
     // Agregar URL completa
     const base = `${req.protocol}://${req.get("host")}`;
@@ -119,13 +137,18 @@ router.get("/fotos", async (req, res) => {
 });
 
 // POST subir foto
-router.post("/fotos", upload.single("archivo"), async (req, res) => {
+router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), async (req, res) => {
   try {
+    const cid = req.user.clinica_id;
     const { sesion_id, paciente_id, momento, pose } = req.body;
+
+    const [[sesion]] = await db.query("SELECT id FROM galeria_sesiones WHERE id=? AND clinica_id=?", [sesion_id, cid]);
+    if (!sesion) return res.status(403).json({ message: "La sesión no pertenece a tu clínica" });
+
     // Si ya existe esa pose, actualizarla
     const [existe] = await db.query(
-      "SELECT id, archivo_nombre FROM galeria_fotos WHERE sesion_id=? AND momento=? AND pose=?",
-      [sesion_id, momento, pose]
+      "SELECT id, archivo_nombre FROM galeria_fotos WHERE sesion_id=? AND momento=? AND pose=? AND clinica_id=?",
+      [sesion_id, momento, pose, cid]
     );
     if (existe.length) {
       // Borrar archivo anterior
@@ -141,8 +164,8 @@ router.post("/fotos", upload.single("archivo"), async (req, res) => {
       return res.json({ data: f });
     }
     const [r] = await db.query(
-      "INSERT INTO galeria_fotos (sesion_id, paciente_id, momento, pose, archivo_nombre) VALUES (?,?,?,?,?)",
-      [sesion_id, paciente_id, momento, pose, req.file.filename]
+      "INSERT INTO galeria_fotos (clinica_id, sesion_id, paciente_id, momento, pose, archivo_nombre) VALUES (?,?,?,?,?,?)",
+      [cid, sesion_id, paciente_id, momento, pose, req.file.filename]
     );
     const [rows] = await db.query("SELECT * FROM galeria_fotos WHERE id=?", [r.insertId]);
     const f = rows[0];
@@ -154,9 +177,10 @@ router.post("/fotos", upload.single("archivo"), async (req, res) => {
 });
 
 // DELETE foto
-router.delete("/fotos/:id", async (req, res) => {
+router.delete("/fotos/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
   try {
-    const [rows] = await db.query("SELECT archivo_nombre FROM galeria_fotos WHERE id=?", [req.params.id]);
+    const cid = req.user.clinica_id;
+    const [rows] = await db.query("SELECT archivo_nombre FROM galeria_fotos WHERE id=? AND clinica_id=?", [req.params.id, cid]);
     if (!rows.length) return res.status(404).json({ message: "No encontrada" });
     const old = path.join(__dirname, "../uploads/galeria-estetica", rows[0].archivo_nombre);
     if (fs.existsSync(old)) fs.unlinkSync(old);
