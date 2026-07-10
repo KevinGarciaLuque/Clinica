@@ -1,27 +1,66 @@
-const express = require("express");
-const router  = express.Router();
-const multer  = require("multer");
-const path    = require("path");
-const fs      = require("fs");
-const db      = require("../db");
-const auth    = require("../middlewares/auth");
+const express     = require("express");
+const router      = express.Router();
+const multer      = require("multer");
+const path        = require("path");
+const fs          = require("fs");
+const db          = require("../db");
+const auth        = require("../middlewares/auth");
+const cloudinary  = require("../utils/cloudinary");
+const streamifier = require("streamifier");
 
 const ROLES           = ["SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA"];
 const ROLES_ESCRITURA = ["SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA"];
 
-// Carpeta de uploads
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    const dir = path.join(__dirname, "../uploads/galeria-estetica");
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    cb(null, dir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `foto_${Date.now()}${ext}`);
+const ALLOWED_IMAGE_MIME = ["image/jpeg", "image/png", "image/webp", "image/gif"];
+const cloudinaryConfigured = !!(
+  process.env.CLOUDINARY_URL ||
+  (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET)
+);
+
+// Producción (Cloudinary configurado): sube en memoria y lo envía a Cloudinary (persiste entre despliegues).
+// Sin Cloudinary configurado (solo dev local): guarda en disco como antes.
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB
+  fileFilter: (req, file, cb) => {
+    if (ALLOWED_IMAGE_MIME.includes(file.mimetype)) return cb(null, true);
+    cb(Object.assign(new Error("Tipo de archivo no permitido. Usa JPG, PNG, WEBP o GIF."), { code: "WRONG_TYPE" }));
   },
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+
+// archivo_nombre guarda un nombre local o, si se subió a Cloudinary, la URL completa.
+function urlDeFoto(f, req) {
+  if (f.archivo_nombre && /^https?:\/\//.test(f.archivo_nombre)) return f.archivo_nombre;
+  return `${req.protocol}://${req.get("host")}/uploads/galeria-estetica/${f.archivo_nombre}`;
+}
+
+async function borrarArchivoFoto(f) {
+  if (f.cloudinary_public_id) {
+    try { await cloudinary.uploader.destroy(f.cloudinary_public_id); } catch { /* ignorar */ }
+  } else if (f.archivo_nombre) {
+    const filePath = path.join(__dirname, "../uploads/galeria-estetica", f.archivo_nombre);
+    try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch { /* ignorar */ }
+  }
+}
+
+async function guardarArchivo(file, clinicaId) {
+  if (cloudinaryConfigured) {
+    const result = await new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: `clinica/galeria-estetica/${clinicaId}` },
+        (err, r) => (err ? reject(err) : resolve(r))
+      );
+      streamifier.createReadStream(file.buffer).pipe(stream);
+    });
+    return { archivo_nombre: result.secure_url, cloudinary_public_id: result.public_id };
+  }
+  const dir = path.join(__dirname, "../uploads/galeria-estetica");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const ext = path.extname(file.originalname || "") || ".jpg";
+  const filename = `foto_${Date.now()}${ext}`;
+  fs.writeFileSync(path.join(dir, filename), file.buffer);
+  return { archivo_nombre: filename, cloudinary_public_id: null };
+}
 
 // GET sesiones: todas o de un paciente específico (siempre dentro de la clínica del usuario)
 router.get("/sesiones", auth(...ROLES), async (req, res) => {
@@ -101,16 +140,9 @@ router.delete("/sesiones/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
     const [[sesion]] = await db.query("SELECT id FROM galeria_sesiones WHERE id=? AND clinica_id=?", [req.params.id, cid]);
     if (!sesion) return res.status(404).json({ message: "Sesión no encontrada" });
 
-    // Obtener todas las fotos de la sesión para borrar archivos
-    const [fotos] = await db.query("SELECT archivo_nombre FROM galeria_fotos WHERE sesion_id = ?", [req.params.id]);
-    // Borrar archivos del sistema
-    fotos.forEach(f => {
-      const filePath = path.join(__dirname, "../uploads/galeria-estetica", f.archivo_nombre);
-      if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
-    });
-    // Borrar fotos de la BD
+    const [fotos] = await db.query("SELECT archivo_nombre, cloudinary_public_id FROM galeria_fotos WHERE sesion_id = ?", [req.params.id]);
+    for (const f of fotos) await borrarArchivoFoto(f);
     await db.query("DELETE FROM galeria_fotos WHERE sesion_id = ?", [req.params.id]);
-    // Borrar sesión
     await db.query("DELETE FROM galeria_sesiones WHERE id = ?", [req.params.id]);
     res.json({ ok: true });
   } catch (e) {
@@ -127,9 +159,7 @@ router.get("/fotos", auth(...ROLES), async (req, res) => {
       "SELECT * FROM galeria_fotos WHERE sesion_id = ? AND clinica_id = ? ORDER BY momento, pose",
       [sesion_id, cid]
     );
-    // Agregar URL completa
-    const base = `${req.protocol}://${req.get("host")}`;
-    rows.forEach(f => { f.archivo_url = `${base}/uploads/galeria-estetica/${f.archivo_nombre}`; });
+    rows.forEach(f => { f.archivo_url = urlDeFoto(f, req); });
     res.json({ data: rows });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -145,31 +175,31 @@ router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), async 
     const [[sesion]] = await db.query("SELECT id FROM galeria_sesiones WHERE id=? AND clinica_id=?", [sesion_id, cid]);
     if (!sesion) return res.status(403).json({ message: "La sesión no pertenece a tu clínica" });
 
+    const { archivo_nombre, cloudinary_public_id } = await guardarArchivo(req.file, cid);
+
     // Si ya existe esa pose, actualizarla
     const [existe] = await db.query(
-      "SELECT id, archivo_nombre FROM galeria_fotos WHERE sesion_id=? AND momento=? AND pose=? AND clinica_id=?",
+      "SELECT id, archivo_nombre, cloudinary_public_id FROM galeria_fotos WHERE sesion_id=? AND momento=? AND pose=? AND clinica_id=?",
       [sesion_id, momento, pose, cid]
     );
     if (existe.length) {
-      // Borrar archivo anterior
-      const old = path.join(__dirname, "../uploads/galeria-estetica", existe[0].archivo_nombre);
-      if (fs.existsSync(old)) fs.unlinkSync(old);
+      await borrarArchivoFoto(existe[0]);
       await db.query(
-        "UPDATE galeria_fotos SET archivo_nombre=?, creado_en=NOW() WHERE id=?",
-        [req.file.filename, existe[0].id]
+        "UPDATE galeria_fotos SET archivo_nombre=?, cloudinary_public_id=?, creado_en=NOW() WHERE id=?",
+        [archivo_nombre, cloudinary_public_id, existe[0].id]
       );
       const [rows] = await db.query("SELECT * FROM galeria_fotos WHERE id=?", [existe[0].id]);
       const f = rows[0];
-      f.archivo_url = `${req.protocol}://${req.get("host")}/uploads/galeria-estetica/${f.archivo_nombre}`;
+      f.archivo_url = urlDeFoto(f, req);
       return res.json({ data: f });
     }
     const [r] = await db.query(
-      "INSERT INTO galeria_fotos (clinica_id, sesion_id, paciente_id, momento, pose, archivo_nombre) VALUES (?,?,?,?,?,?)",
-      [cid, sesion_id, paciente_id, momento, pose, req.file.filename]
+      "INSERT INTO galeria_fotos (clinica_id, sesion_id, paciente_id, momento, pose, archivo_nombre, cloudinary_public_id) VALUES (?,?,?,?,?,?,?)",
+      [cid, sesion_id, paciente_id, momento, pose, archivo_nombre, cloudinary_public_id]
     );
     const [rows] = await db.query("SELECT * FROM galeria_fotos WHERE id=?", [r.insertId]);
     const f = rows[0];
-    f.archivo_url = `${req.protocol}://${req.get("host")}/uploads/galeria-estetica/${f.archivo_nombre}`;
+    f.archivo_url = urlDeFoto(f, req);
     res.json({ data: f });
   } catch (e) {
     res.status(500).json({ message: e.message });
@@ -180,10 +210,9 @@ router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), async 
 router.delete("/fotos/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
   try {
     const cid = req.user.clinica_id;
-    const [rows] = await db.query("SELECT archivo_nombre FROM galeria_fotos WHERE id=? AND clinica_id=?", [req.params.id, cid]);
+    const [rows] = await db.query("SELECT archivo_nombre, cloudinary_public_id FROM galeria_fotos WHERE id=? AND clinica_id=?", [req.params.id, cid]);
     if (!rows.length) return res.status(404).json({ message: "No encontrada" });
-    const old = path.join(__dirname, "../uploads/galeria-estetica", rows[0].archivo_nombre);
-    if (fs.existsSync(old)) fs.unlinkSync(old);
+    await borrarArchivoFoto(rows[0]);
     await db.query("DELETE FROM galeria_fotos WHERE id=?", [req.params.id]);
     res.json({ ok: true });
   } catch (e) {
