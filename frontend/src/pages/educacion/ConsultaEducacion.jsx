@@ -6,24 +6,54 @@ import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import {
   TEAL, TEAL_LIGHT, card, inputStyle, label, btn, deepMerge,
-  TIPOS_DM, COMORBILIDADES, COMPLICACIONES, ESQUEMAS, CONOCE_ITEMS, TEMAS_PLAN, BARRERAS,
+  TIPOS_DM, COMORBILIDADES, COMPLICACIONES, ESQUEMAS, INSULINA_BASAL_OPCIONES, QUIEN_PREPARA_OPCIONES, CONOCE_ITEMS, TEMAS_PLAN, BARRERAS,
   SECCIONES_DEF, emptySesion, calcularIndiceGlobal, calcularAlertas,
 } from "./shared";
 import AlertasBanner from "./AlertasBanner";
 
 const NIVELES_1A5 = ["1", "2", "3", "4", "5"];
 
+// Toggle estilo iPhone (mismo patrón que en el módulo de Endocrinología)
+function Switch({ checked, onChange, disabled }) {
+  return (
+    <div
+      onClick={() => !disabled && onChange(!checked)}
+      style={{
+        flexShrink: 0, width: 40, height: 24, borderRadius: 24,
+        background: checked ? "#34c759" : "#e5e7eb",
+        position: "relative", cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        transition: "background .25s cubic-bezier(.4,0,.2,1)",
+        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+      }}
+    >
+      <div style={{
+        position: "absolute",
+        top: 2, left: checked ? 18 : 2,
+        width: 20, height: 20, borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 2px 6px rgba(0,0,0,.22)",
+        transition: "left .25s cubic-bezier(.4,0,.2,1)",
+      }} />
+    </div>
+  );
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 //  IMPRESIÓN
 // ═══════════════════════════════════════════════════════════════════════════════
-function PrintSesion({ sesion, paciente, user, onClose }) {
+function PrintSesion({ sesion, paciente, user, logoUrl, onClose }) {
   const S = {
     sectionTitle: { fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: "1.5px solid #99f6e4", paddingBottom: 4, margin: "14px 0 8px" },
     fieldRow: { display: "flex", gap: 20, marginBottom: 5, alignItems: "baseline", flexWrap: "wrap" },
     fLabel: { fontWeight: 700, color: "#374151", minWidth: 150, fontSize: 11.5, flexShrink: 0 },
     fValue: { color: "#1f2937", fontSize: 11.5, flex: 1, whiteSpace: "pre-wrap" },
+    dataGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: 18, rowGap: 10 },
+    dLabel: { fontSize: 9.5, fontWeight: 700, color: "#0f766e", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 2 },
+    dValue: { fontSize: 11.5, color: "#1f2937", fontWeight: 600 },
   };
   const R = (k, v) => (v || v === 0) ? <div style={S.fieldRow}><span style={S.fLabel}>{k}:</span><span style={S.fValue}>{v}</span></div> : null;
+  const D = (k, v) => <div><div style={S.dLabel}>{k}</div><div style={S.dValue}>{v || "—"}</div></div>;
   const listaSiNo = (obj, items) => items.filter(([k]) => obj?.[k]).map(([, l]) => l).join(", ");
 
   const { diagnostico: d, antecedentes: a, tratamiento_actual: t, monitoreo: m, alimentacion: al,
@@ -51,10 +81,13 @@ function PrintSesion({ sesion, paciente, user, onClose }) {
       </div>
       <div style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
         <div id="edu-print-doc" style={{ background: "white", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "18mm 20mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2.5px solid ${TEAL}`, paddingBottom: 12, marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: TEAL }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
-              <div style={{ fontSize: 10, color: "#0f766e", marginTop: 3 }}>Educación en Diabetes</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${TEAL}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 120, maxWidth: 240, objectFit: "contain", marginLeft: "-10mm" }} />}
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: TEAL }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
+                <div style={{ fontSize: 10, color: "#0f766e", marginTop: 3 }}>Educación en Diabetes</div>
+              </div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: "#1e1b4b" }}>SESIÓN EDUCATIVA</div>
@@ -63,21 +96,19 @@ function PrintSesion({ sesion, paciente, user, onClose }) {
           </div>
 
           <div style={S.sectionTitle}>1. Datos Generales</div>
-          <div style={S.fieldRow}>
-            <span style={S.fLabel}>Nombre:</span><span style={{ ...S.fValue, fontWeight: 600 }}>{paciente?.nombres} {paciente?.apellidos}</span>
-            <span style={S.fLabel}>Edad:</span><span style={S.fValue}>{paciente?.fecha_nacimiento ? `${dayjs().diff(paciente.fecha_nacimiento, "year")} años` : "—"}</span>
-            <span style={S.fLabel}>Sexo:</span><span style={S.fValue}>{paciente?.sexo || "—"}</span>
-          </div>
-          <div style={S.fieldRow}>
-            <span style={S.fLabel}>Teléfono:</span><span style={S.fValue}>{paciente?.telefono || "—"}</span>
-            <span style={S.fLabel}>Ocupación:</span><span style={S.fValue}>{paciente?.ocupacion || "—"}</span>
-            <span style={S.fLabel}>Escolaridad:</span><span style={S.fValue}>{paciente?.escolaridad || "—"}</span>
+          <div style={S.dataGrid}>
+            {D("Nombre", `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim())}
+            {D("Edad", paciente?.fecha_nacimiento ? `${dayjs().diff(paciente.fecha_nacimiento, "year")} años` : "")}
+            {D("Sexo", paciente?.sexo)}
+            {D("Teléfono", paciente?.telefono)}
+            {D("Ocupación", paciente?.ocupacion)}
+            {D("Escolaridad", paciente?.escolaridad)}
           </div>
 
           {d && (d.tipo_dm || d.motivo_consulta) && (<>
             <div style={S.sectionTitle}>2. Diagnóstico</div>
             {R("Tipo", TIPOS_DM.find(x => x.v === d.tipo_dm)?.l || d.tipo_dm_otro)}
-            {R("Año del diagnóstico", d.anio_diagnostico)}
+            {R("Año del diagnóstico", d.anio_diagnostico && Number(d.anio_diagnostico) > 1900 ? `${d.anio_diagnostico} (${dayjs().year() - Number(d.anio_diagnostico)} años con diabetes)` : d.anio_diagnostico)}
             {R("Motivo de consulta", d.motivo_consulta)}
             {R("Médico tratante", d.medico_tratante)}
           </>)}
@@ -91,24 +122,31 @@ function PrintSesion({ sesion, paciente, user, onClose }) {
           {t && (t.medicamentos || t.insulina_basal) && (<>
             <div style={S.sectionTitle}>4. Tratamiento Actual</div>
             {R("Medicamentos", t.medicamentos)}
-            {R("Insulina basal / rápida", `${t.insulina_basal || "—"} / ${t.insulina_rapida || "—"}`)}
+            {R("Insulina basal / rápida", `${(t.insulina_basal === "OTRO" ? t.insulina_basal_otro : INSULINA_BASAL_OPCIONES.find(x => x.v === t.insulina_basal)?.l) || "—"} / ${t.insulina_rapida || "—"}`)}
             {R("Esquema", ESQUEMAS.find(x => x.v === t.esquema)?.l)}
+            {R("Factor de corrección", t.factor_correccion_variable
+              ? `Desayuno ${t.factor_correccion_comidas?.desayuno || "—"} · Almuerzo ${t.factor_correccion_comidas?.almuerzo || "—"} · Cena ${t.factor_correccion_comidas?.cena || "—"}`
+              : t.factor_correccion)}
+            {R("Índice Insulina/Carbohidrato", t.indice_ic_variable
+              ? `Desayuno ${t.indice_ic_comidas?.desayuno || "—"} · Almuerzo ${t.indice_ic_comidas?.almuerzo || "—"} · Cena ${t.indice_ic_comidas?.cena || "—"}`
+              : t.indice_ic)}
           </>)}
 
           {m && (m.frecuencia || m.metodo?.glucometro || m.metodo?.cgm) && (<>
             <div style={S.sectionTitle}>5. Monitoreo de Glucosa</div>
             {R("Método", [m.metodo?.glucometro && "Glucómetro", m.metodo?.cgm && "CGM"].filter(Boolean).join(", "))}
-            {R("Frecuencia", m.frecuencia)}
-            {R("Ayunas / Antes / Después", `${m.ayunas || "—"} / ${m.antes_comidas || "—"} / ${m.despues_comidas || "—"}`)}
-            {R("Hipoglucemias", m.hipoglucemias)}
-            {R("Reconoce síntomas", m.reconoce_sintomas)}
+            {R("Días de uso", m.frecuencia)}
+            {R("TIR / TAR / TBR", `${m.tir || "—"} / ${m.tar || "—"} / ${m.tbr || "—"}`)}
+            {R("Hipoglucemias", m.hipoglucemias === "SI" ? "Sí" : m.hipoglucemias === "NO" ? "No" : "")}
+            {R("Reconoce síntomas", m.reconoce_sintomas === "SI" ? "Sí" : m.reconoce_sintomas === "NO" ? "No" : "")}
           </>)}
 
           {al && (al.quien_prepara || al.comidas_dia) && (<>
             <div style={S.sectionTitle}>6. Alimentación</div>
-            {R("¿Quién prepara los alimentos?", al.quien_prepara)}
+            {R("¿Quién prepara los alimentos?", al.quien_prepara === "Otro" ? al.quien_prepara_otro : al.quien_prepara)}
             {R("Comidas por día", al.comidas_dia)}
             {R("Hábitos", [al.bebidas_azucaradas && "Bebidas azucaradas", al.conteo_carbohidratos && "Conteo de carbohidratos", al.horario_regular && "Horario regular"].filter(Boolean).join(", "))}
+            {R("Comentario", al.comentario)}
           </>)}
 
           {af && (af.tipo || af.no_realiza) && (<>
@@ -139,7 +177,7 @@ function PrintSesion({ sesion, paciente, user, onClose }) {
 
           <div style={{ marginTop: 40, display: "flex", justifyContent: "flex-end" }}>
             <div style={{ textAlign: "center", minWidth: 220 }}>
-              <div style={{ height: 70 }} />
+              {user?.firma_url ? <img src={user.firma_url} alt="Firma" style={{ maxHeight: 70, maxWidth: 200, objectFit: "contain", display: "block", margin: "0 auto 4px" }} /> : <div style={{ height: 70 }} />}
               <div style={{ borderTop: "1.5px solid #374151", paddingTop: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 12 }}>{sesion.educador_nombre || "Educador(a) en Diabetes"}</div>
                 <div style={{ color: "#6b7280", fontSize: 10, marginTop: 1 }}>Firma y Sello</div>
@@ -175,10 +213,22 @@ export default function ConsultaEducacion() {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState(null);
   const [mostrarPrint, setMostrarPrint] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
 
   useEffect(() => {
     api.get("/pacientes", { params: { limit: 200 } }).then(r => setPacientes(r.data.data || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    // El logo del consultorio se configura en Plantillas de Documentos (Receta) y se
+    // reutiliza aquí para que los documentos impresos de Educación en Diabetes coincidan.
+    if (!user?.clinica_id) return;
+    api.get(`/clinicas/${user.clinica_id}/plantillas/receta`).then(r => {
+      const contenido = r.data?.data?.contenido;
+      if (!contenido) return;
+      try { setLogoUrl(JSON.parse(contenido).logo_url || ""); } catch { /* plantilla sin formato JSON */ }
+    }).catch(() => {});
+  }, [user?.clinica_id]);
 
   useEffect(() => {
     const pid = params.get("paciente_id");
@@ -275,7 +325,7 @@ export default function ConsultaEducacion() {
   const pacientesFiltrados = pacientes.filter(p => `${p.nombres} ${p.apellidos}`.toLowerCase().includes(busqueda.toLowerCase()));
 
   if (mostrarPrint && sesionActiva && sesionActiva !== "nueva") {
-    return <PrintSesion sesion={sesionActiva} paciente={paciente} user={user} onClose={() => setMostrarPrint(false)} />;
+    return <PrintSesion sesion={sesionActiva} paciente={paciente} user={user} logoUrl={logoUrl} onClose={() => setMostrarPrint(false)} />;
   }
 
   return (
@@ -507,7 +557,12 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
             {TIPOS_DM.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
         </div>
-        <div><span style={label}>Año del diagnóstico</span><input style={inputStyle} disabled={disabled} value={d.anio_diagnostico} onChange={e => set(`${seccion}.anio_diagnostico`, e.target.value)} /></div>
+        <div>
+          <span style={label}>Año del diagnóstico {d.anio_diagnostico && Number(d.anio_diagnostico) > 1900 && (
+            <span style={{ fontWeight: 400, color: "#94a3b8" }}>({dayjs().year() - Number(d.anio_diagnostico)} años con diabetes)</span>
+          )}</span>
+          <input type="number" style={inputStyle} disabled={disabled} value={d.anio_diagnostico} onChange={e => set(`${seccion}.anio_diagnostico`, e.target.value)} />
+        </div>
         <div><span style={label}>Médico tratante</span><input style={inputStyle} disabled={disabled} value={d.medico_tratante} onChange={e => set(`${seccion}.medico_tratante`, e.target.value)} /></div>
       </div>
       {d.tipo_dm === "OTRO" && (
@@ -546,13 +601,61 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
     <>
       <div><span style={label}>Medicamentos / Dosis / Horario</span><textarea style={{ ...inputStyle, minHeight: 60 }} disabled={disabled} value={d.medicamentos} onChange={e => set(`${seccion}.medicamentos`, e.target.value)} /></div>
       <div className="edu-grid-3" style={{ marginTop: 10 }}>
-        <div><span style={label}>Insulina basal</span><input style={inputStyle} disabled={disabled} value={d.insulina_basal} onChange={e => set(`${seccion}.insulina_basal`, e.target.value)} /></div>
+        <div>
+          <span style={label}>Insulina basal</span>
+          <select style={inputStyle} disabled={disabled} value={d.insulina_basal} onChange={e => set(`${seccion}.insulina_basal`, e.target.value)}>
+            <option value="">—</option>
+            {INSULINA_BASAL_OPCIONES.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
+          </select>
+        </div>
         <div><span style={label}>Insulina rápida</span><input style={inputStyle} disabled={disabled} value={d.insulina_rapida} onChange={e => set(`${seccion}.insulina_rapida`, e.target.value)} /></div>
         <div><span style={label}>Esquema</span>
           <select style={inputStyle} disabled={disabled} value={d.esquema} onChange={e => set(`${seccion}.esquema`, e.target.value)}>
             <option value="">—</option>
             {ESQUEMAS.map(o => <option key={o.v} value={o.v}>{o.l}</option>)}
           </select>
+        </div>
+      </div>
+      {d.insulina_basal === "OTRO" && (
+        <div style={{ marginTop: 10 }}><span style={label}>Especificar insulina basal</span><input style={inputStyle} disabled={disabled} value={d.insulina_basal_otro} onChange={e => set(`${seccion}.insulina_basal_otro`, e.target.value)} /></div>
+      )}
+
+      <div className="edu-grid-2" style={{ marginTop: 10 }}>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={label}>Factor de corrección</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+              Varía por tiempo de comida
+              <Switch disabled={disabled} checked={!!d.factor_correccion_variable} onChange={v => set(`${seccion}.factor_correccion_variable`, v)} />
+            </div>
+          </div>
+          {d.factor_correccion_variable ? (
+            <div className="edu-grid-3">
+              <div><span style={label}>Desayuno</span><input style={inputStyle} disabled={disabled} value={d.factor_correccion_comidas.desayuno} onChange={e => set(`${seccion}.factor_correccion_comidas.desayuno`, e.target.value)} /></div>
+              <div><span style={label}>Almuerzo</span><input style={inputStyle} disabled={disabled} value={d.factor_correccion_comidas.almuerzo} onChange={e => set(`${seccion}.factor_correccion_comidas.almuerzo`, e.target.value)} /></div>
+              <div><span style={label}>Cena</span><input style={inputStyle} disabled={disabled} value={d.factor_correccion_comidas.cena} onChange={e => set(`${seccion}.factor_correccion_comidas.cena`, e.target.value)} /></div>
+            </div>
+          ) : (
+            <input style={inputStyle} disabled={disabled} value={d.factor_correccion} onChange={e => set(`${seccion}.factor_correccion`, e.target.value)} />
+          )}
+        </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={label}>Índice Insulina/Carbohidrato</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+              Varía por tiempo de comida
+              <Switch disabled={disabled} checked={!!d.indice_ic_variable} onChange={v => set(`${seccion}.indice_ic_variable`, v)} />
+            </div>
+          </div>
+          {d.indice_ic_variable ? (
+            <div className="edu-grid-3">
+              <div><span style={label}>Desayuno</span><input style={inputStyle} disabled={disabled} value={d.indice_ic_comidas.desayuno} onChange={e => set(`${seccion}.indice_ic_comidas.desayuno`, e.target.value)} /></div>
+              <div><span style={label}>Almuerzo</span><input style={inputStyle} disabled={disabled} value={d.indice_ic_comidas.almuerzo} onChange={e => set(`${seccion}.indice_ic_comidas.almuerzo`, e.target.value)} /></div>
+              <div><span style={label}>Cena</span><input style={inputStyle} disabled={disabled} value={d.indice_ic_comidas.cena} onChange={e => set(`${seccion}.indice_ic_comidas.cena`, e.target.value)} /></div>
+            </div>
+          ) : (
+            <input style={inputStyle} disabled={disabled} value={d.indice_ic} onChange={e => set(`${seccion}.indice_ic`, e.target.value)} />
+          )}
         </div>
       </div>
     </>
@@ -566,15 +669,21 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
         <label style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 13 }}><input type="checkbox" disabled={disabled} checked={!!d.metodo.cgm} onChange={e => set(`${seccion}.metodo.cgm`, e.target.checked)} /> CGM</label>
       </div>
       <div className="edu-grid-3">
-        <div><span style={label}>Frecuencia</span><input style={inputStyle} disabled={disabled} value={d.frecuencia} onChange={e => set(`${seccion}.frecuencia`, e.target.value)} /></div>
-        <div><span style={label}>Ayunas</span><input style={inputStyle} disabled={disabled} value={d.ayunas} onChange={e => set(`${seccion}.ayunas`, e.target.value)} /></div>
-        <div><span style={label}>Antes de comidas</span><input style={inputStyle} disabled={disabled} value={d.antes_comidas} onChange={e => set(`${seccion}.antes_comidas`, e.target.value)} /></div>
-        <div><span style={label}>Después de comidas</span><input style={inputStyle} disabled={disabled} value={d.despues_comidas} onChange={e => set(`${seccion}.despues_comidas`, e.target.value)} /></div>
-        <div><span style={label}>Hipoglucemias</span>
-          <select style={inputStyle} disabled={disabled} value={d.hipoglucemias} onChange={e => set(`${seccion}.hipoglucemias`, e.target.value)}><option value="">—</option><option value="SI">Sí</option><option value="NO">No</option></select>
+        <div><span style={label}>Días de uso</span><input style={inputStyle} disabled={disabled} value={d.frecuencia} onChange={e => set(`${seccion}.frecuencia`, e.target.value)} /></div>
+        <div><span style={label}>TIR (%)</span><input style={inputStyle} disabled={disabled} value={d.tir} onChange={e => set(`${seccion}.tir`, e.target.value)} /></div>
+        <div><span style={label}>TAR (%)</span><input style={inputStyle} disabled={disabled} value={d.tar} onChange={e => set(`${seccion}.tar`, e.target.value)} /></div>
+        <div><span style={label}>TBR (%)</span><input style={inputStyle} disabled={disabled} value={d.tbr} onChange={e => set(`${seccion}.tbr`, e.target.value)} /></div>
+        <div>
+          <span style={label}>Hipoglucemias</span>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, marginTop: 8 }}>
+            <input type="checkbox" disabled={disabled} checked={d.hipoglucemias === "SI"} onChange={e => set(`${seccion}.hipoglucemias`, e.target.checked ? "SI" : "NO")} /> Sí
+          </label>
         </div>
-        <div><span style={label}>¿Reconoce síntomas?</span>
-          <select style={inputStyle} disabled={disabled} value={d.reconoce_sintomas} onChange={e => set(`${seccion}.reconoce_sintomas`, e.target.value)}><option value="">—</option><option value="SI">Sí</option><option value="NO">No</option></select>
+        <div>
+          <span style={label}>¿Reconoce síntomas?</span>
+          <label style={{ display: "flex", gap: 6, alignItems: "center", fontSize: 13, marginTop: 8 }}>
+            <input type="checkbox" disabled={disabled} checked={d.reconoce_sintomas === "SI"} onChange={e => set(`${seccion}.reconoce_sintomas`, e.target.checked ? "SI" : "NO")} /> Sí
+          </label>
         </div>
       </div>
     </>
@@ -583,14 +692,24 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
   if (seccion === "alimentacion") return (
     <>
       <div className="edu-grid-2">
-        <div><span style={label}>¿Quién prepara los alimentos?</span><input style={inputStyle} disabled={disabled} value={d.quien_prepara} onChange={e => set(`${seccion}.quien_prepara`, e.target.value)} /></div>
+        <div>
+          <span style={label}>¿Quién prepara los alimentos?</span>
+          <select style={inputStyle} disabled={disabled} value={d.quien_prepara} onChange={e => set(`${seccion}.quien_prepara`, e.target.value)}>
+            <option value="">—</option>
+            {QUIEN_PREPARA_OPCIONES.map(o => <option key={o} value={o}>{o}</option>)}
+          </select>
+        </div>
         <div><span style={label}>Comidas por día</span><input style={inputStyle} disabled={disabled} value={d.comidas_dia} onChange={e => set(`${seccion}.comidas_dia`, e.target.value)} /></div>
       </div>
-      <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+      {d.quien_prepara === "Otro" && (
+        <div style={{ marginBottom: 12 }}><span style={label}>Especificar</span><input style={inputStyle} disabled={disabled} value={d.quien_prepara_otro} onChange={e => set(`${seccion}.quien_prepara_otro`, e.target.value)} /></div>
+      )}
+      <div style={{ display: "flex", gap: 14, flexWrap: "wrap", marginBottom: 12 }}>
         <label style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 13 }}><input type="checkbox" disabled={disabled} checked={!!d.bebidas_azucaradas} onChange={e => set(`${seccion}.bebidas_azucaradas`, e.target.checked)} /> Bebidas azucaradas</label>
         <label style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 13 }}><input type="checkbox" disabled={disabled} checked={!!d.conteo_carbohidratos} onChange={e => set(`${seccion}.conteo_carbohidratos`, e.target.checked)} /> Conteo de carbohidratos</label>
         <label style={{ display: "flex", gap: 5, alignItems: "center", fontSize: 13 }}><input type="checkbox" disabled={disabled} checked={!!d.horario_regular} onChange={e => set(`${seccion}.horario_regular`, e.target.checked)} /> Horario regular</label>
       </div>
+      <div><span style={label}>Comentario</span><textarea style={{ ...inputStyle, minHeight: 60 }} disabled={disabled} value={d.comentario} onChange={e => set(`${seccion}.comentario`, e.target.value)} /></div>
     </>
   );
 

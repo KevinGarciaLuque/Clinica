@@ -132,7 +132,7 @@ export default function SeguimientosEndocrinologia({ pacienteId }) {
             <i className="bi bi-graph-up-arrow" style={{ color: "#fff", fontSize: 18 }} />
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>Seguimientos — Diabetes Tipo 1</div>
+            <div style={{ fontWeight: 700, fontSize: 16, color: C.text }}>Seguimientos — Diabetes</div>
             <div style={{ fontSize: 12, color: C.muted }}>{seguimientos.length} seguimiento{seguimientos.length !== 1 ? "s" : ""} registrado{seguimientos.length !== 1 ? "s" : ""}</div>
           </div>
         </div>

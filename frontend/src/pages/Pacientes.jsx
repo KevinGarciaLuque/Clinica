@@ -434,10 +434,8 @@ export default function Pacientes() {
       {/* Formulario nuevo / editar paciente — modal portal compacto */}
       {showForm && createPortal(
         <div
-          onClick={() => { setShowForm(false); setEditandoId(null); setForm(FORM_VACIO); setFotoFile(null); setFotoPreview(null); }}
           style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,0.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: "16px" }}>
           <div
-            onClick={e => e.stopPropagation()}
             style={{
               background: "#fff", borderRadius: 16, width: "100%", maxWidth: 720,
               maxHeight: "92vh", display: "flex", flexDirection: "column",

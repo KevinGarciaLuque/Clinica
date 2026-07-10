@@ -33,16 +33,70 @@ const emptySeccion = {
   terapia_adherencia: {
     esquema: { basal_bolo: false, bomba: false, otro: false, otro_texto: "" },
     dosis: { basal: "", bolo_desayuno: "", bolo_almuerzo: "", bolo_cena: "" },
-    factor_correccion: "", indice_ic: "", na_ic: false,
+    factor_correccion: "", factor_correccion_variable: false,
+    factor_correccion_comidas: { desayuno: "", almuerzo: "", cena: "" },
+    indice_ic: "", na_ic: false, indice_ic_variable: false,
+    indice_ic_comidas: { desayuno: "", almuerzo: "", cena: "" },
     terapia_farmacologica: "", mcg: { uso: "", marca: "", tiempo_uso: "" }, adherencia: "",
   },
   psicosocial: { depresion_ansiedad: "", apoyo_social: "", paid5_score: "" },
   plan: {
-    criterio_inclusion: "", diagnosticos: "", plan_accion: "",
-    ajustes: { basal_de: "", bolos: "", factor_correccion: "", relacion_ic: "" },
+    diagnosticos: "", plan_accion: "",
+    ajustes: {
+      basal_de: "", bolos: "",
+      factor_correccion: "", factor_correccion_variable: false,
+      factor_correccion_comidas: { desayuno: "", almuerzo: "", cena: "" },
+      relacion_ic: "",
+    },
     proximo_seguimiento: { tipo: "", fecha: "" },
   },
 };
+
+// Toggle estilo iPhone (mismo patrón que ConfigClinica.jsx)
+function Switch({ checked, onChange, disabled }) {
+  return (
+    <div
+      onClick={() => !disabled && onChange(!checked)}
+      style={{
+        flexShrink: 0, width: 40, height: 24, borderRadius: 24,
+        background: checked ? "#34c759" : "#e5e7eb",
+        position: "relative", cursor: disabled ? "not-allowed" : "pointer",
+        opacity: disabled ? 0.6 : 1,
+        transition: "background .25s cubic-bezier(.4,0,.2,1)",
+        boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+      }}
+    >
+      <div style={{
+        position: "absolute",
+        top: 2, left: checked ? 18 : 2,
+        width: 20, height: 20, borderRadius: "50%",
+        background: "#fff",
+        boxShadow: "0 2px 6px rgba(0,0,0,.22)",
+        transition: "left .25s cubic-bezier(.4,0,.2,1)",
+      }} />
+    </div>
+  );
+}
+
+const emptyPlanTratamiento = {
+  tipos: { insulina: false, medicamentos_orales: false, suplementacion: false },
+  medicamentos_orales_detalle: "", suplementacion_detalle: "",
+  insulina: {
+    esquema_basal: "", // "" | "ANALOGOS" | "BOMBA" | "HUMANA"
+    esquema_bolos: "", // "" | "DOSIS_FIJAS" | "CAC"
+    dosis_fijas: { desayuno: "", almuerzo: "", cena: "" },
+    cac: {
+      factor_correccion: "", factor_correccion_variable: false,
+      factor_correccion_comidas: { desayuno: "", almuerzo: "", cena: "" },
+      indice_ic: "", indice_ic_variable: false,
+      indice_ic_comidas: { desayuno: "", almuerzo: "", cena: "" },
+    },
+  },
+  indicaciones: "",
+};
+
+const ESQUEMA_BASAL_OPCIONES = [["ANALOGOS", "Análogos de insulina"], ["BOMBA", "Bomba de insulina"], ["HUMANA", "Insulina humana"]];
+const ESQUEMA_BOLOS_OPCIONES = [["DOSIS_FIJAS", "Dosis fijas"], ["CAC", "Conteo avanzado de carbohidratos (CAC)"]];
 
 const GRADO_RIESGO_PIE = [
   { v: "0", l: "Muy bajo — sin PSP ni EAP" },
@@ -54,7 +108,7 @@ const GRADO_RIESGO_PIE = [
 // ═══════════════════════════════════════════════════════════════════════════════
 //  IMPRESIÓN
 // ═══════════════════════════════════════════════════════════════════════════════
-function PrintSeguimiento({ historia, seguimiento, paciente, user, onClose }) {
+function PrintSeguimiento({ historia, seguimiento, paciente, user, logoUrl, onClose }) {
   const S = {
     sectionTitle: { fontSize: 11, fontWeight: 700, color: ORANGE, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: "1.5px solid #fed7aa", paddingBottom: 4, margin: "14px 0 8px" },
     fieldRow: { display: "flex", gap: 20, marginBottom: 5, alignItems: "baseline", flexWrap: "wrap" },
@@ -90,10 +144,13 @@ function PrintSeguimiento({ historia, seguimiento, paciente, user, onClose }) {
       </div>
       <div style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
         <div id="endo-print-doc" style={{ background: "white", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "18mm 20mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", borderBottom: `2.5px solid ${ORANGE}`, paddingBottom: 12, marginBottom: 16, flexWrap: "wrap", gap: 8 }}>
-            <div>
-              <div style={{ fontSize: 16, fontWeight: 800, color: ORANGE }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
-              <div style={{ fontSize: 10, color: "#9a5b2c", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes Tipo 1</div>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${ORANGE}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 120, maxWidth: 240, objectFit: "contain", marginLeft: "-10mm" }} />}
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: ORANGE }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
+                <div style={{ fontSize: 10, color: "#9a5b2c", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes</div>
+              </div>
             </div>
             <div style={{ textAlign: "right" }}>
               <div style={{ fontSize: 13, fontWeight: 800, color: "#1e1b4b" }}>CONTROL DE SEGUIMIENTO</div>
@@ -158,7 +215,12 @@ function PrintSeguimiento({ historia, seguimiento, paciente, user, onClose }) {
             <div style={S.sectionTitle}>Terapia y Adherencia</div>
             {R("Esquema", te.esquema?.basal_bolo ? "Basal-bolo" : te.esquema?.bomba ? "Bomba de insulina" : te.esquema?.otro_texto)}
             {R("Dosis", `Basal ${te.dosis?.basal || "—"} U · Bolos ${te.dosis?.bolo_desayuno || "—"}/${te.dosis?.bolo_almuerzo || "—"}/${te.dosis?.bolo_cena || "—"} U`)}
-            {R("Factor corrección / IC", `${te.factor_correccion || "—"} / ${te.na_ic ? "N/A" : (te.indice_ic || "—")}`)}
+            {R("Factor de corrección", te.factor_correccion_variable
+              ? `Desayuno ${te.factor_correccion_comidas?.desayuno || "—"} · Almuerzo ${te.factor_correccion_comidas?.almuerzo || "—"} · Cena ${te.factor_correccion_comidas?.cena || "—"}`
+              : (te.factor_correccion || "—"))}
+            {R("Índice Insulina/Carbohidrato", te.indice_ic_variable
+              ? `Desayuno ${te.indice_ic_comidas?.desayuno || "—"} · Almuerzo ${te.indice_ic_comidas?.almuerzo || "—"} · Cena ${te.indice_ic_comidas?.cena || "—"}`
+              : (te.na_ic ? "N/A" : (te.indice_ic || "—")))}
             {R("Uso de MCG", te.mcg?.uso === "SI" ? `Sí — ${te.mcg.marca} (${te.mcg.tiempo_uso})` : "No")}
             {R("Adherencia", te.adherencia)}
           </>)}
@@ -172,7 +234,6 @@ function PrintSeguimiento({ historia, seguimiento, paciente, user, onClose }) {
 
           {pl && (pl.diagnosticos || pl.plan_accion) && (<>
             <div style={S.sectionTitle}>Diagnósticos y Plan de Acción</div>
-            {R("¿Cumple criterio de inclusión?", pl.criterio_inclusion)}
             {pl.diagnosticos && <p style={{ ...S.fValue, margin: "4px 0" }}><strong>Diagnósticos:</strong> {pl.diagnosticos}</p>}
             {pl.plan_accion && <p style={{ ...S.fValue, margin: "4px 0" }}><strong>Plan de acción:</strong> {pl.plan_accion}</p>}
             {R("Próximo seguimiento", pl.proximo_seguimiento?.tipo ? `${pl.proximo_seguimiento.tipo} — ${pl.proximo_seguimiento.fecha ? dayjs(pl.proximo_seguimiento.fecha).format("DD/MM/YYYY") : "—"}` : "")}
@@ -183,6 +244,124 @@ function PrintSeguimiento({ historia, seguimiento, paciente, user, onClose }) {
               {user?.firma_url ? <img src={user.firma_url} alt="Firma" style={{ maxHeight: 70, maxWidth: 200, objectFit: "contain", display: "block", margin: "0 auto 4px" }} /> : <div style={{ height: 70 }} />}
               <div style={{ borderTop: "1.5px solid #374151", paddingTop: 8 }}>
                 <div style={{ fontWeight: 700, fontSize: 12 }}>{seguimiento?.medico_nombre || historia?.medico || "Médico Tratante"}</div>
+                <div style={{ color: "#6b7280", fontSize: 10, marginTop: 1 }}>Firma y Sello</div>
+              </div>
+            </div>
+          </div>
+          <div style={{ marginTop: 28, paddingTop: 10, borderTop: "1px solid #e5e7eb", textAlign: "center", fontSize: 9, color: "#9ca3af" }}>
+            Generado el {dayjs().format("DD/MM/YYYY [a las] HH:mm")}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+//  IMPRESIÓN — PLAN DE SEGUIMIENTO
+// ═══════════════════════════════════════════════════════════════════════════════
+function PrintPlan({ registro, historia, paciente, user, logoUrl, onClose }) {
+  const p = registro?.plan || {};
+  const procedencia = [paciente?.departamento, paciente?.ciudad].filter(Boolean).join(", ");
+  const S = {
+    sectionTitle: { fontSize: 11, fontWeight: 700, color: ORANGE, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: "1.5px solid #fed7aa", paddingBottom: 4, margin: "14px 0 8px" },
+    fieldRow: { display: "flex", gap: 20, marginBottom: 5, alignItems: "baseline", flexWrap: "wrap" },
+    fLabel: { fontWeight: 700, color: "#374151", minWidth: 130, fontSize: 11.5, flexShrink: 0 },
+    fValue: { color: "#1f2937", fontSize: 11.5, flex: 1, whiteSpace: "pre-wrap" },
+    dataGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: 18, rowGap: 10 },
+    dLabel: { fontSize: 9.5, fontWeight: 700, color: "#9a5b2c", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 2 },
+    dValue: { fontSize: 11.5, color: "#1f2937", fontWeight: 600 },
+  };
+  const R = (k, v) => (v || v === 0 ? <div style={S.fieldRow}><span style={S.fLabel}>{k}:</span><span style={S.fValue}>{v}</span></div> : null);
+  const D = (k, v) => <div><div style={S.dLabel}>{k}</div><div style={S.dValue}>{v || "—"}</div></div>;
+
+  const tipos = [
+    p.tipos?.insulina && "Insulina",
+    p.tipos?.medicamentos_orales && `Medicamentos orales${p.medicamentos_orales_detalle ? ` (${p.medicamentos_orales_detalle})` : ""}`,
+    p.tipos?.suplementacion && `Suplementación${p.suplementacion_detalle ? ` (${p.suplementacion_detalle})` : ""}`,
+  ].filter(Boolean).join(", ");
+
+  const basalLabel = ESQUEMA_BASAL_OPCIONES.find(([v]) => v === p.insulina?.esquema_basal)?.[1];
+  const bolosLabel = ESQUEMA_BOLOS_OPCIONES.find(([v]) => v === p.insulina?.esquema_bolos)?.[1];
+
+  return (
+    <>
+      <style>{`
+        @media print {
+          body * { visibility: hidden !important; }
+          #endo-print-doc, #endo-print-doc * { visibility: visible !important; }
+          #endo-print-doc { position:fixed!important; top:0!important; left:0!important; width:100%!important; padding:14mm 18mm!important; box-shadow:none!important; background:white!important; }
+          #print-actions-bar { display:none!important; }
+          @page { margin:0; size:A4; }
+        }
+      `}</style>
+      <div id="print-actions-bar" style={{ background: "#fff7ed", borderBottom: "1px solid #fed7aa", padding: "12px 24px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <button onClick={() => window.print()} style={{ padding: "9px 22px", background: ORANGE, color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontSize: 14 }}>
+          <i className="bi bi-printer-fill" /> Imprimir / Guardar PDF
+        </button>
+        <button onClick={onClose} style={{ padding: "9px 22px", background: "#fff", color: "#374151", border: "1px solid #d1d5db", borderRadius: 9, fontWeight: 600, cursor: "pointer", fontSize: 14, display: "flex", alignItems: "center", gap: 7 }}>
+          <i className="bi bi-x-lg" /> Cerrar
+        </button>
+        <span style={{ marginLeft: "auto", fontSize: 12, color: "#9a5b2c" }}>Vista previa — Plan de Seguimiento {dayjs(registro?.fecha).format("DD/MM/YYYY")}</span>
+      </div>
+      <div style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
+        <div id="endo-print-doc" style={{ background: "white", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "18mm 20mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${ORANGE}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 120, maxWidth: 240, objectFit: "contain", marginLeft: "-10mm" }} />}
+              <div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: ORANGE }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
+                <div style={{ fontSize: 10, color: "#9a5b2c", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes</div>
+              </div>
+            </div>
+            <div style={{ textAlign: "right" }}>
+              <div style={{ fontSize: 13, fontWeight: 800, color: "#1e1b4b" }}>PLAN DE SEGUIMIENTO</div>
+              <div style={{ fontSize: 10, color: "#6b7280", marginTop: 4 }}>Fecha: <strong>{dayjs(registro?.fecha).format("DD/MM/YYYY")}</strong></div>
+            </div>
+          </div>
+
+          <div style={S.sectionTitle}>Datos del Paciente</div>
+          <div style={S.dataGrid}>
+            {D("Nombre", `${paciente?.nombres || ""} ${paciente?.apellidos || ""}`.trim())}
+            {D("Edad", paciente?.fecha_nacimiento ? `${dayjs().diff(paciente.fecha_nacimiento, "year")} años` : "")}
+            {D("ID / DNI", paciente?.dni)}
+            {D("Sexo", paciente?.sexo)}
+            {D("Teléfono", paciente?.telefono)}
+            {D("Dirección", paciente?.direccion)}
+            {D("Religión", paciente?.religion)}
+            {D("Procedencia", procedencia)}
+            {D("Médico tratante", historia?.medico)}
+          </div>
+
+          <div style={S.sectionTitle}>Tipo de Tratamiento</div>
+          {R("Tratamiento", tipos || "—")}
+
+          {p.tipos?.insulina && (<>
+            <div style={S.sectionTitle}>Esquema de Insulina</div>
+            {R("Esquema basal", basalLabel)}
+            {R("Esquema de bolos", bolosLabel)}
+            {p.insulina?.esquema_bolos === "DOSIS_FIJAS" && R("Dosis fijas (U)",
+              `Desayuno ${p.insulina.dosis_fijas?.desayuno || "—"} · Almuerzo ${p.insulina.dosis_fijas?.almuerzo || "—"} · Cena ${p.insulina.dosis_fijas?.cena || "—"}`)}
+            {p.insulina?.esquema_bolos === "CAC" && (<>
+              {R("Factor de corrección", p.insulina.cac?.factor_correccion_variable
+                ? `Desayuno ${p.insulina.cac.factor_correccion_comidas?.desayuno || "—"} · Almuerzo ${p.insulina.cac.factor_correccion_comidas?.almuerzo || "—"} · Cena ${p.insulina.cac.factor_correccion_comidas?.cena || "—"}`
+                : (p.insulina.cac?.factor_correccion || "—"))}
+              {R("Índice Insulina/Carbohidrato", p.insulina.cac?.indice_ic_variable
+                ? `Desayuno ${p.insulina.cac.indice_ic_comidas?.desayuno || "—"} · Almuerzo ${p.insulina.cac.indice_ic_comidas?.almuerzo || "—"} · Cena ${p.insulina.cac.indice_ic_comidas?.cena || "—"}`
+                : (p.insulina.cac?.indice_ic || "—"))}
+            </>)}
+          </>)}
+
+          {p.indicaciones && (<>
+            <div style={S.sectionTitle}>Indicaciones</div>
+            <p style={{ ...S.fValue, margin: "4px 0" }}>{p.indicaciones}</p>
+          </>)}
+
+          <div style={{ marginTop: 40, display: "flex", justifyContent: "flex-end" }}>
+            <div style={{ textAlign: "center", minWidth: 220 }}>
+              {user?.firma_url ? <img src={user.firma_url} alt="Firma" style={{ maxHeight: 70, maxWidth: 200, objectFit: "contain", display: "block", margin: "0 auto 4px" }} /> : <div style={{ height: 70 }} />}
+              <div style={{ borderTop: "1.5px solid #374151", paddingTop: 8 }}>
+                <div style={{ fontWeight: 700, fontSize: 12 }}>{registro?.medico_nombre || "Médico Tratante"}</div>
                 <div style={{ color: "#6b7280", fontSize: 10, marginTop: 1 }}>Firma y Sello</div>
               </div>
             </div>
@@ -216,13 +395,31 @@ export default function ConsultaEndocrinologia() {
   const [seccionesAbiertas, setSeccionesAbiertas] = useState([]);
   const [fechaSeguimiento, setFechaSeguimiento] = useState(dayjs().format("YYYY-MM-DD"));
 
+  const [planes, setPlanes] = useState([]);
+  const [planActivo, setPlanActivo] = useState(null);
+  const [formPlan, setFormPlan] = useState(null);
+  const [fechaPlan, setFechaPlan] = useState(dayjs().format("YYYY-MM-DD"));
+  const [mostrarPrintPlan, setMostrarPrintPlan] = useState(false);
+
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState(null);
   const [mostrarPrint, setMostrarPrint] = useState(false);
+  const [logoUrl, setLogoUrl] = useState("");
 
   useEffect(() => {
     api.get("/pacientes", { params: { limit: 200 } }).then(r => setPacientes(r.data.data || [])).catch(() => {});
   }, []);
+
+  useEffect(() => {
+    // El logo del consultorio se configura en Plantillas de Documentos (Receta) y se
+    // reutiliza aquí para que los documentos impresos de Control de Seguimiento coincidan.
+    if (!user?.clinica_id) return;
+    api.get(`/clinicas/${user.clinica_id}/plantillas/receta`).then(r => {
+      const contenido = r.data?.data?.contenido;
+      if (!contenido) return;
+      try { setLogoUrl(JSON.parse(contenido).logo_url || ""); } catch { /* plantilla sin formato JSON */ }
+    }).catch(() => {});
+  }, [user?.clinica_id]);
 
   useEffect(() => {
     const pid = params.get("paciente_id");
@@ -244,6 +441,7 @@ export default function ConsultaEndocrinologia() {
   const seleccionarPaciente = useCallback(async (p, seguimientoIdUrl = null) => {
     setPaciente(p);
     setSeguimientoActivo(null);
+    setPlanActivo(null);
     setMsg(null);
     setSidebarOpen(false);
 
@@ -251,15 +449,20 @@ export default function ConsultaEndocrinologia() {
     // se pide el detalle completo del expediente para mostrarlo en la Historia Clínica.
     api.get(`/pacientes/${p.id}`).then(r => setPaciente(r.data.data || p)).catch(() => {});
 
-    const [h, s] = await Promise.all([
+    const [h, s, pl] = await Promise.all([
       api.get(`/endocrinologia/historia/${p.id}`),
       api.get("/endocrinologia/seguimientos", { params: { paciente_id: p.id, limit: 50 } }),
-    ]).then(rs => rs.map(r => r.data)).catch(() => [{}, {}]);
+      api.get("/endocrinologia/planes", { params: { paciente_id: p.id, limit: 50 } }),
+    ]).then(rs => rs.map(r => r.data)).catch(() => [{}, {}, {}]);
+    setPlanes(pl.data || []);
 
     setHistoria(h.data || null);
     // Si no hay historia previa, sugiere al médico logueado como médico tratante (editable)
     const medicoSugerido = user ? `${user.nombres || ""} ${user.apellidos || ""}`.trim() : "";
-    setFormHistoria(h.data ? deepMerge(emptyHistoria, h.data) : { ...emptyHistoria, medico: medicoSugerido });
+    // El backend devuelve fecha_diagnostico como datetime ISO (columna DATE de MySQL) —
+    // se normaliza a YYYY-MM-DD para el <input type="date"> y para no reenviar un ISO inválido al guardar.
+    const historiaData = h.data ? { ...h.data, fecha_diagnostico: h.data.fecha_diagnostico ? dayjs(h.data.fecha_diagnostico).format("YYYY-MM-DD") : "" } : null;
+    setFormHistoria(historiaData ? deepMerge(emptyHistoria, historiaData) : { ...emptyHistoria, medico: medicoSugerido });
     setSeguimientos(s.data || []);
     setTab(h.data ? "seguimientos" : "historia");
     if (seguimientoIdUrl) cargarSeguimiento(seguimientoIdUrl);
@@ -270,15 +473,23 @@ export default function ConsultaEndocrinologia() {
     setGuardando(true);
     try {
       await api.post(`/endocrinologia/historia/${paciente.id}`, formHistoria);
-      setMsg({ tipo: "ok", texto: "Historia clínica guardada" });
       const h = await api.get(`/endocrinologia/historia/${paciente.id}`);
       setHistoria(h.data.data);
+      // La primera consulta del paciente debe incluir también el Seguimiento inicial
+      // (Secciones III-V) — al guardar la Historia por primera vez, se pasa directo
+      // a un seguimiento nuevo con todas las secciones abiertas para completar.
+      if (seguimientos.length === 0) {
+        setMsg({ tipo: "ok", texto: "Historia clínica guardada — ahora completa el Seguimiento inicial" });
+        nuevoSeguimiento(true);
+      } else {
+        setMsg({ tipo: "ok", texto: "Historia clínica guardada" });
+      }
     } catch (e) {
       setMsg({ tipo: "err", texto: e.response?.data?.msg || "Error al guardar historia" });
     } finally { setGuardando(false); }
   };
 
-  const nuevoSeguimiento = () => {
+  const nuevoSeguimiento = (esInicial = false) => {
     const hoy = dayjs().format("YYYY-MM-DD");
     const base = structuredClone(emptySeccion);
     // Las fechas de estudios/exámenes se prellenan con la fecha de hoy —
@@ -290,7 +501,8 @@ export default function ConsultaEndocrinologia() {
     base.cardiovascular.perfil_lipidico.fecha = hoy;
     setSeguimientoActivo("nuevo");
     setFormSeguimiento(base);
-    setSeccionesAbiertas([]);
+    // La consulta inicial debe cubrir todas las secciones — se abren todas de una vez.
+    setSeccionesAbiertas(esInicial ? SECCIONES_DEF.map(s => s.key) : []);
     setFechaSeguimiento(hoy);
     setTab("seguimientos");
   };
@@ -311,6 +523,15 @@ export default function ConsultaEndocrinologia() {
 
   const guardarSeguimiento = async () => {
     if (!paciente) return;
+    const esConsultaInicial = seguimientoActivo === "nuevo" && seguimientos.length === 0;
+    if (esConsultaInicial && seccionesAbiertas.length < SECCIONES_DEF.length) {
+      const faltantes = SECCIONES_DEF.filter(s => !seccionesAbiertas.includes(s.key)).map(s => s.titulo);
+      const continuar = confirm(
+        `Esta es la consulta inicial del paciente y debe quedar completa junto con la Historia Clínica.\n\n` +
+        `Faltan por marcar: ${faltantes.join(", ")}.\n\n¿Deseas guardarla de todas formas?`
+      );
+      if (!continuar) return;
+    }
     setGuardando(true);
     try {
       const payload = { paciente_id: paciente.id, fecha: fechaSeguimiento };
@@ -340,6 +561,62 @@ export default function ConsultaEndocrinologia() {
     }
   };
 
+  const nuevoPlan = () => {
+    setPlanActivo("nuevo");
+    setFormPlan(structuredClone(emptyPlanTratamiento));
+    setFechaPlan(dayjs().format("YYYY-MM-DD"));
+    setTab("planes");
+  };
+
+  const cargarPlan = async (id) => {
+    const r = await api.get(`/endocrinologia/planes/${id}`);
+    const registro = r.data.data;
+    setPlanActivo(registro);
+    setFormPlan(deepMerge(emptyPlanTratamiento, registro.plan || {}));
+    setFechaPlan(dayjs(registro.fecha).format("YYYY-MM-DD"));
+    setTab("planes");
+  };
+
+  const guardarPlan = async () => {
+    if (!paciente) return;
+    setGuardando(true);
+    try {
+      const payload = { paciente_id: paciente.id, fecha: fechaPlan, plan: formPlan };
+      if (planActivo === "nuevo") {
+        await api.post("/endocrinologia/planes", payload);
+        setMsg({ tipo: "ok", texto: "Plan de seguimiento guardado" });
+      } else {
+        await api.put(`/endocrinologia/planes/${planActivo.id}`, payload);
+        setMsg({ tipo: "ok", texto: "Plan de seguimiento actualizado" });
+      }
+      await seleccionarPaciente(paciente);
+      setPlanActivo(null);
+    } catch (e) {
+      setMsg({ tipo: "err", texto: e.response?.data?.msg || "Error al guardar" });
+    } finally { setGuardando(false); }
+  };
+
+  const eliminarPlan = async (id) => {
+    if (!confirm("¿Eliminar este plan de seguimiento? Esta acción no se puede deshacer.")) return;
+    try {
+      await api.delete(`/endocrinologia/planes/${id}`);
+      await seleccionarPaciente(paciente);
+    } catch (e) {
+      setMsg({ tipo: "err", texto: e.response?.data?.msg || "Error al eliminar" });
+    }
+  };
+
+  const setPlan = (path, value) => {
+    setFormPlan(prev => {
+      const next = structuredClone(prev);
+      const parts = path.split(".");
+      let obj = next;
+      for (let i = 0; i < parts.length - 1; i++) obj = obj[parts[i]];
+      obj[parts[parts.length - 1]] = value;
+      return next;
+    });
+  };
+
   const set = (path, value) => {
     setFormSeguimiento(prev => {
       const next = structuredClone(prev);
@@ -354,7 +631,11 @@ export default function ConsultaEndocrinologia() {
   const pacientesFiltrados = pacientes.filter(p => `${p.nombres} ${p.apellidos}`.toLowerCase().includes(busqueda.toLowerCase()));
 
   if (mostrarPrint && seguimientoActivo && seguimientoActivo !== "nuevo") {
-    return <PrintSeguimiento historia={historia} seguimiento={seguimientoActivo} paciente={paciente} user={user} onClose={() => setMostrarPrint(false)} />;
+    return <PrintSeguimiento historia={historia} seguimiento={seguimientoActivo} paciente={paciente} user={user} logoUrl={logoUrl} onClose={() => setMostrarPrint(false)} />;
+  }
+
+  if (mostrarPrintPlan && planActivo && planActivo !== "nuevo") {
+    return <PrintPlan registro={planActivo} historia={historia} paciente={paciente} user={user} logoUrl={logoUrl} onClose={() => setMostrarPrintPlan(false)} />;
   }
 
   return (
@@ -408,7 +689,7 @@ export default function ConsultaEndocrinologia() {
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{paciente.nombres} {paciente.apellidos}</div>
-                  <div style={{ fontSize: 12, color: "#64748b" }}>Control de Seguimiento — Diabetes Tipo 1</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>Control de Seguimiento — Diabetes</div>
                 </div>
                 <button onClick={() => navigate(`/pacientes/${paciente.id}/perfil`)} style={btn(ORANGE, true)}>
                   <i className="bi bi-person-vcard" /> Ver Expediente
@@ -428,14 +709,17 @@ export default function ConsultaEndocrinologia() {
                 <button className="endo-tab-btn" onClick={() => setTab("seguimientos")} style={{ color: tab === "seguimientos" ? ORANGE : "#64748b", borderBottomColor: tab === "seguimientos" ? ORANGE : "transparent", fontWeight: tab === "seguimientos" ? 700 : 500 }}>
                   <i className="bi bi-graph-up-arrow" /> Seguimientos ({seguimientos.length})
                 </button>
+                <button className="endo-tab-btn" onClick={() => setTab("planes")} style={{ color: tab === "planes" ? ORANGE : "#64748b", borderBottomColor: tab === "planes" ? ORANGE : "transparent", fontWeight: tab === "planes" ? 700 : 500 }}>
+                  <i className="bi bi-prescription2" /> Plan de Seguimiento ({planes.length})
+                </button>
               </div>
 
               {tab === "historia" && (
-                <TabHistoria paciente={paciente} user={user} formHistoria={formHistoria} setFormHistoria={setFormHistoria} guardando={guardando} guardarHistoria={guardarHistoria} />
+                <TabHistoria paciente={paciente} user={user} formHistoria={formHistoria} setFormHistoria={setFormHistoria} guardando={guardando} guardarHistoria={guardarHistoria} esPrimeraConsulta={seguimientos.length === 0} />
               )}
 
               {tab === "seguimientos" && !seguimientoActivo && (
-                <TabListaSeguimientos seguimientos={seguimientos} onNuevo={nuevoSeguimiento} onVer={cargarSeguimiento} onEliminar={eliminarSeguimiento}
+                <TabListaSeguimientos seguimientos={seguimientos} onNuevo={() => nuevoSeguimiento(seguimientos.length === 0)} onVer={cargarSeguimiento} onEliminar={eliminarSeguimiento}
                   onImprimir={(s) => { setSeguimientoActivo(s); setMostrarPrint(true); }} />
               )}
 
@@ -445,6 +729,19 @@ export default function ConsultaEndocrinologia() {
                   seccionesAbiertas={seccionesAbiertas} toggleSeccion={toggleSeccion}
                   fechaSeguimiento={fechaSeguimiento} setFechaSeguimiento={setFechaSeguimiento}
                   guardando={guardando} onGuardar={guardarSeguimiento} onCancelar={() => setSeguimientoActivo(null)}
+                />
+              )}
+
+              {tab === "planes" && !planActivo && (
+                <TabListaPlanes planes={planes} onNuevo={nuevoPlan} onVer={cargarPlan} onEliminar={eliminarPlan}
+                  onImprimir={(p) => { setPlanActivo(p); setMostrarPrintPlan(true); }} />
+              )}
+
+              {tab === "planes" && planActivo && (
+                <TabFormPlan
+                  formPlan={formPlan} set={setPlan}
+                  fechaPlan={fechaPlan} setFechaPlan={setFechaPlan}
+                  guardando={guardando} onGuardar={guardarPlan} onCancelar={() => setPlanActivo(null)}
                 />
               )}
             </>
@@ -517,7 +814,14 @@ function TabListaSeguimientos({ seguimientos, onNuevo, onVer, onEliminar, onImpr
                 <i className="bi bi-calendar-check" style={{ color: ORANGE, fontSize: 18 }} />
               </div>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{dayjs(s.fecha).format("DD/MM/YYYY")}</div>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", display: "flex", alignItems: "center", gap: 8 }}>
+                  {dayjs(s.fecha).format("DD/MM/YYYY")}
+                  {!!s.es_inicial && (
+                    <span style={{ fontSize: 10, fontWeight: 700, color: ORANGE, background: ORANGE_LIGHT, border: `1px solid ${ORANGE}40`, borderRadius: 999, padding: "2px 8px" }}>
+                      Consulta Inicial
+                    </span>
+                  )}
+                </div>
                 <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>
                   {secciones.length ? `${secciones.length} sección(es): ${secciones.map(k => SECCIONES_DEF.find(d => d.key === k)?.titulo).join(", ")}` : "Sin secciones registradas"}
                 </div>
@@ -747,15 +1051,50 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
         <div><span style={label}>Bolo desayuno (U)</span><input {...inp("dosis.bolo_desayuno")} /></div>
         <div><span style={label}>Bolo almuerzo (U)</span><input {...inp("dosis.bolo_almuerzo")} /></div>
         <div><span style={label}>Bolo cena (U)</span><input {...inp("dosis.bolo_cena")} /></div>
-        <div><span style={label}>Factor de corrección</span><input {...inp("factor_correccion")} /></div>
+      </div>
+
+      <div className="endo-grid-2">
         <div>
-          <span style={label}>Índice Insulina/Carbohidrato</span>
-          <div style={{ display: "flex", gap: 8 }}>
-            <input {...inp("indice_ic")} disabled={disabled || d.na_ic} />
-            <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12, whiteSpace: "nowrap" }}><input {...chk("na_ic")} /> N/A</label>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={label}>Factor de corrección</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+              Varía por tiempo de comida
+              <Switch disabled={disabled} checked={!!d.factor_correccion_variable} onChange={v => set(`${seccion}.factor_correccion_variable`, v)} />
+            </div>
           </div>
+          {d.factor_correccion_variable ? (
+            <div className="endo-grid-3">
+              <div><span style={label}>Desayuno</span><input {...inp("factor_correccion_comidas.desayuno")} /></div>
+              <div><span style={label}>Almuerzo</span><input {...inp("factor_correccion_comidas.almuerzo")} /></div>
+              <div><span style={label}>Cena</span><input {...inp("factor_correccion_comidas.cena")} /></div>
+            </div>
+          ) : (
+            <input {...inp("factor_correccion")} />
+          )}
+        </div>
+        <div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={label}>Índice Insulina/Carbohidrato</span>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+              Varía por tiempo de comida
+              <Switch disabled={disabled} checked={!!d.indice_ic_variable} onChange={v => set(`${seccion}.indice_ic_variable`, v)} />
+            </div>
+          </div>
+          {d.indice_ic_variable ? (
+            <div className="endo-grid-3">
+              <div><span style={label}>Desayuno</span><input {...inp("indice_ic_comidas.desayuno")} /></div>
+              <div><span style={label}>Almuerzo</span><input {...inp("indice_ic_comidas.almuerzo")} /></div>
+              <div><span style={label}>Cena</span><input {...inp("indice_ic_comidas.cena")} /></div>
+            </div>
+          ) : (
+            <div style={{ display: "flex", gap: 8 }}>
+              <input {...inp("indice_ic")} disabled={disabled || d.na_ic} />
+              <label style={{ display: "flex", gap: 4, alignItems: "center", fontSize: 12, whiteSpace: "nowrap" }}><input {...chk("na_ic")} /> N/A</label>
+            </div>
+          )}
         </div>
       </div>
+
       <div><span style={label}>Terapia farmacológica actual</span><textarea style={{ ...inputStyle, minHeight: 50 }} disabled={disabled} value={d.terapia_farmacologica} onChange={e => set(`${seccion}.terapia_farmacologica`, e.target.value)} /></div>
       <div className="endo-grid-3" style={{ marginTop: 8 }}>
         <div><span style={label}>Uso de MCG</span>
@@ -784,17 +1123,31 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
 
   if (seccion === "plan") return (
     <>
-      <div><span style={label}>¿Cumple criterio de inclusión para control intensivo?</span>
-        <select {...inp("criterio_inclusion")}><option value="">—</option><option value="SI">Sí</option><option value="NO">No</option></select>
-      </div>
       <div><span style={label}>Diagnósticos</span><textarea style={{ ...inputStyle, minHeight: 60 }} disabled={disabled} value={d.diagnosticos} onChange={e => set(`${seccion}.diagnosticos`, e.target.value)} /></div>
       <div><span style={label}>Plan de acción</span><textarea style={{ ...inputStyle, minHeight: 80 }} disabled={disabled} value={d.plan_accion} onChange={e => set(`${seccion}.plan_accion`, e.target.value)} /></div>
       <div style={{ ...label, marginTop: 6 }}>Ajustes realizados</div>
       <div className="endo-grid-3">
         <div><span style={label}>Basal de (U)</span><input {...inp("ajustes.basal_de")} /></div>
         <div><span style={label}>Bolos (U)</span><input {...inp("ajustes.bolos")} /></div>
-        <div><span style={label}>Factor de corrección</span><input {...inp("ajustes.factor_correccion")} /></div>
         <div><span style={label}>Relación IC</span><input {...inp("ajustes.relacion_ic")} /></div>
+      </div>
+      <div>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={label}>Factor de corrección</span>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+            Varía por tiempo de comida
+            <Switch disabled={disabled} checked={!!d.ajustes.factor_correccion_variable} onChange={v => set(`${seccion}.ajustes.factor_correccion_variable`, v)} />
+          </div>
+        </div>
+        {d.ajustes.factor_correccion_variable ? (
+          <div className="endo-grid-3">
+            <div><span style={label}>Desayuno</span><input {...inp("ajustes.factor_correccion_comidas.desayuno")} /></div>
+            <div><span style={label}>Almuerzo</span><input {...inp("ajustes.factor_correccion_comidas.almuerzo")} /></div>
+            <div><span style={label}>Cena</span><input {...inp("ajustes.factor_correccion_comidas.cena")} /></div>
+          </div>
+        ) : (
+          <input {...inp("ajustes.factor_correccion")} />
+        )}
       </div>
       <div className="endo-grid-2" style={{ marginTop: 6 }}>
         <div><span style={label}>Próximo seguimiento</span>
@@ -806,4 +1159,178 @@ function SeccionCampos({ seccion, fs, set, disabled }) {
   );
 
   return null;
+}
+
+// ── Tab lista de planes de seguimiento ──────────────────────────────────────
+function TabListaPlanes({ planes, onNuevo, onVer, onEliminar, onImprimir }) {
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 14 }}>
+        <button style={btn()} onClick={onNuevo}><i className="bi bi-plus-lg" /> Nuevo Plan de Seguimiento</button>
+      </div>
+      {planes.length === 0 ? (
+        <div style={{ textAlign: "center", padding: "50px 0", color: "#94a3b8" }}>
+          <i className="bi bi-prescription2" style={{ fontSize: 36, display: "block", marginBottom: 10, opacity: .3 }} />
+          No hay planes de seguimiento registrados
+        </div>
+      ) : (
+        planes.map(p => {
+          const tipos = p.plan?.tipos || {};
+          const etiquetas = [
+            tipos.insulina && "Insulina",
+            tipos.medicamentos_orales && "Medicamentos orales",
+            tipos.suplementacion && "Suplementación",
+          ].filter(Boolean);
+          return (
+            <div key={p.id} style={{ ...card, display: "flex", alignItems: "center", gap: 14, cursor: "pointer" }} onClick={() => onVer(p.id)}>
+              <div style={{ width: 44, height: 44, borderRadius: 10, background: ORANGE_LIGHT, border: `1px solid ${ORANGE}40`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                <i className="bi bi-prescription2" style={{ color: ORANGE, fontSize: 18 }} />
+              </div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b" }}>{dayjs(p.fecha).format("DD/MM/YYYY")}</div>
+                <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 2 }}>
+                  {etiquetas.length ? etiquetas.join(", ") : "Sin tipo de tratamiento registrado"}
+                </div>
+                {p.medico_nombre && <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{p.medico_nombre}</div>}
+              </div>
+              <div style={{ display: "flex", gap: 6 }} onClick={e => e.stopPropagation()}>
+                <button title="Ver / Editar" onClick={() => onVer(p.id)} style={{ width: 32, height: 32, border: `1px solid ${ORANGE}40`, borderRadius: 8, background: ORANGE_LIGHT, color: ORANGE, cursor: "pointer" }}><i className="bi bi-pencil" /></button>
+                <button title="Imprimir" onClick={() => onImprimir(p)} style={{ width: 32, height: 32, border: "1px solid rgba(16,185,129,.25)", borderRadius: 8, background: "rgba(16,185,129,.1)", color: "#10b981", cursor: "pointer" }}><i className="bi bi-printer" /></button>
+                <button title="Eliminar" onClick={() => onEliminar(p.id)} style={{ width: 32, height: 32, border: "1px solid rgba(239,68,68,.25)", borderRadius: 8, background: "rgba(239,68,68,.1)", color: "#ef4444", cursor: "pointer" }}><i className="bi bi-trash" /></button>
+              </div>
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+}
+
+// ── Tab formulario de plan de seguimiento ───────────────────────────────────
+function TabFormPlan({ formPlan: fp, set, fechaPlan, setFechaPlan, guardando, onGuardar, onCancelar }) {
+  if (!fp) return null;
+
+  const chk = (path) => ({
+    type: "checkbox",
+    checked: !!path.split(".").reduce((o, k) => o?.[k], fp),
+    onChange: e => set(path, e.target.checked),
+  });
+  const inp = (path) => ({
+    style: inputStyle,
+    value: path.split(".").reduce((o, k) => o?.[k], fp) ?? "",
+    onChange: e => set(path, e.target.value),
+  });
+
+  return (
+    <div>
+      <div style={card}>
+        <span style={label}>Fecha del plan</span>
+        <input type="date" style={{ ...inputStyle, width: 200 }} value={fechaPlan} onChange={e => setFechaPlan(e.target.value)} />
+      </div>
+
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 12, color: "#1e293b" }}>Tipo de tratamiento</div>
+        <div style={{ display: "flex", gap: 18, flexWrap: "wrap", fontSize: 13, marginBottom: 10 }}>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input {...chk("tipos.insulina")} /> Insulina</label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input {...chk("tipos.medicamentos_orales")} /> Medicamentos orales</label>
+          <label style={{ display: "flex", gap: 6, alignItems: "center" }}><input {...chk("tipos.suplementacion")} /> Suplementación</label>
+        </div>
+        {fp.tipos.medicamentos_orales && (
+          <div style={{ marginBottom: 10 }}><span style={label}>Especificar medicamento(s)</span><input {...inp("medicamentos_orales_detalle")} /></div>
+        )}
+        {fp.tipos.suplementacion && (
+          <div><span style={label}>Especificar suplemento(s)</span><input {...inp("suplementacion_detalle")} /></div>
+        )}
+      </div>
+
+      {fp.tipos.insulina && (
+        <div style={card}>
+          <div style={{ fontWeight: 700, marginBottom: 12, color: "#1e293b" }}>Esquema de insulina</div>
+
+          <div style={{ marginBottom: 12 }}>
+            <span style={label}>Esquema basal</span>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13 }}>
+              {ESQUEMA_BASAL_OPCIONES.map(([v, l]) => (
+                <label key={v} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  <input type="radio" name="esquema_basal" checked={fp.insulina.esquema_basal === v} onChange={() => set("insulina.esquema_basal", v)} /> {l}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 12 }}>
+            <span style={label}>Esquema de bolos</span>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap", fontSize: 13 }}>
+              {ESQUEMA_BOLOS_OPCIONES.map(([v, l]) => (
+                <label key={v} style={{ display: "flex", gap: 5, alignItems: "center" }}>
+                  <input type="radio" name="esquema_bolos" checked={fp.insulina.esquema_bolos === v} onChange={() => set("insulina.esquema_bolos", v)} /> {l}
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {fp.insulina.esquema_bolos === "DOSIS_FIJAS" && (
+            <div className="endo-grid-3">
+              <div><span style={label}>Insulina — Desayuno</span><input {...inp("insulina.dosis_fijas.desayuno")} /></div>
+              <div><span style={label}>Insulina — Almuerzo</span><input {...inp("insulina.dosis_fijas.almuerzo")} /></div>
+              <div><span style={label}>Insulina — Cena</span><input {...inp("insulina.dosis_fijas.cena")} /></div>
+            </div>
+          )}
+
+          {fp.insulina.esquema_bolos === "CAC" && (
+            <div className="endo-grid-2">
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={label}>Factor de corrección</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+                    Varía por tiempo de comida
+                    <Switch checked={!!fp.insulina.cac.factor_correccion_variable} onChange={v => set("insulina.cac.factor_correccion_variable", v)} />
+                  </div>
+                </div>
+                {fp.insulina.cac.factor_correccion_variable ? (
+                  <div className="endo-grid-3">
+                    <div><span style={label}>Desayuno</span><input {...inp("insulina.cac.factor_correccion_comidas.desayuno")} /></div>
+                    <div><span style={label}>Almuerzo</span><input {...inp("insulina.cac.factor_correccion_comidas.almuerzo")} /></div>
+                    <div><span style={label}>Cena</span><input {...inp("insulina.cac.factor_correccion_comidas.cena")} /></div>
+                  </div>
+                ) : (
+                  <input {...inp("insulina.cac.factor_correccion")} />
+                )}
+              </div>
+              <div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <span style={label}>Índice Insulina/Carbohidrato</span>
+                  <div style={{ display: "flex", gap: 8, alignItems: "center", fontSize: 11.5, color: "#64748b", whiteSpace: "nowrap" }}>
+                    Varía por tiempo de comida
+                    <Switch checked={!!fp.insulina.cac.indice_ic_variable} onChange={v => set("insulina.cac.indice_ic_variable", v)} />
+                  </div>
+                </div>
+                {fp.insulina.cac.indice_ic_variable ? (
+                  <div className="endo-grid-3">
+                    <div><span style={label}>Desayuno</span><input {...inp("insulina.cac.indice_ic_comidas.desayuno")} /></div>
+                    <div><span style={label}>Almuerzo</span><input {...inp("insulina.cac.indice_ic_comidas.almuerzo")} /></div>
+                    <div><span style={label}>Cena</span><input {...inp("insulina.cac.indice_ic_comidas.cena")} /></div>
+                  </div>
+                ) : (
+                  <input {...inp("insulina.cac.indice_ic")} />
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div style={card}>
+        <div style={{ fontWeight: 700, marginBottom: 12, color: "#1e293b" }}>Indicaciones</div>
+        <textarea style={{ ...inputStyle, minHeight: 100 }} value={fp.indicaciones} onChange={e => set("indicaciones", e.target.value)} />
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <button style={btn()} disabled={guardando} onClick={onGuardar}>
+          <i className="bi bi-save" /> {guardando ? "Guardando..." : "Guardar Plan de Seguimiento"}
+        </button>
+        <button style={btn(ORANGE, true)} onClick={onCancelar}><i className="bi bi-x-lg" /> Cancelar</button>
+      </div>
+    </div>
+  );
 }

@@ -26,9 +26,21 @@ export const ESQUEMAS = [
   { v: "MEZCLAS", l: "Mezclas" }, { v: "BOMBA", l: "Bomba" },
 ];
 
+export const INSULINA_BASAL_OPCIONES = [
+  { v: "GLARGINA", l: "Glargina" }, { v: "DETEMIR", l: "Detemir" },
+  { v: "DEGLUDEC", l: "Degludec" }, { v: "NPH", l: "NPH" },
+  { v: "OTRO", l: "Otro" },
+];
+
+export const QUIEN_PREPARA_OPCIONES = [
+  "El paciente", "Madre", "Padre", "Hermano", "Hermana",
+  "Abuela materna", "Abuelo materno", "Abuela paterna", "Abuelo paterno",
+  "Tío", "Tía", "Cuidador/Niñera", "Otro",
+];
+
 export const CONOCE_ITEMS = [
   ["hipoglucemia", "Hipoglucemia"], ["hiperglucemia", "Hiperglucemia"], ["tecnica", "Técnica de aplicación"],
-  ["rotacion", "Rotación de sitios"], ["conteo_cho", "Conteo de CHO"], ["correccion", "Corrección"],
+  ["rotacion", "Rotación de sitios"], ["conteo_cho", "Conteo de CHO"], ["correccion", "Factor de corrección"],
   ["dias_enfermedad", "Días de enfermedad"], ["cuidado_pies", "Cuidado de pies"],
 ];
 
@@ -36,6 +48,7 @@ export const TEMAS_PLAN = [
   ["alimentacion", "Alimentación"], ["conteo_cho", "Conteo CHO"], ["ajuste_insulina", "Ajuste de insulina"],
   ["hipoglucemia", "Hipoglucemia"], ["ejercicio", "Ejercicio"], ["cgm", "CGM"],
   ["glucometro", "Glucómetro"], ["cuidado_pies", "Cuidado de pies"], ["metas_glucosa", "Metas de glucosa"],
+  ["lectura_etiquetas", "Lectura de etiquetas"],
 ];
 
 export const BARRERAS = [
@@ -52,8 +65,8 @@ export const SECCIONES_DEF = [
   { key: "actividad_fisica",     titulo: "Actividad Física",                   icon: "bi-bicycle" },
   { key: "educacion_previa",     titulo: "Educación en Diabetes (previa)",     icon: "bi-mortarboard" },
   { key: "objetivos_paciente",   titulo: "Objetivos del Paciente",             icon: "bi-bullseye" },
-  { key: "plan_educativo",       titulo: "Plan Educativo",                     icon: "bi-clipboard2-check" },
   { key: "evaluacion_educativa", titulo: "Evaluación Educativa",               icon: "bi-graph-up" },
+  { key: "plan_educativo",       titulo: "Plan Educativo",                     icon: "bi-clipboard2-check" },
 ];
 
 // ── Automatizaciones ─────────────────────────────────────────────────────────
@@ -111,14 +124,20 @@ export const emptySesion = {
     comorbilidades: { hta: false, dislipidemia: false, obesidad: false, erc: false, ecv: false, hipotiroidismo: false, otra: false, otra_texto: "" },
     complicaciones: { retinopatia: false, neuropatia: false, nefropatia: false, pie_diabetico: false, ninguna: false },
   },
-  tratamiento_actual: { medicamentos: "", insulina_basal: "", insulina_rapida: "", esquema: "" },
-  monitoreo: { metodo: { glucometro: false, cgm: false }, frecuencia: "", ayunas: "", antes_comidas: "", despues_comidas: "", hipoglucemias: "", reconoce_sintomas: "" },
-  alimentacion: { quien_prepara: "", comidas_dia: "", bebidas_azucaradas: false, conteo_carbohidratos: false, horario_regular: false },
+  tratamiento_actual: {
+    medicamentos: "", insulina_basal: "", insulina_basal_otro: "", insulina_rapida: "", esquema: "",
+    factor_correccion: "", factor_correccion_variable: false,
+    factor_correccion_comidas: { desayuno: "", almuerzo: "", cena: "" },
+    indice_ic: "", indice_ic_variable: false,
+    indice_ic_comidas: { desayuno: "", almuerzo: "", cena: "" },
+  },
+  monitoreo: { metodo: { glucometro: false, cgm: false }, frecuencia: "", tir: "", tar: "", tbr: "", hipoglucemias: "", reconoce_sintomas: "" },
+  alimentacion: { quien_prepara: "", quien_prepara_otro: "", comidas_dia: "", bebidas_azucaradas: false, conteo_carbohidratos: false, horario_regular: false, comentario: "" },
   actividad_fisica: { no_realiza: false, tipo: "", frecuencia: "" },
   educacion_previa: { ha_recibido: "", conoce: { hipoglucemia: false, hiperglucemia: false, tecnica: false, rotacion: false, conteo_cho: false, correccion: false, dias_enfermedad: false, cuidado_pies: false } },
   objetivos_paciente: "",
   plan_educativo: {
-    temas: { alimentacion: false, conteo_cho: false, ajuste_insulina: false, hipoglucemia: false, ejercicio: false, cgm: false, glucometro: false, cuidado_pies: false, metas_glucosa: false },
+    temas: { alimentacion: false, conteo_cho: false, ajuste_insulina: false, hipoglucemia: false, ejercicio: false, cgm: false, glucometro: false, cuidado_pies: false, metas_glucosa: false, lectura_etiquetas: false },
     proxima_cita: "", observaciones: "",
   },
   evaluacion_educativa: {
