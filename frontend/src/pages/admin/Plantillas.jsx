@@ -410,7 +410,7 @@ function buildHTML(data, tipo, vars = {}, editableVars = false, editableData = t
 }
 
 const MUESTRA = {
-  paciente: "Carlos Mejia Reyes", paciente_dni: "0801-1990-12345", paciente_edad: "34 anos",
+  paciente: "Carlos Mejia Reyes", paciente_dni: "0801-1990-12345", paciente_edad: "34 años",
   nombres: "Carlos Alexander", apellido1: "Mejia", apellido2: "Reyes",
   expediente: "719",
   fecha: "1 de mayo de 2026", ciudad: "Tegucigalpa, M.D.C",
@@ -422,7 +422,7 @@ const MUESTRA = {
   rtn_medico: "08011995000022", cai: "20C90B-E3C453-9E4CA7-C7F083-E22C30-5C",
   num_recibo: "000-001-04-00000201", rtn_paciente: "05019893456789",
   sintomas: "Tos persistente, fiebre de 3 dias de evolucion, disnea leve.",
-  resumen_clinico: "Paciente masculino de 34 anos con cuadro de 3 dias de fiebre y tos. Se indica referencia para valoracion especializada.",
+  resumen_clinico: "Paciente masculino de 34 años con cuadro de 3 dias de fiebre y tos. Se indica referencia para valoracion especializada.",
   recomendaciones: "Acudir en ayunas. Traer examenes previos.",
   examenes: "- Hemograma completo\n- Perfil lipidico\n- Glucosa en ayunas\n- Uroanalis",
   estudios: "- Radiografia de torax PA\n- Ecografia abdominal",
@@ -802,7 +802,7 @@ export default function Plantillas() {
     return {
       paciente: `${nombres} ${apellidos}`.trim(),
       paciente_dni: pacienteSel.dni || "",
-      paciente_edad: pacienteSel.edad != null ? `${pacienteSel.edad} anos` : "",
+      paciente_edad: pacienteSel.edad != null ? `${pacienteSel.edad} años` : "",
       nombres,
       apellido1: partesApellido[0] || "",
       apellido2: partesApellido.slice(1).join(" ") || "",
@@ -903,7 +903,7 @@ export default function Plantillas() {
                           onMouseDown={e => e.preventDefault()}>
                           <div style={{ fontWeight: 600, color: "#1a2744" }}>{p.nombres} {p.apellidos}</div>
                           <div style={{ color: "#6b7280", fontSize: "0.75rem" }}>
-                            {p.dni ? `DNI: ${p.dni}` : "Sin DNI"}{p.edad != null ? ` · ${p.edad} anos` : ""}
+                            {p.dni ? `DNI: ${p.dni}` : "Sin DNI"}{p.edad != null ? ` · ${p.edad} años` : ""}
                           </div>
                         </div>
                       ))}
@@ -915,7 +915,7 @@ export default function Plantillas() {
                   <div>
                     <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#fff" }}>{pacienteSel.nombres} {pacienteSel.apellidos}</div>
                     <div style={{ color: "rgba(255,255,255,.65)", fontSize: "0.72rem" }}>
-                      {pacienteSel.dni ? `DNI: ${pacienteSel.dni}` : "Sin DNI"}{pacienteSel.edad != null ? ` · ${pacienteSel.edad} anos` : ""}
+                      {pacienteSel.dni ? `DNI: ${pacienteSel.dni}` : "Sin DNI"}{pacienteSel.edad != null ? ` · ${pacienteSel.edad} años` : ""}
                     </div>
                   </div>
                   <button onClick={() => setPacienteSel(null)} title="Quitar paciente" style={{ border: "1px solid rgba(220,38,38,.5)", background: "rgba(220,38,38,.15)", color: "#fecaca", borderRadius: 6, padding: "5px 8px", cursor: "pointer" }}>
