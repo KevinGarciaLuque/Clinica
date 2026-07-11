@@ -246,7 +246,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     const { historia_id, cita_id, paciente_id, notas, firma_digital_url, items = [] } = req.body;
     if (!paciente_id) throw new Error("paciente_id requerido");
-    if (!items.length)  throw new Error("Debe incluir al menos un medicamento");
+    if (!items.length && !(notas || "").trim()) throw new Error("Debe incluir al menos un medicamento o una nota");
 
     // Si es SUPER_ADMIN sin clinica_id, derivarlo del paciente
     if (!cid) {

@@ -20,7 +20,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
 
     const q = (req.query.q || "").trim().slice(0, 100);
     let sql =
-      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes ";
+      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes ";
     const params = [];
 
     // Filtrar por clínica si no es SUPER_ADMIN

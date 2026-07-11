@@ -42,7 +42,10 @@ function Switch({ checked, onChange, disabled }) {
 // ═══════════════════════════════════════════════════════════════════════════════
 //  IMPRESIÓN
 // ═══════════════════════════════════════════════════════════════════════════════
-function PrintSesion({ sesion, paciente, user, logoUrl, onClose }) {
+function PrintSesion({ sesion, paciente, user, logoUrl, headerCfg, onClose }) {
+  const encabezadoOn = headerCfg?.encabezado_color !== false;
+  const encabezadoColor = encabezadoOn ? (headerCfg?.color || TEAL) : "#d1d5db";
+  const encabezadoTextColor = encabezadoOn ? (headerCfg?.color || TEAL) : "#1a1a2e";
   const S = {
     sectionTitle: { fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: "1.5px solid #99f6e4", paddingBottom: 4, margin: "14px 0 8px" },
     fieldRow: { display: "flex", gap: 20, marginBottom: 5, alignItems: "baseline", flexWrap: "wrap" },
@@ -81,12 +84,12 @@ function PrintSesion({ sesion, paciente, user, logoUrl, onClose }) {
       </div>
       <div style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
         <div id="edu-print-doc" style={{ background: "white", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "18mm 20mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${TEAL}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${encabezadoColor}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 120, maxWidth: 240, objectFit: "contain", marginLeft: "-10mm" }} />}
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: TEAL }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
-                <div style={{ fontSize: 10, color: "#0f766e", marginTop: 3 }}>Educación en Diabetes</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: encabezadoTextColor }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
+                <div style={{ fontSize: 10, color: encabezadoOn ? "#0f766e" : "#6b7280", marginTop: 3 }}>Educación en Diabetes</div>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -214,19 +217,29 @@ export default function ConsultaEducacion() {
   const [msg, setMsg] = useState(null);
   const [mostrarPrint, setMostrarPrint] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
+  const [headerCfgSesion, setHeaderCfgSesion] = useState({ encabezado_color: true, color: TEAL });
 
   useEffect(() => {
     api.get("/pacientes", { params: { limit: 200 } }).then(r => setPacientes(r.data.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
-    // El logo del consultorio se configura en Plantillas de Documentos (Receta) y se
-    // reutiliza aquí para que los documentos impresos de Educación en Diabetes coincidan.
+    // El logo y el color del encabezado se configuran en Plantillas de Documentos
+    // (Personalización / Sesión Educativa) y se reutilizan aquí para que los
+    // documentos impresos de Educación en Diabetes coincidan con lo configurado ahí.
     if (!user?.clinica_id) return;
     api.get(`/clinicas/${user.clinica_id}/plantillas/receta`).then(r => {
       const contenido = r.data?.data?.contenido;
       if (!contenido) return;
       try { setLogoUrl(JSON.parse(contenido).logo_url || ""); } catch { /* plantilla sin formato JSON */ }
+    }).catch(() => {});
+    api.get(`/clinicas/${user.clinica_id}/plantillas/educacion_sesion`).then(r => {
+      const contenido = r.data?.data?.contenido;
+      if (!contenido) return;
+      try {
+        const cfg = JSON.parse(contenido);
+        setHeaderCfgSesion({ encabezado_color: cfg.encabezado_color !== false, color: cfg.color || TEAL });
+      } catch { /* plantilla sin formato JSON */ }
     }).catch(() => {});
   }, [user?.clinica_id]);
 
@@ -325,7 +338,7 @@ export default function ConsultaEducacion() {
   const pacientesFiltrados = pacientes.filter(p => `${p.nombres} ${p.apellidos}`.toLowerCase().includes(busqueda.toLowerCase()));
 
   if (mostrarPrint && sesionActiva && sesionActiva !== "nueva") {
-    return <PrintSesion sesion={sesionActiva} paciente={paciente} user={user} logoUrl={logoUrl} onClose={() => setMostrarPrint(false)} />;
+    return <PrintSesion sesion={sesionActiva} paciente={paciente} user={user} logoUrl={logoUrl} headerCfg={headerCfgSesion} onClose={() => setMostrarPrint(false)} />;
   }
 
   return (

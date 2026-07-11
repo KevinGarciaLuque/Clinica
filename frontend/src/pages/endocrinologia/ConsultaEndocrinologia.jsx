@@ -108,7 +108,10 @@ const GRADO_RIESGO_PIE = [
 // ═══════════════════════════════════════════════════════════════════════════════
 //  IMPRESIÓN
 // ═══════════════════════════════════════════════════════════════════════════════
-function PrintSeguimiento({ historia, seguimiento, paciente, user, logoUrl, onClose }) {
+function PrintSeguimiento({ historia, seguimiento, paciente, user, logoUrl, headerCfg, onClose }) {
+  const encabezadoOn = headerCfg?.encabezado_color !== false;
+  const encabezadoColor = encabezadoOn ? (headerCfg?.color || ORANGE) : "#d1d5db";
+  const encabezadoTextColor = encabezadoOn ? (headerCfg?.color || ORANGE) : "#1a1a2e";
   const S = {
     sectionTitle: { fontSize: 11, fontWeight: 700, color: ORANGE, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: "1.5px solid #fed7aa", paddingBottom: 4, margin: "14px 0 8px" },
     fieldRow: { display: "flex", gap: 20, marginBottom: 5, alignItems: "baseline", flexWrap: "wrap" },
@@ -144,12 +147,12 @@ function PrintSeguimiento({ historia, seguimiento, paciente, user, logoUrl, onCl
       </div>
       <div style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
         <div id="endo-print-doc" style={{ background: "white", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "18mm 20mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${ORANGE}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${encabezadoColor}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 120, maxWidth: 240, objectFit: "contain", marginLeft: "-10mm" }} />}
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: ORANGE }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
-                <div style={{ fontSize: 10, color: "#9a5b2c", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: encabezadoTextColor }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
+                <div style={{ fontSize: 10, color: encabezadoOn ? "#9a5b2c" : "#6b7280", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes</div>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -260,7 +263,10 @@ function PrintSeguimiento({ historia, seguimiento, paciente, user, logoUrl, onCl
 // ═══════════════════════════════════════════════════════════════════════════════
 //  IMPRESIÓN — PLAN DE SEGUIMIENTO
 // ═══════════════════════════════════════════════════════════════════════════════
-function PrintPlan({ registro, historia, paciente, user, logoUrl, onClose }) {
+function PrintPlan({ registro, historia, paciente, user, logoUrl, headerCfg, onClose }) {
+  const encabezadoOn = headerCfg?.encabezado_color !== false;
+  const encabezadoColor = encabezadoOn ? (headerCfg?.color || ORANGE) : "#d1d5db";
+  const encabezadoTextColor = encabezadoOn ? (headerCfg?.color || ORANGE) : "#1a1a2e";
   const p = registro?.plan || {};
   const procedencia = [paciente?.departamento, paciente?.ciudad].filter(Boolean).join(", ");
   const S = {
@@ -306,12 +312,12 @@ function PrintPlan({ registro, historia, paciente, user, logoUrl, onClose }) {
       </div>
       <div style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
         <div id="endo-print-doc" style={{ background: "white", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "18mm 20mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${ORANGE}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${encabezadoColor}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 120, maxWidth: 240, objectFit: "contain", marginLeft: "-10mm" }} />}
               <div>
-                <div style={{ fontSize: 16, fontWeight: 800, color: ORANGE }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
-                <div style={{ fontSize: 10, color: "#9a5b2c", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes</div>
+                <div style={{ fontSize: 16, fontWeight: 800, color: encabezadoTextColor }}>{user?.clinica_nombre || "Clínica de Endocrinología"}</div>
+                <div style={{ fontSize: 10, color: encabezadoOn ? "#9a5b2c" : "#6b7280", marginTop: 3 }}>Control Intensivo en Pacientes con Diabetes</div>
               </div>
             </div>
             <div style={{ textAlign: "right" }}>
@@ -405,19 +411,38 @@ export default function ConsultaEndocrinologia() {
   const [msg, setMsg] = useState(null);
   const [mostrarPrint, setMostrarPrint] = useState(false);
   const [logoUrl, setLogoUrl] = useState("");
+  const [headerCfgSeguimiento, setHeaderCfgSeguimiento] = useState({ encabezado_color: true, color: ORANGE });
+  const [headerCfgPlan, setHeaderCfgPlan] = useState({ encabezado_color: true, color: ORANGE });
 
   useEffect(() => {
     api.get("/pacientes", { params: { limit: 200 } }).then(r => setPacientes(r.data.data || [])).catch(() => {});
   }, []);
 
   useEffect(() => {
-    // El logo del consultorio se configura en Plantillas de Documentos (Receta) y se
-    // reutiliza aquí para que los documentos impresos de Control de Seguimiento coincidan.
+    // El logo y el color del encabezado se configuran en Plantillas de Documentos
+    // (Personalización / Control Seguimiento / Plan Seguimiento) y se reutilizan
+    // aquí para que los documentos impresos coincidan con lo configurado ahí.
     if (!user?.clinica_id) return;
     api.get(`/clinicas/${user.clinica_id}/plantillas/receta`).then(r => {
       const contenido = r.data?.data?.contenido;
       if (!contenido) return;
       try { setLogoUrl(JSON.parse(contenido).logo_url || ""); } catch { /* plantilla sin formato JSON */ }
+    }).catch(() => {});
+    api.get(`/clinicas/${user.clinica_id}/plantillas/endo_seguimiento`).then(r => {
+      const contenido = r.data?.data?.contenido;
+      if (!contenido) return;
+      try {
+        const cfg = JSON.parse(contenido);
+        setHeaderCfgSeguimiento({ encabezado_color: cfg.encabezado_color !== false, color: cfg.color || ORANGE });
+      } catch { /* plantilla sin formato JSON */ }
+    }).catch(() => {});
+    api.get(`/clinicas/${user.clinica_id}/plantillas/endo_plan`).then(r => {
+      const contenido = r.data?.data?.contenido;
+      if (!contenido) return;
+      try {
+        const cfg = JSON.parse(contenido);
+        setHeaderCfgPlan({ encabezado_color: cfg.encabezado_color !== false, color: cfg.color || ORANGE });
+      } catch { /* plantilla sin formato JSON */ }
     }).catch(() => {});
   }, [user?.clinica_id]);
 
@@ -631,11 +656,11 @@ export default function ConsultaEndocrinologia() {
   const pacientesFiltrados = pacientes.filter(p => `${p.nombres} ${p.apellidos}`.toLowerCase().includes(busqueda.toLowerCase()));
 
   if (mostrarPrint && seguimientoActivo && seguimientoActivo !== "nuevo") {
-    return <PrintSeguimiento historia={historia} seguimiento={seguimientoActivo} paciente={paciente} user={user} logoUrl={logoUrl} onClose={() => setMostrarPrint(false)} />;
+    return <PrintSeguimiento historia={historia} seguimiento={seguimientoActivo} paciente={paciente} user={user} logoUrl={logoUrl} headerCfg={headerCfgSeguimiento} onClose={() => setMostrarPrint(false)} />;
   }
 
   if (mostrarPrintPlan && planActivo && planActivo !== "nuevo") {
-    return <PrintPlan registro={planActivo} historia={historia} paciente={paciente} user={user} logoUrl={logoUrl} onClose={() => setMostrarPrintPlan(false)} />;
+    return <PrintPlan registro={planActivo} historia={historia} paciente={paciente} user={user} logoUrl={logoUrl} headerCfg={headerCfgPlan} onClose={() => setMostrarPrintPlan(false)} />;
   }
 
   return (
