@@ -5,6 +5,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 const DEFAULT_CFG = {
   directorio_color_primario: "#213665",
+  directorio_color_tarjetas: "#213665",
   directorio_badge_texto:    "Directorio médico",
   directorio_titulo:         "Agenda tu consulta médica",
   directorio_subtitulo:      "Los mejores médicos y especialistas los encuentras aquí. Compara perfiles y agenda tu cita en línea, sin llamadas ni esperas.",
@@ -134,6 +135,7 @@ export default function DirectorioMedicos() {
   const [cfg, setCfg] = useState(DEFAULT_CFG);
 
   const COLOR = (cfg.directorio_color_primario || DEFAULT_CFG.directorio_color_primario).trim();
+  const CARD_COLOR = (cfg.directorio_color_tarjetas || DEFAULT_CFG.directorio_color_tarjetas).trim();
 
   useEffect(() => {
     fetch(`${API}/api/public/directorio`)
@@ -176,7 +178,7 @@ export default function DirectorioMedicos() {
           50%      { transform: translateY(-14px); }
         }
         .dm-card:hover {
-          transform: translateY(-8px);
+          transform: translateY(-8px) scale(1.035);
           box-shadow: 0 20px 46px rgba(15,23,42,.14) !important;
           border-color: rgba(33,54,101,.18) !important;
         }
@@ -315,7 +317,7 @@ export default function DirectorioMedicos() {
               display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 22,
             }}>
               {filtrados.map((m, i) => (
-                <DoctorCard key={m.slug} medico={m} index={i} fallbackColor={COLOR} onSelect={(slug) => navigate(`/p/${slug}`)} />
+                <DoctorCard key={m.slug} medico={m} index={i} fallbackColor={CARD_COLOR} onSelect={(slug) => navigate(`/p/${slug}`)} />
               ))}
             </div>
           )}

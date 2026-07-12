@@ -48,6 +48,7 @@ export default function LandingPageAdmin() {
         landing_plan_anual_features:  c.landing_plan_anual_features   ?? "[]",
         // Directorio médico público (/agenda-tu-consulta)
         directorio_color_primario:    c.directorio_color_primario     ?? "#213665",
+        directorio_color_tarjetas:    c.directorio_color_tarjetas     ?? "#213665",
         directorio_badge_texto:       c.directorio_badge_texto        ?? "",
         directorio_titulo:            c.directorio_titulo             ?? "",
         directorio_subtitulo:         c.directorio_subtitulo          ?? "",
@@ -556,38 +557,64 @@ export default function LandingPageAdmin() {
             </p>
           </div>
 
-          {/* Color */}
-          <div>
-            <label className="form-label fw-bold">
-              <i className="bi bi-palette-fill me-1" />Color principal del directorio
-            </label>
-            <div className="form-text mb-2">
-              Se usa en el fondo del encabezado, el botón "Agendar cita" de las tarjetas (cuando la clínica
-              no definió su propio color) y el banner final para médicos.
+          {/* Colores */}
+          <div className="row g-3">
+            <div className="col-sm-6">
+              <label className="form-label fw-bold">
+                <i className="bi bi-palette-fill me-1" />Color del encabezado y banner
+              </label>
+              <div className="form-text mb-2">
+                Fondo del encabezado superior y del banner final "Para médicos y especialistas".
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  type="color"
+                  value={form.directorio_color_primario}
+                  onChange={e => set("directorio_color_primario", e.target.value)}
+                  style={{ width: 44, height: 38, border: "none", borderRadius: 8, cursor: "pointer", padding: 2 }}
+                />
+                <input
+                  className="form-control"
+                  style={{ fontFamily: "monospace", maxWidth: 130 }}
+                  value={form.directorio_color_primario}
+                  onChange={e => set("directorio_color_primario", e.target.value)}
+                  placeholder="#213665"
+                />
+                <div style={{
+                  flex: 1, minWidth: 90, height: 38, borderRadius: 10,
+                  background: `linear-gradient(135deg, ${form.directorio_color_primario} 0%, #000 100%)`,
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,.2)",
+                }} />
+              </div>
             </div>
-            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-              <input
-                type="color"
-                value={form.directorio_color_primario}
-                onChange={e => set("directorio_color_primario", e.target.value)}
-                style={{ width: 44, height: 38, border: "none", borderRadius: 8, cursor: "pointer", padding: 2 }}
-              />
-              <input
-                className="form-control"
-                style={{ fontFamily: "monospace", maxWidth: 130 }}
-                value={form.directorio_color_primario}
-                onChange={e => set("directorio_color_primario", e.target.value)}
-                placeholder="#213665"
-              />
-              <div style={{
-                flex: 1, minWidth: 120, height: 38, borderRadius: 10,
-                background: `linear-gradient(135deg, ${form.directorio_color_primario} 0%, #000 100%)`,
-                display: "flex", alignItems: "center", justifyContent: "center",
-                boxShadow: "inset 0 1px 3px rgba(0,0,0,.2)",
-              }}>
-                <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, opacity: .9, letterSpacing: ".5px" }}>
-                  Vista previa
-                </span>
+
+            <div className="col-sm-6">
+              <label className="form-label fw-bold">
+                <i className="bi bi-card-heading me-1" />Color de las tarjetas
+              </label>
+              <div className="form-text mb-2">
+                Franja superior, título de especialidad y botón "Agendar cita" — solo para clínicas que no
+                definieron su propio color en Configuración.
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  type="color"
+                  value={form.directorio_color_tarjetas}
+                  onChange={e => set("directorio_color_tarjetas", e.target.value)}
+                  style={{ width: 44, height: 38, border: "none", borderRadius: 8, cursor: "pointer", padding: 2 }}
+                />
+                <input
+                  className="form-control"
+                  style={{ fontFamily: "monospace", maxWidth: 130 }}
+                  value={form.directorio_color_tarjetas}
+                  onChange={e => set("directorio_color_tarjetas", e.target.value)}
+                  placeholder="#213665"
+                />
+                <div style={{
+                  flex: 1, minWidth: 90, height: 38, borderRadius: 10,
+                  background: `linear-gradient(135deg, ${form.directorio_color_tarjetas} 0%, #000 100%)`,
+                  boxShadow: "inset 0 1px 3px rgba(0,0,0,.2)",
+                }} />
               </div>
             </div>
           </div>
