@@ -51,7 +51,7 @@ function DoctorCard({ medico, index, onSelect, fallbackColor }) {
         textAlign: "center",
         cursor: "pointer",
         animation: `dmFadeUp .55s ${Math.min(index * 0.06, 0.6)}s ease both`,
-        transition: "transform .25s ease, box-shadow .25s ease, border-color .25s ease",
+        transition: "transform .35s cubic-bezier(.25,.8,.25,1), box-shadow .35s ease, border-color .35s ease",
         position: "relative",
         overflow: "hidden",
       }}
@@ -178,8 +178,8 @@ export default function DirectorioMedicos() {
           50%      { transform: translateY(-14px); }
         }
         .dm-card:hover {
-          transform: translateY(-8px) scale(1.035) !important;
-          box-shadow: 0 20px 46px rgba(15,23,42,.14) !important;
+          transform: translateY(-5px) scale(1.015) !important;
+          box-shadow: 0 16px 36px rgba(15,23,42,.11) !important;
           border-color: rgba(33,54,101,.18) !important;
         }
         .dm-card:hover .dm-card-btn { filter: brightness(1.08); }
