@@ -244,6 +244,35 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] catalogos_tipos_cita OK");
 
+    // Corrige la FK citas.servicio_id: debe apuntar a catalogos_tipos_cita
+    // (tabla usada por el agendamiento público y de admin), no a "servicios"
+    // (catálogo de precios). Con la FK apuntando a "servicios", agendar una
+    // cita desde el portal público fallaba con:
+    //   Cannot add or update a child row: a foreign key constraint fails
+    //   (`citas`, CONSTRAINT `fk_citas_servicio` ...)
+    const [fkServicio] = await pool.query(`
+      SELECT REFERENCED_TABLE_NAME FROM information_schema.KEY_COLUMN_USAGE
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'citas'
+        AND CONSTRAINT_NAME = 'fk_citas_servicio'
+    `);
+    if (fkServicio.length && fkServicio[0].REFERENCED_TABLE_NAME !== 'catalogos_tipos_cita') {
+      await pool.query(`ALTER TABLE citas DROP FOREIGN KEY fk_citas_servicio`);
+      await pool.query(`
+        UPDATE citas c
+        LEFT JOIN catalogos_tipos_cita t ON t.id = c.servicio_id
+        SET c.servicio_id = NULL
+        WHERE c.servicio_id IS NOT NULL AND t.id IS NULL
+      `);
+      await pool.query(`
+        ALTER TABLE citas
+          ADD CONSTRAINT fk_citas_servicio
+          FOREIGN KEY (servicio_id) REFERENCES catalogos_tipos_cita(id) ON DELETE SET NULL
+      `);
+      console.log("✅ [auto-migrate] fk_citas_servicio → catalogos_tipos_cita (corregida)");
+    } else {
+      console.log("✅ [auto-migrate] fk_citas_servicio OK");
+    }
+
     // Notificaciones internas para usuarios de clínica (campanita navbar)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS notificaciones_usuario (
