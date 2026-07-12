@@ -178,7 +178,7 @@ export default function DirectorioMedicos() {
           50%      { transform: translateY(-14px); }
         }
         .dm-card:hover {
-          transform: translateY(-8px) scale(1.035);
+          transform: translateY(-8px) scale(1.035) !important;
           box-shadow: 0 20px 46px rgba(15,23,42,.14) !important;
           border-color: rgba(33,54,101,.18) !important;
         }
