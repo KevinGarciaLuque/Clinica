@@ -1,4 +1,15 @@
 {
+  "redirects": [
+    {
+      "source": "/:path*",
+      "missing": [
+        { "type": "host", "value": "medickg.com" },
+        { "type": "host", "value": "www.medickg.com" }
+      ],
+      "destination": "https://medickg.com/:path*",
+      "permanent": true
+    }
+  ],
   "rewrites": [
     {
       "source": "/(.*)",
