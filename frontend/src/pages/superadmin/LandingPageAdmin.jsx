@@ -2,10 +2,11 @@ import { useState, useEffect, useRef } from "react";
 import api from "../../api/api";
 
 const TABS = [
-  { id: "hero",     label: "Hero",      icon: "bi-house-heart-fill" },
-  { id: "planes",   label: "Planes",    icon: "bi-tags-fill" },
-  { id: "nosotros", label: "Nosotros",  icon: "bi-people-fill" },
-  { id: "contacto", label: "Contacto",  icon: "bi-chat-dots-fill" },
+  { id: "hero",       label: "Hero",       icon: "bi-house-heart-fill" },
+  { id: "planes",     label: "Planes",     icon: "bi-tags-fill" },
+  { id: "nosotros",   label: "Nosotros",   icon: "bi-people-fill" },
+  { id: "contacto",   label: "Contacto",   icon: "bi-chat-dots-fill" },
+  { id: "directorio", label: "Directorio", icon: "bi-hospital-fill" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -45,6 +46,18 @@ export default function LandingPageAdmin() {
         landing_plan_semestral_features:  c.landing_plan_semestral_features   ?? "[]",
         landing_plan_anual_precio:    c.landing_plan_anual_precio     ?? "",
         landing_plan_anual_features:  c.landing_plan_anual_features   ?? "[]",
+        // Directorio médico público (/agenda-tu-consulta)
+        directorio_color_primario:    c.directorio_color_primario     ?? "#213665",
+        directorio_badge_texto:       c.directorio_badge_texto        ?? "",
+        directorio_titulo:            c.directorio_titulo             ?? "",
+        directorio_subtitulo:         c.directorio_subtitulo          ?? "",
+        directorio_badge1_texto:      c.directorio_badge1_texto       ?? "",
+        directorio_badge2_texto:      c.directorio_badge2_texto       ?? "",
+        directorio_badge3_texto:      c.directorio_badge3_texto       ?? "",
+        directorio_cta_badge:         c.directorio_cta_badge          ?? "",
+        directorio_cta_titulo:        c.directorio_cta_titulo         ?? "",
+        directorio_cta_texto:         c.directorio_cta_texto          ?? "",
+        directorio_cta_boton:         c.directorio_cta_boton          ?? "",
       });
     }).catch(() => {});
   }, []);
@@ -529,6 +542,175 @@ export default function LandingPageAdmin() {
               />
             </div>
           </div>
+        </div>
+      )}
+
+      {/* ── TAB: DIRECTORIO ── */}
+      {tab === "directorio" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+              <i className="bi bi-info-circle me-1" />
+              Esto edita el <strong>directorio público de médicos</strong> (<code>/agenda-tu-consulta</code>),
+              donde los pacientes buscan y comparan especialistas.
+            </p>
+          </div>
+
+          {/* Color */}
+          <div>
+            <label className="form-label fw-bold">
+              <i className="bi bi-palette-fill me-1" />Color principal del directorio
+            </label>
+            <div className="form-text mb-2">
+              Se usa en el fondo del encabezado, el botón "Agendar cita" de las tarjetas (cuando la clínica
+              no definió su propio color) y el banner final para médicos.
+            </div>
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <input
+                type="color"
+                value={form.directorio_color_primario}
+                onChange={e => set("directorio_color_primario", e.target.value)}
+                style={{ width: 44, height: 38, border: "none", borderRadius: 8, cursor: "pointer", padding: 2 }}
+              />
+              <input
+                className="form-control"
+                style={{ fontFamily: "monospace", maxWidth: 130 }}
+                value={form.directorio_color_primario}
+                onChange={e => set("directorio_color_primario", e.target.value)}
+                placeholder="#213665"
+              />
+              <div style={{
+                flex: 1, minWidth: 120, height: 38, borderRadius: 10,
+                background: `linear-gradient(135deg, ${form.directorio_color_primario} 0%, #000 100%)`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                boxShadow: "inset 0 1px 3px rgba(0,0,0,.2)",
+              }}>
+                <span style={{ color: "#fff", fontSize: 11, fontWeight: 700, opacity: .9, letterSpacing: ".5px" }}>
+                  Vista previa
+                </span>
+              </div>
+            </div>
+          </div>
+
+          {/* Encabezado */}
+          <div className="row g-3">
+            <div className="col-sm-6">
+              <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Texto del badge superior</label>
+              <input
+                className="form-control form-control-sm"
+                value={form.directorio_badge_texto}
+                onChange={e => set("directorio_badge_texto", e.target.value)}
+                placeholder="Directorio médico"
+              />
+            </div>
+            <div className="col-12">
+              <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Título</label>
+              <input
+                className="form-control"
+                value={form.directorio_titulo}
+                onChange={e => set("directorio_titulo", e.target.value)}
+                placeholder="Agenda tu consulta médica"
+              />
+            </div>
+            <div className="col-12">
+              <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Subtítulo</label>
+              <textarea
+                className="form-control"
+                rows={2}
+                value={form.directorio_subtitulo}
+                onChange={e => set("directorio_subtitulo", e.target.value)}
+                placeholder="Los mejores médicos y especialistas los encuentras aquí..."
+              />
+            </div>
+          </div>
+
+          {/* Franja de confianza */}
+          <div>
+            <label className="form-label fw-bold">
+              <i className="bi bi-patch-check-fill me-1" />Franja de confianza
+            </label>
+            <div className="form-text mb-2">Tres frases cortas debajo del subtítulo. Deja una vacía para ocultarla.</div>
+            <div className="row g-2">
+              {[1, 2, 3].map(n => (
+                <div className="col-sm-4" key={n}>
+                  <input
+                    className="form-control form-control-sm"
+                    value={form[`directorio_badge${n}_texto`]}
+                    onChange={e => set(`directorio_badge${n}_texto`, e.target.value)}
+                    placeholder={`Frase ${n}`}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Banner CTA médicos */}
+          <div style={{ border: "1px solid #e2e8f0", borderRadius: 14, padding: "18px 20px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+              <div style={{
+                width: 36, height: 36, borderRadius: 10,
+                background: "#3b82f618", border: "1px solid #3b82f640",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-stethoscope" style={{ color: "#3b82f6", fontSize: 16 }} />
+              </div>
+              <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>
+                Banner "Para médicos y especialistas"
+              </span>
+            </div>
+            <div className="row g-3">
+              <div className="col-sm-6">
+                <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Texto del badge</label>
+                <input
+                  className="form-control form-control-sm"
+                  value={form.directorio_cta_badge}
+                  onChange={e => set("directorio_cta_badge", e.target.value)}
+                  placeholder="Para médicos y especialistas"
+                />
+              </div>
+              <div className="col-sm-6">
+                <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Texto del botón</label>
+                <input
+                  className="form-control form-control-sm"
+                  value={form.directorio_cta_boton}
+                  onChange={e => set("directorio_cta_boton", e.target.value)}
+                  placeholder="Quiero unirme"
+                />
+              </div>
+              <div className="col-12">
+                <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Título</label>
+                <input
+                  className="form-control form-control-sm"
+                  value={form.directorio_cta_titulo}
+                  onChange={e => set("directorio_cta_titulo", e.target.value)}
+                  placeholder="Haz crecer tu consulta con nosotros"
+                />
+              </div>
+              <div className="col-12">
+                <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Descripción</label>
+                <textarea
+                  className="form-control form-control-sm"
+                  rows={2}
+                  value={form.directorio_cta_texto}
+                  onChange={e => set("directorio_cta_texto", e.target.value)}
+                  placeholder="Súmate a nuestro directorio y deja que nuevos pacientes te encuentren..."
+                />
+              </div>
+            </div>
+            <div className="form-text mt-2">
+              El botón lleva al usuario a la página de inicio, donde están los planes y el contacto para unirse.
+            </div>
+          </div>
+
+          <a
+            href="/agenda-tu-consulta"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="btn btn-outline-primary btn-sm"
+            style={{ borderRadius: 8, fontWeight: 600, alignSelf: "flex-start" }}
+          >
+            <i className="bi bi-eye me-1" />Ver directorio público
+          </a>
         </div>
       )}
 

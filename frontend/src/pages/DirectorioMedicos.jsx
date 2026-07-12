@@ -2,7 +2,20 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
-const COLOR = "#213665";
+
+const DEFAULT_CFG = {
+  directorio_color_primario: "#213665",
+  directorio_badge_texto:    "Directorio médico",
+  directorio_titulo:         "Agenda tu consulta médica",
+  directorio_subtitulo:      "Los mejores médicos y especialistas los encuentras aquí. Compara perfiles y agenda tu cita en línea, sin llamadas ni esperas.",
+  directorio_badge1_texto:   "Especialistas verificados",
+  directorio_badge2_texto:   "Confirmación al instante",
+  directorio_badge3_texto:   "Tus datos siempre protegidos",
+  directorio_cta_badge:      "Para médicos y especialistas",
+  directorio_cta_titulo:     "Haz crecer tu consulta con nosotros",
+  directorio_cta_texto:      "Súmate a nuestro directorio y deja que nuevos pacientes te encuentren, agenden y confirmen citas en línea, sin esfuerzo adicional para tu clínica.",
+  directorio_cta_boton:      "Quiero unirme",
+};
 
 function darken(hex, pct) {
   const num = parseInt(hex.replace("#", ""), 16);
@@ -17,9 +30,9 @@ function hexToRgb(hex) {
   return r ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}` : "33,54,101";
 }
 
-function DoctorCard({ medico, index, onSelect }) {
+function DoctorCard({ medico, index, onSelect, fallbackColor }) {
   const [fotoError, setFotoError] = useState(false);
-  const color = (medico.color_primario || COLOR).trim();
+  const color = (medico.color_primario || fallbackColor).trim();
   const colorRgb = hexToRgb(color);
   const foto = !fotoError && medico.foto_doctor
     ? (medico.foto_doctor.startsWith("http") ? medico.foto_doctor : `${API}${medico.foto_doctor}`)
@@ -118,6 +131,9 @@ export default function DirectorioMedicos() {
   const [medicos, setMedicos] = useState(null);
   const [error, setError] = useState(null);
   const [busqueda, setBusqueda] = useState("");
+  const [cfg, setCfg] = useState(DEFAULT_CFG);
+
+  const COLOR = (cfg.directorio_color_primario || DEFAULT_CFG.directorio_color_primario).trim();
 
   useEffect(() => {
     fetch(`${API}/api/public/directorio`)
@@ -127,6 +143,11 @@ export default function DirectorioMedicos() {
         setMedicos(d.data || []);
       })
       .catch(() => setError("No pudimos cargar el directorio. Intenta de nuevo más tarde."));
+
+    fetch(`${API}/api/config-sistema`)
+      .then(r => r.json())
+      .then(d => { if (d.ok) setCfg(c => ({ ...c, ...d.data })); })
+      .catch(() => {});
   }, []);
 
   const filtrados = useMemo(() => {
@@ -202,14 +223,34 @@ export default function DirectorioMedicos() {
               color: "rgba(255,255,255,.9)", fontSize: 13, fontWeight: 600,
             }}>
               <i className="bi bi-calendar2-heart" />
-              Directorio médico
+              {cfg.directorio_badge_texto}
             </div>
             <h1 style={{ fontSize: "clamp(1.8rem, 4vw, 2.6rem)", fontWeight: 900, color: "#fff", margin: "0 0 14px", letterSpacing: "-.4px" }}>
-              Agenda tu consulta médica
+              {cfg.directorio_titulo}
             </h1>
             <p style={{ fontSize: 15.5, color: "rgba(255,255,255,.75)", lineHeight: 1.7, maxWidth: 480, margin: "0 auto" }}>
-              Encuentra un médico disponible y agenda tu cita en línea, sin llamadas ni esperas.
+              {cfg.directorio_subtitulo}
             </p>
+
+            {/* Franja de confianza */}
+            <div style={{
+              display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px 28px",
+              marginTop: 28, animation: "dmFadeUp .6s .15s ease both",
+            }}>
+              {[
+                { icon: "bi-patch-check-fill", label: cfg.directorio_badge1_texto },
+                { icon: "bi-lightning-charge-fill", label: cfg.directorio_badge2_texto },
+                { icon: "bi-shield-lock-fill", label: cfg.directorio_badge3_texto },
+              ].filter(item => item.label).map(item => (
+                <div key={item.label} style={{
+                  display: "flex", alignItems: "center", gap: 7,
+                  color: "rgba(255,255,255,.78)", fontSize: 12.5, fontWeight: 600,
+                }}>
+                  <i className={`bi ${item.icon}`} style={{ color: "rgba(255,255,255,.85)" }} />
+                  {item.label}
+                </div>
+              ))}
+            </div>
           </div>
         </section>
 
@@ -274,10 +315,64 @@ export default function DirectorioMedicos() {
               display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 22,
             }}>
               {filtrados.map((m, i) => (
-                <DoctorCard key={m.slug} medico={m} index={i} onSelect={(slug) => navigate(`/p/${slug}`)} />
+                <DoctorCard key={m.slug} medico={m} index={i} fallbackColor={COLOR} onSelect={(slug) => navigate(`/p/${slug}`)} />
               ))}
             </div>
           )}
+
+          {/* CTA para médicos */}
+          <div
+            className="dm-cta-medicos"
+            style={{
+              marginTop: 64,
+              background: `linear-gradient(135deg, ${COLOR} 0%, ${darken(COLOR, 30)} 100%)`,
+              borderRadius: 24,
+              padding: "44px 32px",
+              textAlign: "center",
+              position: "relative",
+              overflow: "hidden",
+              animation: "dmFadeUp .5s .1s ease both",
+            }}
+          >
+            <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
+            <div style={{ position: "absolute", bottom: -70, left: -50, width: 200, height: 200, borderRadius: "50%", background: "rgba(255,255,255,.04)" }} />
+
+            <div style={{
+              display: "inline-flex", alignItems: "center", gap: 7,
+              background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)",
+              borderRadius: 100, padding: "6px 16px", marginBottom: 16,
+              color: "rgba(255,255,255,.9)", fontSize: 12.5, fontWeight: 600, position: "relative",
+            }}>
+              <i className="bi bi-stethoscope" />
+              {cfg.directorio_cta_badge}
+            </div>
+
+            <h2 style={{ fontSize: "clamp(1.3rem, 3vw, 1.7rem)", fontWeight: 800, color: "#fff", margin: "0 0 10px", position: "relative" }}>
+              {cfg.directorio_cta_titulo}
+            </h2>
+            <p style={{
+              fontSize: 14.5, color: "rgba(255,255,255,.75)", lineHeight: 1.7,
+              maxWidth: 480, margin: "0 auto 26px", position: "relative",
+            }}>
+              {cfg.directorio_cta_texto}
+            </p>
+
+            <button
+              onClick={() => navigate("/")}
+              style={{
+                position: "relative",
+                background: "#fff", color: COLOR, border: "none", borderRadius: 12,
+                padding: "12px 26px", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                display: "inline-flex", alignItems: "center", gap: 8,
+                boxShadow: "0 10px 30px rgba(0,0,0,.25)",
+                transition: "transform .2s ease, box-shadow .2s ease",
+              }}
+              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-2px)"; }}
+              onMouseLeave={e => { e.currentTarget.style.transform = "translateY(0)"; }}
+            >
+              {cfg.directorio_cta_boton} <i className="bi bi-arrow-right" />
+            </button>
+          </div>
         </section>
       </div>
     </>
