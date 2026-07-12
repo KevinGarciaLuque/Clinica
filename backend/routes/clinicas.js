@@ -2,7 +2,6 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const argon2 = require("argon2");
-const { uploadClinicas } = require("../middlewares/upload");
 const { seedPacienteDemo } = require("../utils/seedPacienteDemo");
 const cloudinary  = require("../utils/cloudinary");
 const multer      = require("multer");
@@ -1092,14 +1091,36 @@ router.post("/:id/plantillas/predeterminada", auth("SUPER_ADMIN","ADMIN","MEDICO
 // ══════════════════════════════════════════════════════════════════════════
 
 // POST /api/clinicas/:id/upload-logo  → subir logo de la clínica
-router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), uploadClinicas.single("logo"), async (req, res) => {
+// Producción (CLOUDINARY_CLOUD_NAME definido): sube a Cloudinary (persiste entre despliegues)
+// Desarrollo  (sin credenciales):              guarda en uploads/clinicas/
+router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), uploadFotoDoctor.single("logo"), async (req, res) => {
   try {
     if (!req.file) {
       return res.status(400).json({ ok: false, msg: "No se recibió ningún archivo" });
     }
 
     const id = req.user.super ? req.params.id : req.user.clinica_id;
-    const logoUrl = `/uploads/clinicas/${req.file.filename}`;
+    let logoUrl;
+
+    if (USE_CLOUDINARY) {
+      const result = await new Promise((resolve, reject) => {
+        const stream = cloudinary.uploader.upload_stream(
+          { folder: "clinica/clinicas/logo", resource_type: "image" },
+          (err, r) => (err ? reject(err) : resolve(r))
+        );
+        streamifier.createReadStream(req.file.buffer).pipe(stream);
+      });
+      logoUrl = result.secure_url;
+    } else {
+      const dir = path.join(__dirname, "../uploads/clinicas");
+      if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+
+      const ext = req.file.mimetype === "image/png" ? ".png"
+                : req.file.mimetype === "image/webp" ? ".webp" : ".jpg";
+      const filename = `logo-${id}-${Date.now()}${ext}`;
+      fs.writeFileSync(path.join(dir, filename), req.file.buffer);
+      logoUrl = `/uploads/clinicas/${filename}`;
+    }
 
     // Actualizar logo_url en la base de datos
     await pool.query(
@@ -1107,10 +1128,10 @@ router.post("/:id/upload-logo", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO")
       [logoUrl, id]
     );
 
-    res.json({ 
-      ok: true, 
+    res.json({
+      ok: true,
       logo_url: logoUrl,
-      msg: "Logo subido correctamente" 
+      msg: "Logo subido correctamente"
     });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
