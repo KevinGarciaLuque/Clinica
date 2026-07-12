@@ -485,6 +485,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   const { user, modulos } = useAuth();
   const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
   const { super: sItems, main, admin } = getMenuSections(user?.tipo, modulos);
+  const [showFotoModal, setShowFotoModal] = useState(false);
 
   return (
     <>
@@ -583,15 +584,19 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           {!collapsed && (
             <>
               {/* Foto grande centrada */}
-              <div style={{
-                width: 72, height: 72, borderRadius: "50%", flexShrink: 0,
-                background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                overflow: "hidden",
-                border: "3px solid rgba(255,255,255,.18)",
-                boxShadow: "0 4px 16px rgba(0,0,0,.5)",
-                alignSelf: "center",
-              }}>
+              <div
+                onClick={() => user?.foto_url && setShowFotoModal(true)}
+                style={{
+                  width: 72, height: 72, borderRadius: "50%", flexShrink: 0,
+                  background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  overflow: "hidden",
+                  border: "3px solid rgba(255,255,255,.18)",
+                  boxShadow: "0 4px 16px rgba(0,0,0,.5)",
+                  alignSelf: "center",
+                  cursor: user?.foto_url ? "pointer" : "default",
+                }}
+              >
                 {user?.foto_url
                   ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                   : <span style={{ color: "#fff", fontWeight: 700, fontSize: "1.5rem" }}>{initials}</span>
@@ -623,13 +628,17 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           )}
 
           {collapsed && (
-            <div style={{
-              width: 36, height: 36, borderRadius: "50%",
-              background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              overflow: "hidden", border: "2px solid rgba(255,255,255,.15)",
-              boxShadow: "0 2px 8px rgba(0,0,0,.4)",
-            }}>
+            <div
+              onClick={() => user?.foto_url && setShowFotoModal(true)}
+              style={{
+                width: 36, height: 36, borderRadius: "50%",
+                background: "linear-gradient(135deg, #3b82f6, #1d4ed8)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                overflow: "hidden", border: "2px solid rgba(255,255,255,.15)",
+                boxShadow: "0 2px 8px rgba(0,0,0,.4)",
+                cursor: user?.foto_url ? "pointer" : "default",
+              }}
+            >
               {user?.foto_url
                 ? <img src={user.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
                 : <span style={{ color: "#fff", fontWeight: 700, fontSize: "0.78rem" }}>{initials}</span>
@@ -667,6 +676,49 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
           </div>
         )}
       </div>
+
+      {/* ════════════ MODAL FOTO DE PERFIL ════════════ */}
+      {showFotoModal && user?.foto_url && (
+        <div
+          onClick={() => setShowFotoModal(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 2000,
+            background: "rgba(0,0,0,.75)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            cursor: "zoom-out",
+            animation: "fadeInModal 0.15s ease",
+          }}
+        >
+          <style>{`@keyframes fadeInModal { from { opacity: 0; } to { opacity: 1; } }`}</style>
+          <button
+            onClick={() => setShowFotoModal(false)}
+            style={{
+              position: "absolute", top: 20, right: 24,
+              background: "rgba(255,255,255,.12)", border: "none", color: "#fff",
+              width: 40, height: 40, borderRadius: "50%",
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: "1.3rem", cursor: "pointer",
+            }}
+          >
+            <i className="bi bi-x-lg" />
+          </button>
+          <img
+            src={user.foto_url}
+            alt={`${user?.nombres ?? ""} ${user?.apellidos ?? ""}`}
+            onClick={(e) => e.stopPropagation()}
+            style={{
+              maxWidth: "min(90vw, 480px)",
+              maxHeight: "80vh",
+              borderRadius: "50%",
+              aspectRatio: "1 / 1",
+              objectFit: "cover",
+              boxShadow: "0 20px 60px rgba(0,0,0,.5)",
+              border: "4px solid rgba(255,255,255,.15)",
+              cursor: "default",
+            }}
+          />
+        </div>
+      )}
     </>
   );
 }
