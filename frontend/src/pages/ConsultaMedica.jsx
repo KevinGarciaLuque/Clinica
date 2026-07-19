@@ -63,6 +63,7 @@ export default function Consulta() {
   const [saving,    setSaving]    = useState(false);
   const [alertMsg,  setAlertMsg]  = useState(null);   // { type, msg }
   const [showSignedModal, setShowSignedModal] = useState(false);
+  const [showFacturaPrompt, setShowFacturaPrompt] = useState(false);
   const [showSavedChangesModal, setShowSavedChangesModal] = useState(false);
   const [showConfirmSignedEditSave, setShowConfirmSignedEditSave] = useState(false);
   const [showConsultaModal,  setShowConsultaModal]  = useState(false);
@@ -173,7 +174,7 @@ export default function Consulta() {
           await api.post(`/historias/${hid}/firmar`, usarFirmaDigital && user?.firma_url ? { firma_digital_url: user.firma_url, colegiatura_firmante: user.numero_colegiatura || null } : {});
           setFirmada(true);
           setAlertMsg(null);
-          setShowSignedModal(true);
+          setShowFacturaPrompt(true);
         } else {
           if (firmada) {
             setAlertMsg(null);
@@ -189,7 +190,7 @@ export default function Consulta() {
           await api.post(`/historias/${r.data.id}/firmar`, usarFirmaDigital && user?.firma_url ? { firma_digital_url: user.firma_url, colegiatura_firmante: user.numero_colegiatura || null } : {});
           setFirmada(true);
           setAlertMsg(null);
-          setShowSignedModal(true);
+          setShowFacturaPrompt(true);
         } else {
           setAlertMsg({ type: "success", msg: "Guardado como borrador." });
         }
@@ -561,6 +562,19 @@ export default function Consulta() {
         document.body
       )}
 
+      {showFacturaPrompt && createPortal(
+        <ModalGenerarFactura
+          paciente={paciente}
+          onNo={() => { setShowFacturaPrompt(false); setShowSignedModal(true); }}
+          onSi={() => {
+            setShowFacturaPrompt(false);
+            const pid = paciente?.id || pacId;
+            navigate(`/facturacion?nueva=1&paciente_id=${pid}${citaId ? `&cita_id=${citaId}` : ""}`);
+          }}
+        />,
+        document.body
+      )}
+
       {showConfirmSignedEditSave && createPortal(
         <ModalConfirmarEdicionFirmada
           onCancel={() => setShowConfirmSignedEditSave(false)}
@@ -670,6 +684,61 @@ function ModalHistoriaFirmada({ paciente, onClose, onVerHistorial }) {
           </button>
           <button className="btn btn-success btn-sm" onClick={onVerHistorial}>
             <i className="bi bi-journal-medical me-1"></i>Ver historial clínico
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ModalGenerarFactura({ paciente, onSi, onNo }) {
+  const esMenor = paciente?.fecha_nacimiento
+    ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") < 18
+    : false;
+  return (
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 10002,
+      background: "rgba(15,23,42,.55)", backdropFilter: "blur(3px)",
+      display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{
+        width: "100%", maxWidth: 440, background: "#fff", borderRadius: 16,
+        boxShadow: "0 16px 48px rgba(0,0,0,.22)", overflow: "hidden",
+      }}>
+        <div style={{ padding: "22px 22px 14px", textAlign: "center" }}>
+          <div style={{
+            width: 64, height: 64, margin: "0 auto 14px", borderRadius: "50%",
+            background: "linear-gradient(135deg,#2563eb,#1d4ed8)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            boxShadow: "0 8px 22px rgba(37,99,235,.35)",
+          }}>
+            <i className="bi bi-receipt" style={{ color: "#fff", fontSize: "1.6rem" }} />
+          </div>
+          <div style={{ fontSize: "1.1rem", fontWeight: 800, color: "#1e293b", marginBottom: 6 }}>
+            Consulta firmada · ¿Generar factura?
+          </div>
+          <div style={{ fontSize: "0.9rem", color: "#4b5563" }}>
+            ¿Deseas generar la factura o recibo de la consulta de{" "}
+            <strong>{paciente?.nombres} {paciente?.apellidos}</strong>?
+          </div>
+          {esMenor && (
+            <div style={{
+              marginTop: 12, background: "#eff6ff", border: "1px solid #bfdbfe",
+              borderRadius: 8, padding: "8px 12px", fontSize: "0.8rem", color: "#1e40af",
+            }}>
+              <i className="bi bi-info-circle me-1" />
+              Paciente menor de edad: la factura se emitirá a nombre del <strong>responsable</strong>.
+            </div>
+          )}
+        </div>
+        <div style={{ padding: "8px 18px 18px", display: "flex", gap: 10, justifyContent: "center" }}>
+          <button onClick={onNo}
+            style={{ padding: "9px 22px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#374151", cursor: "pointer", fontWeight: 600, fontSize: "0.88rem" }}>
+            No, gracias
+          </button>
+          <button onClick={onSi}
+            style={{ padding: "9px 24px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#2563eb,#1d4ed8)", color: "#fff", cursor: "pointer", fontWeight: 700, fontSize: "0.88rem", display: "flex", alignItems: "center", gap: 7 }}>
+            <i className="bi bi-receipt-cutoff" /> Sí, generar factura
           </button>
         </div>
       </div>

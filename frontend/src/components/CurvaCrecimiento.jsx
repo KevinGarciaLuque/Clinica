@@ -150,7 +150,8 @@ function buildChartData(indKey, meds, curvasRef) {
           newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
         } else if (ci === 0) { newPt[`z${z}`] = curva[0].valor; }
       });
-      if (idx === -1) data.push(newPt);
+      const hasZ = [-3, -2, -1, 0, 1, 2, 3].some(z => newPt[`z${z}`] !== undefined);
+      if (idx === -1) { if (hasZ) data.push(newPt); }
       else if (Math.abs(data[idx].talla - t) < 0.5) data[idx].paciente = parseFloat(peso);
       else data.splice(idx, 0, newPt);
     } else {
@@ -168,7 +169,8 @@ function buildChartData(indKey, meds, curvasRef) {
           newPt[`z${z}`] = Math.round((a.valor + frac * (b.valor - a.valor)) * 100) / 100;
         } else if (ci === 0) { newPt[`z${z}`] = curva[0].valor; }
       });
-      if (idx === -1) data.push(newPt);
+      const hasZ = [-3, -2, -1, 0, 1, 2, 3].some(z => newPt[`z${z}`] !== undefined);
+      if (idx === -1) { if (hasZ) data.push(newPt); }
       else if (Math.abs(data[idx].mes - m.edad_meses) < 0.5) data[idx].paciente = parseFloat(valor);
       else data.splice(idx, 0, newPt);
     }
@@ -599,6 +601,14 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
     setShowMenuDescargar(false);
     setGenerandoConsolidado(true);
 
+    // Abrir la ventana de inmediato (síncrono con el click) para que el
+    // navegador no la bloquee como popup — se rellena luego con el contenido.
+    const win = window.open("", "_blank", "width=1200,height=900");
+    if (win) {
+      win.document.write("<html><body style='font-family:Arial,sans-serif;padding:40px;text-align:center;color:#666'>Generando reporte consolidado…</body></html>");
+      win.document.close();
+    }
+
     // Esperar a que las gráficas ocultas estén renderizadas
     await new Promise(r => setTimeout(r, 600));
 
@@ -618,8 +628,8 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
     });
 
     const html = generateConsolidadoHTML(svgSections, mediciones, sexoPaciente, fechaNacimiento);
-    const win  = window.open("", "_blank", "width=1200,height=900");
-    if (!win) { setGenerandoConsolidado(false); return; }
+    if (!win || win.closed) { setGenerandoConsolidado(false); return; }
+    win.document.open();
     win.document.write(html);
     win.document.close();
     win.focus();

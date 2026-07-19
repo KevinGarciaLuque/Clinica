@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import Odontograma from "./Odontograma";
 import {
   CONDITIONS, PROCEDIMIENTOS, DX_RAPIDOS, MATERIALES,
-  SURFACE_LABEL
+  SURFACE_LABEL, EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS, ALL_TEETH,
+  PLAN_FASES_DEFAULT
 } from "./constantes_odontologia";
 
 const Odontograma3D = lazy(() => import("./Odontograma3D"));
@@ -23,6 +24,7 @@ const TABS = [
   { id: 'sesion',      label: '📋 Consulta' },
   { id: 'plan',        label: '📝 Plan de Tratamiento' },
   { id: 'historia',    label: '📚 Historia' },
+  { id: 'cuenta',      label: '💳 Estudios y Cuenta' },
 ];
 
 // ─── Buscador CIE-10 ──────────────────────────────────────────────────────────
@@ -110,28 +112,42 @@ function BuscadorCIE({ value, desc, onChange, onClear, readOnly }) {
 }
 
 // ─── Estado inicial sesión ────────────────────────────────────────────────────
+const initExploracionClinica = () => ({
+  ...Object.fromEntries(EXAMEN_CLINICO_GRUPOS.map(g => [g.key, ''])),
+  higiene_detalle: Object.fromEntries(HIGIENE_DETALLE_CAMPOS.map(c => [c.key, ''])),
+});
+
 const initSesion = () => ({
   motivo_consulta: '',
-  exploracion_clinica: { tejidos_blandos: '', oclusion: '', higiene_oral: '', atm: '', otros: '' },
+  exploracion_clinica: initExploracionClinica(),
+  hallazgos: [],
   procedimientos: [],
   diagnostico_cie: '', diagnostico_desc: '',
   indicaciones: '', proxima_cita: '', observaciones: '',
 });
 
 const initHistoria = () => ({
-  motivo_consulta_inicial: '',
+  motivo_consulta_inicial: '', fecha_ultima_consulta: '', complicaciones_previas: '',
+  antecedentes: [], medicamentos: [],
   frecuencia_cepillado: '', usa_hilo_dental: false, usa_enjuague: false, habitos_nocivos: '',
   diabetes: false, hipertension: false, anticoagulantes: false,
   alergia_anestesia: false, alergia_latex: false, otras_condiciones: '',
   ortodoncia_previa: false, extracciones_previas: '', implantes_previos: false,
   protesis_actual: '', tratamientos_previos: '', historia_familiar: '', notas: '',
+  declaracion_veraz: false, firma_paciente_nombre: '',
 });
 
-const initPlan = () => ({ items: [], notas: '' });
+const initPlan = () => ({
+  fases: PLAN_FASES_DEFAULT(),
+  vigencia_dias: 90,
+  formas_pago: 'Efectivo, Tarjeta, Transferencia',
+  nota_clinica: 'El plan puede variar si se detectan condiciones internas no visibles radiográficamente.',
+});
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function ConsultaOdontologia() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [sp] = useSearchParams();
   const pacienteId  = sp.get('paciente_id');
   const citaId      = sp.get('cita_id');
@@ -157,11 +173,17 @@ export default function ConsultaOdontologia() {
   // Historia
   const [historia, setHistoria]       = useState(initHistoria());
   const [historiaGuardada, setHistoriaGuardada] = useState(false);
+  const [catalogoCondiciones, setCatalogoCondiciones] = useState([]);
 
   // Plan
   const [plan, setPlan]               = useState(initPlan());
   const [planGuardado, setPlanGuardado] = useState(false);
-  const [nuevoProcItem, setNuevoProcItem] = useState({ diente: '', superficie: '', procedimiento: '', material: '', prioridad: 'media', costo_estimado: '' });
+
+  // Estudios complementarios + estado de cuenta
+  const [estudios, setEstudios]       = useState([]);
+  const [facturas, setFacturas]       = useState([]);
+  const [showFormEstudio, setShowFormEstudio] = useState(false);
+  const [formEstudio, setFormEstudio] = useState({ tipo: 'LABORATORIO', descripcion: '' });
 
   // ── Carga inicial ────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -171,24 +193,45 @@ export default function ConsultaOdontologia() {
   async function loadAll(pid) {
     setLoading(true);
     try {
-      const [rPac, rOdo, rHist, rPlan, rRes, rSes] = await Promise.all([
+      const [rPac, rOdo, rHist, rPlan, rRes, rSes, rCond, rEst, rFact] = await Promise.all([
         api.get(`/pacientes/${pid}`),
         api.get(`/odontologia/odontograma/${pid}`),
         api.get(`/odontologia/historia/${pid}`),
         api.get(`/odontologia/plan/${pid}`),
         api.get(`/odontologia/resumen/${pid}`),
         api.get('/odontologia/sesiones', { params: { paciente_id: pid, limit: 30 } }),
+        api.get('/catalogos-condiciones-medicas'),
+        api.get('/estudios', { params: { paciente_id: pid } }),
+        api.get('/facturacion', { params: { paciente_id: pid } }),
       ]);
       setPaciente(rPac.data.data || rPac.data);
+      setCatalogoCondiciones(rCond.data.data || []);
+      setEstudios(rEst.data.data || []);
+      setFacturas(rFact.data.data || []);
       if (rOdo.data.data?.dientes) {
         const d = rOdo.data.data.dientes;
         setOdontograma(typeof d === 'string' ? JSON.parse(d) : d);
       }
-      if (rHist.data.data) setHistoria({ ...initHistoria(), ...rHist.data.data });
+      if (rHist.data.data) {
+        const h = rHist.data.data;
+        const hSinNulos = Object.fromEntries(Object.entries(h).map(([k, v]) => [k, v === null ? '' : v]));
+        const antecedentes = typeof h.antecedentes === 'string' ? JSON.parse(h.antecedentes || '[]') : (h.antecedentes || []);
+        const medicamentos = typeof h.medicamentos === 'string' ? JSON.parse(h.medicamentos || '[]') : (h.medicamentos || []);
+        setHistoria({
+          ...initHistoria(), ...hSinNulos,
+          fecha_ultima_consulta: h.fecha_ultima_consulta ? String(h.fecha_ultima_consulta).slice(0, 10) : '',
+          antecedentes, medicamentos,
+        });
+      }
       if (rPlan.data.data) {
         const p = rPlan.data.data;
-        const items = typeof p.items === 'string' ? JSON.parse(p.items) : (p.items || []);
-        setPlan({ items, notas: p.notas || '' });
+        const fases = typeof p.fases === 'string' ? JSON.parse(p.fases || 'null') : p.fases;
+        setPlan({
+          fases: (Array.isArray(fases) && fases.length > 0) ? fases : PLAN_FASES_DEFAULT(),
+          vigencia_dias: p.vigencia_dias || 90,
+          formas_pago: p.formas_pago || 'Efectivo, Tarjeta, Transferencia',
+          nota_clinica: p.nota_clinica || initPlan().nota_clinica,
+        });
       }
       if (rRes.data.data) setResumen(rRes.data.data);
       if (rSes.data.data) setSesiones(rSes.data.data);
@@ -257,11 +300,19 @@ export default function ConsultaOdontologia() {
 
   function cargarSesion(s) {
     setSesionActual(s);
+    const ec = typeof s.exploracion_clinica === 'string'
+      ? JSON.parse(s.exploracion_clinica || '{}')
+      : (s.exploracion_clinica || {});
     setSesionForm({
       motivo_consulta:    s.motivo_consulta || '',
-      exploracion_clinica: typeof s.exploracion_clinica === 'string'
-        ? JSON.parse(s.exploracion_clinica || '{}')
-        : (s.exploracion_clinica || { tejidos_blandos: '', oclusion: '', higiene_oral: '', atm: '', otros: '' }),
+      exploracion_clinica: {
+        ...initExploracionClinica(),
+        ...ec,
+        higiene_detalle: { ...initExploracionClinica().higiene_detalle, ...(ec.higiene_detalle || {}) },
+      },
+      hallazgos:          typeof s.hallazgos === 'string'
+        ? JSON.parse(s.hallazgos || '[]')
+        : (s.hallazgos || []),
       procedimientos:     typeof s.procedimientos === 'string'
         ? JSON.parse(s.procedimientos || '[]')
         : (s.procedimientos || []),
@@ -286,7 +337,37 @@ export default function ConsultaOdontologia() {
     finally { setSaving(false); }
   }
 
-  // ── Plan de tratamiento ──────────────────────────────────────────────────────
+  // ── Anamnesis: antecedentes dinámicos (HC-02) ────────────────────────────────
+  function getAntecedente(condicionId) {
+    return historia.antecedentes?.find(a => a.condicion_id === condicionId) || null;
+  }
+
+  function setAntecedente(cond, patch) {
+    setHistoria(h => {
+      const existentes = h.antecedentes || [];
+      const idx = existentes.findIndex(a => a.condicion_id === cond.id);
+      const base = idx >= 0 ? existentes[idx] : { condicion_id: cond.id, nombre: cond.nombre, respuesta: 'NO', especifique: '' };
+      const actualizado = { ...base, ...patch };
+      const nuevos = idx >= 0
+        ? existentes.map((a, i) => i === idx ? actualizado : a)
+        : [...existentes, actualizado];
+      return { ...h, antecedentes: nuevos };
+    });
+  }
+
+  const [nuevoMed, setNuevoMed] = useState({ nombre: '', dosis: '', motivo: '' });
+
+  function agregarMedicamento() {
+    if (!nuevoMed.nombre) return;
+    setHistoria(h => ({ ...h, medicamentos: [...(h.medicamentos || []), { ...nuevoMed, id: Date.now() }] }));
+    setNuevoMed({ nombre: '', dosis: '', motivo: '' });
+  }
+
+  function eliminarMedicamento(id) {
+    setHistoria(h => ({ ...h, medicamentos: (h.medicamentos || []).filter(m => m.id !== id) }));
+  }
+
+  // ── Plan de tratamiento por fases ────────────────────────────────────────────
   async function guardarPlan() {
     if (!pacienteId) return;
     setSaving(true);
@@ -299,25 +380,129 @@ export default function ConsultaOdontologia() {
     finally { setSaving(false); }
   }
 
-  function agregarItemPlan() {
-    if (!nuevoProcItem.procedimiento) return;
-    const item = { ...nuevoProcItem, id: Date.now(), completado: false };
-    setPlan(p => ({ ...p, items: [...p.items, item] }));
-    setNuevoProcItem({ diente: '', superficie: '', procedimiento: '', material: '', prioridad: 'media', costo_estimado: '' });
+  const [nuevoItemFase, setNuevoItemFase] = useState({});
+  const draftItemFase = (faseId) => nuevoItemFase[faseId] || { pieza: '', procedimiento: '', material: '', costo_estimado: '' };
+
+  function setDraftItemFase(faseId, patch) {
+    setNuevoItemFase(d => ({ ...d, [faseId]: { ...draftItemFase(faseId), ...patch } }));
   }
 
-  function toggleItemPlan(id) {
+  function agregarItemFase(faseId) {
+    const draft = draftItemFase(faseId);
+    if (!draft.procedimiento) return;
     setPlan(p => ({
       ...p,
-      items: p.items.map(it => it.id === id ? { ...it, completado: !it.completado } : it),
+      fases: p.fases.map(f => f.id === faseId
+        ? { ...f, items: [...(f.items || []), { ...draft, id: Date.now(), completado: false }] }
+        : f),
+    }));
+    setNuevoItemFase(d => ({ ...d, [faseId]: { pieza: '', procedimiento: '', material: '', costo_estimado: '' } }));
+  }
+
+  function toggleItemFase(faseId, itemId) {
+    setPlan(p => ({
+      ...p,
+      fases: p.fases.map(f => f.id === faseId
+        ? { ...f, items: f.items.map(it => it.id === itemId ? { ...it, completado: !it.completado } : it) }
+        : f),
     }));
   }
 
-  function eliminarItemPlan(id) {
-    setPlan(p => ({ ...p, items: p.items.filter(it => it.id !== id) }));
+  function eliminarItemFase(faseId, itemId) {
+    setPlan(p => ({
+      ...p,
+      fases: p.fases.map(f => f.id === faseId ? { ...f, items: f.items.filter(it => it.id !== itemId) } : f),
+    }));
   }
 
-  const costoTotal = plan.items.reduce((s, i) => s + (parseFloat(i.costo_estimado) || 0), 0);
+  function actualizarFaseCampo(faseId, campo, valor) {
+    setPlan(p => ({ ...p, fases: p.fases.map(f => f.id === faseId ? { ...f, [campo]: valor } : f) }));
+  }
+
+  function agregarFase() {
+    const n = plan.fases.length + 1;
+    setPlan(p => ({
+      ...p,
+      fases: [...p.fases, { id: `fase_${Date.now()}`, nombre: `FASE ${n}: NUEVA FASE`, objetivo: '', items: [] }],
+    }));
+  }
+
+  function eliminarFase(faseId) {
+    setPlan(p => ({ ...p, fases: p.fases.filter(f => f.id !== faseId) }));
+  }
+
+  const subtotalFase = (fase) => (fase.items || []).reduce((s, i) => s + (parseFloat(i.costo_estimado) || 0), 0);
+  const costoTotal = plan.fases.reduce((s, f) => s + subtotalFase(f), 0);
+
+  // ── Estudios complementarios (módulo /api/estudios, sin duplicar) ───────────
+  async function solicitarEstudio() {
+    if (!formEstudio.descripcion || !pacienteId) return;
+    setSaving(true);
+    try {
+      await api.post('/estudios', {
+        paciente_id: pacienteId,
+        tipo: formEstudio.tipo,
+        descripcion: formEstudio.descripcion,
+      });
+      const r = await api.get('/estudios', { params: { paciente_id: pacienteId } });
+      setEstudios(r.data.data || []);
+      setShowFormEstudio(false);
+      setFormEstudio({ tipo: 'LABORATORIO', descripcion: '' });
+      showMsg('ok', 'Solicitud de estudio creada');
+    } catch { showMsg('error', 'Error al solicitar estudio'); }
+    finally { setSaving(false); }
+  }
+
+  async function verPdfEstudios() {
+    try {
+      const r = await api.get(`/estudios/pdf?paciente_id=${pacienteId}`, { responseType: 'blob' });
+      window.open(URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' })), '_blank');
+    } catch { showMsg('error', 'Error al generar PDF'); }
+  }
+
+  async function verPdfFactura(facturaId) {
+    try {
+      const r = await api.get(`/facturacion/${facturaId}/pdf`, { responseType: 'blob' });
+      window.open(URL.createObjectURL(new Blob([r.data], { type: 'application/pdf' })), '_blank');
+    } catch { showMsg('error', 'Error al generar PDF'); }
+  }
+
+  // ── Hallazgos clínicos detallados (independiente de procedimientos) ─────────
+  const [nuevoHallazgo, setNuevoHallazgo] = useState({ pieza: '', descripcion: '' });
+
+  function agregarHallazgo() {
+    if (!nuevoHallazgo.pieza || !nuevoHallazgo.descripcion) return;
+    setSesionForm(f => ({ ...f, hallazgos: [...(f.hallazgos || []), { ...nuevoHallazgo, id: Date.now() }] }));
+    setNuevoHallazgo({ pieza: '', descripcion: '' });
+  }
+
+  function eliminarHallazgo(id) {
+    setSesionForm(f => ({ ...f, hallazgos: (f.hallazgos || []).filter(h => h.id !== id) }));
+  }
+
+  function prellenarHallazgosDesdeOdontograma() {
+    const existentes = new Set((sesionForm.hallazgos || []).map(h => h.pieza));
+    const nuevos = [];
+    for (const pieza of ALL_TEETH) {
+      const key = String(pieza);
+      if (existentes.has(key)) continue;
+      const estado = odontograma[key];
+      if (!estado) continue;
+      if (estado.ausente) {
+        nuevos.push({ id: Date.now() + Math.random(), pieza: key, descripcion: 'Ausente' });
+        continue;
+      }
+      const problemas = ['v', 'p', 'm', 'd', 'o']
+        .filter(s => estado[s] && estado[s] !== 'sano')
+        .map(s => `${CONDITIONS[estado[s]]?.label || estado[s]} (${SURFACE_LABEL[s]})`);
+      if (problemas.length) {
+        nuevos.push({ id: Date.now() + Math.random(), pieza: key, descripcion: problemas.join(', ') });
+      }
+    }
+    if (nuevos.length === 0) { showMsg('ok', 'No se detectaron piezas con hallazgos pendientes en el odontograma'); return; }
+    setSesionForm(f => ({ ...f, hallazgos: [...(f.hallazgos || []), ...nuevos] }));
+    showMsg('ok', `${nuevos.length} hallazgo(s) prellenado(s) desde el odontograma`);
+  }
 
   // ── Agregar procedimiento a la sesión ────────────────────────────────────────
   const [nuevoProc, setNuevoProc] = useState({ diente: '', superficie: '', procedimiento: '', material: '', observacion: '' });
@@ -567,27 +752,86 @@ export default function ConsultaOdontologia() {
                     />
                   </div>
 
-                  {/* Exploración clínica */}
+                  {/* Examen clínico estomatológico (HC-03) */}
                   <div>
-                    <label style={lbl}>Exploración clínica</label>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                      {[
-                        ['tejidos_blandos', 'Tejidos blandos'],
-                        ['oclusion', 'Oclusión'],
-                        ['higiene_oral', 'Higiene oral'],
-                        ['atm', 'ATM'],
-                      ].map(([key, label]) => (
-                        <div key={key}>
-                          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{label}</div>
-                          <textarea rows={2}
-                            value={sesionForm.exploracion_clinica?.[key] || ''}
-                            onChange={e => setSesionForm(f => ({ ...f, exploracion_clinica: { ...f.exploracion_clinica, [key]: e.target.value } }))}
+                    <label style={lbl}>Examen clínico estomatológico (HC-03)</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8 }}>
+                      {EXAMEN_CLINICO_GRUPOS.map(g => (
+                        <div key={g.key}>
+                          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{g.label}</div>
+                          <select
+                            value={sesionForm.exploracion_clinica?.[g.key] || ''}
+                            onChange={e => setSesionForm(f => ({ ...f, exploracion_clinica: { ...f.exploracion_clinica, [g.key]: e.target.value } }))}
+                            disabled={readOnly}
+                            style={inputStyle}>
+                            <option value="">— Seleccionar —</option>
+                            {g.opciones.map(op => <option key={op} value={op}>{op}</option>)}
+                          </select>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Detalle de la higiene oral */}
+                  <div>
+                    <label style={lbl}>Detalle de la higiene oral</label>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8, padding: 10, background: BG_LIGHT, borderRadius: 8, border: `1px solid ${BORDER}` }}>
+                      {HIGIENE_DETALLE_CAMPOS.map(c => (
+                        <div key={c.key}>
+                          <div style={{ fontSize: 11, color: '#64748b', marginBottom: 2 }}>{c.label}</div>
+                          <input type="text"
+                            value={sesionForm.exploracion_clinica?.higiene_detalle?.[c.key] || ''}
+                            onChange={e => setSesionForm(f => ({
+                              ...f,
+                              exploracion_clinica: {
+                                ...f.exploracion_clinica,
+                                higiene_detalle: { ...f.exploracion_clinica.higiene_detalle, [c.key]: e.target.value },
+                              },
+                            }))}
                             readOnly={readOnly}
-                            style={{ ...textareaStyle(readOnly), minHeight: 0 }}
+                            style={inputStyle}
                           />
                         </div>
                       ))}
                     </div>
+                  </div>
+
+                  {/* Hallazgos clínicos detallados */}
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <label style={{ ...lbl, marginBottom: 0 }}>Hallazgos clínicos detallados</label>
+                      {!readOnly && (
+                        <button onClick={prellenarHallazgosDesdeOdontograma}
+                          style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${BORDER}`, background: '#fff', color: COLOR_D, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
+                          🦷 Prellenar desde odontograma
+                        </button>
+                      )}
+                    </div>
+                    {sesionForm.hallazgos?.map((h, idx) => (
+                      <div key={h.id || idx} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '6px 10px', background: BG_LIGHT, borderRadius: 6, border: `1px solid ${BORDER}`, fontSize: 12 }}>
+                        <span style={{ fontWeight: 700, color: COLOR, minWidth: 30 }}>{h.pieza || '—'}</span>
+                        <span style={{ color: '#475569', flex: 1 }}>{h.descripcion}</span>
+                        {!readOnly && (
+                          <button onClick={() => eliminarHallazgo(h.id)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14, padding: 0 }}>✕</button>
+                        )}
+                      </div>
+                    ))}
+                    {(!sesionForm.hallazgos || sesionForm.hallazgos.length === 0) && (
+                      <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 6 }}>Sin hallazgos registrados</div>
+                    )}
+                    {!readOnly && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 36px', gap: 6, marginTop: 6 }}>
+                        <select value={nuevoHallazgo.pieza} onChange={e => setNuevoHallazgo(h => ({ ...h, pieza: e.target.value }))} style={inputStyle}>
+                          <option value="">Pieza</option>
+                          {ALL_TEETH.map(p => <option key={p} value={p}>{p}</option>)}
+                        </select>
+                        <input value={nuevoHallazgo.descripcion} onChange={e => setNuevoHallazgo(h => ({ ...h, descripcion: e.target.value }))}
+                          placeholder="Descripción del hallazgo (caries, prótesis, etc.)" style={inputStyle} />
+                        <button onClick={agregarHallazgo}
+                          style={{ background: COLOR, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>+</button>
+                      </div>
+                    )}
                   </div>
 
                   {/* Procedimientos de la sesión */}
@@ -686,96 +930,134 @@ export default function ConsultaOdontologia() {
           ══════════════════════════════════════════ */}
           {tab === 'plan' && (
             <div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                <h3 style={{ margin: 0, fontSize: 16, color: COLOR_D }}>Plan de tratamiento</h3>
-                <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
-                  <span style={{ fontSize: 13, color: '#475569' }}>
-                    Costo estimado total: <strong style={{ color: COLOR_D }}>${costoTotal.toFixed(2)}</strong>
-                  </span>
-                  <button onClick={guardarPlan} disabled={saving}
-                    style={{ padding: '7px 18px', borderRadius: 8, background: planGuardado ? '#dcfce7' : COLOR, color: planGuardado ? '#166534' : '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                    {saving ? 'Guardando...' : planGuardado ? '✓ Guardado' : 'Guardar plan'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Agregar ítem al plan */}
-              <div style={{ padding: 14, background: BG_LIGHT, borderRadius: 10, border: `1px solid ${BORDER}`, marginBottom: 16 }}>
-                <div style={{ fontSize: 12, fontWeight: 700, color: COLOR_D, marginBottom: 8 }}>Agregar procedimiento al plan</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '80px 120px 1fr 120px 90px 90px 36px', gap: 6 }}>
-                  <input value={nuevoProcItem.diente} onChange={e => setNuevoProcItem(p => ({ ...p, diente: e.target.value }))}
-                    placeholder="Diente" style={inputStyle} />
-                  <input value={nuevoProcItem.superficie} onChange={e => setNuevoProcItem(p => ({ ...p, superficie: e.target.value }))}
-                    placeholder="Superficie" style={inputStyle} />
-                  <select value={nuevoProcItem.procedimiento} onChange={e => setNuevoProcItem(p => ({ ...p, procedimiento: e.target.value }))} style={inputStyle}>
-                    <option value="">— Procedimiento —</option>
-                    {PROCEDIMIENTOS.map(g => (
-                      <optgroup key={g.grupo} label={g.grupo}>
-                        {g.items.map(i => <option key={i} value={i}>{i}</option>)}
-                      </optgroup>
-                    ))}
-                  </select>
-                  <select value={nuevoProcItem.material} onChange={e => setNuevoProcItem(p => ({ ...p, material: e.target.value }))} style={inputStyle}>
-                    <option value="">Material</option>
-                    {MATERIALES.map(m => <option key={m} value={m}>{m}</option>)}
-                  </select>
-                  <select value={nuevoProcItem.prioridad} onChange={e => setNuevoProcItem(p => ({ ...p, prioridad: e.target.value }))} style={inputStyle}>
-                    <option value="alta">🔴 Alta</option>
-                    <option value="media">🟡 Media</option>
-                    <option value="baja">🟢 Baja</option>
-                  </select>
-                  <input type="number" value={nuevoProcItem.costo_estimado} onChange={e => setNuevoProcItem(p => ({ ...p, costo_estimado: e.target.value }))}
-                    placeholder="Costo $" style={inputStyle} />
-                  <button onClick={agregarItemPlan}
-                    style={{ background: COLOR, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>+</button>
-                </div>
-              </div>
-
-              {/* Lista del plan */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {plan.items.length === 0 && (
-                  <div style={{ textAlign: 'center', padding: 30, color: '#94a3b8', fontSize: 13 }}>Sin procedimientos en el plan</div>
-                )}
-                {plan.items.map(item => (
-                  <div key={item.id} style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0',
-                    background: item.completado ? '#f0fdf4' : '#fff',
-                    opacity: item.completado ? 0.75 : 1,
-                  }}>
-                    <input type="checkbox" checked={item.completado || false} onChange={() => toggleItemPlan(item.id)}
-                      style={{ width: 16, height: 16, cursor: 'pointer' }} />
-                    <div style={{ width: 40, textAlign: 'center', fontWeight: 700, color: COLOR, fontSize: 13 }}>{item.diente || '—'}</div>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', textDecoration: item.completado ? 'line-through' : 'none' }}>
-                        {item.procedimiento}
-                      </div>
-                      {item.material && <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.material}</div>}
-                    </div>
-                    <span style={{
-                      fontSize: 11, padding: '2px 8px', borderRadius: 8, fontWeight: 700,
-                      background: item.prioridad === 'alta' ? '#fee2e2' : item.prioridad === 'baja' ? '#dcfce7' : '#fef3c7',
-                      color:      item.prioridad === 'alta' ? '#dc2626' : item.prioridad === 'baja' ? '#16a34a' : '#92400e',
-                    }}>{item.prioridad}</span>
-                    {item.costo_estimado && (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', minWidth: 70, textAlign: 'right' }}>
-                        ${parseFloat(item.costo_estimado).toFixed(2)}
-                      </span>
-                    )}
-                    <button onClick={() => eliminarItemPlan(item.id)}
-                      style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 15, padding: 0 }}>✕</button>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                <div>
+                  <h3 style={{ margin: 0, fontSize: 18, color: COLOR_D }}>Plan de Tratamiento Integral</h3>
+                  <div style={{ fontSize: 12, color: '#64748b', marginTop: 2 }}>
+                    Ordenado por prioridad clínica para garantizar el éxito y la duración del tratamiento.
                   </div>
-                ))}
+                </div>
+                <button onClick={guardarPlan} disabled={saving}
+                  style={{ padding: '7px 18px', borderRadius: 8, background: planGuardado ? '#dcfce7' : COLOR, color: planGuardado ? '#166534' : '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                  {saving ? 'Guardando...' : planGuardado ? '✓ Guardado' : 'Guardar plan'}
+                </button>
               </div>
 
-              {/* Notas del plan */}
-              <div style={{ marginTop: 16 }}>
-                <label style={lbl}>Notas del plan</label>
-                <textarea rows={2}
-                  value={plan.notas}
-                  onChange={e => setPlan(p => ({ ...p, notas: e.target.value }))}
-                  style={textareaStyle(false)}
-                />
+              {/* Fases */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginTop: 16 }}>
+                {plan.fases.map(fase => {
+                  const draft = draftItemFase(fase.id);
+                  return (
+                    <div key={fase.id} style={{ border: `1px solid ${BORDER}`, borderRadius: 10, overflow: 'hidden' }}>
+                      <div style={{ background: COLOR, padding: '10px 14px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                        <input value={fase.nombre}
+                          onChange={e => actualizarFaseCampo(fase.id, 'nombre', e.target.value)}
+                          style={{ flex: 1, background: 'transparent', border: 'none', outline: 'none', color: '#fff', fontWeight: 700, fontSize: 14, padding: '2px 4px' }} />
+                        <button onClick={() => eliminarFase(fase.id)} title="Eliminar fase"
+                          style={{ background: 'rgba(255,255,255,.2)', border: 'none', borderRadius: 6, color: '#fff', cursor: 'pointer', fontSize: 13, padding: '2px 8px', flexShrink: 0 }}>✕</button>
+                      </div>
+                      <div style={{ padding: '10px 14px', background: BG_LIGHT }}>
+                        <input value={fase.objetivo}
+                          onChange={e => actualizarFaseCampo(fase.id, 'objetivo', e.target.value)}
+                          placeholder="Objetivo de esta fase..."
+                          style={{ width: '100%', border: 'none', background: 'transparent', outline: 'none', fontSize: 12, fontStyle: 'italic', color: '#7c4a03', boxSizing: 'border-box' }} />
+                      </div>
+
+                      <div style={{ padding: '10px 14px' }}>
+                        {(fase.items || []).length === 0 && (
+                          <div style={{ textAlign: 'center', padding: 14, color: '#94a3b8', fontSize: 12 }}>Sin procedimientos en esta fase</div>
+                        )}
+                        {(fase.items || []).map(item => (
+                          <div key={item.id} style={{
+                            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 6,
+                            padding: '8px 12px', borderRadius: 8, border: '1px solid #e2e8f0',
+                            background: item.completado ? '#f0fdf4' : '#fff',
+                            opacity: item.completado ? 0.75 : 1,
+                          }}>
+                            <input type="checkbox" checked={item.completado || false} onChange={() => toggleItemFase(fase.id, item.id)}
+                              style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                            <div style={{ width: 36, textAlign: 'center', fontWeight: 700, color: COLOR, fontSize: 13 }}>{item.pieza || '—'}</div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ fontWeight: 600, fontSize: 13, color: '#1e293b', textDecoration: item.completado ? 'line-through' : 'none' }}>
+                                {item.procedimiento}
+                              </div>
+                              {item.material && <div style={{ fontSize: 11, color: '#94a3b8' }}>{item.material}</div>}
+                            </div>
+                            {item.costo_estimado !== '' && item.costo_estimado != null && (
+                              <span style={{ fontSize: 12, fontWeight: 700, color: '#475569', minWidth: 80, textAlign: 'right' }}>
+                                L {parseFloat(item.costo_estimado).toFixed(2)}
+                              </span>
+                            )}
+                            <button onClick={() => eliminarItemFase(fase.id, item.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 15, padding: 0 }}>✕</button>
+                          </div>
+                        ))}
+
+                        {/* Agregar ítem a esta fase */}
+                        <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 130px 100px 36px', gap: 6, marginTop: 8 }}>
+                          <input value={draft.pieza} onChange={e => setDraftItemFase(fase.id, { pieza: e.target.value })}
+                            placeholder="Pieza" style={inputStyle} />
+                          <select value={draft.procedimiento} onChange={e => setDraftItemFase(fase.id, { procedimiento: e.target.value })} style={inputStyle}>
+                            <option value="">— Procedimiento clínico —</option>
+                            {PROCEDIMIENTOS.map(g => (
+                              <optgroup key={g.grupo} label={g.grupo}>
+                                {g.items.map(i => <option key={i} value={i}>{i}</option>)}
+                              </optgroup>
+                            ))}
+                          </select>
+                          <select value={draft.material} onChange={e => setDraftItemFase(fase.id, { material: e.target.value })} style={inputStyle}>
+                            <option value="">Material</option>
+                            {MATERIALES.map(m => <option key={m} value={m}>{m}</option>)}
+                          </select>
+                          <input type="number" value={draft.costo_estimado} onChange={e => setDraftItemFase(fase.id, { costo_estimado: e.target.value })}
+                            placeholder="Inversión L" style={inputStyle} />
+                          <button onClick={() => agregarItemFase(fase.id)}
+                            style={{ background: COLOR, color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>+</button>
+                        </div>
+                      </div>
+
+                      <div style={{ padding: '8px 14px', background: '#fafafa', borderTop: '1px solid #f1f5f9', textAlign: 'right', fontSize: 13, fontWeight: 700, color: COLOR_D }}>
+                        Subtotal {fase.nombre.split(':')[0] || 'Fase'}: L {subtotalFase(fase).toFixed(2)}
+                      </div>
+                    </div>
+                  );
+                })}
+
+                <button onClick={agregarFase}
+                  style={{ alignSelf: 'flex-start', padding: '7px 16px', borderRadius: 8, border: `1px dashed ${BORDER}`, background: '#fff', color: COLOR_D, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  + Agregar fase
+                </button>
+              </div>
+
+              {/* Términos del presupuesto + inversión total */}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 260px', gap: 16, marginTop: 20, alignItems: 'start' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 12, color: '#334155', marginBottom: 8 }}>Términos del presupuesto</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 10 }}>
+                    <div>
+                      <label style={lbl}>Vigencia (días)</label>
+                      <input type="number" value={plan.vigencia_dias}
+                        onChange={e => setPlan(p => ({ ...p, vigencia_dias: e.target.value }))}
+                        style={inputStyle} />
+                    </div>
+                    <div>
+                      <label style={lbl}>Formas de pago</label>
+                      <input type="text" value={plan.formas_pago}
+                        onChange={e => setPlan(p => ({ ...p, formas_pago: e.target.value }))}
+                        style={inputStyle} />
+                    </div>
+                  </div>
+                  <label style={lbl}>Nota clínica</label>
+                  <textarea rows={2}
+                    value={plan.nota_clinica}
+                    onChange={e => setPlan(p => ({ ...p, nota_clinica: e.target.value }))}
+                    style={textareaStyle(false)}
+                  />
+                </div>
+                <div style={{ padding: 16, borderRadius: 10, background: BG_LIGHT, border: `1px solid ${BORDER}`, textAlign: 'center' }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: '#7c4a03', textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 6 }}>Inversión Total</div>
+                  <div style={{ fontSize: 26, fontWeight: 800, color: COLOR_D }}>L {costoTotal.toFixed(2)}</div>
+                </div>
               </div>
             </div>
           )}
@@ -797,10 +1079,104 @@ export default function ConsultaOdontologia() {
 
                 {/* Motivo inicial */}
                 <div style={{ gridColumn: '1 / -1' }}>
-                  <label style={lbl}>Motivo de primera consulta</label>
+                  <label style={lbl}>Motivo de consulta</label>
                   <textarea rows={2} value={historia.motivo_consulta_inicial}
                     onChange={e => setHistoria(h => ({ ...h, motivo_consulta_inicial: e.target.value }))}
                     style={textareaStyle(false)} />
+                </div>
+
+                <div>
+                  <label style={lbl}>Fecha de última consulta odontológica</label>
+                  <input type="date" value={historia.fecha_ultima_consulta}
+                    onChange={e => setHistoria(h => ({ ...h, fecha_ultima_consulta: e.target.value }))}
+                    style={inputStyle} />
+                </div>
+                <div>
+                  <label style={lbl}>¿Ha presentado complicaciones?</label>
+                  <input type="text" value={historia.complicaciones_previas}
+                    onChange={e => setHistoria(h => ({ ...h, complicaciones_previas: e.target.value }))}
+                    placeholder="Describir si aplica..."
+                    style={inputStyle} />
+                </div>
+
+                {/* Anamnesis y antecedentes médicos (HC-02) */}
+                <div style={{ gridColumn: '1 / -1', padding: 14, background: '#fef2f2', borderRadius: 10, border: '1px solid #fecaca' }}>
+                  <div style={{ fontWeight: 700, color: '#dc2626', marginBottom: 10, fontSize: 13 }}>
+                    ⚕ Anamnesis y antecedentes médicos (HC-02)
+                  </div>
+                  {catalogoCondiciones.length === 0 && (
+                    <div style={{ fontSize: 12, color: '#94a3b8' }}>
+                      No hay condiciones configuradas. Ve a <strong>Catálogos → Anamnesis</strong> para definirlas.
+                    </div>
+                  )}
+                  <div style={{ overflowX: 'auto', border: '1px solid #fecaca', borderRadius: 8, background: '#fff' }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#fef2f2' }}>
+                          <th style={condTh}>Condición / Antecedente</th>
+                          <th style={{ ...condTh, width: 46, textAlign: 'center' }}>SI</th>
+                          <th style={{ ...condTh, width: 46, textAlign: 'center' }}>NO</th>
+                          <th style={condTh}>Especifique</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {catalogoCondiciones.map(cond => {
+                          const ant = getAntecedente(cond.id);
+                          const respuesta = ant?.respuesta || 'NO';
+                          const esSi = respuesta === 'SI';
+                          return (
+                            <tr key={cond.id} style={{ background: cond.es_alerta && esSi ? '#fee2e2' : '#fff' }}>
+                              <td style={{ ...condTd, fontWeight: cond.es_alerta ? 700 : 400, color: cond.es_alerta ? '#dc2626' : '#334155' }}>
+                                {!!cond.es_alerta && '⚠ '}{cond.nombre}
+                              </td>
+                              <td style={{ ...condTd, textAlign: 'center' }}>
+                                <input type="checkbox" checked={esSi}
+                                  onChange={() => setAntecedente(cond, { respuesta: esSi ? 'NO' : 'SI', ...(esSi ? { especifique: '' } : {}) })}
+                                  style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                              </td>
+                              <td style={{ ...condTd, textAlign: 'center' }}>
+                                <input type="checkbox" checked={!esSi}
+                                  onChange={() => setAntecedente(cond, { respuesta: esSi ? 'NO' : 'SI', ...(esSi ? { especifique: '' } : {}) })}
+                                  style={{ width: 16, height: 16, cursor: 'pointer' }} />
+                              </td>
+                              <td style={condTd}>
+                                {cond.requiere_especifique && esSi ? (
+                                  <input type="text" placeholder="Especifique..."
+                                    value={ant?.especifique || ''}
+                                    onChange={e => setAntecedente(cond, { especifique: e.target.value })}
+                                    style={{ ...inputStyle, padding: '4px 8px' }} />
+                                ) : <span style={{ color: '#cbd5e1' }}>—</span>}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  {/* Medicamentos tomados */}
+                  <div style={{ marginTop: 16 }}>
+                    <label style={lbl}>Medicamentos tomados</label>
+                    {(historia.medicamentos || []).map(m => (
+                      <div key={m.id} style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6, padding: '6px 10px', background: '#fff', borderRadius: 6, border: '1px solid #fecaca', fontSize: 12 }}>
+                        <span style={{ fontWeight: 700, color: '#334155', flex: 1 }}>{m.nombre}</span>
+                        <span style={{ color: '#64748b', minWidth: 90 }}>{m.dosis}</span>
+                        <span style={{ color: '#64748b', flex: 1 }}>{m.motivo}</span>
+                        <button onClick={() => eliminarMedicamento(m.id)}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#ef4444', fontSize: 14, padding: 0 }}>✕</button>
+                      </div>
+                    ))}
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px 1fr 36px', gap: 6, marginTop: 6 }}>
+                      <input value={nuevoMed.nombre} onChange={e => setNuevoMed(m => ({ ...m, nombre: e.target.value }))}
+                        placeholder="Medicamento" style={inputStyle} />
+                      <input value={nuevoMed.dosis} onChange={e => setNuevoMed(m => ({ ...m, dosis: e.target.value }))}
+                        placeholder="Dosis" style={inputStyle} />
+                      <input value={nuevoMed.motivo} onChange={e => setNuevoMed(m => ({ ...m, motivo: e.target.value }))}
+                        placeholder="Motivo" style={inputStyle} />
+                      <button onClick={agregarMedicamento}
+                        style={{ background: '#dc2626', color: '#fff', border: 'none', borderRadius: 6, cursor: 'pointer', fontSize: 18, fontWeight: 700 }}>+</button>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Hábitos de higiene */}
@@ -909,7 +1285,152 @@ export default function ConsultaOdontologia() {
                     style={textareaStyle(false)} />
                 </div>
 
+                {/* Declaración y firma del paciente */}
+                <div style={{ gridColumn: '1 / -1', padding: 14, background: '#f8fafc', borderRadius: 10, border: '1px solid #e2e8f0' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: 8, fontSize: 13, cursor: 'pointer', marginBottom: 10 }}>
+                    <input type="checkbox" checked={historia.declaracion_veraz || false}
+                      onChange={e => setHistoria(h => ({ ...h, declaracion_veraz: e.target.checked }))}
+                      style={{ marginTop: 2 }} />
+                    Declaro que la información proporcionada es verdadera y completa. No he omitido ningún dato sobre mi estado de salud.
+                  </label>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div>
+                      <label style={lbl}>Firma del paciente / tutor (nombre)</label>
+                      <input type="text" value={historia.firma_paciente_nombre}
+                        onChange={e => setHistoria(h => ({ ...h, firma_paciente_nombre: e.target.value }))}
+                        placeholder="Nombre completo"
+                        style={inputStyle} />
+                    </div>
+                    <div style={{ fontSize: 12, color: '#94a3b8', alignSelf: 'end', paddingBottom: 8 }}>
+                      {historia.firma_fecha && `Firmado: ${dayjs(historia.firma_fecha).format('DD/MM/YYYY HH:mm')}`}
+                    </div>
+                  </div>
+                </div>
+
               </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════
+              TAB: ESTUDIOS COMPLEMENTARIOS Y ESTADO DE CUENTA
+              (integración con módulos existentes /estudios y /facturacion)
+          ══════════════════════════════════════════ */}
+          {tab === 'cuenta' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+
+              {/* Estudios complementarios */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, color: COLOR_D }}>Estudios o exámenes complementarios</h3>
+                  <div style={{ display: 'flex', gap: 8 }}>
+                    {estudios.length > 0 && (
+                      <button onClick={verPdfEstudios}
+                        style={{ padding: '6px 14px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', color: COLOR_D, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                        🖨 Ver PDF
+                      </button>
+                    )}
+                    <button onClick={() => setShowFormEstudio(v => !v)}
+                      style={{ padding: '6px 14px', borderRadius: 8, background: COLOR, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                      + Solicitar estudio
+                    </button>
+                  </div>
+                </div>
+
+                {showFormEstudio && (
+                  <div style={{ padding: 14, background: BG_LIGHT, borderRadius: 10, border: `1px solid ${BORDER}`, marginBottom: 14 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: '160px 1fr', gap: 8, marginBottom: 8 }}>
+                      <select value={formEstudio.tipo} onChange={e => setFormEstudio(f => ({ ...f, tipo: e.target.value }))} style={inputStyle}>
+                        {['LABORATORIO', 'IMAGENOLOGIA', 'OTRO'].map(t => <option key={t} value={t}>{t}</option>)}
+                      </select>
+                      <input value={formEstudio.descripcion} onChange={e => setFormEstudio(f => ({ ...f, descripcion: e.target.value }))}
+                        placeholder="Ej: Radiografía panorámica, biometría hemática..." style={inputStyle} />
+                    </div>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <button onClick={solicitarEstudio} disabled={saving}
+                        style={{ padding: '6px 16px', borderRadius: 8, background: COLOR, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                        {saving ? 'Guardando...' : 'Crear solicitud'}
+                      </button>
+                      <button onClick={() => setShowFormEstudio(false)}
+                        style={{ padding: '6px 16px', borderRadius: 8, border: '1px solid #cbd5e1', background: '#fff', color: '#475569', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                        Cancelar
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {estudios.length === 0 && !showFormEstudio && (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>Sin estudios solicitados</div>
+                )}
+                {estudios.map(s => (
+                  <div key={s.id} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', borderRadius: 8, border: '1px solid #e2e8f0', marginBottom: 6 }}>
+                    <span style={{
+                      fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 700,
+                      background: s.estado === 'COMPLETADO' ? '#dcfce7' : s.estado === 'EN_PROCESO' ? '#e0f2fe' : s.estado === 'CANCELADO' ? '#f1f5f9' : '#fef3c7',
+                      color:      s.estado === 'COMPLETADO' ? '#166534' : s.estado === 'EN_PROCESO' ? '#0369a1' : s.estado === 'CANCELADO' ? '#64748b' : '#92400e',
+                    }}>{s.estado}</span>
+                    <span style={{ fontSize: 11, fontWeight: 700, color: COLOR_D, minWidth: 90 }}>{s.tipo}</span>
+                    <span style={{ fontSize: 13, color: '#334155', flex: 1 }}>{s.descripcion}</span>
+                    <span style={{ fontSize: 11, color: '#94a3b8' }}>{dayjs(s.creado_en).format('DD/MM/YYYY')}</span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Estado de cuenta */}
+              <div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <h3 style={{ margin: 0, fontSize: 16, color: COLOR_D }}>Estado de cuenta del paciente</h3>
+                  <button onClick={() => navigate(`/facturacion?paciente_id=${pacienteId}`)}
+                    style={{ padding: '6px 14px', borderRadius: 8, background: COLOR, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    + Nueva factura / recibo
+                  </button>
+                </div>
+
+                {facturas.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 24, color: '#94a3b8', fontSize: 13 }}>Sin movimientos registrados</div>
+                )}
+                {facturas.length > 0 && (
+                  <div style={{ overflowX: 'auto', border: '1px solid #e2e8f0', borderRadius: 8 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                      <thead>
+                        <tr style={{ background: '#f8fafc' }}>
+                          {['Fecha', 'No.', 'Descripción', 'Debe', 'Haber', 'Saldo', 'Estado', ''].map(h => (
+                            <th key={h} style={{ padding: '8px 10px', textAlign: h === 'Debe' || h === 'Haber' || h === 'Saldo' ? 'right' : 'left', fontSize: 11, color: '#64748b', fontWeight: 700, borderBottom: '2px solid #e2e8f0' }}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {facturas.map(f => {
+                          const pagado = parseFloat(f.total_pagado || 0);
+                          const total = parseFloat(f.total || 0);
+                          const saldo = total - pagado;
+                          return (
+                            <tr key={f.id} style={{ borderBottom: '1px solid #f1f5f9' }}>
+                              <td style={condTd}>{dayjs(f.creado_en).format('DD/MM/YYYY')}</td>
+                              <td style={{ ...condTd, fontWeight: 700, color: COLOR_D }}>{f.numero_completo || f.numero}</td>
+                              <td style={condTd}>{f.tipo_comprobante === 'FACTURA' ? 'Factura' : 'Recibo'}</td>
+                              <td style={{ ...condTd, textAlign: 'right' }}>L {total.toFixed(2)}</td>
+                              <td style={{ ...condTd, textAlign: 'right' }}>L {pagado.toFixed(2)}</td>
+                              <td style={{ ...condTd, textAlign: 'right', fontWeight: 700, color: saldo > 0 ? '#dc2626' : '#16a34a' }}>L {saldo.toFixed(2)}</td>
+                              <td style={condTd}>
+                                <span style={{
+                                  fontSize: 10, padding: '2px 8px', borderRadius: 10, fontWeight: 700,
+                                  background: f.estado === 'PAGADA' ? '#dcfce7' : f.estado === 'ANULADA' ? '#fee2e2' : '#fef3c7',
+                                  color:      f.estado === 'PAGADA' ? '#166534' : f.estado === 'ANULADA' ? '#991b1b' : '#92400e',
+                                }}>{f.estado}</span>
+                              </td>
+                              <td style={condTd}>
+                                <button onClick={() => verPdfFactura(f.id)}
+                                  style={{ background: 'none', border: 'none', cursor: 'pointer', color: COLOR_D, fontSize: 13 }}>🖨</button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+
             </div>
           )}
 
@@ -929,6 +1450,16 @@ const inputStyle = {
   width: '100%', padding: '7px 10px', borderRadius: 6,
   border: '1px solid #e2e8f0', fontSize: 13,
   background: '#fff', boxSizing: 'border-box',
+};
+
+const condTh = {
+  padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700,
+  color: '#991b1b', textTransform: 'uppercase', letterSpacing: '0.03em',
+  borderBottom: '2px solid #fecaca',
+};
+
+const condTd = {
+  padding: '6px 10px', borderBottom: '1px solid #f1f5f9',
 };
 
 function textareaStyle(readOnly) {

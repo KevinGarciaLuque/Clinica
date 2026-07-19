@@ -144,6 +144,51 @@ export const DX_RAPIDOS = [
   ]},
 ];
 
+// ─── Examen clínico estomatológico (HC-03) — 9 grupos de opción única ────────
+export const EXAMEN_CLINICO_GRUPOS = [
+  { key: 'atm',         label: 'ATM',                 opciones: ['Normal', 'Dolor', 'Chasquido'] },
+  { key: 'ganglios',    label: 'Ganglios',             opciones: ['Normal', 'Inflamados'] },
+  { key: 'labios',      label: 'Labios / Comisuras',   opciones: ['Normales', 'Lesión'] },
+  { key: 'lengua',      label: 'Lengua',               opciones: ['Normal', 'Saburral', 'Geográfica'] },
+  { key: 'paladar',     label: 'Paladar',               opciones: ['Normal', 'Profundo'] },
+  { key: 'piso_boca',   label: 'Piso de boca',          opciones: ['Normal', 'Patología'] },
+  { key: 'encia',       label: 'Encía',                 opciones: ['Sana', 'Gingivitis', 'Periodontitis'] },
+  { key: 'higiene_oral',label: 'Higiene Oral',          opciones: ['Buena', 'Regular', 'Mala'] },
+  { key: 'oclusion',    label: 'Oclusión',              opciones: ['Clase I', 'Clase II', 'Clase III'] },
+  { key: 'musculatura', label: 'Musculatura Facial',    opciones: ['Normal', 'Hipotónico', 'Hipertónico'] },
+];
+
+// ─── Detalle de higiene oral (HC-03, sección 7) ──────────────────────────────
+export const HIGIENE_DETALLE_CAMPOS = [
+  { key: 'frecuencia',   label: 'Frecuencia de higiene' },
+  { key: 'tipo_cepillo', label: 'Tipo de cepillo' },
+  { key: 'cerdas',       label: 'Cerdas suaves o rígidas' },
+  { key: 'tecnica',      label: 'Técnica de cepillado' },
+  { key: 'hilo_dental',  label: 'Uso de hilo dental' },
+];
+
+// ─── Plan de tratamiento integral — plantilla de fases (réplica del PDF) ─────
+export const PLAN_FASES_DEFAULT = () => ([
+  {
+    id: 'fase1',
+    nombre: 'FASE 1: SALUD, HIGIENE Y CONTROL DE DOLOR (PRIORIDAD ALTA)',
+    objetivo: 'Eliminar infecciones, dolor y preparar los tejidos para futuros tratamientos.',
+    items: [],
+  },
+  {
+    id: 'fase2',
+    nombre: 'FASE 2: RESTAURACIÓN FUNCIONAL (REHABILITACIÓN)',
+    objetivo: 'Recuperar la estructura dental perdida, la masticación y la estabilidad.',
+    items: [],
+  },
+  {
+    id: 'fase3',
+    nombre: 'FASE 3: ESTÉTICA AVANZADA Y MANTENIMIENTO',
+    objetivo: 'Perfeccionar la sonrisa y establecer protocolos para que dure toda la vida.',
+    items: [],
+  },
+]);
+
 // ─── Materiales frecuentes ────────────────────────────────────────────────────
 export const MATERIALES = [
   'Resina compuesta A1', 'Resina compuesta A2', 'Resina compuesta A3',

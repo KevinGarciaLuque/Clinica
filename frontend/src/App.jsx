@@ -6,6 +6,8 @@ import AppLayout from "./components/AppLayout";
 import Login from "./pages/Login";
 
 const Dashboard       = lazy(() => import("./pages/Dashboard"));
+const Estadisticas    = lazy(() => import("./pages/Estadisticas"));
+const Facturacion     = lazy(() => import("./pages/Facturacion"));
 const Pacientes       = lazy(() => import("./pages/Pacientes"));
 const Citas           = lazy(() => import("./pages/Citas"));
 const ChatIA          = lazy(() => import("./pages/ChatIA"));
@@ -50,6 +52,7 @@ const ConsultaPsicologia = lazy(() => import("./pages/psicologia/ConsultaPsicolo
 
 // Módulo Odontología
 const ConsultaOdontologia = lazy(() => import("./pages/odontologia/ConsultaOdontologia"));
+const HojaAnaliticaNefrologia = lazy(() => import("./pages/nefrologia/HojaAnaliticaNefrologia"));
 
 // Módulo Endocrinología
 const ConsultaEndocrinologia = lazy(() => import("./pages/endocrinologia/ConsultaEndocrinologia"));
@@ -124,9 +127,11 @@ export default function App() {
       >
         {/* Rutas generales */}
         <Route path="/dashboard"              element={<Dashboard />} />
+        <Route path="/estadisticas"           element={<Estadisticas />} />
         <Route path="/pacientes"              element={<Pacientes />} />
         <Route path="/pacientes/:id/perfil"   element={<Suspense fallback={<PageSkeleton />}><PerfilPaciente /></Suspense>} />
         <Route path="/citas"                  element={<Citas />} />
+        <Route path="/facturacion"            element={<Facturacion />} />
         <Route path="/chat-ia"                element={<ChatIA />} />
         <Route path="/consulta"               element={<Consulta />} />
         <Route path="/consulta-medica"        element={<Suspense fallback={<PageSkeleton />}><ConsultaMedica /></Suspense>} />
@@ -227,6 +232,15 @@ export default function App() {
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Suspense fallback={<PageSkeleton />}>
               <ConsultaOdontologia />
+            </Suspense>
+          </RolRoute>
+        } />
+
+        {/* ── Módulo Nefrología ── */}
+        <Route path="/nefrologia/hoja-analitica" element={
+          <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO","ENFERMERA"]}>
+            <Suspense fallback={<PageSkeleton />}>
+              <HojaAnaliticaNefrologia />
             </Suspense>
           </RolRoute>
         } />

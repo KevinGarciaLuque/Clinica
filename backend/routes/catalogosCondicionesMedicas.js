@@ -1,9 +1,10 @@
 /**
- * Catálogo de Tipos de Cita por clínica
- * GET    /api/catalogos-tipos-cita        → lista activos de la clínica
- * POST   /api/catalogos-tipos-cita        → crear
- * PUT    /api/catalogos-tipos-cita/:id    → actualizar
- * DELETE /api/catalogos-tipos-cita/:id    → desactivar
+ * Catálogo de Condiciones Médicas (Anamnesis / HC-02) por clínica
+ * GET    /api/catalogos-condiciones-medicas        → lista activas de la clínica
+ * POST   /api/catalogos-condiciones-medicas        → crear
+ * PUT    /api/catalogos-condiciones-medicas/:id    → actualizar
+ * PUT    /api/catalogos-condiciones-medicas/:id/mover → subir / bajar
+ * DELETE /api/catalogos-condiciones-medicas/:id    → desactivar
  */
 const router = require("express").Router();
 const pool   = require("../db");
@@ -16,8 +17,8 @@ router.get("/", auth(), async (req, res) => {
     if (!clinicaId) return res.json({ ok: true, data: [] });
 
     const [rows] = await pool.query(
-      `SELECT id, nombre, descripcion, precio, orden, activo
-       FROM catalogos_tipos_cita
+      `SELECT id, nombre, requiere_especifique, es_alerta, orden, activo
+       FROM catalogo_condiciones_medicas
        WHERE clinica_id = ? AND activo = 1
        ORDER BY orden ASC, nombre ASC`,
       [clinicaId]
@@ -34,30 +35,20 @@ router.post("/", auth("ADMIN", "SUPER_ADMIN", "MEDICO", "RECEPCIONISTA"), async 
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "No se encontró la clínica. Recarga la página e intenta de nuevo." });
 
-    // Verificar que la clínica exista
-    const [[clinicaRow]] = await pool.query("SELECT id FROM clinicas WHERE id = ?", [clinicaId]);
-    if (!clinicaRow) return res.status(400).json({ ok: false, msg: "Clínica no válida." });
-
-    const { nombre, descripcion, precio } = req.body;
+    const { nombre, requiere_especifique, es_alerta } = req.body;
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({ ok: false, msg: "El nombre es obligatorio" });
     }
-    const precioNum = precio !== undefined && precio !== null && precio !== ""
-      ? Number(precio) : null;
-    if (precioNum !== null && (!Number.isFinite(precioNum) || precioNum < 0)) {
-      return res.status(400).json({ ok: false, msg: "El precio debe ser un número válido" });
-    }
 
-    // Auto-calcular orden como MAX + 1
     const [[{ maxOrden }]] = await pool.query(
-      "SELECT COALESCE(MAX(orden), 0) AS maxOrden FROM catalogos_tipos_cita WHERE clinica_id = ? AND activo = 1",
+      "SELECT COALESCE(MAX(orden), 0) AS maxOrden FROM catalogo_condiciones_medicas WHERE clinica_id = ? AND activo = 1",
       [clinicaId]
     );
 
     const [r] = await pool.query(
-      `INSERT INTO catalogos_tipos_cita (clinica_id, nombre, descripcion, precio, orden)
+      `INSERT INTO catalogo_condiciones_medicas (clinica_id, nombre, requiere_especifique, es_alerta, orden)
        VALUES (?, ?, ?, ?, ?)`,
-      [clinicaId, nombre.trim(), descripcion?.trim() || null, precioNum, maxOrden + 1]
+      [clinicaId, nombre.trim(), requiere_especifique ? 1 : 0, es_alerta ? 1 : 0, maxOrden + 1]
     );
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) {
@@ -69,22 +60,17 @@ router.post("/", auth("ADMIN", "SUPER_ADMIN", "MEDICO", "RECEPCIONISTA"), async 
 router.put("/:id", auth("ADMIN", "SUPER_ADMIN", "MEDICO", "RECEPCIONISTA"), async (req, res) => {
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
-    const { nombre, descripcion, precio } = req.body;
+    const { nombre, requiere_especifique, es_alerta } = req.body;
 
     if (!nombre || !nombre.trim()) {
       return res.status(400).json({ ok: false, msg: "El nombre es obligatorio" });
     }
-    const precioNum = precio !== undefined && precio !== null && precio !== ""
-      ? Number(precio) : null;
-    if (precioNum !== null && (!Number.isFinite(precioNum) || precioNum < 0)) {
-      return res.status(400).json({ ok: false, msg: "El precio debe ser un número válido" });
-    }
 
     await pool.query(
-      `UPDATE catalogos_tipos_cita
-       SET nombre = ?, descripcion = ?, precio = ?
+      `UPDATE catalogo_condiciones_medicas
+       SET nombre = ?, requiere_especifique = ?, es_alerta = ?
        WHERE id = ? AND clinica_id = ?`,
-      [nombre.trim(), descripcion?.trim() || null, precioNum, req.params.id, clinicaId]
+      [nombre.trim(), requiere_especifique ? 1 : 0, es_alerta ? 1 : 0, req.params.id, clinicaId]
     );
     res.json({ ok: true });
   } catch (e) {
@@ -99,7 +85,7 @@ router.put("/:id/mover", auth("ADMIN", "SUPER_ADMIN", "MEDICO", "RECEPCIONISTA")
     const { direccion } = req.body; // "arriba" | "abajo"
 
     const [[item]] = await pool.query(
-      "SELECT id, orden FROM catalogos_tipos_cita WHERE id = ? AND clinica_id = ? AND activo = 1",
+      "SELECT id, orden FROM catalogo_condiciones_medicas WHERE id = ? AND clinica_id = ? AND activo = 1",
       [req.params.id, clinicaId]
     );
     if (!item) return res.status(404).json({ ok: false, msg: "No encontrado" });
@@ -107,15 +93,15 @@ router.put("/:id/mover", auth("ADMIN", "SUPER_ADMIN", "MEDICO", "RECEPCIONISTA")
     const op  = direccion === "arriba" ? "<" : ">";
     const ord = direccion === "arriba" ? "DESC" : "ASC";
     const [[adj]] = await pool.query(
-      `SELECT id, orden FROM catalogos_tipos_cita
+      `SELECT id, orden FROM catalogo_condiciones_medicas
        WHERE clinica_id = ? AND activo = 1 AND orden ${op} ?
        ORDER BY orden ${ord} LIMIT 1`,
       [clinicaId, item.orden]
     );
     if (!adj) return res.json({ ok: true }); // ya está en el extremo
 
-    await pool.query("UPDATE catalogos_tipos_cita SET orden = ? WHERE id = ?", [adj.orden, item.id]);
-    await pool.query("UPDATE catalogos_tipos_cita SET orden = ? WHERE id = ?", [item.orden, adj.id]);
+    await pool.query("UPDATE catalogo_condiciones_medicas SET orden = ? WHERE id = ?", [adj.orden, item.id]);
+    await pool.query("UPDATE catalogo_condiciones_medicas SET orden = ? WHERE id = ?", [item.orden, adj.id]);
 
     res.json({ ok: true });
   } catch (e) {
@@ -128,7 +114,7 @@ router.delete("/:id", auth("ADMIN", "SUPER_ADMIN", "MEDICO", "RECEPCIONISTA"), a
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     await pool.query(
-      `UPDATE catalogos_tipos_cita SET activo = 0 WHERE id = ? AND clinica_id = ?`,
+      `UPDATE catalogo_condiciones_medicas SET activo = 0 WHERE id = ? AND clinica_id = ?`,
       [req.params.id, clinicaId]
     );
     res.json({ ok: true });

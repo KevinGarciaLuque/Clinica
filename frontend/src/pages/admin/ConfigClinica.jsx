@@ -25,6 +25,9 @@ export default function ConfigClinica() {
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);
   const [msg, setMsg] = useState({ tipo: "", texto: "" });
 
+  const [formFactura, setFormFactura] = useState({});
+  const [guardandoFactura, setGuardandoFactura] = useState(false);
+
   const [storage, setStorage] = useState(null);
   const [showEspacioModal, setShowEspacioModal] = useState(false);
   const [gbSolicitados, setGbSolicitados] = useState(10);
@@ -74,6 +77,19 @@ export default function ConfigClinica() {
           perfil_color_primario:  cfgMap.perfil_color_primario  || "#213665",
           perfil_agendar_activo:  cfgMap.perfil_agendar_activo  !== undefined ? cfgMap.perfil_agendar_activo : "1",
           perfil_mostrar_directorio: cfgMap.perfil_mostrar_directorio || "0",
+        });
+
+        setFormFactura({
+          factura_rtn_clinica:        cfgMap.factura_rtn_clinica        || "",
+          factura_cai:                cfgMap.factura_cai                || "",
+          factura_establecimiento:    cfgMap.factura_establecimiento    || "001",
+          factura_punto_emision:      cfgMap.factura_punto_emision      || "001",
+          factura_tipo_documento:     cfgMap.factura_tipo_documento     || "01",
+          factura_rango_inicio:       cfgMap.factura_rango_inicio       || "",
+          factura_rango_fin:          cfgMap.factura_rango_fin          || "",
+          factura_correlativo_actual: cfgMap.factura_correlativo_actual || "",
+          factura_fecha_limite_emision: cfgMap.factura_fecha_limite_emision || "",
+          factura_isv_porcentaje:     cfgMap.factura_isv_porcentaje     || "15",
         });
 
         setStorage(resDetalles.data?.data?.almacenamiento || null);
@@ -211,9 +227,26 @@ export default function ConfigClinica() {
     }
   };
 
+  const guardarFactura = async (e) => {
+    e.preventDefault();
+    setGuardandoFactura(true);
+    setMsg({ tipo: "", texto: "" });
+    try {
+      const config = {};
+      Object.entries(formFactura).forEach(([k, v]) => { config[k] = v || ""; });
+      await api.put(`/clinicas/${clinicaId}/config`, { config });
+      setMsg({ tipo: "success", texto: "Configuración de facturación guardada correctamente" });
+    } catch (e) {
+      setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
+    } finally {
+      setGuardandoFactura(false);
+    }
+  };
+
   const tabsVisibles = [
     { key: "general",       label: "Datos generales",  icon: "bi-building"       },
     { key: "perfil_publico", label: "Perfil público",   icon: "bi-link-45deg"     },
+    { key: "facturacion",   label: "Facturación",      icon: "bi-receipt-cutoff" },
     { key: "almacenamiento", label: "Almacenamiento",   icon: "bi-hdd-stack"      },
   ];
 
@@ -766,6 +799,90 @@ export default function ConfigClinica() {
                   </a>
                 )}
               </div>
+            </form>
+          )}
+
+          {tab === "facturacion" && (
+            <form onSubmit={guardarFactura}>
+              <div style={{
+                background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 10,
+                padding: "10px 16px", marginBottom: 16, fontSize: "0.85rem", color: "#92400e",
+                display: "flex", alignItems: "flex-start", gap: 8,
+              }}>
+                <i className="bi bi-info-circle-fill" style={{ fontSize: "1rem", flexShrink: 0, marginTop: 1 }} />
+                <span>
+                  Estos datos vienen del <strong>CAI (Código de Autorización de Impresión)</strong> que la SAR te asignó.
+                  Mientras no los completes, el sistema seguirá emitiendo <strong>recibos internos</strong> (sin numeración fiscal)
+                  sin bloquear el resto de la clínica. Solo es obligatorio para emitir facturas formales.
+                </span>
+              </div>
+
+              <div className="row g-3">
+                <div className="col-md-6">
+                  <label className="form-label">RTN de la clínica</label>
+                  <input className="form-control" placeholder="0801-1990-123456"
+                    value={formFactura.factura_rtn_clinica || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_rtn_clinica: e.target.value })} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">CAI</label>
+                  <input className="form-control" placeholder="XXXXXX-XXXXXX-XXXXXX-XXXXXX-XXXXXX-XX"
+                    value={formFactura.factura_cai || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_cai: e.target.value })} />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Establecimiento</label>
+                  <input className="form-control" placeholder="001"
+                    value={formFactura.factura_establecimiento || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_establecimiento: e.target.value })} />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Punto de emisión</label>
+                  <input className="form-control" placeholder="001"
+                    value={formFactura.factura_punto_emision || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_punto_emision: e.target.value })} />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">Tipo de documento</label>
+                  <input className="form-control" placeholder="01"
+                    value={formFactura.factura_tipo_documento || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_tipo_documento: e.target.value })} />
+                </div>
+                <div className="col-md-3">
+                  <label className="form-label">ISV (%)</label>
+                  <input className="form-control" type="number" min="0" max="100" step="0.01"
+                    value={formFactura.factura_isv_porcentaje || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_isv_porcentaje: e.target.value })} />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Rango autorizado — Inicio</label>
+                  <input className="form-control" placeholder="00000001"
+                    value={formFactura.factura_rango_inicio || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_rango_inicio: e.target.value })} />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Rango autorizado — Fin</label>
+                  <input className="form-control" placeholder="00050000"
+                    value={formFactura.factura_rango_fin || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_rango_fin: e.target.value })} />
+                </div>
+                <div className="col-md-4">
+                  <label className="form-label">Correlativo actual</label>
+                  <input className="form-control" placeholder="Se autoincrementa con cada factura"
+                    value={formFactura.factura_correlativo_actual || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_correlativo_actual: e.target.value })} />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Fecha límite de emisión</label>
+                  <input className="form-control" type="date"
+                    value={formFactura.factura_fecha_limite_emision || ""}
+                    onChange={(e) => setFormFactura({ ...formFactura, factura_fecha_limite_emision: e.target.value })} />
+                </div>
+              </div>
+
+              <button type="submit" className="btn btn-primary mt-3" disabled={guardandoFactura}>
+                {guardandoFactura ? "Guardando..." : "Guardar configuración de facturación"}
+              </button>
             </form>
           )}
 

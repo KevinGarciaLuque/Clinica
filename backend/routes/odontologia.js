@@ -13,7 +13,7 @@ async function ensureTablas() {
       clinica_id INT UNSIGNED NOT NULL, paciente_id INT UNSIGNED NOT NULL,
       dentista_id INT UNSIGNED NOT NULL, cita_id INT UNSIGNED,
       numero_sesion SMALLINT UNSIGNED NOT NULL DEFAULT 1,
-      motivo_consulta TEXT, exploracion_clinica JSON, procedimientos JSON,
+      motivo_consulta TEXT, exploracion_clinica JSON, hallazgos JSON, procedimientos JSON,
       diagnostico_cie VARCHAR(120), diagnostico_desc TEXT,
       indicaciones TEXT, proxima_cita TEXT, observaciones TEXT,
       estado ENUM('BORRADOR','FIRMADA') DEFAULT 'BORRADOR',
@@ -39,6 +39,8 @@ async function ensureTablas() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       clinica_id INT UNSIGNED NOT NULL, paciente_id INT UNSIGNED NOT NULL,
       motivo_consulta_inicial TEXT,
+      fecha_ultima_consulta DATE, complicaciones_previas TEXT,
+      antecedentes JSON, medicamentos JSON,
       frecuencia_cepillado VARCHAR(80), usa_hilo_dental TINYINT(1) DEFAULT 0,
       usa_enjuague TINYINT(1) DEFAULT 0, habitos_nocivos TEXT,
       diabetes TINYINT(1) DEFAULT 0, hipertension TINYINT(1) DEFAULT 0,
@@ -47,9 +49,24 @@ async function ensureTablas() {
       ortodoncia_previa TINYINT(1) DEFAULT 0, extracciones_previas TEXT,
       implantes_previos TINYINT(1) DEFAULT 0, protesis_actual VARCHAR(120),
       tratamientos_previos TEXT, historia_familiar TEXT, notas TEXT,
+      declaracion_veraz TINYINT(1) DEFAULT 0,
+      firma_paciente_nombre VARCHAR(150), firma_fecha DATETIME,
       creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
       actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
       UNIQUE KEY uq_ho(clinica_id, paciente_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+  `);
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS catalogo_condiciones_medicas (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL,
+      nombre VARCHAR(150) NOT NULL,
+      requiere_especifique TINYINT(1) DEFAULT 0,
+      es_alerta TINYINT(1) DEFAULT 0,
+      orden INT DEFAULT 0,
+      activo TINYINT(1) DEFAULT 1,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_ccm_clinica(clinica_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
   await pool.query(`
@@ -57,7 +74,11 @@ async function ensureTablas() {
       id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
       clinica_id INT UNSIGNED NOT NULL, paciente_id INT UNSIGNED NOT NULL,
       dentista_id INT UNSIGNED NOT NULL,
-      items JSON NOT NULL DEFAULT ('[]'), costo_total DECIMAL(10,2) DEFAULT 0,
+      items JSON NOT NULL DEFAULT ('[]'), fases JSON,
+      costo_total DECIMAL(10,2) DEFAULT 0,
+      vigencia_dias INT UNSIGNED DEFAULT 90,
+      formas_pago VARCHAR(255) DEFAULT 'Efectivo, Tarjeta, Transferencia',
+      nota_clinica TEXT,
       notas TEXT, activo TINYINT(1) DEFAULT 1,
       creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
       actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -87,7 +108,7 @@ router.get("/sesiones", auth(...ROLES), async (req, res) => {
       [cid, pid]
     );
     const [rows] = await pool.query(
-      `SELECT s.*, CONCAT(u.nombre,' ',IFNULL(u.apellido,'')) AS dentista_nombre
+      `SELECT s.*, CONCAT(u.nombres,' ',IFNULL(u.apellidos,'')) AS dentista_nombre
        FROM sesiones_odontologia s
        LEFT JOIN usuarios u ON u.id = s.dentista_id
        WHERE s.clinica_id=? AND s.paciente_id=?
@@ -103,7 +124,7 @@ router.get("/sesiones/:id", auth(...ROLES), async (req, res) => {
   try {
     const cid = req.user.clinica_id;
     const [[row]] = await pool.query(
-      `SELECT s.*, CONCAT(u.nombre,' ',IFNULL(u.apellido,'')) AS dentista_nombre
+      `SELECT s.*, CONCAT(u.nombres,' ',IFNULL(u.apellidos,'')) AS dentista_nombre
        FROM sesiones_odontologia s
        LEFT JOIN usuarios u ON u.id = s.dentista_id
        WHERE s.id=? AND s.clinica_id=?`,
@@ -120,7 +141,7 @@ router.post("/sesiones", auth(...ROLES_ESCRITURA), async (req, res) => {
     const cid = req.user.clinica_id;
     const uid = req.user.id;
     const {
-      paciente_id, cita_id, motivo_consulta, exploracion_clinica,
+      paciente_id, cita_id, motivo_consulta, exploracion_clinica, hallazgos,
       procedimientos, diagnostico_cie, diagnostico_desc,
       indicaciones, proxima_cita, observaciones
     } = req.body;
@@ -136,13 +157,14 @@ router.post("/sesiones", auth(...ROLES_ESCRITURA), async (req, res) => {
     const [result] = await pool.query(
       `INSERT INTO sesiones_odontologia
         (clinica_id, paciente_id, dentista_id, cita_id, numero_sesion,
-         motivo_consulta, exploracion_clinica, procedimientos,
+         motivo_consulta, exploracion_clinica, hallazgos, procedimientos,
          diagnostico_cie, diagnostico_desc, indicaciones, proxima_cita, observaciones)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         cid, paciente_id, uid, cita_id || null, cnt + 1,
         motivo_consulta || null,
         exploracion_clinica ? JSON.stringify(exploracion_clinica) : null,
+        hallazgos ? JSON.stringify(hallazgos) : JSON.stringify([]),
         procedimientos ? JSON.stringify(procedimientos) : JSON.stringify([]),
         diagnostico_cie || null, diagnostico_desc || null,
         indicaciones || null, proxima_cita || null, observaciones || null
@@ -167,19 +189,20 @@ router.put("/sesiones/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
     if (sesion.estado === 'FIRMADA') return res.status(400).json({ ok: false, msg: "Sesión ya firmada" });
 
     const {
-      motivo_consulta, exploracion_clinica, procedimientos,
+      motivo_consulta, exploracion_clinica, hallazgos, procedimientos,
       diagnostico_cie, diagnostico_desc, indicaciones, proxima_cita, observaciones
     } = req.body;
 
     await pool.query(
       `UPDATE sesiones_odontologia SET
-        motivo_consulta=?, exploracion_clinica=?, procedimientos=?,
+        motivo_consulta=?, exploracion_clinica=?, hallazgos=?, procedimientos=?,
         diagnostico_cie=?, diagnostico_desc=?,
         indicaciones=?, proxima_cita=?, observaciones=?
        WHERE id=? AND clinica_id=?`,
       [
         motivo_consulta ?? sesion.motivo_consulta,
         exploracion_clinica ? JSON.stringify(exploracion_clinica) : sesion.exploracion_clinica,
+        hallazgos ? JSON.stringify(hallazgos) : sesion.hallazgos,
         procedimientos ? JSON.stringify(procedimientos) : sesion.procedimientos,
         diagnostico_cie ?? sesion.diagnostico_cie,
         diagnostico_desc ?? sesion.diagnostico_desc,
@@ -293,15 +316,19 @@ router.post("/historia/:paciente_id", auth(...ROLES_ESCRITURA), async (req, res)
 
     await pool.query(
       `INSERT INTO historia_odontologica
-        (clinica_id, paciente_id, motivo_consulta_inicial, frecuencia_cepillado,
+        (clinica_id, paciente_id, motivo_consulta_inicial, fecha_ultima_consulta,
+         complicaciones_previas, antecedentes, medicamentos, frecuencia_cepillado,
          usa_hilo_dental, usa_enjuague, habitos_nocivos,
          diabetes, hipertension, anticoagulantes, alergia_anestesia, alergia_latex,
          otras_condiciones, ortodoncia_previa, extracciones_previas,
          implantes_previos, protesis_actual, tratamientos_previos,
-         historia_familiar, notas)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+         historia_familiar, notas, declaracion_veraz, firma_paciente_nombre, firma_fecha)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE
          motivo_consulta_inicial=VALUES(motivo_consulta_inicial),
+         fecha_ultima_consulta=VALUES(fecha_ultima_consulta),
+         complicaciones_previas=VALUES(complicaciones_previas),
+         antecedentes=VALUES(antecedentes), medicamentos=VALUES(medicamentos),
          frecuencia_cepillado=VALUES(frecuencia_cepillado),
          usa_hilo_dental=VALUES(usa_hilo_dental), usa_enjuague=VALUES(usa_enjuague),
          habitos_nocivos=VALUES(habitos_nocivos),
@@ -312,17 +339,25 @@ router.post("/historia/:paciente_id", auth(...ROLES_ESCRITURA), async (req, res)
          implantes_previos=VALUES(implantes_previos), protesis_actual=VALUES(protesis_actual),
          tratamientos_previos=VALUES(tratamientos_previos),
          historia_familiar=VALUES(historia_familiar), notas=VALUES(notas),
+         declaracion_veraz=VALUES(declaracion_veraz),
+         firma_paciente_nombre=VALUES(firma_paciente_nombre), firma_fecha=VALUES(firma_fecha),
          actualizado_en=NOW()`,
       [
         cid, pid,
-        f.motivo_consulta_inicial || null, f.frecuencia_cepillado || null,
+        f.motivo_consulta_inicial || null, f.fecha_ultima_consulta || null,
+        f.complicaciones_previas || null,
+        f.antecedentes ? JSON.stringify(f.antecedentes) : JSON.stringify([]),
+        f.medicamentos ? JSON.stringify(f.medicamentos) : JSON.stringify([]),
+        f.frecuencia_cepillado || null,
         f.usa_hilo_dental ? 1 : 0, f.usa_enjuague ? 1 : 0, f.habitos_nocivos || null,
         f.diabetes ? 1 : 0, f.hipertension ? 1 : 0,
         f.anticoagulantes ? 1 : 0, f.alergia_anestesia ? 1 : 0, f.alergia_latex ? 1 : 0,
         f.otras_condiciones || null,
         f.ortodoncia_previa ? 1 : 0, f.extracciones_previas || null,
         f.implantes_previos ? 1 : 0, f.protesis_actual || null,
-        f.tratamientos_previos || null, f.historia_familiar || null, f.notas || null
+        f.tratamientos_previos || null, f.historia_familiar || null, f.notas || null,
+        f.declaracion_veraz ? 1 : 0, f.firma_paciente_nombre || null,
+        f.firma_paciente_nombre ? new Date() : null
       ]
     );
     const [[row]] = await pool.query(
@@ -354,17 +389,28 @@ router.post("/plan/:paciente_id", auth(...ROLES_ESCRITURA), async (req, res) => 
     const cid = req.user.clinica_id;
     const pid = req.params.paciente_id;
     const uid = req.user.id;
-    const { items = [], notas, costo_total } = req.body;
+    const { items = [], fases = [], notas, costo_total, vigencia_dias, formas_pago, nota_clinica } = req.body;
 
-    const costoCalc = items.reduce((s, i) => s + (parseFloat(i.costo_estimado) || 0), 0);
+    const costoCalc = fases.reduce(
+      (sTot, f) => sTot + (f.items || []).reduce((s, i) => s + (parseFloat(i.costo_estimado) || 0), 0),
+      0
+    );
 
     await pool.query(
-      `INSERT INTO plan_tratamiento_odontologia (clinica_id, paciente_id, dentista_id, items, costo_total, notas)
-       VALUES (?,?,?,?,?,?)
+      `INSERT INTO plan_tratamiento_odontologia
+        (clinica_id, paciente_id, dentista_id, items, fases, costo_total, vigencia_dias, formas_pago, nota_clinica, notas)
+       VALUES (?,?,?,?,?,?,?,?,?,?)
        ON DUPLICATE KEY UPDATE
-         items=VALUES(items), costo_total=VALUES(costo_total),
+         items=VALUES(items), fases=VALUES(fases), costo_total=VALUES(costo_total),
+         vigencia_dias=VALUES(vigencia_dias), formas_pago=VALUES(formas_pago),
+         nota_clinica=VALUES(nota_clinica),
          notas=VALUES(notas), dentista_id=VALUES(dentista_id), actualizado_en=NOW()`,
-      [cid, pid, uid, JSON.stringify(items), costo_total ?? costoCalc, notas || null]
+      [
+        cid, pid, uid, JSON.stringify(items), JSON.stringify(fases),
+        costo_total ?? costoCalc, vigencia_dias || 90,
+        formas_pago || 'Efectivo, Tarjeta, Transferencia', nota_clinica || null,
+        notas || null
+      ]
     );
     const [[row]] = await pool.query(
       `SELECT * FROM plan_tratamiento_odontologia WHERE clinica_id=? AND paciente_id=?`, [cid, pid]
@@ -392,13 +438,14 @@ router.get("/resumen/:paciente_id", auth(...ROLES), async (req, res) => {
       [cid, pid]
     );
     const [[plan]] = await pool.query(
-      `SELECT items, costo_total FROM plan_tratamiento_odontologia WHERE clinica_id=? AND paciente_id=?`,
+      `SELECT fases, costo_total FROM plan_tratamiento_odontologia WHERE clinica_id=? AND paciente_id=?`,
       [cid, pid]
     );
 
     let pendientes = 0, completados = 0;
-    if (plan?.items) {
-      const items = typeof plan.items === 'string' ? JSON.parse(plan.items) : plan.items;
+    if (plan?.fases) {
+      const fases = typeof plan.fases === 'string' ? JSON.parse(plan.fases) : plan.fases;
+      const items = (fases || []).flatMap(f => f.items || []);
       pendientes  = items.filter(i => !i.completado).length;
       completados = items.filter(i => i.completado).length;
     }

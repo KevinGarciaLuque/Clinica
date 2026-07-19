@@ -18,6 +18,15 @@ const getHistoriasCols = async () => {
   return historiasColsCache;
 };
 
+// Devuelve el código CIE-10 solo si existe en la tabla `cie10` (para respetar la FK).
+// Si el código está vacío o no existe (ej. diagnóstico libre o de catálogo no seedeado), devuelve null.
+const cieValido = async (codigo) => {
+  const c = (codigo || "").trim();
+  if (!c) return null;
+  const [rows] = await pool.query("SELECT codigo FROM cie10 WHERE codigo=? LIMIT 1", [c]);
+  return rows.length ? c : null;
+};
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // HISTORIAS CLÍNICAS
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -161,6 +170,8 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     if (!paciente_id) return res.status(400).json({ ok: false, msg: "paciente_id requerido" });
 
+    const cieCod = await cieValido(diagnostico_cie);
+
     const insertCols = await getHistoriasCols();
     const hasDxDescCol = insertCols.has("diagnostico_desc");
 
@@ -168,8 +179,8 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       ? "(clinica_id, paciente_id, medico_id, cita_id, subjetivo, objetivo, examen_fisico, diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan, estado, datos_derma)"
       : "(clinica_id, paciente_id, medico_id, cita_id, subjetivo, objetivo, examen_fisico, diagnostico_cie, diagnosticos_secundarios, plan, estado, datos_derma)";
     const insertVals = hasDxDescCol
-      ? [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null]
-      : [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null];
+      ? [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCod, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null]
+      : [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCod, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null];
     const placeholders = insertVals.map(() => "?").join(",");
 
     const [r] = await pool.query(
@@ -230,12 +241,14 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     const updateCols = await getHistoriasCols();
     const hasDxDescUpd = updateCols.has("diagnostico_desc");
 
+    const cieCodUpd = await cieValido(diagnostico_cie);
+
     const updateSql = hasDxDescUpd
       ? `UPDATE historias_clinicas SET subjetivo=?, objetivo=?, examen_fisico=?, diagnostico_cie=?, diagnostico_desc=?, diagnosticos_secundarios=?, plan=?, datos_derma=? WHERE id=? AND clinica_id=?`
       : `UPDATE historias_clinicas SET subjetivo=?, objetivo=?, examen_fisico=?, diagnostico_cie=?, diagnosticos_secundarios=?, plan=?, datos_derma=? WHERE id=? AND clinica_id=?`;
     const updateVals = hasDxDescUpd
-      ? [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid]
-      : [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, diagnostico_cie || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid];
+      ? [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCodUpd, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid]
+      : [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCodUpd, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid];
 
     await pool.query(updateSql, updateVals);
 
@@ -257,7 +270,7 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
     const cols = await getHistoriasCols();
 
     const [[h]] = await pool.query(
-      "SELECT estado, medico_id, cita_id FROM historias_clinicas WHERE id=? AND clinica_id=?",
+      "SELECT estado, medico_id, cita_id, paciente_id FROM historias_clinicas WHERE id=? AND clinica_id=?",
       [id, cid]
     );
     if (!h) return res.status(404).json({ ok: false, msg: "No encontrado" });
@@ -290,6 +303,10 @@ router.post("/:id/firmar", auth("MEDICO","SUPER_ADMIN"), async (req, res) => {
         [h.cita_id, cid]
       );
     }
+
+    // Nota: la factura/recibo ya NO se genera automáticamente al firmar.
+    // Ahora el médico decide si generarla mediante el modal "¿Generar factura?"
+    // que abre el flujo de facturación precargado (con cliente=responsable si es menor).
 
     res.json({ ok: true, msg: yaFirmada ? "Ya firmada (cita sincronizada)" : "Historia firmada" });
   } catch (e) {

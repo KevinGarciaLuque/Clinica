@@ -24,6 +24,7 @@ import HistoriaEndocrinologiaTab from "../components/HistoriaEndocrinologiaTab";
 import SeguimientosEndocrinologia from "../components/SeguimientosEndocrinologia";
 import EducacionDiabetesTab from "../components/EducacionDiabetesTab";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
+import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/constantes_odontologia";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -81,6 +82,9 @@ export default function PerfilPaciente() {
   // Estados principales
   const [paciente, setPaciente] = useState(null);
   const [historias, setHistorias] = useState([]);
+  const [sesionesOdonto, setSesionesOdonto] = useState([]);
+  const [hojaNefroColumnas, setHojaNefroColumnas] = useState([]);
+  const [expandOdontoId, setExpandOdontoId] = useState(null);
   const [docsPorHistoria, setDocsPorHistoria] = useState({});
   const [documentos, setDocumentos] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -98,7 +102,7 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "psicologia", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
   const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
   
@@ -256,18 +260,32 @@ export default function PerfilPaciente() {
       setPaciente(dataPac);
       setForm(dataPac);
       // Cargar datos secundarios en paralelo para reducir espera inicial
-      const [histResult, alergiasResult, docsResult, docsPorHistResult] = await Promise.allSettled([
+      const [histResult, alergiasResult, docsResult, docsPorHistResult, odontoResult, nefroResult] = await Promise.allSettled([
         api.get(`/historias?paciente_id=${id}`),
         api.get(`/historias/paciente/${id}/alergias`),
         api.get(`/pacientes/${id}/documentos`),
         api.get(`/pacientes/${id}/documentos/por-historia`),
+        api.get("/odontologia/sesiones", { params: { paciente_id: id, limit: 50 } }),
+        api.get("/nefrologia/hoja-analitica", { params: { paciente_id: id } }),
       ]);
+
+      if (nefroResult.status === "fulfilled") {
+        setHojaNefroColumnas(nefroResult.value.data.data || []);
+      } else {
+        setHojaNefroColumnas([]);
+      }
 
       if (histResult.status === "fulfilled") {
         setHistorias(histResult.value.data.data || []);
       } else {
         console.log("No hay historias cl�nicas");
         setHistorias([]);
+      }
+
+      if (odontoResult.status === "fulfilled") {
+        setSesionesOdonto(odontoResult.value.data.data || []);
+      } else {
+        setSesionesOdonto([]);
       }
 
       if (alergiasResult.status === "fulfilled") {
@@ -422,6 +440,98 @@ export default function PerfilPaciente() {
       <p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>
       ${det.especialidad ? `<p>${det.especialidad}</p>` : ""}
       ${det.colegiatura_firmante ? `<p>Col. ${det.colegiatura_firmante}</p>` : ""}
+    </div>
+  </div>
+</body></html>`;
+    const win = window.open("", "_blank", "width=800,height=900");
+    if (!win) {
+      showFeedback({ type: "warning", title: "Ventana bloqueada", message: "El navegador bloqueó la ventana emergente. Permite popups para este sitio." });
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    setTimeout(() => { win.print(); }, 400);
+  };
+
+  // ── Expandir sesión odontológica ────────────────────────────────────────────
+  const toggleExpandOdonto = (sId) => setExpandOdontoId(prev => prev === sId ? null : sId);
+
+  // ── Imprimir sesión odontológica ────────────────────────────────────────────
+  const imprimirSesionOdonto = (s) => {
+    const ec = typeof s.exploracion_clinica === 'string' ? JSON.parse(s.exploracion_clinica || '{}') : (s.exploracion_clinica || {});
+    const hallazgos = typeof s.hallazgos === 'string' ? JSON.parse(s.hallazgos || '[]') : (s.hallazgos || []);
+    const procedimientos = typeof s.procedimientos === 'string' ? JSON.parse(s.procedimientos || '[]') : (s.procedimientos || []);
+
+    const examenHtml = EXAMEN_CLINICO_GRUPOS
+      .filter(g => ec[g.key])
+      .map(g => `<span class="vital">${g.label}: <strong>${ec[g.key]}</strong></span>`)
+      .join("");
+    const higieneHtml = HIGIENE_DETALLE_CAMPOS
+      .filter(c => ec.higiene_detalle?.[c.key])
+      .map(c => `<li>${c.label}: ${ec.higiene_detalle[c.key]}</li>`)
+      .join("");
+    const hallazgosHtml = hallazgos.length
+      ? `<div class="section"><div class="section-title">Hallazgos clínicos</div><ul>${hallazgos.map(h => `<li><strong>${h.pieza || '—'}</strong> — ${h.descripcion}</li>`).join("")}</ul></div>`
+      : "";
+    const procHtml = procedimientos.length
+      ? `<div class="section"><div class="section-title">Procedimientos realizados</div><ul>${procedimientos.map(p => `<li><strong>${p.diente || '—'}</strong> ${p.procedimiento || ''}${p.material ? ` — ${p.material}` : ''}${p.observacion ? ` (${p.observacion})` : ''}</li>`).join("")}</ul></div>`
+      : "";
+
+    const html = `<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Consulta Odontológica — ${nombreCompleto} — ${dayjs(s.creado_en).format("DD/MM/YYYY")}</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: Arial, sans-serif; font-size: 13px; color: #111; padding: 24px 32px; }
+    .header { display: flex; justify-content: space-between; align-items: flex-start; border-bottom: 2px solid #FF9800; padding-bottom: 12px; margin-bottom: 16px; }
+    .header-left h1 { font-size: 18px; color: #e65100; }
+    .header-left p { font-size: 12px; color: #555; margin-top: 2px; }
+    .header-right { text-align: right; font-size: 12px; color: #555; }
+    .paciente { background: #fff7ed; border-radius: 6px; padding: 12px 16px; margin-bottom: 16px; }
+    .paciente h2 { font-size: 15px; margin-bottom: 4px; }
+    .vitales { display: flex; flex-wrap: wrap; gap: 10px; background: #fff3e0; border-radius: 4px; padding: 10px 14px; margin-bottom: 14px; }
+    .vital { font-size: 12px; color: #333; }
+    .section { margin-bottom: 14px; }
+    .section-title { font-weight: 700; font-size: 12px; text-transform: uppercase; letter-spacing: .04em; color: #e65100; border-bottom: 1px solid #fed7aa; padding-bottom: 3px; margin-bottom: 6px; }
+    .section p, .section pre { font-size: 13px; color: #333; white-space: pre-wrap; line-height: 1.5; }
+    ul { padding-left: 20px; } ul li { margin-bottom: 3px; }
+    .badge-cie { display: inline-block; background: #e9ecef; border: 1px solid #ced4da; border-radius: 4px; padding: 2px 8px; font-size: 12px; font-weight: bold; margin-right: 6px; }
+    .firma { margin-top: 40px; padding-top: 12px; border-top: 1px solid #ccc; display: flex; justify-content: flex-end; }
+    .firma-box { text-align: center; }
+    .firma-box .linea { width: 200px; border-top: 1px solid #333; margin: 0 auto 4px; }
+    .firma-box p { font-size: 12px; color: #444; }
+    @media print { body { padding: 12px 20px; } }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="header-left">
+      <h1>Consulta Odontológica</h1>
+      <p>Dr. ${s.dentista_nombre || ""}</p>
+    </div>
+    <div class="header-right">
+      <p><strong>Fecha:</strong> ${dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</p>
+      <p><strong>Estado:</strong> ${s.estado}</p>
+      <p><strong>Sesión #${s.numero_sesion}</strong></p>
+    </div>
+  </div>
+  <div class="paciente">
+    <h2>${nombreCompleto}</h2>
+  </div>
+  ${examenHtml ? `<div class="vitales">${examenHtml}</div>` : ""}
+  ${higieneHtml ? `<div class="section"><div class="section-title">Detalle de higiene oral</div><ul>${higieneHtml}</ul></div>` : ""}
+  ${s.motivo_consulta ? `<div class="section"><div class="section-title">Motivo de consulta</div><p>${s.motivo_consulta}</p></div>` : ""}
+  ${hallazgosHtml}${procHtml}
+  ${s.diagnostico_cie ? `<div class="section"><div class="section-title">Diagnóstico</div><p><span class="badge-cie">CIE: ${s.diagnostico_cie}</span>${s.diagnostico_desc || ""}</p></div>` : ""}
+  ${s.indicaciones ? `<div class="section"><div class="section-title">Indicaciones</div><p>${s.indicaciones}</p></div>` : ""}
+  ${s.observaciones ? `<div class="section"><div class="section-title">Observaciones</div><p>${s.observaciones}</p></div>` : ""}
+  <div class="firma">
+    <div class="firma-box">
+      <div class="linea"></div>
+      <p>Dr. ${s.dentista_nombre || ""}</p>
     </div>
   </div>
 </body></html>`;
@@ -768,6 +878,14 @@ export default function PerfilPaciente() {
     ...(tieneModulo("consulta")
       ? [{ key: "historial", label: "Historial Clínico", short: "Historial", icon: "bi-journal-medical",
           badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" }]
+      : []),
+    ...(tieneModulo("consulta_odontologica")
+      ? [{ key: "historial_odonto", label: "Historial Odontológico", short: "Odonto", icon: "bi-emoji-smile-fill",
+          badge: sesionesOdonto.length > 0 ? sesionesOdonto.length : null, badgeColor: "#FF9800", color: "#FF9800" }]
+      : []),
+    ...(tieneModulo("hoja_analitica_nefrologia")
+      ? [{ key: "hoja_nefrologia", label: "Hoja Analítica", short: "Nefrología", icon: "bi-clipboard2-pulse",
+          badge: hojaNefroColumnas.length > 0 ? hojaNefroColumnas.length : null, badgeColor: "#0891b2", color: "#0891b2" }]
       : []),
     ...(tieneModulo("consulta_psicologica")
       ? [{ key: "psicologia", label: "Historia Psicológica", short: "Psicología", icon: "bi-activity", color: "#673AB7" }]
@@ -1823,6 +1941,151 @@ export default function PerfilPaciente() {
       )}
 
       {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: HISTORIAL ODONTOLÓGICO */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "historial_odonto" && (
+        <div className="card shadow-sm">
+          <div className="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">
+              <i className="bi bi-emoji-smile-fill me-2" style={{ color: "#FF9800" }} />
+              Historial Odontológico
+              <span className="badge bg-secondary ms-2" style={{ fontSize: "0.75rem" }}>{sesionesOdonto.length}</span>
+            </h5>
+            <button
+              className="btn btn-sm"
+              style={{ background: "#FF9800", color: "#fff", fontWeight: 600, border: "none" }}
+              onClick={() => navigate(`/odontologia/consulta?paciente_id=${id}`)}
+            >
+              <i className="bi bi-plus-circle me-1" />Ir a Consulta Odontológica
+            </button>
+          </div>
+          <div className="card-body">
+            {sesionesOdonto.length === 0 ? (
+              <div className="text-center py-5">
+                <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
+                <p className="text-muted mt-3">No hay sesiones odontológicas registradas</p>
+                <button
+                  className="btn"
+                  style={{ background: "#FF9800", color: "#fff", fontWeight: 600, border: "none" }}
+                  onClick={() => navigate(`/odontologia/consulta?paciente_id=${id}`)}
+                >
+                  <i className="bi bi-plus-circle me-1" />Nueva Consulta Odontológica
+                </button>
+              </div>
+            ) : (
+              <div className="timeline" style={{ maxHeight: 600, overflowY: "auto", paddingRight: 4 }}>
+                {sesionesOdonto.map((s, i) => {
+                  const expanded = expandOdontoId === s.id;
+                  const ec = typeof s.exploracion_clinica === 'string' ? JSON.parse(s.exploracion_clinica || '{}') : (s.exploracion_clinica || {});
+                  const hallazgos = typeof s.hallazgos === 'string' ? JSON.parse(s.hallazgos || '[]') : (s.hallazgos || []);
+                  const procedimientos = typeof s.procedimientos === 'string' ? JSON.parse(s.procedimientos || '[]') : (s.procedimientos || []);
+                  return (
+                    <div key={s.id} className="d-flex gap-3 mb-3">
+                      <div className="d-flex flex-column align-items-center" style={{ minWidth: 24 }}>
+                        <div className={`rounded-circle border border-2 ${s.estado === "FIRMADA" ? "border-success bg-success" : "border-warning bg-warning"}`}
+                          style={{ width: 12, height: 12, marginTop: 6, flexShrink: 0 }} />
+                        {i < sesionesOdonto.length - 1 && (
+                          <div style={{ width: 2, flex: 1, background: "#dee2e6", minHeight: 40 }} />
+                        )}
+                      </div>
+                      <div className="card border-0 shadow-sm flex-grow-1 mb-2">
+                        <div className="card-body py-2">
+                          <div className="d-flex justify-content-between align-items-start flex-wrap gap-1">
+                            <div>
+                              <span className={`badge ${s.estado === "FIRMADA" ? "bg-success" : "bg-warning text-dark"} me-1`}>
+                                {s.estado}
+                              </span>
+                              <strong className="small">Sesión #{s.numero_sesion}</strong>
+                              {s.dentista_nombre && <span className="text-muted small ms-1">— Dr. {s.dentista_nombre}</span>}
+                            </div>
+                            <small className="text-muted">{dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</small>
+                          </div>
+                          {s.diagnostico_cie && (
+                            <div className="small mt-1">
+                              <span className="badge bg-light text-dark border me-1">CIE: {s.diagnostico_cie}</span>
+                              <span className="text-muted">{s.diagnostico_desc}</span>
+                            </div>
+                          )}
+                          {s.motivo_consulta && !s.diagnostico_cie && (
+                            <div className="small text-muted mt-1">
+                              {s.motivo_consulta.substring(0, 100)}{s.motivo_consulta.length > 100 ? "…" : ""}
+                            </div>
+                          )}
+                          <div className="d-flex gap-2 mt-2 flex-wrap align-items-center">
+                            <button className="btn btn-outline-secondary btn-sm" onClick={() => toggleExpandOdonto(s.id)}>
+                              {expanded ? "Ocultar detalle" : "Ver detalle"}
+                            </button>
+                            <button
+                              className="btn btn-outline-primary btn-sm"
+                              onClick={() => navigate(`/odontologia/consulta?paciente_id=${id}`)}
+                            >
+                              <i className="bi bi-pencil-square me-1" />Abrir en Consulta
+                            </button>
+                            <button
+                              className="btn btn-outline-dark btn-sm ms-auto"
+                              onClick={() => imprimirSesionOdonto(s)}
+                            >
+                              <i className="bi bi-printer me-1" />Imprimir
+                            </button>
+                          </div>
+                          {expanded && (
+                            <div className="mt-3 pt-2 border-top">
+                              {EXAMEN_CLINICO_GRUPOS.some(g => ec[g.key]) && (
+                                <div className="mb-2">
+                                  <div className="small fw-semibold mb-1">🦷 Examen clínico estomatológico:</div>
+                                  <div className="d-flex flex-wrap gap-2">
+                                    {EXAMEN_CLINICO_GRUPOS.filter(g => ec[g.key]).map(g => (
+                                      <span key={g.key} className="badge bg-light text-dark border">{g.label}: {ec[g.key]}</span>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                              {hallazgos.length > 0 && (
+                                <div className="mb-2">
+                                  <div className="small fw-semibold mb-1">🔎 Hallazgos clínicos:</div>
+                                  {hallazgos.map((h, idx) => (
+                                    <div key={idx} className="small text-muted ps-2">
+                                      <strong>{h.pieza || "—"}</strong> — {h.descripcion}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {procedimientos.length > 0 && (
+                                <div className="mb-2">
+                                  <div className="small fw-semibold mb-1">🛠 Procedimientos realizados:</div>
+                                  {procedimientos.map((p, idx) => (
+                                    <div key={idx} className="small text-muted ps-2">
+                                      <strong>{p.diente || "—"}</strong> {p.procedimiento}{p.material ? ` — ${p.material}` : ""}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                              {s.indicaciones && (
+                                <div className="mb-2">
+                                  <div className="small fw-semibold mb-1">Indicaciones:</div>
+                                  <div className="small text-muted" style={{ whiteSpace: "pre-wrap" }}>{s.indicaciones}</div>
+                                </div>
+                              )}
+                              {s.observaciones && (
+                                <div>
+                                  <div className="small fw-semibold mb-1">Observaciones:</div>
+                                  <div className="small text-muted" style={{ whiteSpace: "pre-wrap" }}>{s.observaciones}</div>
+                                </div>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
       {/* TAB 3: EXÁMENES / DOCUMENTOS */}
       {/* ─────────────────────────────────────────────────────── */}
       {tab === "examenes" && (
@@ -2135,6 +2398,71 @@ export default function PerfilPaciente() {
               sexo={paciente.sexo}
               fechaNacimiento={paciente.fecha_nacimiento}
             />
+          </div>
+        </div>
+      )}
+
+      {/* ─────────────────────────────────────────────────────── */}
+      {/* TAB: HOJA ANALÍTICA (NEFROLOGÍA) */}
+      {/* ─────────────────────────────────────────────────────── */}
+      {tab === "hoja_nefrologia" && (
+        <div className="card shadow-sm">
+          <div className="card-header bg-white d-flex justify-content-between align-items-center">
+            <h5 className="mb-0">
+              <i className="bi bi-clipboard2-pulse me-2" style={{ color: "#0891b2" }} />
+              Hoja Analítica
+              <span className="badge bg-secondary ms-2" style={{ fontSize: "0.75rem" }}>{hojaNefroColumnas.length}</span>
+            </h5>
+            <button
+              className="btn btn-sm"
+              style={{ background: "#0891b2", color: "#fff", fontWeight: 600, border: "none" }}
+              onClick={() => navigate(`/nefrologia/hoja-analitica?paciente_id=${id}`)}
+            >
+              <i className="bi bi-clipboard2-pulse me-1" />Abrir Hoja Analítica
+            </button>
+          </div>
+          <div className="card-body">
+            {hojaNefroColumnas.length === 0 ? (
+              <div className="text-center py-5">
+                <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
+                <p className="text-muted mt-3">Todavía no hay visitas registradas en la hoja analítica</p>
+                <button
+                  className="btn"
+                  style={{ background: "#0891b2", color: "#fff", fontWeight: 600, border: "none" }}
+                  onClick={() => navigate(`/nefrologia/hoja-analitica?paciente_id=${id}`)}
+                >
+                  <i className="bi bi-plus-circle me-1" />Registrar primera visita
+                </button>
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="table table-sm align-middle mb-0">
+                  <thead>
+                    <tr>
+                      <th>Fecha</th>
+                      <th>Peso</th>
+                      <th>Talla</th>
+                      <th>Diálisis</th>
+                      <th>TR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {[...hojaNefroColumnas].reverse().map(c => {
+                      const enc = typeof c.encabezado === 'string' ? JSON.parse(c.encabezado || '{}') : (c.encabezado || {});
+                      return (
+                        <tr key={c.id} style={{ cursor: "pointer" }} onClick={() => navigate(`/nefrologia/hoja-analitica?paciente_id=${id}`)}>
+                          <td>{dayjs(c.fecha).format("DD/MM/YYYY")}</td>
+                          <td>{enc.peso || "—"}</td>
+                          <td>{enc.talla || "—"}</td>
+                          <td>{enc.dialisis || "—"}</td>
+                          <td>{enc.tr || "—"}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
         </div>
       )}

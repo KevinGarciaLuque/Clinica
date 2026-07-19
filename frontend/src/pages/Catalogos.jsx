@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import api from "../api/api";
 
-const TABS_VALIDAS = ["medicamentos", "diagnosticos", "estudios", "procedimientos", "tipos_cita"];
+const TABS_VALIDAS = ["medicamentos", "diagnosticos", "estudios", "procedimientos", "tipos_cita", "condiciones_medicas"];
 
 // ═════════════════════════════════════════════════════════════════════
 // Página Catálogos: Diagnósticos + Medicamentos
@@ -93,6 +93,7 @@ export default function Catalogos() {
               { key: "estudios",     label: "🧪 Estudios",      short: "🧪" },
               { key: "tipos_cita",      label: "📅 Tipos de Cita",    short: "📅" },
               { key: "procedimientos",   label: "🔬 Procedimientos",    short: "🔬" },
+              { key: "condiciones_medicas", label: "⚕️ Anamnesis", short: "⚕️" },
             ].map(t => (
               <button
                 key={t.key}
@@ -116,6 +117,7 @@ export default function Catalogos() {
           {tab === "estudios" && <CatalogoEstudios />}
           {tab === "tipos_cita" && <CatalogoTiposCita />}
           {tab === "procedimientos" && <CatalogoProcedimientos />}
+          {tab === "condiciones_medicas" && <CatalogoCondicionesMedicas />}
         </div>
       </div>
     </>
@@ -1029,7 +1031,7 @@ function CatalogoTiposCita() {
   const [alert, setAlert] = useState(null);
 
   function emptyTipo() {
-    return { nombre: "", descripcion: "" };
+    return { nombre: "", descripcion: "", precio: "" };
   }
 
   const cargar = () => {
@@ -1048,7 +1050,11 @@ function CatalogoTiposCita() {
   };
 
   const abrirEditar = (t) => {
-    setForm({ nombre: t.nombre || "", descripcion: t.descripcion || "" });
+    setForm({
+      nombre: t.nombre || "",
+      descripcion: t.descripcion || "",
+      precio: t.precio != null ? String(t.precio) : "",
+    });
     setEditId(t.id);
     setShowForm(true);
     setAlert(null);
@@ -1058,11 +1064,12 @@ function CatalogoTiposCita() {
     if (!form.nombre.trim()) { setAlert({ t: "danger", m: "El nombre es obligatorio" }); return; }
     setSaving(true);
     try {
+      const payload = { ...form, precio: form.precio !== "" ? parseFloat(form.precio) : null };
       if (editId) {
-        await api.put(`/catalogos-tipos-cita/${editId}`, form);
+        await api.put(`/catalogos-tipos-cita/${editId}`, payload);
         setAlert({ t: "success", m: "Tipo de cita actualizado" });
       } else {
-        await api.post("/catalogos-tipos-cita", form);
+        await api.post("/catalogos-tipos-cita", payload);
         setAlert({ t: "success", m: "Tipo de cita creado" });
       }
       setShowForm(false);
@@ -1111,6 +1118,7 @@ function CatalogoTiposCita() {
         <span>
           Define los <strong>tipos de cita</strong> disponibles en tu clínica. Al crear una cita,
           el desplegable mostrará los tipos que configures aquí. Usa los botones ↑↓ para cambiar el orden.
+          El <strong>precio</strong> se usa para generar automáticamente el recibo/factura al completar la consulta.
         </span>
       </div>
 
@@ -1149,12 +1157,19 @@ function CatalogoTiposCita() {
                 value={form.nombre}
                 onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
             </div>
-            <div className="col-md-7">
+            <div className="col-md-5">
               <label className="form-label small fw-semibold">Descripción (opcional)</label>
               <input className="form-control form-control-sm"
                 placeholder="Descripción corta o nota interna"
                 value={form.descripcion}
                 onChange={e => setForm(f => ({ ...f, descripcion: e.target.value }))} />
+            </div>
+            <div className="col-md-2">
+              <label className="form-label small fw-semibold">Precio (L)</label>
+              <input className="form-control form-control-sm" type="number" min="0" step="0.01"
+                placeholder="0.00"
+                value={form.precio}
+                onChange={e => setForm(f => ({ ...f, precio: e.target.value }))} />
             </div>
             <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
               <button onClick={guardar} disabled={saving} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
@@ -1172,7 +1187,7 @@ function CatalogoTiposCita() {
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc" }}>
-                {["#", "Nombre del tipo de cita", "Descripción", "Acciones"].map(h => (
+                {["#", "Nombre del tipo de cita", "Descripción", "Precio", "Acciones"].map(h => (
                   <th key={h} style={{
                     padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
                     color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
@@ -1202,6 +1217,9 @@ function CatalogoTiposCita() {
                   <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: t.descripcion ? "#374151" : "#d1d5db" }}>
                     {t.descripcion || "—"}
                   </td>
+                  <td style={{ padding: "11px 14px", fontSize: "0.83rem", color: t.precio != null ? "#166534" : "#d1d5db", fontWeight: t.precio != null ? 700 : 400, whiteSpace: "nowrap" }}>
+                    {t.precio != null ? `L ${parseFloat(t.precio).toLocaleString("es-HN", { minimumFractionDigits: 2 })}` : "—"}
+                  </td>
                   <td style={{ padding: "11px 14px" }}>
                     <div style={{ display: "flex", gap: 6 }}>
                       <button onClick={() => abrirEditar(t)} title="Editar"
@@ -1218,10 +1236,247 @@ function CatalogoTiposCita() {
               ))}
               {list.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
                     <i className="bi bi-calendar-x" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
                     No hay tipos de cita configurados.<br />
                     <span style={{ fontSize: "0.82rem" }}>Se usarán los tipos por defecto del sistema.</span>
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ═════════════════════════════════════════════════════════════════════
+// Tab: Catálogo de Condiciones Médicas (Anamnesis / HC-02)
+// ═════════════════════════════════════════════════════════════════════
+function CatalogoCondicionesMedicas() {
+  const [list, setList] = useState([]);
+  const [showForm, setShowForm] = useState(false);
+  const [editId, setEditId] = useState(null);
+  const [form, setForm] = useState(emptyCond());
+  const [saving, setSaving] = useState(false);
+  const [alert, setAlert] = useState(null);
+
+  function emptyCond() {
+    return { nombre: "", requiere_especifique: true, es_alerta: false };
+  }
+
+  const cargar = () => {
+    api.get("/catalogos-condiciones-medicas")
+      .then(r => setList(r.data.data || []))
+      .catch(() => {});
+  };
+
+  useEffect(() => { cargar(); }, []);
+
+  const abrirNuevo = () => {
+    setForm(emptyCond());
+    setEditId(null);
+    setShowForm(true);
+    setAlert(null);
+  };
+
+  const abrirEditar = (c) => {
+    setForm({
+      nombre: c.nombre || "",
+      requiere_especifique: !!c.requiere_especifique,
+      es_alerta: !!c.es_alerta,
+    });
+    setEditId(c.id);
+    setShowForm(true);
+    setAlert(null);
+  };
+
+  const guardar = async () => {
+    if (!form.nombre.trim()) { setAlert({ t: "danger", m: "El nombre es obligatorio" }); return; }
+    setSaving(true);
+    try {
+      if (editId) {
+        await api.put(`/catalogos-condiciones-medicas/${editId}`, form);
+        setAlert({ t: "success", m: "Condición actualizada" });
+      } else {
+        await api.post("/catalogos-condiciones-medicas", form);
+        setAlert({ t: "success", m: "Condición creada" });
+      }
+      setShowForm(false);
+      cargar();
+    } catch (e) {
+      setAlert({ t: "danger", m: e.response?.data?.msg || "Error" });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const eliminar = async (id) => {
+    await api.delete(`/catalogos-condiciones-medicas/${id}`);
+    cargar();
+  };
+
+  const mover = async (id, direccion) => {
+    try {
+      await api.put(`/catalogos-condiciones-medicas/${id}/mover`, { direccion });
+      cargar();
+    } catch {}
+  };
+
+  return (
+    <div>
+      {alert && (
+        <div style={{
+          marginBottom: 16, padding: "10px 16px", borderRadius: 8, fontSize: "0.87rem",
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          background: alert.t === "success" ? "#dcfce7" : "#fee2e2",
+          color: alert.t === "success" ? "#166534" : "#991b1b",
+          border: `1px solid ${alert.t === "success" ? "#bbf7d0" : "#fecaca"}`,
+        }}>
+          <span>{alert.m}</span>
+          <button onClick={() => setAlert(null)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "inherit" }}>×</button>
+        </div>
+      )}
+
+      {/* Info banner */}
+      <div style={{
+        background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 10,
+        padding: "10px 16px", marginBottom: 16, fontSize: "0.82rem", color: "#1e40af",
+        display: "flex", alignItems: "flex-start", gap: 8,
+      }}>
+        <i className="bi bi-info-circle-fill" style={{ fontSize: "1rem", flexShrink: 0, marginTop: 1 }}></i>
+        <span>
+          Define las <strong>condiciones / antecedentes médicos</strong> que aparecen en el checklist SI/NO
+          de la Anamnesis (HC-02) al abrir la Historia de un paciente. Marca <strong>Alerta</strong> para
+          resaltarla en rojo (alergias, coagulación, etc.). Usa ↑↓ para cambiar el orden.
+        </span>
+      </div>
+
+      {/* Toolbar */}
+      <div style={{ display: "flex", gap: 10, marginBottom: 16, alignItems: "center" }}>
+        <button onClick={abrirNuevo} style={{
+          marginLeft: "auto", background: "#2563eb", border: "none", borderRadius: 8,
+          color: "#fff", padding: "7px 16px", fontSize: "0.82rem", fontWeight: 600, cursor: "pointer",
+          display: "flex", alignItems: "center", gap: 6,
+        }}>
+          <i className="bi bi-plus-circle"></i> Nueva Condición
+        </button>
+      </div>
+
+      {/* Inline form */}
+      {showForm && (
+        <div style={{
+          background: "#fff", border: "1px solid #bfdbfe", borderRadius: 12,
+          marginBottom: 20, overflow: "hidden", boxShadow: "0 2px 8px rgba(0,0,0,.07)",
+        }}>
+          <div style={{
+            background: "#eff6ff", padding: "12px 20px", borderBottom: "1px solid #bfdbfe",
+            display: "flex", justifyContent: "space-between", alignItems: "center",
+          }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#1e40af" }}>
+              <i className="bi bi-clipboard2-pulse me-2"></i>
+              {editId ? "Editar Condición" : "Nueva Condición"}
+            </span>
+            <button onClick={() => setShowForm(false)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "1.1rem", color: "#6b7280" }}>×</button>
+          </div>
+          <div className="row g-2" style={{ padding: "16px 20px" }}>
+            <div className="col-md-8">
+              <label className="form-label small fw-semibold">Nombre de la condición *</label>
+              <input className="form-control form-control-sm"
+                placeholder="Ej: Alergia a Medicamentos (Penicilina, etc.)"
+                value={form.nombre}
+                onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
+            </div>
+            <div className="col-md-2 d-flex align-items-end">
+              <div className="form-check">
+                <input className="form-check-input" type="checkbox" id="req-esp"
+                  checked={form.requiere_especifique}
+                  onChange={e => setForm(f => ({ ...f, requiere_especifique: e.target.checked }))} />
+                <label className="form-check-label small" htmlFor="req-esp">Pide detalle</label>
+              </div>
+            </div>
+            <div className="col-md-2 d-flex align-items-end">
+              <div className="form-check">
+                <input className="form-check-input" type="checkbox" id="es-alerta"
+                  checked={form.es_alerta}
+                  onChange={e => setForm(f => ({ ...f, es_alerta: e.target.checked }))} />
+                <label className="form-check-label small text-danger fw-semibold" htmlFor="es-alerta">Alerta</label>
+              </div>
+            </div>
+            <div className="col-12" style={{ display: "flex", gap: 8, marginTop: 4 }}>
+              <button onClick={guardar} disabled={saving} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>
+                {saving ? "Guardando…" : editId ? "Actualizar" : "Crear"}
+              </button>
+              <button onClick={() => setShowForm(false)} style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", color: "#374151", fontSize: "0.84rem", fontWeight: 600, cursor: "pointer" }}>Cancelar</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Lista */}
+      <div style={{ background: "#fff", borderRadius: 12, boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
+        <div style={{ overflowY: "auto", maxHeight: "calc(100vh - 320px)" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: "#f8fafc" }}>
+                {["#", "Condición", "Pide detalle", "Alerta", "Acciones"].map(h => (
+                  <th key={h} style={{
+                    padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                    color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                    borderBottom: "2px solid #e5e7eb", textAlign: "left", whiteSpace: "nowrap",
+                    background: "#f8fafc",
+                  }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {list.map((c, idx) => (
+                <tr key={c.id} style={{ borderBottom: "1px solid #f3f4f6" }}
+                  onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                  <td style={{ padding: "11px 14px", width: 48 }}>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 2, alignItems: "center" }}>
+                      <button onClick={() => mover(c.id, "arriba")} disabled={idx === 0} title="Subir"
+                        style={{ background: "none", border: "none", cursor: idx === 0 ? "default" : "pointer", color: idx === 0 ? "#d1d5db" : "#6b7280", padding: "1px 4px", lineHeight: 1, fontSize: "0.78rem" }}>▲</button>
+                      <span style={{ fontWeight: 700, fontSize: "0.78rem", color: "#9ca3af" }}>{idx + 1}</span>
+                      <button onClick={() => mover(c.id, "abajo")} disabled={idx === list.length - 1} title="Bajar"
+                        style={{ background: "none", border: "none", cursor: idx === list.length - 1 ? "default" : "pointer", color: idx === list.length - 1 ? "#d1d5db" : "#6b7280", padding: "1px 4px", lineHeight: 1, fontSize: "0.78rem" }}>▼</button>
+                    </div>
+                  </td>
+                  <td style={{ padding: "11px 14px", fontWeight: 600, fontSize: "0.88rem", color: c.es_alerta ? "#dc2626" : "#111827" }}>
+                    {!!c.es_alerta && <i className="bi bi-exclamation-triangle-fill me-2" style={{ fontSize: "0.75rem" }}></i>}
+                    {c.nombre}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    {c.requiere_especifique
+                      ? <span style={{ background: "#eff6ff", color: "#2563eb", border: "1px solid #bfdbfe", borderRadius: 20, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 700 }}>Sí</span>
+                      : <span style={{ color: "#d1d5db" }}>—</span>}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    {c.es_alerta
+                      ? <span style={{ background: "#fee2e2", color: "#dc2626", border: "1px solid #fecaca", borderRadius: 20, padding: "2px 10px", fontSize: "0.75rem", fontWeight: 700 }}>⚠ Alerta</span>
+                      : <span style={{ color: "#d1d5db" }}>—</span>}
+                  </td>
+                  <td style={{ padding: "11px 14px" }}>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      <button onClick={() => abrirEditar(c)} title="Editar"
+                        style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: 7, color: "#2563eb", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-pencil" style={{ fontSize: "0.82rem" }}></i>
+                      </button>
+                      <button onClick={() => eliminar(c.id)} title="Eliminar"
+                        style={{ background: "#fff1f2", border: "1px solid #fecdd3", borderRadius: 7, color: "#e11d48", padding: "4px 8px", cursor: "pointer" }}>
+                        <i className="bi bi-trash3" style={{ fontSize: "0.82rem" }}></i>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {list.length === 0 && (
+                <tr>
+                  <td colSpan={5} style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af", fontSize: "0.9rem" }}>
+                    <i className="bi bi-clipboard2-pulse" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }}></i>
+                    No hay condiciones configuradas.
                   </td>
                 </tr>
               )}
