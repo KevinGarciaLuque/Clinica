@@ -9,8 +9,8 @@ self.addEventListener("push", (event) => {
   const title = data.title || "Notificación";
   const options = {
     body: data.body || "Tienes una nueva notificación",
-    icon: "/vite.svg",
-    badge: "/vite.svg",
+    icon: "/icons/icon-512.png",
+    badge: "/icons/icon-192.png",
     tag: data.tag || "clinica-notif",
     data: data.data || {},
   };
