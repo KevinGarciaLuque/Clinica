@@ -282,6 +282,11 @@ router.get("/:id/modulos-permisos/usuario/:usuarioId", auth("SUPER_ADMIN"), asyn
       return res.status(404).json({ ok: false, msg: "Usuario no encontrado en esta clínica" });
     }
 
+    const [[clinica]] = await pool.query(
+      "SELECT tipo_id, es_pediatrica FROM clinicas WHERE id=? LIMIT 1",
+      [clinicaId]
+    );
+
     const [rows] = await pool.query(
       `
       SELECT
@@ -291,14 +296,14 @@ router.get("/:id/modulos-permisos/usuario/:usuarioId", auth("SUPER_ADMIN"), asyn
         IFNULL(cm.habilitado, 1) AS habilitado_clinica,
         um.habilitado AS habilitado_usuario
       FROM modulos_sistema ms
-      INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id
-      INNER JOIN clinicas c ON c.tipo_id = tcm.tipo_id AND c.id = ?
-      LEFT JOIN clinica_modulos cm ON cm.clinica_id = c.id AND cm.modulo_id = ms.id
+      INNER JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id AND tcm.tipo_id = ?
+      LEFT JOIN clinica_modulos cm ON cm.clinica_id = ? AND cm.modulo_id = ms.id
       LEFT JOIN usuario_modulos um ON um.usuario_id = ? AND um.modulo_id = ms.id
       WHERE ms.disponible = 1
+        AND (? = 1 AND ms.para_pediatrica = 1 OR ? = 0 AND ms.para_normal = 1)
       ORDER BY ms.orden
       `,
-      [clinicaId, usuarioId]
+      [clinica.tipo_id, clinicaId, usuarioId, clinica.es_pediatrica ? 1 : 0, clinica.es_pediatrica ? 1 : 0]
     );
 
     res.json({ ok: true, data: { usuario, modulos: rows } });

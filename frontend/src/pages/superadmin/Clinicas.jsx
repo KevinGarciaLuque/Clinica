@@ -975,7 +975,7 @@ export default function Clinicas() {
                               <button
                                 key={t.id}
                                 type="button"
-                                onClick={() => setForm({ ...form, tipo_id: sel ? "" : String(t.id) })}
+                                onClick={() => setForm({ ...form, tipo_id: String(t.id) })}
                                 style={{
                                   background: sel ? `${t.color}22` : "rgba(255,255,255,.03)",
                                   border: `2px solid ${sel ? t.color : C.border}`,
@@ -1790,44 +1790,87 @@ export default function Clinicas() {
       {showPermisosModal && permisosClinica?.clinica && createPortal(
         <div className="modal show d-block" style={{ background: "rgba(0,0,0,.62)", zIndex: 9000 }}>
           <div className="modal-dialog modal-xl modal-dialog-scrollable">
-            <div className="modal-content" style={{ background: C.card, color: C.text, border: `1px solid ${C.border}` }}>
-              <div className="modal-header" style={{ borderBottom: `1px solid ${C.border}` }}>
-                <h5 className="modal-title">
-                  Permisos de módulos: {permisosClinica.clinica.nombre}
-                </h5>
-                <div className="d-flex align-items-center gap-2">
+            <div className="modal-content" style={{ background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
+              <div
+                className="modal-header"
+                style={{ borderBottom: `1px solid ${C.border}`, padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+              >
+                <div>
+                  <h5 className="modal-title" style={{ fontWeight: 700, marginBottom: 2 }}>
+                    Permisos de módulos
+                  </h5>
+                  <div style={{ fontSize: 13, color: C.muted }}>{permisosClinica.clinica.nombre}</div>
+                </div>
+                <div className="d-flex align-items-center gap-2" style={{ marginLeft: "auto" }}>
                   <button
-                    className="btn btn-sm btn-outline-warning"
+                    className="btn btn-sm"
                     onClick={reaplicarPresetClinica}
                     title="Reaplica módulos según tipo/especialidad de clínica"
+                    style={{
+                      background: "rgba(255,193,7,.12)",
+                      border: "1px solid rgba(255,193,7,.4)",
+                      color: "#ffc107",
+                      fontWeight: 600,
+                      borderRadius: 8,
+                    }}
                   >
                     <i className="bi bi-arrow-repeat me-1"></i>Reaplicar preset
                   </button>
                   <button className="btn-close btn-close-white" onClick={() => setShowPermisosModal(false)} />
                 </div>
               </div>
-              <div className="modal-body">
+              <div className="modal-body" style={{ padding: 24 }}>
                 <div className="row g-4">
                   <div className="col-lg-6">
-                    <h6 style={{ color: C.accent }}>Por clínica</h6>
-                    <div className="small" style={{ color: C.muted, marginBottom: 10 }}>
+                    <div className="d-flex align-items-center gap-2" style={{ marginBottom: 4 }}>
+                      <i className="bi bi-hospital" style={{ color: C.accent }} />
+                      <h6 style={{ color: C.accent, fontWeight: 700, margin: 0 }}>Por clínica</h6>
+                    </div>
+                    <div className="small" style={{ color: C.muted, marginBottom: 12 }}>
                       Estos permisos aplican a toda la clínica.
                     </div>
-                    <div style={{ maxHeight: 420, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                      {permisosClinica.modulos.map((m) => (
-                        <div key={m.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}>
-                          <div>
-                            <div style={{ fontWeight: 600 }}>{m.nombre}</div>
-                            <div style={{ fontSize: 12, color: C.muted }}>{m.clave}</div>
-                          </div>
-                          <input type="checkbox" checked={Number(m.habilitado_clinica) === 1} onChange={(e) => toggleModuloClinica(m, e.target.checked)} />
-                        </div>
-                      ))}
+                    <div style={{ maxHeight: 440, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                      {permisosClinica.modulos.map((m, i) => {
+                        const on = Number(m.habilitado_clinica) === 1;
+                        return (
+                          <label
+                            key={m.id}
+                            htmlFor={`mod-clinica-${m.id}`}
+                            style={{
+                              display: "flex", justifyContent: "space-between", alignItems: "center",
+                              padding: "12px 14px", cursor: "pointer",
+                              borderBottom: i === permisosClinica.modulos.length - 1 ? "none" : `1px solid ${C.border}`,
+                              transition: "background .12s",
+                            }}
+                            onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,.03)")}
+                            onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                          >
+                            <div>
+                              <div style={{ fontWeight: 600, fontSize: 14, color: on ? C.text : C.muted }}>{m.nombre}</div>
+                              <div style={{ fontSize: 11.5, color: C.muted, fontFamily: "monospace" }}>{m.clave}</div>
+                            </div>
+                            <div className="form-check form-switch" style={{ margin: 0 }}>
+                              <input
+                                id={`mod-clinica-${m.id}`}
+                                className="form-check-input"
+                                type="checkbox"
+                                role="switch"
+                                style={{ width: 40, height: 22, cursor: "pointer" }}
+                                checked={on}
+                                onChange={(e) => toggleModuloClinica(m, e.target.checked)}
+                              />
+                            </div>
+                          </label>
+                        );
+                      })}
                     </div>
                   </div>
                   <div className="col-lg-6">
-                    <h6 style={{ color: C.success }}>Por doctor/usuario</h6>
-                    <div className="small" style={{ color: C.muted, marginBottom: 10 }}>
+                    <div className="d-flex align-items-center gap-2" style={{ marginBottom: 4 }}>
+                      <i className="bi bi-person-badge" style={{ color: C.success }} />
+                      <h6 style={{ color: C.success, fontWeight: 700, margin: 0 }}>Por doctor/usuario</h6>
+                    </div>
+                    <div className="small" style={{ color: C.muted, marginBottom: 12 }}>
                       Excepciones individuales sobre permisos de clínica.
                     </div>
                     <select
@@ -1838,7 +1881,7 @@ export default function Clinicas() {
                         setUsuarioPermisosDetalle(null);
                         if (e.target.value) cargarPermisosUsuario(e.target.value);
                       }}
-                      style={{ background: C.inputBg, color: C.text, border: `1px solid ${C.border}` }}
+                      style={{ background: C.inputBg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 8 }}
                     >
                       <option value="">Selecciona usuario...</option>
                       {permisosClinica.usuarios.map((u) => (
@@ -1848,31 +1891,68 @@ export default function Clinicas() {
                       ))}
                     </select>
                     {usuarioPermisosDetalle ? (
-                      <div style={{ maxHeight: 360, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
-                        {usuarioPermisosDetalle.modulos.map((m) => {
-                          const efectivo = m.habilitado_usuario === null || m.habilitado_usuario === undefined
-                            ? Number(m.habilitado_clinica) === 1
-                            : Number(m.habilitado_usuario) === 1;
+                      <div style={{ maxHeight: 380, overflowY: "auto", border: `1px solid ${C.border}`, borderRadius: 10 }}>
+                        {usuarioPermisosDetalle.modulos.map((m, i) => {
+                          const tieneOverride = m.habilitado_usuario !== null && m.habilitado_usuario !== undefined;
+                          const clinicaOn = Number(m.habilitado_clinica) === 1;
+                          const efectivo = tieneOverride ? Number(m.habilitado_usuario) === 1 : clinicaOn;
                           return (
-                            <div key={m.modulo_id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 12px", borderBottom: `1px solid ${C.border}` }}>
+                            <label
+                              key={m.modulo_id}
+                              htmlFor={`mod-usuario-${m.modulo_id}`}
+                              style={{
+                                display: "flex", justifyContent: "space-between", alignItems: "center",
+                                padding: "12px 14px", cursor: "pointer",
+                                borderBottom: i === usuarioPermisosDetalle.modulos.length - 1 ? "none" : `1px solid ${C.border}`,
+                                transition: "background .12s",
+                              }}
+                              onMouseEnter={(e) => (e.currentTarget.style.background = "rgba(255,255,255,.03)")}
+                              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                            >
                               <div>
-                                <div style={{ fontWeight: 600 }}>{m.nombre}</div>
-                                <div style={{ fontSize: 12, color: C.muted }}>
-                                  Clínica: {Number(m.habilitado_clinica) === 1 ? "ON" : "OFF"} | Efectivo: {efectivo ? "ON" : "OFF"}
+                                <div style={{ fontWeight: 600, fontSize: 14, color: efectivo ? C.text : C.muted }}>{m.nombre}</div>
+                                <div className="d-flex align-items-center gap-2" style={{ fontSize: 11.5, color: C.muted, marginTop: 2 }}>
+                                  <span>Clínica: {clinicaOn ? "ON" : "OFF"}</span>
+                                  {tieneOverride && (
+                                    <span
+                                      style={{
+                                        fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 20,
+                                        background: "rgba(255,193,7,.14)", color: "#ffc107", border: "1px solid rgba(255,193,7,.35)",
+                                      }}
+                                    >
+                                      OVERRIDE
+                                    </span>
+                                  )}
                                 </div>
                               </div>
-                              <input type="checkbox" checked={efectivo} onChange={(e) => toggleModuloUsuario(m, e.target.checked)} />
-                            </div>
+                              <div className="form-check form-switch" style={{ margin: 0 }}>
+                                <input
+                                  id={`mod-usuario-${m.modulo_id}`}
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  role="switch"
+                                  style={{ width: 40, height: 22, cursor: "pointer" }}
+                                  checked={efectivo}
+                                  onChange={(e) => toggleModuloUsuario(m, e.target.checked)}
+                                />
+                              </div>
+                            </label>
                           );
                         })}
                       </div>
                     ) : (
-                      <div style={{ color: C.muted, fontSize: 13 }}>Selecciona un usuario para ajustar permisos individuales.</div>
+                      <div
+                        className="d-flex flex-column align-items-center justify-content-center text-center"
+                        style={{ color: C.muted, fontSize: 13, border: `1px dashed ${C.border}`, borderRadius: 10, padding: "40px 16px" }}
+                      >
+                        <i className="bi bi-person-lines-fill" style={{ fontSize: 24, marginBottom: 8, opacity: .5 }} />
+                        Selecciona un usuario para ajustar permisos individuales.
+                      </div>
                     )}
                   </div>
                 </div>
               </div>
-              <div className="modal-footer" style={{ borderTop: `1px solid ${C.border}` }}>
+              <div className="modal-footer" style={{ borderTop: `1px solid ${C.border}`, padding: "14px 24px" }}>
                 <button className="btn btn-secondary" onClick={() => setShowPermisosModal(false)}>Cerrar</button>
               </div>
             </div>

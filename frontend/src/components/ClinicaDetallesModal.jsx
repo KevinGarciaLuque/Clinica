@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import api from "../api/api";
 import BitacoraModal from "./BitacoraModal";
 
@@ -15,7 +15,7 @@ const C = {
   muted:   "#94a3b8",
 };
 
-/* â”€â”€ helpers â”€â”€ */
+/* ── helpers ── */
 const fmt = (n) => Number(n).toLocaleString("es");
 
 function formatBytes(kb) {
@@ -31,7 +31,7 @@ function nivelAlmacenamiento(kb) {
   return                       { label: "Alto",     color: C.danger,  pct: Math.min(67 + ((kb - 200*1024) / (300*1024)) * 33, 100) };
 }
 
-/* â”€â”€ Tarjeta de stat â”€â”€ */
+/* ── Tarjeta de stat ── */
 function StatCard({ icon, label, value, color = C.accent, sub }) {
   return (
     <div style={{
@@ -57,7 +57,7 @@ function StatCard({ icon, label, value, color = C.accent, sub }) {
   );
 }
 
-/* â”€â”€ Barra de desglose â”€â”€ */
+/* ── Barra de desglose ── */
 function BarraDesglose({ label, icon, cantidad, kb, colorBar }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "7px 0" }}>
@@ -66,7 +66,7 @@ function BarraDesglose({ label, icon, cantidad, kb, colorBar }) {
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
           <span style={{ fontSize: 13, color: C.text }}>{label}</span>
           <span style={{ fontSize: 12, color: C.muted, fontFamily: "monospace" }}>
-            {fmt(cantidad)} arch. Â· {formatBytes(kb)}
+            {fmt(cantidad)} arch. · {formatBytes(kb)}
           </span>
         </div>
         <div style={{ height: 5, background: "rgba(255,255,255,.07)", borderRadius: 3, overflow: "hidden" }}>
@@ -138,7 +138,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
     setError("");
     const valor = Number(precioGbInput);
     if (!Number.isFinite(valor) || valor < 0) {
-      setError("El precio por GB debe ser un nÃºmero vÃ¡lido.");
+      setError("El precio por GB debe ser un número válido.");
       return;
     }
     try {
@@ -174,7 +174,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
         overflow: "hidden",
       }}>
 
-        {/* â”€â”€ Header â”€â”€ */}
+        {/* ── Header ── */}
         <div style={{
           padding: "20px 28px",
           borderBottom: `1px solid ${C.border}`,
@@ -216,7 +216,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
           </button>
         </div>
 
-        {/* â”€â”€ Cuerpo â”€â”€ */}
+        {/* ── Cuerpo ── */}
         <div style={{ overflowY: "auto", flex: 1, padding: "24px 28px", display: "flex", flexDirection: "column", gap: 24 }}>
 
           {/* Estado de carga */}
@@ -227,7 +227,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                 borderTopColor: C.accent, borderRadius: "50%",
                 animation: "spin .8s linear infinite", margin: "0 auto 14px",
               }} />
-              <span style={{ color: C.muted, fontSize: 14 }}>Cargando estadÃ­sticas...</span>
+              <span style={{ color: C.muted, fontSize: 14 }}>Cargando estadísticas...</span>
               <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
             </div>
           )}
@@ -245,7 +245,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
 
           {data && !cargando && (
             <>
-              {/* â”€â”€ Grid de conteos â”€â”€ */}
+              {/* ── Grid de conteos ── */}
               <div>
                 <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase",
                                letterSpacing: ".06em", marginBottom: 12 }}>
@@ -256,15 +256,15 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   <StatCard icon="bi-people-fill"       label="Pacientes"        value={data.conteos.total_pacientes}   color={C.accent} />
                   <StatCard icon="bi-calendar2-check-fill" label="Citas totales"  value={data.conteos.total_citas}        color="#8b5cf6" />
                   <StatCard icon="bi-person-badge-fill"  label="Staff activo"     value={data.conteos.total_usuarios}    color={C.success} />
-                  <StatCard icon="bi-images"             label="Fotos galerÃ­a"    value={data.conteos.fotos_galeria}     color="#f59e0b"
-                    sub="antes/despuÃ©s" />
+                  <StatCard icon="bi-images"             label="Fotos galería"    value={data.conteos.fotos_galeria}     color="#f59e0b"
+                    sub="antes/después" />
                   <StatCard icon="bi-person-circle"      label="Fotos pacientes"  value={data.conteos.fotos_perfil_pacientes} color="#06b6d4"
                     sub="perfil Cloudinary" />
                   <StatCard icon="bi-file-earmark-fill"  label="Documentos"       value={data.conteos.total_documentos}  color="#ec4899" />
                 </div>
               </div>
 
-              {/* â”€â”€ Almacenamiento en nube â”€â”€ */}
+              {/* ── Almacenamiento en nube ── */}
               <div style={{
                 background: C.card,
                 border: `1px solid ${C.border}`,
@@ -280,7 +280,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                     <div style={{ fontSize: 20, fontWeight: 700, color: nivel.color, lineHeight: 1.1 }}>
                       {data.almacenamiento.espacio_legible}
                     </div>
-                    <div style={{ fontSize: 11, color: C.muted }}>estimado Â· {fmt(data.conteos.total_archivos_nube)} archivos</div>
+                    <div style={{ fontSize: 11, color: C.muted }}>estimado · {fmt(data.conteos.total_archivos_nube)} archivos</div>
                   </div>
                 </div>
 
@@ -438,7 +438,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                     Desglose por tipo
                   </div>
                   <BarraDesglose
-                    icon="bi-images" label="GalerÃ­a Antes/DespuÃ©s"
+                    icon="bi-images" label="Galería Antes/Después"
                     cantidad={data.almacenamiento.desglose.galeria_fotos.cantidad}
                     kb={data.almacenamiento.desglose.galeria_fotos.kb}
                     colorBar="#f59e0b"
@@ -464,14 +464,14 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                 </div>
               </div>
 
-              {/* â”€â”€ Info de actividad y sugerencia â”€â”€ */}
+              {/* ── Info de actividad y sugerencia ── */}
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 {/* Especialidad */}
                 {(data.clinica.tipo_nombre || data.clinica.es_pediatrica) && (() => {
                   const esPed  = !!data.clinica.es_pediatrica;
                   const label  = data.clinica.tipo_nombre
-                    ? (esPed ? `${data.clinica.tipo_nombre} PediÃ¡trica` : data.clinica.tipo_nombre)
-                    : "PediÃ¡trica";
+                    ? (esPed ? `${data.clinica.tipo_nombre} Pediátrica` : data.clinica.tipo_nombre)
+                    : "Pediátrica";
                   const color  = esPed ? "#9C27B0" : (data.clinica.tipo_color || C.accent);
                   const icon   = esPed ? "bi-balloon-heart-fill" : (data.clinica.tipo_icono || "bi-building-fill");
                   return (
@@ -500,7 +500,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   );
                 })()}
 
-                {/* Ãšltima cita */}
+                {/* Última cita */}
                 <div style={{
                   background: C.card, border: `1px solid ${C.border}`,
                   borderRadius: 12, padding: "16px 18px",
@@ -508,7 +508,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase",
                                  letterSpacing: ".05em", fontWeight: 600, marginBottom: 8 }}>
                     <i className="bi bi-clock-history me-2" style={{ color: C.accent }} />
-                    Ãšltima cita
+                    Última cita
                   </div>
                   <div style={{ fontSize: 14, color: C.text, fontWeight: 600 }}>
                     {data.ultima_cita
@@ -535,12 +535,12 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                       ? new Date(data.clinica.creado_en).toLocaleDateString("es-PE", {
                           day: "2-digit", month: "long", year: "numeric",
                         })
-                      : "â€”"}
+                      : "—"}
                   </div>
                 </div>
               </div>
 
-              {/* â”€â”€ Top usuarios activos â”€â”€ */}
+              {/* ── Top usuarios activos ── */}
               {data.top_usuarios.length > 0 && (
                 <div style={{
                   background: C.card, border: `1px solid ${C.border}`,
@@ -549,7 +549,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                   <div style={{ fontSize: 11, color: C.muted, textTransform: "uppercase",
                                  letterSpacing: ".05em", fontWeight: 600, marginBottom: 12 }}>
                     <i className="bi bi-person-lines-fill me-2" style={{ color: "#8b5cf6" }} />
-                    Staff Â· Ãºltimos accesos
+                    Staff · últimos accesos
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {data.top_usuarios.map((u, i) => {
@@ -594,7 +594,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
                 </div>
               )}
 
-              {/* â”€â”€ Nota de estimaciÃ³n â”€â”€ */}
+              {/* ── Nota de estimación ── */}
               <div style={{
                 background: "rgba(245,158,11,.06)", border: "1px solid rgba(245,158,11,.2)",
                 borderRadius: 10, padding: "10px 14px",
@@ -602,7 +602,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
               }}>
                 <i className="bi bi-info-circle-fill" style={{ color: "#f59e0b", fontSize: 14, marginTop: 1, flexShrink: 0 }} />
                 <span style={{ fontSize: 12, color: "#fbbf24", lineHeight: 1.5 }}>
-                  El espacio estimado se calcula con pesos promedio por tipo de archivo (galerÃ­a ~900 KB,
+                  El espacio estimado se calcula con pesos promedio por tipo de archivo (galería ~900 KB,
                   fotos de perfil ~350 KB, documentos ~400 KB). Para ver el consumo real visita el panel
                   de Cloudinary de la cuenta correspondiente.
                 </span>
@@ -611,7 +611,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
           )}
         </div>
 
-        {/* â”€â”€ Footer â”€â”€ */}
+        {/* ── Footer ── */}
         <div style={{
           padding: "14px 28px", borderTop: `1px solid ${C.border}`,
           display: "flex", justifyContent: "space-between", alignItems: "center",
@@ -630,7 +630,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
             onMouseLeave={(e) => e.currentTarget.style.background = "linear-gradient(135deg, #8b5cf620, #6d28d920)"}
           >
             <i className="bi bi-journal-text" />
-            BitÃ¡cora
+            Bitácora
           </button>
           <button
             onClick={onClose}
@@ -646,7 +646,7 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
           </button>
         </div>
 
-      {/* â”€â”€ Modal BitÃ¡cora â”€â”€ */}
+      {/* ── Modal Bitácora ── */}
       {showBitacora && (
         <BitacoraModal
           clinicaId={clinicaId}
@@ -658,4 +658,3 @@ export default function ClinicaDetallesModal({ clinicaId, clinicaNombre, onClose
     </div>
   );
 }
-
