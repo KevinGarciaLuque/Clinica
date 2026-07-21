@@ -58,6 +58,14 @@ export default function NavbarApp({ onMenuClick }) {
   const [cumpleaneros, setCumpleaneros]         = useState([]);
   const [showCumpleDD, setShowCumpleDD]         = useState(false);
   const cumpleRef                               = useRef(null);
+
+  // ── Banner de activación de notificaciones push ─────────────────
+  const [pushPermission, setPushPermission]     = useState("default"); // default | granted | denied | unsupported
+  const [pushSubscribed, setPushSubscribed]     = useState(false);
+  const [activandoPush, setActivandoPush]       = useState(false);
+  const [pushBannerDismissed, setPushBannerDismissed] = useState(
+    () => sessionStorage.getItem("push_banner_dismissed") === "1"
+  );
   const [modalFelicitar, setModalFelicitar]     = useState(null);
 
   // ── Respuestas a reportes de soporte (usuarios regulares) ──
@@ -222,37 +230,47 @@ export default function NavbarApp({ onMenuClick }) {
     return () => { cancelled2 = true; esRef2?.close(); clearInterval(iv); };
   }, [user]);
 
+  const activarNotificaciones = async ({ silent = false } = {}) => {
+    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+      setPushPermission("unsupported");
+      return false;
+    }
+    try {
+      const perm = silent ? Notification.permission : await Notification.requestPermission();
+      setPushPermission(perm);
+      if (perm !== "granted") return false;
+
+      const reg = await navigator.serviceWorker.register("/sw.js");
+      const keyResp = await api.get("/soporte/push/public-key");
+      const publicKey = keyResp.data?.publicKey;
+      if (!publicKey) return false;
+
+      let sub = await reg.pushManager.getSubscription();
+      if (!sub) {
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: urlBase64ToUint8Array(publicKey),
+        });
+      }
+      if (!sub) return false;
+      await api.post("/soporte/push/subscribe", { subscription: sub.toJSON() });
+      setPushSubscribed(true);
+      return true;
+    } catch {
+      // Silencioso: push puede no estar habilitado en todos los entornos
+      return false;
+    }
+  };
+
   useEffect(() => {
     if (!user || user.super) return;
-    if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) return;
+    if (!("Notification" in window)) { setPushPermission("unsupported"); return; }
 
-    let cancelled = false;
-    const setupPush = async () => {
-      try {
-        const perm = await Notification.requestPermission();
-        if (perm !== "granted" || cancelled) return;
-
-        const reg = await navigator.serviceWorker.register("/sw.js");
-        const keyResp = await api.get("/soporte/push/public-key");
-        const publicKey = keyResp.data?.publicKey;
-        if (!publicKey) return;
-
-        let sub = await reg.pushManager.getSubscription();
-        if (!sub) {
-          sub = await reg.pushManager.subscribe({
-            userVisibleOnly: true,
-            applicationServerKey: urlBase64ToUint8Array(publicKey),
-          });
-        }
-        if (!sub) return;
-        await api.post("/soporte/push/subscribe", { subscription: sub.toJSON() });
-      } catch {
-        // Silencioso: push puede no estar habilitado en todos los entornos
-      }
-    };
-
-    setupPush();
-    return () => { cancelled = true; };
+    setPushPermission(Notification.permission);
+    // Si ya lo había aceptado antes, re-suscribimos en silencio (sin volver a pedir permiso).
+    if (Notification.permission === "granted") {
+      activarNotificaciones({ silent: true });
+    }
   }, [user]);
 
   // ── Cargar cumpleañeros del día (usuarios regulares) ───────────
@@ -287,6 +305,23 @@ export default function NavbarApp({ onMenuClick }) {
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, []);
+
+  const clickActivarPush = async () => {
+    setActivandoPush(true);
+    await activarNotificaciones({ silent: false });
+    setActivandoPush(false);
+  };
+
+  const descartarBannerPush = () => {
+    sessionStorage.setItem("push_banner_dismissed", "1");
+    setPushBannerDismissed(true);
+  };
+
+  const mostrarBannerPush =
+    !!user && !user.super &&
+    !pushBannerDismissed &&
+    pushPermission !== "unsupported" &&
+    !(pushPermission === "granted" && pushSubscribed);
 
   const atenderSolicitud = async (solicitudId, clinicaId) => {
     try {
@@ -1079,6 +1114,51 @@ export default function NavbarApp({ onMenuClick }) {
         </div>
       </div>
     </nav>
+
+    {mostrarBannerPush && (
+      <div
+        style={{
+          background: pushPermission === "denied" ? "rgba(239,68,68,.12)" : "rgba(33,150,243,.12)",
+          borderBottom: `1px solid ${pushPermission === "denied" ? "rgba(239,68,68,.35)" : "rgba(33,150,243,.35)"}`,
+          padding: "10px 16px",
+          display: "flex", alignItems: "center", justifyContent: "center", flexWrap: "wrap", gap: 10,
+        }}
+      >
+        <i
+          className={`bi ${pushPermission === "denied" ? "bi-bell-slash-fill" : "bi-bell-fill"}`}
+          style={{ color: pushPermission === "denied" ? "#ef4444" : "#2196f3", fontSize: 16 }}
+        />
+        <span style={{ fontSize: 13.5, color: "#e2e8f0" }}>
+          {pushPermission === "denied"
+            ? "Bloqueaste las notificaciones para esta app. Actívalas desde los ajustes del sitio en Chrome (candado 🔒 junto a la URL → Notificaciones → Permitir) para recibir avisos aunque la app esté cerrada."
+            : "Activa las notificaciones para recibir avisos importantes en tu celular aunque la app esté cerrada o hayas cerrado sesión."}
+        </span>
+        {pushPermission !== "denied" && (
+          <button
+            onClick={clickActivarPush}
+            disabled={activandoPush}
+            style={{
+              background: "#2196f3", border: "none", borderRadius: 8,
+              color: "#fff", fontWeight: 600, fontSize: 13,
+              padding: "6px 14px", cursor: activandoPush ? "wait" : "pointer",
+              flexShrink: 0,
+            }}
+          >
+            {activandoPush ? "Activando..." : "Activar notificaciones"}
+          </button>
+        )}
+        <button
+          onClick={descartarBannerPush}
+          title="Ahora no"
+          style={{
+            background: "transparent", border: "none", color: "#94a3b8",
+            fontSize: 13, cursor: "pointer", flexShrink: 0,
+          }}
+        >
+          Ahora no
+        </button>
+      </div>
+    )}
 
     <ModalAyudaSoporte open={showAyuda} onClose={() => setShowAyuda(false)} />
 
