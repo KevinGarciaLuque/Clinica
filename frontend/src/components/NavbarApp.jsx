@@ -248,7 +248,10 @@ export default function NavbarApp({ onMenuClick }) {
       setPushPermission(perm);
       if (perm !== "granted") return false;
 
-      const reg = await withTimeout(navigator.serviceWorker.register("/sw.js"), 8000, "registrar service worker");
+      await withTimeout(navigator.serviceWorker.register("/sw.js"), 8000, "registrar service worker");
+      // En Safari/iOS el service worker debe quedar ACTIVO (no solo registrado) antes de suscribir el push,
+      // si no pushManager.subscribe() se queda colgado sin resolver ni rechazar nunca.
+      const reg = await withTimeout(navigator.serviceWorker.ready, 10000, "activar service worker");
       const keyResp = await withTimeout(api.get("/soporte/push/public-key"), 8000, "obtener llave del servidor");
       const publicKey = keyResp.data?.publicKey;
       if (!publicKey) {
