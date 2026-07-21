@@ -232,7 +232,7 @@ export default function LandingPage() {
         padding: "0 24px", height: 60,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img src={logoUrl} alt="logo" style={{ height: 46, objectFit: "contain" }} />
+          <img src={logoUrl} alt="logo" style={{ height: 54, objectFit: "contain" }} />
           <span style={{ color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: "-.3px" }}>{nombre}</span>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
