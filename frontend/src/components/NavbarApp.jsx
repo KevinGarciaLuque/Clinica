@@ -273,6 +273,19 @@ export default function NavbarApp({ onMenuClick }) {
     }
   }, [user]);
 
+  // ── Limpiar el badge del ícono al abrir la app (ya viste las notificaciones) ──
+  useEffect(() => {
+    if (!user) return;
+    if ("clearAppBadge" in navigator) {
+      navigator.clearAppBadge().catch(() => {});
+    }
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistration("/sw.js")
+        .then((reg) => reg?.active?.postMessage({ type: "RESET_BADGE" }))
+        .catch(() => {});
+    }
+  }, [user]);
+
   // ── Cargar cumpleañeros del día (usuarios regulares) ───────────
   useEffect(() => {
     if (user?.super) return;
