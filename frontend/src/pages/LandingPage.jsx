@@ -303,7 +303,7 @@ export default function LandingPage() {
 
         <div style={{ maxWidth: 720, animation: "fadeUp .6s ease both", position: "relative" }}>
           <div style={{ marginBottom: 24 }}>
-            <img src={logoUrl} alt="logo" style={{ height: 150, objectFit: "contain", filter: "drop-shadow(0 6px 24px rgba(0,0,0,.4))" }} />
+            <img src={logoUrl} alt="logo" style={{ height: 210, objectFit: "contain", filter: "drop-shadow(0 6px 24px rgba(0,0,0,.4))" }} />
           </div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 7,
