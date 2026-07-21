@@ -63,6 +63,7 @@ export default function NavbarApp({ onMenuClick }) {
   const [pushPermission, setPushPermission]     = useState("default"); // default | granted | denied | unsupported
   const [pushSubscribed, setPushSubscribed]     = useState(false);
   const [activandoPush, setActivandoPush]       = useState(false);
+  const [pushError, setPushError]               = useState("");
   const [pushBannerDismissed, setPushBannerDismissed] = useState(
     () => sessionStorage.getItem("push_banner_dismissed") === "1"
   );
@@ -230,34 +231,48 @@ export default function NavbarApp({ onMenuClick }) {
     return () => { cancelled2 = true; esRef2?.close(); clearInterval(iv); };
   }, [user]);
 
+  const withTimeout = (promise, ms, label) =>
+    Promise.race([
+      promise,
+      new Promise((_, reject) => setTimeout(() => reject(new Error(`Tiempo agotado (${label})`)), ms)),
+    ]);
+
   const activarNotificaciones = async ({ silent = false } = {}) => {
     if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
       setPushPermission("unsupported");
       return false;
     }
+    if (!silent) setPushError("");
     try {
       const perm = silent ? Notification.permission : await Notification.requestPermission();
       setPushPermission(perm);
       if (perm !== "granted") return false;
 
-      const reg = await navigator.serviceWorker.register("/sw.js");
-      const keyResp = await api.get("/soporte/push/public-key");
+      const reg = await withTimeout(navigator.serviceWorker.register("/sw.js"), 8000, "registrar service worker");
+      const keyResp = await withTimeout(api.get("/soporte/push/public-key"), 8000, "obtener llave del servidor");
       const publicKey = keyResp.data?.publicKey;
-      if (!publicKey) return false;
+      if (!publicKey) {
+        if (!silent) setPushError("El servidor no tiene configuradas las notificaciones push todavía.");
+        return false;
+      }
 
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
-        sub = await reg.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey: urlBase64ToUint8Array(publicKey),
-        });
+        sub = await withTimeout(
+          reg.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey: urlBase64ToUint8Array(publicKey),
+          }),
+          10000,
+          "suscribir el dispositivo"
+        );
       }
       if (!sub) return false;
-      await api.post("/soporte/push/subscribe", { subscription: sub.toJSON() });
+      await withTimeout(api.post("/soporte/push/subscribe", { subscription: sub.toJSON() }), 8000, "guardar suscripción");
       setPushSubscribed(true);
       return true;
-    } catch {
-      // Silencioso: push puede no estar habilitado en todos los entornos
+    } catch (e) {
+      if (!silent) setPushError(e?.message || "No se pudo activar las notificaciones. Intenta de nuevo.");
       return false;
     }
   };
@@ -321,8 +336,11 @@ export default function NavbarApp({ onMenuClick }) {
 
   const clickActivarPush = async () => {
     setActivandoPush(true);
-    await activarNotificaciones({ silent: false });
-    setActivandoPush(false);
+    try {
+      await activarNotificaciones({ silent: false });
+    } finally {
+      setActivandoPush(false);
+    }
   };
 
   const descartarBannerPush = () => {
@@ -1145,6 +1163,11 @@ export default function NavbarApp({ onMenuClick }) {
           {pushPermission === "denied"
             ? "Bloqueaste las notificaciones para esta app. Actívalas desde los ajustes del sitio en Chrome (candado 🔒 junto a la URL → Notificaciones → Permitir) para recibir avisos aunque la app esté cerrada."
             : "Activa las notificaciones para recibir avisos importantes en tu celular aunque la app esté cerrada o hayas cerrado sesión."}
+          {pushError && (
+            <span style={{ display: "block", color: "#fca5a5", fontSize: 12, marginTop: 2 }}>
+              {pushError}
+            </span>
+          )}
         </span>
         {pushPermission !== "denied" && (
           <button
@@ -1157,7 +1180,7 @@ export default function NavbarApp({ onMenuClick }) {
               flexShrink: 0,
             }}
           >
-            {activandoPush ? "Activando..." : "Activar notificaciones"}
+            {activandoPush ? "Activando..." : pushError ? "Reintentar" : "Activar notificaciones"}
           </button>
         )}
         <button
