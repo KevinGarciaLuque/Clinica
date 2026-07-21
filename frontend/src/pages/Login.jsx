@@ -150,7 +150,7 @@ export default function Login() {
             <div className="login-logo mb-2">
               {cfg.logoUrl
                 ? <img src={cfg.logoUrl} alt={cfg.nombre_sistema}
-                       style={{ width: 64, height: 64, objectFit: "contain", borderRadius: 12 }} />
+                       style={{ width: 100, height: 100, objectFit: "contain", borderRadius: 12 }} />
                 : <i className={`bi ${cfg.icono_bootstrap}`} />
               }
             </div>
