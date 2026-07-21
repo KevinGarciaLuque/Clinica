@@ -244,13 +244,12 @@ export default function NavbarApp({ onMenuClick }) {
     }
     if (!silent) setPushError("");
     try {
-      const perm = silent ? Notification.permission : await Notification.requestPermission();
-      setPushPermission(perm);
-      if (perm !== "granted") return false;
-
+      // Preparamos todo ANTES de pedir permiso: en Safari/iOS, si pasa mucho tiempo (varios
+      // await con red de por medio) entre conceder el permiso y llamar a subscribe(), el propio
+      // subscribe() se queda colgado sin resolver ni rechazar nunca. Por eso dejamos listos el
+      // service worker activo y la llave del servidor de antemano, y llamamos a requestPermission
+      // + subscribe() casi de corrido.
       await withTimeout(navigator.serviceWorker.register("/sw.js"), 8000, "registrar service worker");
-      // En Safari/iOS el service worker debe quedar ACTIVO (no solo registrado) antes de suscribir el push,
-      // si no pushManager.subscribe() se queda colgado sin resolver ni rechazar nunca.
       const reg = await withTimeout(navigator.serviceWorker.ready, 10000, "activar service worker");
       const keyResp = await withTimeout(api.get("/soporte/push/public-key"), 8000, "obtener llave del servidor");
       const publicKey = keyResp.data?.publicKey;
@@ -258,6 +257,10 @@ export default function NavbarApp({ onMenuClick }) {
         if (!silent) setPushError("El servidor no tiene configuradas las notificaciones push todavía.");
         return false;
       }
+
+      const perm = silent ? Notification.permission : await Notification.requestPermission();
+      setPushPermission(perm);
+      if (perm !== "granted") return false;
 
       let sub = await reg.pushManager.getSubscription();
       if (!sub) {
