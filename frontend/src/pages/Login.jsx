@@ -3,10 +3,20 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useConfigSistema } from "../context/ConfigSistemaContext";
 
+function darken(hex, pct) {
+  const num = parseInt(hex.replace("#", ""), 16);
+  const r = Math.max(0, (num >> 16) - Math.round(2.55 * pct));
+  const g = Math.max(0, ((num >> 8) & 0xff) - Math.round(2.55 * pct));
+  const b = Math.max(0, (num & 0xff) - Math.round(2.55 * pct));
+  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+}
+
 export default function Login() {
   const { login } = useAuth();
   const navigate  = useNavigate();
   const cfg = useConfigSistema();
+  const color     = cfg.landing_color_primario || cfg.color_primario || "#0E1F3C";
+  const colorDark = darken(color, 25);
 
   const [email,    setEmail]    = useState("");
   const [password, setPassword] = useState("");
@@ -47,7 +57,7 @@ export default function Login() {
           content: '';
           position: fixed;
           inset: 0;
-          background: linear-gradient(135deg, rgba(10,30,60,0.72) 0%, rgba(0,80,100,0.60) 100%);
+          background: linear-gradient(135deg, ${color}b8 0%, ${colorDark}99 100%);
           z-index: 0;
         }
         .glass-card {
@@ -85,7 +95,7 @@ export default function Login() {
           cursor: pointer;
         }
         .btn-glass-primary {
-          background: linear-gradient(135deg, #0ea5e9, #0369a1);
+          background: linear-gradient(135deg, ${color}, ${colorDark});
           border: none;
           border-radius: 0.6rem;
           color: #fff;
@@ -96,7 +106,7 @@ export default function Login() {
         }
         .btn-glass-primary:hover:not(:disabled) { opacity: 0.9; transform: translateY(-1px); color: #fff; }
         .btn-glass-primary:disabled { opacity: 0.6; color: #fff; }
-        .login-logo { font-size: 2.2rem; color: #38bdf8; }
+        .login-logo { font-size: 2.2rem; color: ${color}; }
         .divider-line {
           border-top: 1px solid rgba(255,255,255,0.15);
           margin: 1.5rem 0;
