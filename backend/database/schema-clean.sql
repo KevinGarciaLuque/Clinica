@@ -177,6 +177,7 @@ CREATE TABLE IF NOT EXISTS citas (
   canal           ENUM('RECEPCION','PORTAL','IA','TELEFONO')
                   DEFAULT 'RECEPCION',
   notas_internas  TEXT,
+  google_event_id VARCHAR(150),
   creado_en       DATETIME DEFAULT CURRENT_TIMESTAMP,
   actualizado_en  DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   KEY idx_citas_medico_inicio (clinica_id, medico_id, inicio),
@@ -185,6 +186,22 @@ CREATE TABLE IF NOT EXISTS citas (
   FOREIGN KEY (paciente_id) REFERENCES pacientes(id) ON DELETE CASCADE,
   FOREIGN KEY (medico_id)   REFERENCES usuarios(id)  ON DELETE CASCADE,
   FOREIGN KEY (servicio_id) REFERENCES servicios(id) ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+CREATE TABLE IF NOT EXISTS medico_google_tokens (
+  id             INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  medico_id      INT UNSIGNED NOT NULL,
+  clinica_id     INT UNSIGNED NOT NULL,
+  google_email   VARCHAR(150),
+  access_token   TEXT NOT NULL,
+  refresh_token  TEXT NOT NULL,
+  expiry_date    BIGINT,
+  calendar_id    VARCHAR(150) DEFAULT 'primary',
+  creado_en      DATETIME DEFAULT CURRENT_TIMESTAMP,
+  actualizado_en DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_medico_google (medico_id),
+  FOREIGN KEY (medico_id)  REFERENCES usuarios(id)  ON DELETE CASCADE,
+  FOREIGN KEY (clinica_id) REFERENCES clinicas(id)  ON DELETE CASCADE
 ) ENGINE=InnoDB;
 
 CREATE TABLE IF NOT EXISTS cita_recordatorios (

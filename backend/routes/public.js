@@ -3,6 +3,7 @@ const pool      = require("../db");
 const rateLimit = require("express-rate-limit");
 const sse       = require("../utils/sseManager");
 const webPush   = require("../utils/webPush");
+const gcal      = require("../utils/googleCalendar");
 
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -239,12 +240,23 @@ router.get("/clinica/:slug/slots", publicLimiter, async (req, res) => {
     );
     if (!horarios.length) return res.json({ ok: true, data: [] });
 
-    const [ocupadas] = await pool.query(
+    const [ocupadasDb] = await pool.query(
       `SELECT inicio, fin FROM citas
        WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION','PENDIENTE_APROBACION')`,
       [clinicaId, medicoIdInt, fecha]
     );
+
+    let ocupadasGoogle = [];
+    try {
+      const freebusy = await gcal.consultarFreeBusy(
+        medicoIdInt, `${fecha}T00:00:00`, `${fecha}T23:59:59`, tz
+      );
+      ocupadasGoogle = freebusy.map(b => ({ inicio: b.inicio, fin: b.fin }));
+    } catch (e) {
+      console.error("[public/slots] error consultando Google freebusy:", e.message);
+    }
+    const ocupadas = [...ocupadasDb, ...ocupadasGoogle];
 
     const toLocalISO = d => {
       const p = n => String(n).padStart(2, "0");
@@ -374,6 +386,24 @@ router.post("/clinica/:slug/agendar", agendarLimiter, async (req, res) => {
       inicio,
       citaId: citaRes.insertId,
     });
+
+    // Sincronizar con el Google Calendar del médico (si está conectado) — no debe bloquear la solicitud
+    try {
+      const [[tzRow]] = await pool.query(
+        "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='zona_horaria'",
+        [clinicaId]
+      );
+      const googleEventId = await gcal.crearEvento(medicoIdInt, {
+        paciente_nombre: `${nombres.trim()} ${apellidos.trim()}`,
+        motivo: motivo?.trim() || null,
+        inicio, fin,
+      }, tzRow?.valor || "America/Tegucigalpa");
+      if (googleEventId) {
+        await pool.query("UPDATE citas SET google_event_id=? WHERE id=?", [googleEventId, citaRes.insertId]);
+      }
+    } catch (e) {
+      console.error("[public/agendar] error sincronizando con Google Calendar:", e.message);
+    }
 
     res.status(201).json({ ok: true, id: citaRes.insertId, msg: "¡Tu solicitud fue enviada! El doctor confirmará tu cita pronto." });
   } catch (e) {

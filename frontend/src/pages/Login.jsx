@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useConfigSistema } from "../context/ConfigSistemaContext";
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 function darken(hex, pct) {
   const num = parseInt(hex.replace("#", ""), 16);
@@ -12,7 +14,7 @@ function darken(hex, pct) {
 }
 
 export default function Login() {
-  const { login } = useAuth();
+  const { login, loginConGoogle } = useAuth();
   const navigate  = useNavigate();
   const cfg = useConfigSistema();
   const color     = cfg.landing_color_primario || cfg.color_primario || "#0E1F3C";
@@ -23,6 +25,7 @@ export default function Login() {
   const [showPass, setShowPass] = useState(false);
   const [msg,      setMsg]      = useState("");
   const [loading,  setLoading]  = useState(false);
+  const googleBtnRef = useRef(null);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -37,6 +40,46 @@ export default function Login() {
       setLoading(false);
     }
   };
+
+  // Iniciar sesión con Google (Google Identity Services, gratuito)
+  useEffect(() => {
+    if (!GOOGLE_CLIENT_ID) return;
+
+    const handleCredential = async (response) => {
+      setMsg("");
+      setLoading(true);
+      try {
+        await loginConGoogle(response.credential);
+        navigate("/dashboard");
+      } catch (err) {
+        setMsg(err?.response?.data?.msg || "No se pudo iniciar sesión con Google");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    const initGoogle = () => {
+      if (!window.google || !googleBtnRef.current) return;
+      window.google.accounts.id.initialize({
+        client_id: GOOGLE_CLIENT_ID,
+        callback: handleCredential,
+      });
+      window.google.accounts.id.renderButton(googleBtnRef.current, {
+        theme: "filled_black", size: "large", width: 340, text: "signin_with",
+      });
+    };
+
+    if (window.google) {
+      initGoogle();
+    } else {
+      const script = document.createElement("script");
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.onload = initGoogle;
+      document.body.appendChild(script);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <>
@@ -225,6 +268,17 @@ export default function Login() {
               }
             </button>
           </form>
+
+          {GOOGLE_CLIENT_ID && (
+            <>
+              <div className="d-flex align-items-center my-3" style={{ gap: ".75rem" }}>
+                <hr className="flex-grow-1" style={{ borderColor: "rgba(255,255,255,0.15)", margin: 0 }} />
+                <span style={{ color: "rgba(255,255,255,.5)", fontSize: ".78rem" }}>o</span>
+                <hr className="flex-grow-1" style={{ borderColor: "rgba(255,255,255,0.15)", margin: 0 }} />
+              </div>
+              <div ref={googleBtnRef} className="d-flex justify-content-center" />
+            </>
+          )}
 
           <p className="text-center mt-4 mb-0" style={{ color: "rgba(255,255,255,.35)", fontSize: ".75rem" }}>
             © {new Date().getFullYear()} {cfg.copyright_texto}

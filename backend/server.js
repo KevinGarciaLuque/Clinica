@@ -149,6 +149,7 @@ app.use("/api/pacientes", require("./routes/pacientes"));
 app.use("/api/pacientes/:pacienteId/documentos", require("./routes/documentos"));
 app.use("/api/documentos", require("./routes/documentosPdf"));
 app.use("/api/citas", require("./routes/citas"));
+app.use("/api/google", require("./routes/google"));
 app.use("/api/ia", require("./routes/ia"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/estadisticas", require("./routes/estadisticas"));

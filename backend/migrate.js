@@ -69,6 +69,7 @@ async function runMigrations() {
       '046_documentos_historia_id.sql',
       '047_fix_cie10_nefrologia_categoria.sql',
       '048_historias_diagnostico_desc.sql',
+      '049_google_calendar.sql',
     ];
 
     for (const migration of migrations) {

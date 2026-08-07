@@ -2,8 +2,13 @@ import { useEffect, useState, useRef, useCallback } from "react";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const ROLES_GOOGLE_CALENDAR = ["MEDICO", "PSICOLOGO", "ADMIN", "SUPER_ADMIN"];
+
 export default function PerfilUsuario() {
   const { user, updateUser } = useAuth();
+  const [googleStatus, setGoogleStatus] = useState({ conectado: false, google_email: null });
+  const [cargandoGoogle, setCargandoGoogle] = useState(false);
   const [form, setForm] = useState({
     nombres: "", apellidos: "", telefono: "", foto_url: "",
     numero_colegiatura: "",
@@ -46,6 +51,49 @@ export default function PerfilUsuario() {
       setFirmaUrl(user.firma_url || "");
     }
   }, [user]);
+
+  const puedeUsarGoogleCalendar = ROLES_GOOGLE_CALENDAR.includes(user?.tipo);
+
+  const cargarGoogleStatus = useCallback(async () => {
+    try {
+      const res = await api.get("/google/status");
+      setGoogleStatus(res.data);
+    } catch { /* ignorar */ }
+  }, []);
+
+  useEffect(() => {
+    if (!puedeUsarGoogleCalendar) return;
+    cargarGoogleStatus();
+
+    const params = new URLSearchParams(window.location.search);
+    const resultado = params.get("google");
+    if (resultado === "ok") {
+      showMsg("success", "Tu cuenta de Google fue conectada correctamente");
+      window.history.replaceState({}, "", window.location.pathname);
+    } else if (resultado === "error") {
+      showMsg("danger", "No se pudo conectar tu cuenta de Google. Intenta de nuevo.");
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [puedeUsarGoogleCalendar]);
+
+  const conectarGoogle = () => {
+    const token = localStorage.getItem("token");
+    window.location.href = `${API_URL}/api/google/connect?auth_token=${token}`;
+  };
+
+  const desconectarGoogle = async () => {
+    setCargandoGoogle(true);
+    try {
+      await api.delete("/google/disconnect");
+      setGoogleStatus({ conectado: false, google_email: null });
+      showMsg("success", "Tu cuenta de Google fue desconectada");
+    } catch (err) {
+      showMsg("danger", err.response?.data?.msg || "Error al desconectar Google Calendar");
+    } finally {
+      setCargandoGoogle(false);
+    }
+  };
 
   const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
 
@@ -229,6 +277,9 @@ export default function PerfilUsuario() {
     { k: "info",     label: "Información personal", icon: "bi-person-fill" },
     { k: "firma",    label: "Firma Digital",         icon: "bi-pen-fill" },
     { k: "password", label: "Contraseña",            icon: "bi-shield-lock-fill" },
+    ...(puedeUsarGoogleCalendar
+      ? [{ k: "google", label: "Google Calendar", icon: "bi-calendar-event-fill" }]
+      : []),
   ];
 
   // ── estilos reutilizables ──────────────────────────────────────────────────
@@ -287,7 +338,7 @@ export default function PerfilUsuario() {
               whiteSpace: "nowrap", flexShrink: 0,
             }}>
               <i className={`bi ${t.icon}`} style={{ fontSize: isMobile ? "0.75rem" : "0.85rem" }} />
-              {isMobile ? (t.k === "info" ? "Perfil" : t.k === "firma" ? "Firma" : "Clave") : t.label}
+              {isMobile ? (t.k === "info" ? "Perfil" : t.k === "firma" ? "Firma" : t.k === "google" ? "Google" : "Clave") : t.label}
             </button>
           ))}
         </div>
@@ -630,6 +681,46 @@ export default function PerfilUsuario() {
                 </div>
               </div>
             </form>
+          </div>
+        )}
+
+        {/* ════════════════════════ TAB: GOOGLE CALENDAR ════════════════════════ */}
+        {tab === "google" && puedeUsarGoogleCalendar && (
+          <div style={{ ...cardSt, padding: isMobile ? "18px 16px" : "28px", maxWidth: 500, width: "100%" }}>
+            <div style={{ marginBottom: 20 }}>
+              <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b" }}>Sincronización con Google Calendar</div>
+              <div style={{ fontSize: "0.78rem", color: "#64748b", marginTop: 4 }}>
+                Conecta tu cuenta de Google para que tus citas se agreguen automáticamente a tu calendario,
+                y para que tus reuniones en Google Calendar bloqueen esos horarios en el portal de citas.
+              </div>
+            </div>
+
+            {googleStatus.conectado ? (
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <div style={{
+                    width: 40, height: 40, borderRadius: "50%", background: "rgba(16,185,129,.12)",
+                    display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+                  }}>
+                    <i className="bi bi-check-circle-fill" style={{ color: "#10b981", fontSize: "1.1rem" }} />
+                  </div>
+                  <div>
+                    <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "#1e293b" }}>Cuenta conectada</div>
+                    <div style={{ fontSize: "0.78rem", color: "#64748b" }}>{googleStatus.google_email}</div>
+                  </div>
+                </div>
+                <button type="button" onClick={desconectarGoogle} disabled={cargandoGoogle}
+                  style={{ padding: "8px 18px", borderRadius: 8, border: "1px solid #fecaca", background: "#fff", color: "#b91c1c", fontWeight: 700, fontSize: "0.85rem", cursor: "pointer", opacity: cargandoGoogle ? .7 : 1 }}>
+                  {cargandoGoogle ? "Desconectando..." : "Desconectar"}
+                </button>
+              </div>
+            ) : (
+              <button type="button" onClick={conectarGoogle}
+                style={{ padding: "10px 22px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#1a2744,#243b72)", color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}>
+                <i className="bi bi-google" />
+                Conectar con Google Calendar
+              </button>
+            )}
           </div>
         )}
       </div>

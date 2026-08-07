@@ -1,6 +1,15 @@
 const router = require("express").Router();
 const pool = require("../db");
 const auth = require("../middlewares/auth");
+const gcal = require("../utils/googleCalendar");
+
+async function obtenerTZ(clinicaId) {
+  const [[tzRow]] = await pool.query(
+    "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='zona_horaria'",
+    [clinicaId]
+  );
+  return tzRow?.valor || "America/Tegucigalpa";
+}
 
 // ──────────────────────────────────────────────
 // GET /api/citas/slots?medico_id=X&fecha=YYYY-MM-DD
@@ -35,12 +44,24 @@ router.get("/slots", auth(), async (req, res) => {
     );
     if (!horarios.length) return res.json({ ok: true, data: [] });
 
-    const [ocupadas] = await pool.query(
+    const [ocupadasDb] = await pool.query(
       `SELECT inicio, fin FROM citas
        WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
       [clinicaId, medico_id, fecha]
     );
+
+    // Bloques ocupados por reuniones/eventos en el Google Calendar del médico (si está conectado)
+    let ocupadasGoogle = [];
+    try {
+      const freebusy = await gcal.consultarFreeBusy(
+        medico_id, `${fecha}T00:00:00`, `${fecha}T23:59:59`, tz
+      );
+      ocupadasGoogle = freebusy.map(b => ({ inicio: b.inicio, fin: b.fin }));
+    } catch (e) {
+      console.error("[citas/slots] error consultando Google freebusy:", e.message);
+    }
+    const ocupadas = [...ocupadasDb, ...ocupadasGoogle];
 
     // Formatea Date como ISO local (sin 'Z') para que el frontend lo trate como hora local
     const toLocalISO = d => {
@@ -187,6 +208,33 @@ router.put("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
        tipo_consulta||null, motivo||null, canal||null, notas_internas||null,
        req.params.id, clinicaId]
     );
+
+    // Reflejar el cambio en el Google Calendar del médico (si la cita tiene evento sincronizado)
+    if (inicio || fin) {
+      try {
+        const [[citaActualizada]] = await pool.query(
+          `SELECT c.medico_id, c.google_event_id, c.motivo,
+                  DATE_FORMAT(c.inicio, '%Y-%m-%dT%H:%i:%s') AS inicio,
+                  DATE_FORMAT(c.fin,    '%Y-%m-%dT%H:%i:%s') AS fin,
+                  p.nombres, p.apellidos
+           FROM citas c JOIN pacientes p ON p.id = c.paciente_id
+           WHERE c.id=? AND c.clinica_id=?`,
+          [req.params.id, clinicaId]
+        );
+        if (citaActualizada?.google_event_id) {
+          const tz = await obtenerTZ(clinicaId);
+          await gcal.actualizarEvento(citaActualizada.medico_id, citaActualizada.google_event_id, {
+            paciente_nombre: `${citaActualizada.nombres} ${citaActualizada.apellidos}`,
+            motivo: citaActualizada.motivo,
+            inicio: citaActualizada.inicio,
+            fin: citaActualizada.fin,
+          }, tz);
+        }
+      } catch (e) {
+        console.error("[citas] error actualizando evento de Google Calendar:", e.message);
+      }
+    }
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -226,6 +274,24 @@ router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","
       [clinicaId, paciente_id, medico_id, inicio, fin,
        tipo_consulta || "CONTROL", motivo || null, canal || "RECEPCION", servicio_id || null]
     );
+
+    // Sincronizar con Google Calendar del médico (si está conectado) — no debe bloquear la creación de la cita
+    try {
+      const [[paciente]] = await pool.query(
+        "SELECT nombres, apellidos FROM pacientes WHERE id=?", [paciente_id]
+      );
+      const tz = await obtenerTZ(clinicaId);
+      const googleEventId = await gcal.crearEvento(medico_id, {
+        paciente_nombre: paciente ? `${paciente.nombres} ${paciente.apellidos}` : "Paciente",
+        motivo, inicio, fin,
+      }, tz);
+      if (googleEventId) {
+        await pool.query("UPDATE citas SET google_event_id=? WHERE id=?", [googleEventId, r.insertId]);
+      }
+    } catch (e) {
+      console.error("[citas] error sincronizando con Google Calendar:", e.message);
+    }
+
     res.json({ ok: true, id: r.insertId });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -243,10 +309,21 @@ router.delete("/:id/permanente", auth("ADMIN","MEDICO","PSICOLOGO","SUPER_ADMIN"
       const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
       clinicaId = row?.clinica_id;
     }
+    const [[citaBorrar]] = await pool.query(
+      "SELECT medico_id, google_event_id FROM citas WHERE id=? AND clinica_id=?",
+      [req.params.id, clinicaId]
+    );
+
     await pool.query(
       "DELETE FROM citas WHERE id=? AND clinica_id=?",
       [req.params.id, clinicaId]
     );
+
+    if (citaBorrar?.google_event_id) {
+      gcal.borrarEvento(citaBorrar.medico_id, citaBorrar.google_event_id)
+        .catch(e => console.error("[citas] error borrando evento de Google Calendar:", e.message));
+    }
+
     res.json({ ok: true, msg: "Cita eliminada permanentemente" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -263,10 +340,21 @@ router.delete("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONIS
       const [[row]] = await pool.query("SELECT clinica_id FROM citas WHERE id=?", [req.params.id]);
       clinicaId = row?.clinica_id;
     }
+    const [[citaCancelar]] = await pool.query(
+      "SELECT medico_id, google_event_id FROM citas WHERE id=? AND clinica_id=?",
+      [req.params.id, clinicaId]
+    );
+
     await pool.query(
       "UPDATE citas SET estado='CANCELADA' WHERE id=? AND clinica_id=?",
       [req.params.id, clinicaId]
     );
+
+    if (citaCancelar?.google_event_id) {
+      gcal.borrarEvento(citaCancelar.medico_id, citaCancelar.google_event_id)
+        .catch(e => console.error("[citas] error borrando evento de Google Calendar:", e.message));
+    }
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

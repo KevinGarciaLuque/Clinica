@@ -986,6 +986,28 @@ export default function PerfilPaciente() {
 
           {/* Botón Nueva Consulta */}
           <div className="d-flex align-items-center gap-2">
+            {tieneModulo("exportar_pacientes") && (
+              <>
+                <a
+                  href={`${API_BASE}/api/pacientes/${id}/export/excel?auth_token=${localStorage.getItem("token") || ""}`}
+                  className="btn btn-sm"
+                  style={{ background: "rgba(255,255,255,.14)", color: "#fff", fontWeight: 600, border: "1px solid rgba(255,255,255,.35)", borderRadius: 8, padding: "7px 14px", textDecoration: "none" }}
+                  title="Descargar datos del paciente en Excel"
+                >
+                  <i className="bi bi-file-earmark-excel me-1" />
+                  Excel
+                </a>
+                <a
+                  href={`${API_BASE}/api/pacientes/${id}/export/zip?auth_token=${localStorage.getItem("token") || ""}`}
+                  className="btn btn-sm"
+                  style={{ background: "rgba(255,255,255,.14)", color: "#fff", fontWeight: 600, border: "1px solid rgba(255,255,255,.35)", borderRadius: 8, padding: "7px 14px", textDecoration: "none" }}
+                  title="Descargar Excel + documentos, estudios e imágenes en un ZIP"
+                >
+                  <i className="bi bi-file-earmark-zip me-1" />
+                  ZIP
+                </a>
+              </>
+            )}
             <button
               className="btn btn-sm"
               style={{ background: "rgba(255,255,255,.14)", color: "#fff", fontWeight: 600, border: "1px solid rgba(255,255,255,.35)", borderRadius: 8, padding: "7px 14px" }}

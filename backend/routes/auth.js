@@ -97,68 +97,147 @@ router.post("/login", async (req, res) => {
       return res.status(401).json({ ok: false, msg: "Credenciales inválidas" });
     }
 
-    const esSuper = user.tipo === "SUPER_ADMIN";
-
-    // Obtener nombre e info de licencia de la clínica
-    let clinicaNombre = null;
-    let licencia_info = null;
-    if (user.clinica_id) {
-      const [clinicaRows] = await pool.query(
-        "SELECT nombre, plan_tipo, licencia_inicio, licencia_fin FROM clinicas WHERE id=? LIMIT 1",
-        [user.clinica_id]
-      );
-      if (clinicaRows.length) {
-        clinicaNombre = clinicaRows[0].nombre;
-        const { plan_tipo, licencia_inicio, licencia_fin } = clinicaRows[0];
-        const fin  = licencia_fin ? new Date(licencia_fin) : null;
-        const ahora = new Date();
-        const dias  = fin ? Math.ceil((fin - ahora) / 86400000) : null;
-        licencia_info = {
-          plan_tipo:       plan_tipo || "trial",
-          licencia_inicio: licencia_inicio || null,
-          licencia_fin:    licencia_fin    || null,
-          dias_restantes:  dias,
-          vencida:         fin ? fin < ahora : false,
-        };
-      }
-    }
-
-    const token = jwt.sign(
-      {
-        uid: user.id,
-        clinica_id: user.clinica_id || null,
-        tipo: user.tipo,
-        super: esSuper,
-      },
-      process.env.JWT_SECRET,
-      { expiresIn: process.env.JWT_EXPIRES || "8h" },
-    );
-
     // Registrar en bitácora
     registrarAcceso(pool, { usuario_id: user.id, clinica_id: user.clinica_id, nombres: user.nombres,
       apellidos: user.apellidos, email: user.email, tipo: user.tipo, ip: ipAddr, user_agent: uaStr, exito: true });
 
-    // Obtener foto_url del usuario
-    const [fotoRows] = await pool.query(
-      "SELECT foto_url FROM usuarios WHERE id=? LIMIT 1", [user.id]
-    );
+    res.json(await construirSesion(user));
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
 
-    res.json({
-      ok: true,
-      token,
-      licencia_info,
-      usuario: {
-        id: user.id,
-        clinica_id: user.clinica_id || null,
-        clinica_nombre: clinicaNombre,
-        nombres: user.nombres,
-        apellidos: user.apellidos,
-        email: user.email,
-        tipo: user.tipo,
-        super: esSuper,
-        foto_url: fotoRows[0]?.foto_url || null,
-      },
-    });
+// ── Construye el payload de sesión (token + usuario + licencia) para un usuario ya validado ──
+async function construirSesion(user) {
+  const esSuper = user.tipo === "SUPER_ADMIN";
+
+  // Obtener nombre e info de licencia de la clínica
+  let clinicaNombre = null;
+  let licencia_info = null;
+  if (user.clinica_id) {
+    const [clinicaRows] = await pool.query(
+      "SELECT nombre, plan_tipo, licencia_inicio, licencia_fin FROM clinicas WHERE id=? LIMIT 1",
+      [user.clinica_id]
+    );
+    if (clinicaRows.length) {
+      clinicaNombre = clinicaRows[0].nombre;
+      const { plan_tipo, licencia_inicio, licencia_fin } = clinicaRows[0];
+      const fin  = licencia_fin ? new Date(licencia_fin) : null;
+      const ahora = new Date();
+      const dias  = fin ? Math.ceil((fin - ahora) / 86400000) : null;
+      licencia_info = {
+        plan_tipo:       plan_tipo || "trial",
+        licencia_inicio: licencia_inicio || null,
+        licencia_fin:    licencia_fin    || null,
+        dias_restantes:  dias,
+        vencida:         fin ? fin < ahora : false,
+      };
+    }
+  }
+
+  const token = jwt.sign(
+    {
+      uid: user.id,
+      clinica_id: user.clinica_id || null,
+      tipo: user.tipo,
+      super: esSuper,
+    },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES || "8h" },
+  );
+
+  // Obtener foto_url del usuario
+  const [fotoRows] = await pool.query(
+    "SELECT foto_url FROM usuarios WHERE id=? LIMIT 1", [user.id]
+  );
+
+  return {
+    ok: true,
+    token,
+    licencia_info,
+    usuario: {
+      id: user.id,
+      clinica_id: user.clinica_id || null,
+      clinica_nombre: clinicaNombre,
+      nombres: user.nombres,
+      apellidos: user.apellidos,
+      email: user.email,
+      tipo: user.tipo,
+      super: esSuper,
+      foto_url: fotoRows[0]?.foto_url || null,
+    },
+  };
+}
+
+// ── POST /api/auth/google-login  → inicio de sesión con Google (solo cuentas ya existentes) ──
+router.post("/google-login", async (req, res) => {
+  try {
+    const { id_token, clinica_slug } = req.body;
+    if (!id_token) {
+      return res.status(400).json({ ok: false, msg: "id_token es obligatorio" });
+    }
+
+    const { OAuth2Client } = require("google-auth-library");
+    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+    let ticket;
+    try {
+      ticket = await client.verifyIdToken({ idToken: id_token, audience: process.env.GOOGLE_CLIENT_ID });
+    } catch {
+      return res.status(401).json({ ok: false, msg: "Token de Google inválido" });
+    }
+    const payload = ticket.getPayload();
+    if (!payload?.email_verified) {
+      return res.status(401).json({ ok: false, msg: "El correo de Google no está verificado" });
+    }
+    const email = payload.email;
+
+    let clinicaId = req.tenant?.clinica_id || null;
+    if (!clinicaId && clinica_slug) {
+      const [slugRows] = await pool.query(
+        "SELECT id FROM clinicas WHERE slug=? AND activo=1 LIMIT 1",
+        [clinica_slug]
+      );
+      if (slugRows.length) clinicaId = slugRows[0].id;
+    }
+
+    // Misma resolución de usuario que /login: SUPER_ADMIN → clínica indicada → email único
+    let user = null;
+    const [superRows] = await pool.query(
+      "SELECT id, clinica_id, email, tipo, activo, nombres, apellidos FROM usuarios WHERE email=? AND tipo='SUPER_ADMIN' LIMIT 1",
+      [email],
+    );
+    if (superRows.length > 0) {
+      user = superRows[0];
+    } else {
+      if (clinicaId) {
+        const [rows] = await pool.query(
+          "SELECT id, clinica_id, email, tipo, activo, nombres, apellidos FROM usuarios WHERE clinica_id=? AND email=? LIMIT 1",
+          [clinicaId, email],
+        );
+        if (rows.length) user = rows[0];
+      }
+      if (!user) {
+        const [anyRows] = await pool.query(
+          "SELECT id, clinica_id, email, tipo, activo, nombres, apellidos FROM usuarios WHERE email=? AND tipo != 'SUPER_ADMIN' LIMIT 1",
+          [email],
+        );
+        if (anyRows.length) user = anyRows[0];
+      }
+    }
+
+    if (!user) {
+      return res.status(404).json({ ok: false, msg: "No existe una cuenta con este correo. Contacta a tu administrador." });
+    }
+    if (!user.activo) {
+      return res.status(403).json({ ok: false, msg: "Usuario inactivo" });
+    }
+
+    const ipAddr = req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.socket?.remoteAddress || null;
+    const uaStr  = req.headers["user-agent"] || null;
+    registrarAcceso(pool, { usuario_id: user.id, clinica_id: user.clinica_id, nombres: user.nombres,
+      apellidos: user.apellidos, email: user.email, tipo: user.tipo, ip: ipAddr, user_agent: uaStr, exito: true });
+
+    res.json(await construirSesion(user));
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

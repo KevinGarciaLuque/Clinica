@@ -63,6 +63,23 @@ export function AuthProvider({ children }) {
     return usuario;
   };
 
+  const loginConGoogle = async (idToken) => {
+    const res = await api.post("/auth/google-login", { id_token: idToken });
+    const { token, usuario, licencia_info } = res.data;
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(usuario));
+    if (licencia_info) {
+      localStorage.setItem("licencia_info", JSON.stringify(licencia_info));
+    }
+    setUser(usuario);
+    setLicenciaInfo(licencia_info || null);
+
+    await cargarModulos();
+
+    return usuario;
+  };
+
   const logout = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("user");
@@ -83,7 +100,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, logout, cargarModulos, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, loginConGoogle, logout, cargarModulos, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
