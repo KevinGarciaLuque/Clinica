@@ -93,7 +93,6 @@ const preloadPerfilPaciente = () => {
 export default function Pacientes() {
   const { user, modulos }  = useAuth();
   const tieneCrecimiento = modulos.some(m => m.clave === "curva_crecimiento");
-  const tieneExportar = modulos.some(m => m.clave === "exportar_pacientes");
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [q,      setQ]      = useState("");
@@ -713,35 +712,6 @@ export default function Pacientes() {
             >
               <i className="bi bi-search" /> Buscar
             </button>
-            {tieneExportar && (
-              <a
-                href={`${API_BASE}/api/pacientes/export/excel?auth_token=${localStorage.getItem("token") || ""}`}
-                style={{
-                  background: "#15803d", border: "none", borderRadius: 8,
-                  padding: "8px 20px", color: "#fff", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 7,
-                  fontWeight: 600, fontSize: "0.87rem", textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <i className="bi bi-file-earmark-excel" /> Exportar a Excel
-              </a>
-            )}
-            {tieneExportar && (
-              <a
-                href={`${API_BASE}/api/pacientes/export/zip-todos?auth_token=${localStorage.getItem("token") || ""}`}
-                title="Descarga un ZIP con una carpeta por paciente (excel + documentos, estudios e imágenes)"
-                style={{
-                  background: "#0f766e", border: "none", borderRadius: 8,
-                  padding: "8px 20px", color: "#fff", cursor: "pointer",
-                  display: "flex", alignItems: "center", gap: 7,
-                  fontWeight: 600, fontSize: "0.87rem", textDecoration: "none",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <i className="bi bi-file-earmark-zip" /> Descargar todo (ZIP)
-              </a>
-            )}
           </div>
 
           <div style={{ overflowX: "auto" }}>
