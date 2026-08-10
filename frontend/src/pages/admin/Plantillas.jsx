@@ -47,10 +47,12 @@ const CONFIG_EXTRA_KEYS = new Set(CONFIG_EXTRA_TIPOS.map(t => t.key));
 
 const TABS_UI = [PERSONALIZACION_TAB, ...TIPOS, ...CONFIG_EXTRA_TIPOS];
 
-// Lista que se renderiza en la barra de pestañas: igual que TABS_UI pero con
-// cada grupo (ver GRUPOS_TABS) colapsado en un solo botón, en la posición que
-// ocupaba su primer integrante.
-const TABS_BAR = (() => {
+// Construye la lista que se renderiza en la barra de pestañas: igual que
+// TABS_UI pero con cada grupo (ver GRUPOS_TABS) colapsado en un solo botón, en
+// la posición que ocupaba su primer integrante. Recibe configExtraVisibles ya
+// filtrado por módulos de la clínica (Control/Plan Seguimiento y Sesión
+// Educativa solo deben verse en clínicas con el módulo de Endocrinología).
+function construirTabsBar(configExtraVisibles) {
   const salida = [];
   const gruposInsertados = new Set();
   TIPOS.forEach(t => {
@@ -61,8 +63,8 @@ const TABS_BAR = (() => {
       salida.push(t);
     }
   });
-  return [PERSONALIZACION_TAB, ...salida, ...CONFIG_EXTRA_TIPOS];
-})();
+  return [PERSONALIZACION_TAB, ...salida, ...configExtraVisibles];
+}
 
 /* Placeholder que se muestra (solo en pantalla, vía CSS) cuando el bloque de
    contenido libre de cada tipo esta vacio, para orientar al doctor. */
@@ -524,9 +526,18 @@ const FUENTES = [
 
 /* --- Componente principal ----------------------------------------- */
 export default function Plantillas() {
-  const { user } = useAuth();
+  const { user, modulos } = useAuth();
   const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID;
   const medicoNombre = `${user?.nombres || ""} ${user?.apellidos || ""}`.trim();
+
+  // Control Seguimiento / Plan Seguimiento / Sesión Educativa son plantillas
+  // exclusivas del módulo de Endocrinología — solo se muestran si la clínica
+  // del usuario tiene ese módulo activo (igual criterio que usa el Sidebar).
+  const modulosClave = new Set((modulos || []).map(m => m.clave));
+  const configExtraVisibles = CONFIG_EXTRA_TIPOS.filter(t =>
+    t.key === "educacion_sesion" ? modulosClave.has("educacion_diabetes") : modulosClave.has("control_seguimiento_dm1")
+  );
+  const tabsBar = construirTabsBar(configExtraVisibles);
 
   const [tab,       setTab]       = useState("receta");
   const [medicoFirmaUrl, setMedicoFirmaUrl] = useState("");
@@ -1010,7 +1021,7 @@ export default function Plantillas() {
         </div>
         {/* Tabs — se envuelven en varias filas en vez de recortarse u obligar a hacer scroll */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 3, rowGap: 5 }}>
-          {TABS_BAR.map((t) => {
+          {tabsBar.map((t) => {
             const grupo = GRUPOS_TABS.find(g => g.key === t.key);
             if (grupo) {
               const grupoActivo = grupo.items.includes(tab);

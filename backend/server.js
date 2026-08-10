@@ -640,6 +640,56 @@ const pool = require("./db");
       console.log("✅ [auto-migrate] citas.estado OK");
     }
 
+    // Columna two_factor_enabled en usuarios (2FA por correo, opcional por usuario)
+    const [col2fa] = await pool.query(`
+      SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'usuarios'
+        AND COLUMN_NAME  = 'two_factor_enabled'
+    `);
+    if (col2fa[0].n === 0) {
+      await pool.query(`
+        ALTER TABLE usuarios
+          ADD COLUMN two_factor_enabled TINYINT(1) NOT NULL DEFAULT 0
+          COMMENT 'Verificación en dos pasos por correo, activada por el propio usuario'
+      `);
+      console.log("✅ [auto-migrate] usuarios.two_factor_enabled agregada");
+    } else {
+      console.log("✅ [auto-migrate] usuarios.two_factor_enabled OK");
+    }
+
+    // Códigos de un solo uso para 2FA por correo (login y activación)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuario_2fa_codigos (
+        id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        usuario_id  INT UNSIGNED NOT NULL,
+        codigo_hash VARCHAR(255) NOT NULL,
+        proposito   ENUM('LOGIN','ACTIVAR') NOT NULL DEFAULT 'LOGIN',
+        expira_en   DATETIME NOT NULL,
+        usado       TINYINT(1) NOT NULL DEFAULT 0,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_u2fa_usuario (usuario_id),
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] usuario_2fa_codigos OK");
+
+    // Tokens de recuperación de contraseña ("olvidé mi contraseña")
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS usuario_password_reset (
+        id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        usuario_id  INT UNSIGNED NOT NULL,
+        token_hash  VARCHAR(255) NOT NULL,
+        expira_en   DATETIME NOT NULL,
+        usado       TINYINT(1) NOT NULL DEFAULT 0,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_upr_usuario (usuario_id),
+        INDEX idx_upr_token (token_hash),
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] usuario_password_reset OK");
+
   } catch (e) {
     console.warn("⚠️  [auto-migrate]:", e.message);
   }

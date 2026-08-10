@@ -20,6 +20,8 @@ const Estudios        = lazy(() => import("./pages/Estudios"));
 // Páginas públicas (sin auth)
 const RegistroPaciente  = lazy(() => import("./pages/RegistroPaciente"));
 const VerificarEmail    = lazy(() => import("./pages/VerificarEmail"));
+const OlvideContrasena      = lazy(() => import("./pages/OlvideContrasena"));
+const RestablecerContrasena = lazy(() => import("./pages/RestablecerContrasena"));
 const RecetaPublica     = lazy(() => import("./pages/RecetaPublica"));
 const PublicClinicaPage = lazy(() => import("./pages/PublicClinicaPage"));
 const DirectorioMedicos = lazy(() => import("./pages/DirectorioMedicos"));
@@ -113,6 +115,8 @@ export default function App() {
       <Route path="/login"           element={<Login />} />
       <Route path="/registro"        element={<RegistroPaciente />} />
       <Route path="/verificar-email" element={<VerificarEmail />} />
+      <Route path="/olvide-password"       element={<OlvideContrasena />} />
+      <Route path="/restablecer-password"  element={<RestablecerContrasena />} />
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
       <Route path="/agenda-tu-consulta" element={<DirectorioMedicos />} />

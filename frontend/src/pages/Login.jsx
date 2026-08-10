@@ -14,7 +14,7 @@ function darken(hex, pct) {
 }
 
 export default function Login() {
-  const { login, loginConGoogle } = useAuth();
+  const { login, verificar2FA, loginConGoogle } = useAuth();
   const navigate  = useNavigate();
   const cfg = useConfigSistema();
   const color     = cfg.landing_color_primario || cfg.color_primario || "#0E1F3C";
@@ -27,15 +27,60 @@ export default function Login() {
   const [loading,  setLoading]  = useState(false);
   const googleBtnRef = useRef(null);
 
+  // Paso 2FA: si el login responde requiere_2fa, se guarda el pre_token y se
+  // muestra un segundo formulario para el código de 6 dígitos enviado al correo.
+  const [paso2FA,   setPaso2FA]   = useState(false);
+  const [preToken,  setPreToken]  = useState(null);
+  const [emailAviso, setEmailAviso] = useState("");
+  const [codigo2FA, setCodigo2FA] = useState("");
+
   const submit = async (e) => {
     e.preventDefault();
     setMsg("");
     setLoading(true);
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const resultado = await login(email, password);
+      if (resultado?.requiere_2fa) {
+        setPreToken(resultado.pre_token);
+        setEmailAviso(resultado.email || email);
+        setPaso2FA(true);
+      } else {
+        navigate("/dashboard");
+      }
     } catch (err) {
       setMsg(err?.response?.data?.msg || "Credenciales incorrectas");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const submitCodigo2FA = async (e) => {
+    e.preventDefault();
+    setMsg("");
+    setLoading(true);
+    try {
+      await verificar2FA(preToken, codigo2FA.trim());
+      navigate("/dashboard");
+    } catch (err) {
+      setMsg(err?.response?.data?.msg || "Código incorrecto");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Reenviar código: simplemente se repite el login (genera y envía uno nuevo)
+  const reenviarCodigo = async () => {
+    setMsg("");
+    setLoading(true);
+    try {
+      const resultado = await login(email, password);
+      if (resultado?.requiere_2fa) {
+        setPreToken(resultado.pre_token);
+        setMsg("");
+        setCodigo2FA("");
+      }
+    } catch (err) {
+      setMsg(err?.response?.data?.msg || "No se pudo reenviar el código");
     } finally {
       setLoading(false);
     }
@@ -225,58 +270,110 @@ export default function Login() {
             </div>
           )}
 
-          <form onSubmit={submit}>
-            <div className="mb-3">
-              <label className="form-label">Correo electrónico</label>
-              <div className="input-group">
-                <span className="input-group-text"><i className="bi bi-envelope" /></span>
+          {paso2FA ? (
+            <form onSubmit={submitCodigo2FA}>
+              <p className="text-center mb-3" style={{ color: "rgba(255,255,255,.75)", fontSize: ".85rem" }}>
+                <i className="bi bi-envelope-check me-2" />
+                Enviamos un código a <strong>{emailAviso}</strong>
+              </p>
+              <div className="mb-4">
+                <label className="form-label">Código de verificación</label>
                 <input
-                  className="form-control"
-                  type="email"
-                  placeholder="usuario@clinica.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
+                  className="form-control text-center"
+                  style={{ fontSize: "1.4rem", letterSpacing: "0.4em", fontWeight: 700 }}
+                  inputMode="numeric"
+                  maxLength={6}
+                  placeholder="000000"
+                  value={codigo2FA}
+                  onChange={(e) => setCodigo2FA(e.target.value.replace(/\D/g, "").slice(0, 6))}
                   required
-                  autoComplete="email"
+                  autoFocus
                 />
               </div>
-            </div>
 
-            <div className="mb-4">
-              <label className="form-label">Contraseña</label>
-              <div className="input-group">
-                <span className="input-group-text"><i className="bi bi-lock" /></span>
-                <input
-                  className="form-control"
-                  type={showPass ? "text" : "password"}
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  autoComplete="current-password"
-                />
-                <span className="input-group-text" onClick={() => setShowPass(s => !s)}>
-                  <i className={`bi ${showPass ? "bi-eye-slash" : "bi-eye"}`} />
-                </span>
+              <button className="btn btn-glass-primary w-100" type="submit" disabled={loading || codigo2FA.length !== 6}>
+                {loading
+                  ? <><span className="spinner-border spinner-border-sm me-2" />Verificando...</>
+                  : <><i className="bi bi-shield-check me-2" />Verificar y entrar</>
+                }
+              </button>
+
+              <div className="d-flex justify-content-between mt-3">
+                <button type="button" className="btn btn-link p-0" disabled={loading}
+                  style={{ color: "rgba(255,255,255,.65)", fontSize: ".8rem", textDecoration: "none" }}
+                  onClick={() => { setPaso2FA(false); setCodigo2FA(""); setMsg(""); }}>
+                  <i className="bi bi-arrow-left me-1" />Volver
+                </button>
+                <button type="button" className="btn btn-link p-0" disabled={loading}
+                  style={{ color: "rgba(255,255,255,.65)", fontSize: ".8rem", textDecoration: "none" }}
+                  onClick={reenviarCodigo}>
+                  Reenviar código
+                </button>
               </div>
-            </div>
-
-            <button className="btn btn-glass-primary w-100" type="submit" disabled={loading}>
-              {loading
-                ? <><span className="spinner-border spinner-border-sm me-2" />Verificando...</>
-                : <><i className="bi bi-box-arrow-in-right me-2" />Iniciar sesión</>
-              }
-            </button>
-          </form>
-
-          {GOOGLE_CLIENT_ID && (
+            </form>
+          ) : (
             <>
-              <div className="d-flex align-items-center my-3" style={{ gap: ".75rem" }}>
-                <hr className="flex-grow-1" style={{ borderColor: "rgba(255,255,255,0.15)", margin: 0 }} />
-                <span style={{ color: "rgba(255,255,255,.5)", fontSize: ".78rem" }}>o</span>
-                <hr className="flex-grow-1" style={{ borderColor: "rgba(255,255,255,0.15)", margin: 0 }} />
-              </div>
-              <div ref={googleBtnRef} className="d-flex justify-content-center" />
+              <form onSubmit={submit}>
+                <div className="mb-3">
+                  <label className="form-label">Correo electrónico</label>
+                  <div className="input-group">
+                    <span className="input-group-text"><i className="bi bi-envelope" /></span>
+                    <input
+                      className="form-control"
+                      type="email"
+                      placeholder="usuario@clinica.com"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      autoComplete="email"
+                    />
+                  </div>
+                </div>
+
+                <div className="mb-2">
+                  <label className="form-label">Contraseña</label>
+                  <div className="input-group">
+                    <span className="input-group-text"><i className="bi bi-lock" /></span>
+                    <input
+                      className="form-control"
+                      type={showPass ? "text" : "password"}
+                      placeholder="••••••••"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      required
+                      autoComplete="current-password"
+                    />
+                    <span className="input-group-text" onClick={() => setShowPass(s => !s)}>
+                      <i className={`bi ${showPass ? "bi-eye-slash" : "bi-eye"}`} />
+                    </span>
+                  </div>
+                </div>
+
+                <div className="text-end mb-4">
+                  <a href="/olvide-password" onClick={(e) => { e.preventDefault(); navigate("/olvide-password"); }}
+                    style={{ color: "rgba(255,255,255,.6)", fontSize: ".8rem", textDecoration: "none" }}>
+                    ¿Olvidaste tu contraseña?
+                  </a>
+                </div>
+
+                <button className="btn btn-glass-primary w-100" type="submit" disabled={loading}>
+                  {loading
+                    ? <><span className="spinner-border spinner-border-sm me-2" />Verificando...</>
+                    : <><i className="bi bi-box-arrow-in-right me-2" />Iniciar sesión</>
+                  }
+                </button>
+              </form>
+
+              {GOOGLE_CLIENT_ID && (
+                <>
+                  <div className="d-flex align-items-center my-3" style={{ gap: ".75rem" }}>
+                    <hr className="flex-grow-1" style={{ borderColor: "rgba(255,255,255,0.15)", margin: 0 }} />
+                    <span style={{ color: "rgba(255,255,255,.5)", fontSize: ".78rem" }}>o</span>
+                    <hr className="flex-grow-1" style={{ borderColor: "rgba(255,255,255,0.15)", margin: 0 }} />
+                  </div>
+                  <div ref={googleBtnRef} className="d-flex justify-content-center" />
+                </>
+              )}
             </>
           )}
 

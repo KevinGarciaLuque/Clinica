@@ -47,6 +47,14 @@ export function AuthProvider({ children }) {
 
   const login = async (email, password) => {
     const res = await api.post("/auth/login", { email, password });
+
+    // El usuario tiene 2FA activado: aún no hay sesión — falta el código
+    // enviado a su correo (ver verificar2FA). Se devuelve el pre_token para
+    // que el segundo paso del login lo complete.
+    if (res.data.requiere_2fa) {
+      return { requiere_2fa: true, pre_token: res.data.pre_token, email: res.data.email };
+    }
+
     const { token, usuario, licencia_info } = res.data;
 
     localStorage.setItem("token", token);
@@ -58,6 +66,24 @@ export function AuthProvider({ children }) {
     setLicenciaInfo(licencia_info || null);
 
     // Cargar módulos inmediatamente tras login
+    await cargarModulos();
+
+    return usuario;
+  };
+
+  /** Segundo paso del login cuando el usuario tiene 2FA activado */
+  const verificar2FA = async (preToken, codigo) => {
+    const res = await api.post("/auth/login/verificar-2fa", { pre_token: preToken, codigo });
+    const { token, usuario, licencia_info } = res.data;
+
+    localStorage.setItem("token", token);
+    localStorage.setItem("user", JSON.stringify(usuario));
+    if (licencia_info) {
+      localStorage.setItem("licencia_info", JSON.stringify(licencia_info));
+    }
+    setUser(usuario);
+    setLicenciaInfo(licencia_info || null);
+
     await cargarModulos();
 
     return usuario;
@@ -100,7 +126,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, loginConGoogle, logout, cargarModulos, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, verificar2FA, loginConGoogle, logout, cargarModulos, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

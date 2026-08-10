@@ -644,7 +644,8 @@ export default function PerfilUsuario() {
 
         {/* ════════════════════════ TAB: CONTRASEÑA ════════════════════════ */}
         {tab === "password" && (
-          <div style={{ ...cardSt, padding: isMobile ? "18px 16px" : "28px", maxWidth: 500, width: "100%" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 20, maxWidth: 500, width: "100%" }}>
+          <div style={{ ...cardSt, padding: isMobile ? "18px 16px" : "28px" }}>
             <div style={{ marginBottom: 20 }}>
               <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b" }}>Cambiar contraseña</div>
               <div style={{ fontSize: "0.78rem", color: "#64748b", marginTop: 4 }}>
@@ -681,6 +682,9 @@ export default function PerfilUsuario() {
                 </div>
               </div>
             </form>
+          </div>
+
+          <Seccion2FA cardSt={cardSt} labelSt={labelSt} inputSt={inputSt} isMobile={isMobile} showMsg={showMsg} />
           </div>
         )}
 
@@ -724,6 +728,152 @@ export default function PerfilUsuario() {
           </div>
         )}
       </div>
+    </div>
+  );
+}
+
+// ── Verificación en dos pasos (2FA por correo) — el propio usuario la activa/desactiva ──
+function Seccion2FA({ cardSt, labelSt, inputSt, isMobile, showMsg }) {
+  const [activado, setActivado]   = useState(null); // null = cargando
+  const [paso, setPaso]           = useState("estado"); // estado | codigo | desactivar
+  const [codigo, setCodigo]       = useState("");
+  const [passwordActual, setPasswordActual] = useState("");
+  const [cargando, setCargando]   = useState(false);
+
+  useEffect(() => {
+    api.get("/auth/me")
+      .then(res => setActivado(!!res.data?.data?.two_factor_enabled))
+      .catch(() => setActivado(false));
+  }, []);
+
+  const solicitarActivacion = async () => {
+    setCargando(true);
+    try {
+      const res = await api.post("/auth/me/2fa/solicitar-activacion");
+      showMsg("success", res.data.msg);
+      setPaso("codigo");
+    } catch (err) {
+      showMsg("danger", err.response?.data?.msg || "No se pudo enviar el código");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const confirmarActivacion = async (e) => {
+    e.preventDefault();
+    setCargando(true);
+    try {
+      await api.post("/auth/me/2fa/confirmar-activacion", { codigo });
+      setActivado(true);
+      setPaso("estado");
+      setCodigo("");
+      showMsg("success", "Verificación en dos pasos activada");
+    } catch (err) {
+      showMsg("danger", err.response?.data?.msg || "Código incorrecto");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  const desactivar = async (e) => {
+    e.preventDefault();
+    setCargando(true);
+    try {
+      await api.post("/auth/me/2fa/desactivar", { password_actual: passwordActual });
+      setActivado(false);
+      setPaso("estado");
+      setPasswordActual("");
+      showMsg("success", "Verificación en dos pasos desactivada");
+    } catch (err) {
+      showMsg("danger", err.response?.data?.msg || "No se pudo desactivar");
+    } finally {
+      setCargando(false);
+    }
+  };
+
+  return (
+    <div style={{ ...cardSt, padding: isMobile ? "18px 16px" : "28px" }}>
+      <div style={{ marginBottom: 20, display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+        <div>
+          <div style={{ fontWeight: 700, fontSize: "1rem", color: "#1e293b" }}>Verificación en dos pasos</div>
+          <div style={{ fontSize: "0.78rem", color: "#64748b", marginTop: 4 }}>
+            Al iniciar sesión, además de tu contraseña te pediremos un código enviado a tu correo.
+          </div>
+        </div>
+        {activado !== null && (
+          <span style={{
+            flexShrink: 0, fontSize: "0.72rem", fontWeight: 700, padding: "4px 10px", borderRadius: 20,
+            background: activado ? "rgba(16,185,129,.12)" : "#f1f5f9",
+            color: activado ? "#059669" : "#64748b",
+          }}>
+            {activado ? "Activada" : "Desactivada"}
+          </span>
+        )}
+      </div>
+
+      {activado === null ? (
+        <div style={{ fontSize: "0.85rem", color: "#94a3b8" }}>Cargando...</div>
+      ) : paso === "estado" ? (
+        activado ? (
+          <button type="button" onClick={() => setPaso("desactivar")}
+            style={{ padding: "9px 22px", borderRadius: 8, border: "1px solid #fca5a5", background: "#fff", color: "#dc2626", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 7 }}>
+            <i className="bi bi-shield-slash" />Desactivar
+          </button>
+        ) : (
+          <button type="button" onClick={solicitarActivacion} disabled={cargando}
+            style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#1a2744,#243b72)", color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, opacity: cargando ? .7 : 1 }}>
+            <i className="bi bi-shield-plus" />
+            {cargando ? "Enviando código..." : "Activar"}
+          </button>
+        )
+      ) : paso === "codigo" ? (
+        <form onSubmit={confirmarActivacion}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={labelSt}>Código de verificación *</label>
+              <input style={{ ...inputSt, letterSpacing: "0.3em", fontWeight: 700, textAlign: "center" }}
+                inputMode="numeric" maxLength={6} required autoFocus
+                value={codigo}
+                onChange={e => setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+              <div style={{ fontSize: "0.71rem", color: "#94a3b8", marginTop: 3 }}>Revisa tu correo — expira en 10 minutos</div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" onClick={() => { setPaso("estado"); setCodigo(""); }}
+                style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#374151", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+                Cancelar
+              </button>
+              <button type="submit" disabled={cargando || codigo.length !== 6}
+                style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#1a2744,#243b72)", color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, opacity: (cargando || codigo.length !== 6) ? .7 : 1 }}>
+                <i className="bi bi-shield-check" />
+                {cargando ? "Verificando..." : "Confirmar"}
+              </button>
+            </div>
+          </div>
+        </form>
+      ) : (
+        <form onSubmit={desactivar}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            <div>
+              <label style={labelSt}>Contraseña actual *</label>
+              <input style={inputSt} type="password" required autoFocus
+                value={passwordActual}
+                onChange={e => setPasswordActual(e.target.value)} />
+              <div style={{ fontSize: "0.71rem", color: "#94a3b8", marginTop: 3 }}>Confírmala para desactivar la verificación en dos pasos</div>
+            </div>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button type="button" onClick={() => { setPaso("estado"); setPasswordActual(""); }}
+                style={{ padding: "9px 18px", borderRadius: 8, border: "1px solid #d1d5db", background: "#fff", color: "#374151", fontWeight: 600, fontSize: "0.85rem", cursor: "pointer" }}>
+                Cancelar
+              </button>
+              <button type="submit" disabled={cargando}
+                style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, opacity: cargando ? .7 : 1 }}>
+                <i className="bi bi-shield-slash" />
+                {cargando ? "Desactivando..." : "Desactivar"}
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
     </div>
   );
 }
