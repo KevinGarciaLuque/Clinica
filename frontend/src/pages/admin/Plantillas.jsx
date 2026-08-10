@@ -5,16 +5,34 @@ import { useAuth } from "../../auth/AuthContext";
 /* --- Tipos de documento --------------------------------------------- */
 const TIPOS = [
   { key: "receta",      label: "Receta",        icon: "bi-file-earmark-medical-fill", color: "#1565c0" },
-  { key: "constancia_libre", label: "Constancia Libre", icon: "bi-file-earmark-richtext-fill", color: "#0f766e" },
+  { key: "constancia_libre", label: "Constancia Libre", menuLabel: "Libre",     icon: "bi-file-earmark-richtext-fill", color: "#0f766e" },
   { key: "incapacidad", label: "Incapacidad",    icon: "bi-bandaid-fill",              color: "#c62828" },
-  { key: "referencia",  label: "Referencia",     icon: "bi-send-fill",                 color: "#6a1b9a" },
-  { key: "constancia",  label: "Constancia",     icon: "bi-patch-check-fill",          color: "#00695c" },
+  { key: "referencia",  label: "Referencia",     menuLabel: "Detallada (hospital)", icon: "bi-send-fill", color: "#6a1b9a" },
+  { key: "referencia_simple", label: "Referencia Simple", menuLabel: "Simple", icon: "bi-send-check-fill", color: "#8b5cf6" },
+  { key: "constancia",  label: "Constancia",     menuLabel: "Estándar",       icon: "bi-patch-check-fill",          color: "#00695c" },
+  { key: "constancias", label: "Constancias",    menuLabel: "Con Motivo",     icon: "bi-file-earmark-check-fill",   color: "#9333ea" },
   { key: "recibo",      label: "Recibo",         icon: "bi-receipt-cutoff",            color: "#e65100" },
   { key: "laboratorio", label: "Laboratorio",    icon: "bi-capsule",                   color: "#0277bd" },
   { key: "estudios",    label: "Estudios",       icon: "bi-clipboard2-pulse-fill",     color: "#2e7d32" },
 ];
 
+// Tipos de documento que se agrupan bajo un solo botón con menú desplegable
+// en la barra (para no saturarla con variantes del mismo documento) — cada
+// uno conserva su propio diseño, datos y plantilla guardada por separado.
+const GRUPOS_TABS = [
+  { key: "constancias_grupo", label: "Constancias", icon: "bi-file-earmark-check-fill", color: "#9333ea", items: ["constancia_libre", "constancia", "constancias"] },
+  { key: "referencia_grupo",  label: "Referencia",  icon: "bi-send-fill",               color: "#6a1b9a", items: ["referencia", "referencia_simple"] },
+];
 const PERSONALIZACION_TAB = { key: "personalizacion", label: "Personalización", icon: "bi-sliders", color: "#7c3aed" };
+
+/* Opciones del selector "Tipo de constancia" de la pestaña Constancias. El
+   valor elegido se guarda en titulo_documento (mismo campo que ya usa
+   Constancia Libre para su título) y se imprime como encabezado del bloque. */
+const CONSTANCIA_TIPOS = [
+  { value: "CONSTANCIA MEDICA",   label: "Médica" },
+  { value: "CONSTANCIA LABORAL",  label: "Laboral" },
+  { value: "CONSTANCIA DE ESTUDIO", label: "Estudio" },
+];
 
 /* Documentos que NO pasan por buildHTML (tienen su propia plantilla fija en
    Endocrinología/Educación en Diabetes) — aquí solo se configura si el
@@ -29,19 +47,38 @@ const CONFIG_EXTRA_KEYS = new Set(CONFIG_EXTRA_TIPOS.map(t => t.key));
 
 const TABS_UI = [PERSONALIZACION_TAB, ...TIPOS, ...CONFIG_EXTRA_TIPOS];
 
+// Lista que se renderiza en la barra de pestañas: igual que TABS_UI pero con
+// cada grupo (ver GRUPOS_TABS) colapsado en un solo botón, en la posición que
+// ocupaba su primer integrante.
+const TABS_BAR = (() => {
+  const salida = [];
+  const gruposInsertados = new Set();
+  TIPOS.forEach(t => {
+    const grupo = GRUPOS_TABS.find(g => g.items.includes(t.key));
+    if (grupo) {
+      if (!gruposInsertados.has(grupo.key)) { salida.push(grupo); gruposInsertados.add(grupo.key); }
+    } else {
+      salida.push(t);
+    }
+  });
+  return [PERSONALIZACION_TAB, ...salida, ...CONFIG_EXTRA_TIPOS];
+})();
+
 /* Placeholder que se muestra (solo en pantalla, vía CSS) cuando el bloque de
    contenido libre de cada tipo esta vacio, para orientar al doctor. */
 const CONTENT_HINTS = {
   receta:      "Cuerpo de la receta: medicamentos e indicaciones",
   incapacidad: "Observaciones / recomendaciones",
   referencia:  "Recomendaciones / observaciones adicionales",
+  referencia_simple: "Información clínica (antecedentes, hallazgos, exámenes relevantes)",
   constancia:  "Texto principal de la constancia",
+  constancias: "Contenido de la constancia (detalles, recomendaciones, etc.)",
   recibo:      "Concepto del servicio (por concepto de)",
   laboratorio: "Indicaciones previas al examen",
   estudios:    "Indicaciones / motivo del estudio",
 };
 
-/* --- Diseño compartido (Personalización), aplica a los 8 documentos --- */
+/* --- Diseño compartido (Personalización), aplica a los 9 documentos --- */
 const defaultPersonalizacion = () => ({
   _v: 1, logo_url: "", color: "#1a2744", header_text_color: "#ffffff",
   clinica: "", credenciales: "", footer: "",
@@ -110,8 +147,12 @@ function buildHTML(data, tipo, vars = {}, editableVars = false, editableData = t
 
   const TITULOS = {
     incapacidad: "INCAPACIDAD MEDICA", referencia: "REFERENCIA MEDICA",
+    referencia_simple: "REFERENCIA MEDICA",
     constancia: "CONSTANCIA MEDICA",  recibo: "RECIBO DE HONORARIOS",
     laboratorio: "ORDEN DE LABORATORIO", estudios: "ORDEN DE ESTUDIOS",
+    // El título de Constancias lo elige el doctor con el selector "Tipo de
+    // constancia" (Médica/Laboral/Estudio), guardado en titulo_documento.
+    constancias: titulo_documento || "CONSTANCIA MEDICA",
   };
 
   const tituloBloque = TITULOS[tipo] ? `
@@ -277,6 +318,33 @@ function buildHTML(data, tipo, vars = {}, editableVars = false, editableData = t
       <div>CON # DE EXPEDIENTE: <span style="display:inline-block;border-bottom:1px solid #333;min-width:80px;"${ed("expediente")}>${vars.expediente || " "}</span>&nbsp;&nbsp;DIAGNÓSTICO <span style="display:inline-block;border-bottom:1px solid #333;min-width:240px;font-weight:600;"${ed("diagnostico")}>${dx}</span></div>
       <div style="margin-top:16px;">PARA FINES QUE EL INTERESADO ESTIME CONVENIENTE, SE EXTIENDE LA PRESENTE EN LA CIUDAD DE <span style="display:inline-block;border-bottom:1px solid #333;min-width:160px;font-weight:600;"${ed("ciudad")}>${ciudad}</span>, EL DÍA <span style="font-weight:600;"${ed("fecha")}>${fecha}</span>.</div>
     </div>`;
+  } else if (tipo === "constancias") {
+    datosBloque = `<div style="font-size:0.9em;">
+      <div style="display:flex;gap:20px;margin-bottom:8px;flex-wrap:wrap;">
+        <div style="flex:2;">Paciente: <span style="display:inline-block;border-bottom:1px solid #555;min-width:220px;font-weight:600;"${ed("paciente")}>${p}</span></div>
+        <div style="flex:1;">Fecha: <span style="display:inline-block;border-bottom:1px solid #555;min-width:110px;"${ed("fecha")}>${fecha}</span></div>
+      </div>
+      <div style="display:flex;gap:20px;font-size:0.9em;color:#444;margin-bottom:12px;">
+        <div>DNI: <span style="display:inline-block;border-bottom:1px solid #999;min-width:150px;"${ed("paciente_dni")}>${dni}</span></div>
+        <div>Edad: <span style="display:inline-block;border-bottom:1px solid #999;min-width:70px;"${ed("paciente_edad")}>${edad}</span></div>
+      </div>
+      <div style="font-weight:600;color:#374151;margin-bottom:2px;">Motivo:</div>
+      <div style="border-bottom:1px solid #999;min-height:20px;padding-bottom:2px;font-weight:600;"${ed("motivo")}>${vars.motivo || "________________________"}</div>
+    </div>`;
+  } else if (tipo === "referencia_simple") {
+    datosBloque = `<div style="font-size:0.9em;">
+      <div style="display:flex;gap:20px;margin-bottom:8px;flex-wrap:wrap;">
+        <div style="flex:2;">Paciente: <span style="display:inline-block;border-bottom:1px solid #555;min-width:220px;font-weight:600;"${ed("paciente")}>${p}</span></div>
+        <div style="flex:1;">Fecha: <span style="display:inline-block;border-bottom:1px solid #555;min-width:110px;"${ed("fecha")}>${fecha}</span></div>
+      </div>
+      <div style="display:flex;gap:20px;font-size:0.9em;color:#444;margin-bottom:12px;">
+        <div>DNI: <span style="display:inline-block;border-bottom:1px solid #999;min-width:150px;"${ed("paciente_dni")}>${dni}</span></div>
+        <div>Edad: <span style="display:inline-block;border-bottom:1px solid #999;min-width:70px;"${ed("paciente_edad")}>${edad}</span></div>
+      </div>
+      <div style="margin-bottom:12px;">Se refiere a (médico/especialidad): <span style="display:inline-block;border-bottom:1px solid #999;min-width:280px;font-weight:600;"${ed("especialidad_destino")}>${vars.especialidad_destino || "________________________"}</span></div>
+      <div style="font-weight:600;color:#374151;margin-bottom:2px;">Motivo de referencia:</div>
+      <div style="border-bottom:1px solid #999;min-height:20px;padding-bottom:2px;font-weight:600;"${ed("motivo")}>${vars.motivo || "________________________"}</div>
+    </div>`;
   } else if (tipo === "recibo") {
     const retencion = vars.retenciones || (vars.monto ? (parseFloat(vars.monto) * 0.125).toFixed(2) : "0.00");
     const totalNeto = vars.total_neto || (vars.monto ? (parseFloat(vars.monto) * 0.875).toFixed(2) : "0.00");
@@ -337,7 +405,7 @@ function buildHTML(data, tipo, vars = {}, editableVars = false, editableData = t
   // vacio) para los tipos que lo usan, ya que ahora es la unica forma de
   // editarlo (contenteditable). No aplica a constancia_libre (su cuerpo ya se
   // muestra completo en datosBloque) ni a recibo (usa su propio campo arriba).
-  const contenidoBloque = ["incapacidad", "referencia", "constancia", "laboratorio", "estudios"].includes(tipo) ? `
+  const contenidoBloque = ["incapacidad", "referencia", "referencia_simple", "constancia", "constancias", "laboratorio", "estudios"].includes(tipo) ? `
     <div style="background:#f9f9f9;border-left:3px solid ${color};padding:8px 12px;margin-top:12px;font-size:0.85em;line-height:1.7;min-height:20px;"${edData("contenido", CONTENT_HINTS[tipo])}>${bodyHTML}</div>` : "";
 
   const rxBloque = tipo === "receta" ? `
@@ -426,6 +494,7 @@ const MUESTRA = {
   recomendaciones: "Acudir en ayunas. Traer examenes previos.",
   examenes: "- Hemograma completo\n- Perfil lipidico\n- Glucosa en ayunas\n- Uroanalis",
   estudios: "- Radiografia de torax PA\n- Ecografia abdominal",
+  motivo: "Trámite personal ante la institución que lo requiera",
 };
 
 const COLORES_RAPIDOS = [
@@ -473,7 +542,20 @@ export default function Plantillas() {
   const pageRef = useRef(null);
   const dragSelloRef = useRef(null);
 
-  // --- Paciente real (buscador unico en la cabecera, aplica a los 8 documentos) ---
+  // --- Menú desplegable de los botones agrupados (Constancias, Referencia) en la barra ---
+  const [grupoAbierto, setGrupoAbierto] = useState(null); // key de GRUPOS_TABS abierto, o null
+  const grupoRefs = useRef({});
+  useEffect(() => {
+    if (!grupoAbierto) return;
+    const cerrar = (e) => {
+      const el = grupoRefs.current[grupoAbierto];
+      if (el && !el.contains(e.target)) setGrupoAbierto(null);
+    };
+    document.addEventListener("mousedown", cerrar);
+    return () => document.removeEventListener("mousedown", cerrar);
+  }, [grupoAbierto]);
+
+  // --- Paciente real (buscador unico en la cabecera, aplica a los 9 documentos) ---
   const [busquedaPaciente, setBusquedaPaciente] = useState("");
   const [resultadosPaciente, setResultadosPaciente] = useState([]);
   const [buscandoPaciente, setBuscandoPaciente] = useState(false);
@@ -627,7 +709,7 @@ export default function Plantillas() {
     } finally { setGuardando(false); }
   };
 
-  // Guarda el diseño global y lo aplica (fan-out) a los 8 documentos, para que
+  // Guarda el diseño global y lo aplica (fan-out) a los 9 documentos, para que
   // el backend que genera PDFs reales (prescripciones.js/estudios.js, que leen
   // la fila "receta") siempre encuentre el diseño actualizado sin cambios ahi.
   const guardarPersonalizacion = async () => {
@@ -643,7 +725,7 @@ export default function Plantillas() {
           tipo: t.key, nombre: t.label, contenido: JSON.stringify(merged),
         });
       }
-      setMsg({ tipo: "success", texto: "Personalización guardada y aplicada a los 8 documentos" });
+      setMsg({ tipo: "success", texto: "Personalización guardada y aplicada a los 9 documentos" });
     } catch (e) {
       setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
     } finally { setGuardando(false); }
@@ -882,7 +964,7 @@ export default function Plantillas() {
             {!isMobile && <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>Personaliza el diseño de tus documentos médicos</div>}
           </div>
 
-          {/* Buscador de paciente unico: aplica a los 8 documentos, oculto en Personalizacion y en las config ligeras */}
+          {/* Buscador de paciente unico: aplica a los 9 documentos, oculto en Personalizacion y en las config ligeras */}
           {tab !== "personalizacion" && !CONFIG_EXTRA_KEYS.has(tab) && (
             <div style={{ marginLeft: isMobile ? 0 : "auto", position: "relative", width: isMobile ? "100%" : 280 }}>
               {!pacienteSel ? (
@@ -928,13 +1010,47 @@ export default function Plantillas() {
         </div>
         {/* Tabs — se envuelven en varias filas en vez de recortarse u obligar a hacer scroll */}
         <div style={{ display: "flex", flexWrap: "wrap", gap: 3, rowGap: 5 }}>
-          {TABS_UI.map(({ key, label, icon, color }) => (
-            <button key={key} onClick={() => { setTab(key); setMsg({ tipo: "", texto: "" }); setVistaMovil("form"); }}
-              style={{ padding: isMobile ? "6px 10px" : "7px 14px", fontSize: isMobile ? "0.72rem" : "0.8rem", fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer", background: tab === key ? "#fff" : "rgba(255,255,255,.1)", color: tab === key ? color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 4, transition: "background .15s", whiteSpace: "nowrap" }}>
-              <i className={`bi ${icon}`} />
-              {isMobile ? label.split(" ")[0] : label}
-            </button>
-          ))}
+          {TABS_BAR.map((t) => {
+            const grupo = GRUPOS_TABS.find(g => g.key === t.key);
+            if (grupo) {
+              const grupoActivo = grupo.items.includes(tab);
+              const abierto = grupoAbierto === grupo.key;
+              return (
+                <div key={grupo.key} ref={el => { grupoRefs.current[grupo.key] = el; }} style={{ position: "relative" }}>
+                  <button onClick={() => setGrupoAbierto(o => (o === grupo.key ? null : grupo.key))}
+                    style={{ padding: isMobile ? "6px 10px" : "7px 14px", fontSize: isMobile ? "0.72rem" : "0.8rem", fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer", background: grupoActivo ? "#fff" : "rgba(255,255,255,.1)", color: grupoActivo ? grupo.color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 4, transition: "background .15s", whiteSpace: "nowrap" }}>
+                    <i className={`bi ${grupo.icon}`} />
+                    {grupo.label}
+                    <i className="bi bi-chevron-down" style={{ fontSize: "0.65em", marginLeft: 1, transform: abierto ? "rotate(180deg)" : "none", transition: "transform .15s" }} />
+                  </button>
+                  {abierto && (
+                    <div style={{ position: "absolute", top: "calc(100% + 6px)", left: 0, zIndex: 40, background: "#1a2744", border: "1px solid rgba(255,255,255,.12)", borderRadius: 12, boxShadow: "0 12px 32px rgba(0,0,0,.35)", minWidth: 210, overflow: "hidden" }}>
+                      {grupo.items.map(k => {
+                        const it = TIPOS.find(x => x.key === k);
+                        const seleccionado = tab === k;
+                        return (
+                          <button key={k} onClick={() => { setTab(k); setMsg({ tipo: "", texto: "" }); setVistaMovil("form"); setGrupoAbierto(null); }}
+                            style={{ display: "flex", alignItems: "center", gap: 10, width: "100%", padding: "10px 14px", border: "none", background: seleccionado ? "rgba(255,255,255,.08)" : "transparent", color: "#fff", cursor: "pointer", fontSize: "0.83rem", fontWeight: 600, textAlign: "left" }}>
+                            <i className={`bi ${it.icon}`} style={{ color: it.color, fontSize: "1rem" }} />
+                            <span style={{ flex: 1 }}>{it.menuLabel || it.label}</span>
+                            {seleccionado && <i className="bi bi-check-lg" style={{ color: "#7dd3fc" }} />}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              );
+            }
+            const { key, label, icon, color } = t;
+            return (
+              <button key={key} onClick={() => { setTab(key); setMsg({ tipo: "", texto: "" }); setVistaMovil("form"); }}
+                style={{ padding: isMobile ? "6px 10px" : "7px 14px", fontSize: isMobile ? "0.72rem" : "0.8rem", fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer", background: tab === key ? "#fff" : "rgba(255,255,255,.1)", color: tab === key ? color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 4, transition: "background .15s", whiteSpace: "nowrap" }}>
+                <i className={`bi ${icon}`} />
+                {isMobile ? label.split(" ")[0] : label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
@@ -974,7 +1090,7 @@ export default function Plantillas() {
               <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#1a2744" }}>{tipoActivo?.label}</span>
             </div>
             <small style={{ color: "#6b7280", fontSize: "0.78rem", marginTop: -10 }}>
-              Este diseño aplica por igual a los 8 documentos (Receta, Constancia Libre, Incapacidad, Referencia, Constancia, Recibo, Laboratorio, Estudios).
+              Este diseño aplica por igual a los 9 documentos (Receta, Constancia Libre, Incapacidad, Referencia, Constancia, Constancias, Recibo, Laboratorio, Estudios).
             </small>
 
             {/* Logo */}
@@ -997,7 +1113,7 @@ export default function Plantillas() {
                   </button>
                 )}
               </div>
-              <small style={{ color: "#9ca3af", fontSize: "0.75rem" }}>El logo aparece en la esquina izquierda del encabezado de los 8 documentos.</small>
+              <small style={{ color: "#9ca3af", fontSize: "0.75rem" }}>El logo aparece en la esquina izquierda del encabezado de los 9 documentos.</small>
             </div>
 
             {/* Sellos movibles */}
@@ -1024,7 +1140,7 @@ export default function Plantillas() {
                 />
               </label>
               <div style={{ marginTop: 8 }}>
-                <small style={{ color: "#6b7280" }}>Tip: arrastra cada sello en la hoja de vista previa. Aplica a los 8 documentos.</small>
+                <small style={{ color: "#6b7280" }}>Tip: arrastra cada sello en la hoja de vista previa. Aplica a los 9 documentos.</small>
               </div>
               {(personalizacion.sellos || []).length > 0 && (
                 <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 6 }}>
@@ -1325,6 +1441,19 @@ export default function Plantillas() {
               )}
               <span style={{ marginLeft: "auto", fontSize: "0.75rem", color: "#9ca3af", fontStyle: "italic" }}>Los cambios se reflejan en tiempo real</span>
             </div>
+            {tab === "constancias" && (
+              <div style={{ background: "#fff", borderBottom: "1px solid #eef2f7", padding: "8px 18px", display: "flex", alignItems: "center", gap: 8 }}>
+                <label style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151" }}>Tipo de constancia:</label>
+                <select
+                  className="form-select form-select-sm"
+                  style={{ width: "auto", fontSize: "0.8rem" }}
+                  value={(datos.constancias || {}).titulo_documento || CONSTANCIA_TIPOS[0].value}
+                  onChange={e => set("titulo_documento", e.target.value)}
+                >
+                  {CONSTANCIA_TIPOS.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                </select>
+              </div>
+            )}
             {isRichWordMode && (
               <div style={{ background: "#fff", borderBottom: "1px solid #eef2f7", padding: "8px 16px", display: "flex", gap: 6, flexWrap: "wrap" }}>
                 <button onClick={() => execRich("bold")} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 6, padding: "4px 8px" }} title="Negrita"><b>B</b></button>
