@@ -926,11 +926,11 @@ export default function Plantillas() {
             </div>
           )}
         </div>
-        {/* Tabs — scroll horizontal en móvil */}
-        <div style={{ display: "flex", gap: 3, overflowX: "auto", WebkitOverflowScrolling: "touch", paddingBottom: 0 }}>
+        {/* Tabs — se envuelven en varias filas en vez de recortarse u obligar a hacer scroll */}
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 3, rowGap: 5 }}>
           {TABS_UI.map(({ key, label, icon, color }) => (
             <button key={key} onClick={() => { setTab(key); setMsg({ tipo: "", texto: "" }); setVistaMovil("form"); }}
-              style={{ padding: isMobile ? "6px 10px" : "7px 14px", fontSize: isMobile ? "0.72rem" : "0.8rem", fontWeight: 600, borderRadius: "8px 8px 0 0", border: "none", cursor: "pointer", background: tab === key ? "#fff" : "rgba(255,255,255,.1)", color: tab === key ? color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 4, transition: "background .15s", whiteSpace: "nowrap", flexShrink: 0 }}>
+              style={{ padding: isMobile ? "6px 10px" : "7px 14px", fontSize: isMobile ? "0.72rem" : "0.8rem", fontWeight: 600, borderRadius: 8, border: "none", cursor: "pointer", background: tab === key ? "#fff" : "rgba(255,255,255,.1)", color: tab === key ? color : "rgba(255,255,255,.75)", display: "flex", alignItems: "center", gap: 4, transition: "background .15s", whiteSpace: "nowrap" }}>
               <i className={`bi ${icon}`} />
               {isMobile ? label.split(" ")[0] : label}
             </button>

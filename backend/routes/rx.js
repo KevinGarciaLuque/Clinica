@@ -11,7 +11,7 @@
 const express   = require("express");
 const router    = express.Router();
 const pool      = require("../db");
-const rateLimit = require("express-rate-limit");
+const { rateLimit, ipKeyGenerator } = require("express-rate-limit");
 
 const RX_EXPIRY_DAYS = parseInt(process.env.RX_EXPIRY_DAYS || "365", 10);
 
@@ -22,7 +22,7 @@ const rxLimiter = rateLimit({
   standardHeaders: true,
   legacyHeaders: false,
   message: { ok: false, msg: "Demasiadas solicitudes. Intenta en unos minutos." },
-  keyGenerator: (req) => req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.ip,
+  keyGenerator: (req) => ipKeyGenerator(req.headers["x-forwarded-for"]?.split(",")[0].trim() || req.ip),
 });
 
 router.get("/:codigo", rxLimiter, async (req, res) => {
