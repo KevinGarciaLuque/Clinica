@@ -39,6 +39,8 @@ export default function LandingPageAdmin() {
         landing_instagram:            c.landing_instagram             ?? "",
         landing_facebook:             c.landing_facebook              ?? "",
         landing_tiktok:               c.landing_tiktok                ?? "",
+        landing_youtube:              c.landing_youtube               ?? "",
+        landing_linkedin:             c.landing_linkedin              ?? "",
         landing_plan_trial_precio:    c.landing_plan_trial_precio     ?? "",
         landing_plan_trial_duracion:  c.landing_plan_trial_duracion   ?? "",
         landing_plan_trial_features:  c.landing_plan_trial_features   ?? "[]",
@@ -540,6 +542,24 @@ export default function LandingPageAdmin() {
                 value={form.landing_tiktok}
                 onChange={e => set("landing_tiktok", e.target.value)}
                 placeholder="@usuario o URL"
+              />
+            </div>
+            <div className="col-sm-4">
+              <label className="form-label fw-bold"><i className="bi bi-youtube me-1" style={{ color: "#ff0000" }} />YouTube</label>
+              <input
+                className="form-control"
+                value={form.landing_youtube}
+                onChange={e => set("landing_youtube", e.target.value)}
+                placeholder="URL de tu canal"
+              />
+            </div>
+            <div className="col-sm-4">
+              <label className="form-label fw-bold"><i className="bi bi-linkedin me-1" style={{ color: "#0a66c2" }} />LinkedIn</label>
+              <input
+                className="form-control"
+                value={form.landing_linkedin}
+                onChange={e => set("landing_linkedin", e.target.value)}
+                placeholder="URL de tu perfil o página"
               />
             </div>
           </div>

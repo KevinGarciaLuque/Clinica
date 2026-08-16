@@ -734,7 +734,7 @@ export default function LandingPage() {
           </div>
 
           {/* Redes sociales */}
-          {(cfg.landing_instagram || cfg.landing_facebook || cfg.landing_tiktok) && (
+          {(cfg.landing_instagram || cfg.landing_facebook || cfg.landing_tiktok || cfg.landing_youtube || cfg.landing_linkedin) && (
             <div style={{
               background: "#fff", borderRadius: 24, padding: "32px 36px",
               border: "1px solid #e2e8f0", boxShadow: "0 2px 16px rgba(0,0,0,.05)",
@@ -801,6 +801,46 @@ export default function LandingPage() {
                     >
                       <i className="bi bi-tiktok" style={{ fontSize: 18 }} />
                       TikTok
+                    </div>
+                  </a>
+                )}
+                {cfg.landing_youtube && (
+                  <a
+                    href={cfg.landing_youtube.startsWith("http") ? cfg.landing_youtube : `https://youtube.com/${cfg.landing_youtube}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 10,
+                      background: "#ff0000", color: "#fff", borderRadius: 14, padding: "12px 20px",
+                      fontWeight: 700, fontSize: 14, transition: "transform .18s, box-shadow .18s",
+                      boxShadow: "0 4px 16px rgba(255,0,0,.3)",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(255,0,0,.4)"; }}
+                    onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 16px rgba(255,0,0,.3)"; }}
+                    >
+                      <i className="bi bi-youtube" style={{ fontSize: 18 }} />
+                      YouTube
+                    </div>
+                  </a>
+                )}
+                {cfg.landing_linkedin && (
+                  <a
+                    href={cfg.landing_linkedin.startsWith("http") ? cfg.landing_linkedin : `https://linkedin.com/${cfg.landing_linkedin}`}
+                    target="_blank" rel="noopener noreferrer"
+                    style={{ textDecoration: "none" }}
+                  >
+                    <div style={{
+                      display: "inline-flex", alignItems: "center", gap: 10,
+                      background: "#0a66c2", color: "#fff", borderRadius: 14, padding: "12px 20px",
+                      fontWeight: 700, fontSize: 14, transition: "transform .18s, box-shadow .18s",
+                      boxShadow: "0 4px 16px rgba(10,102,194,.3)",
+                    }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = "0 8px 24px rgba(10,102,194,.4)"; }}
+                    onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 16px rgba(10,102,194,.3)"; }}
+                    >
+                      <i className="bi bi-linkedin" style={{ fontSize: 18 }} />
+                      LinkedIn
                     </div>
                   </a>
                 )}
