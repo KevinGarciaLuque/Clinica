@@ -936,8 +936,8 @@ export default function LandingPageAdmin() {
 
       {/* Botón guardar inferior */}
       <div style={{ marginTop: 28, display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <a href="/inicio" target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary" style={{ borderRadius: 8 }}>
-          <i className="bi bi-eye me-1" />Ver página pública
+        <a href={tab === "milink" ? "/links" : "/inicio"} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary" style={{ borderRadius: 8 }}>
+          <i className="bi bi-eye me-1" />{tab === "milink" ? "Ver mi link" : "Ver página pública"}
         </a>
         <button className="btn btn-primary" onClick={guardar} disabled={guardando} style={{ borderRadius: 8, fontWeight: 700, minWidth: 130 }}>
           {guardando
