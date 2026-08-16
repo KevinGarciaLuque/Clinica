@@ -63,14 +63,30 @@ export default function LinksPage() {
         textAlign: "center",
       }}>
         <div style={{
-          width: 96, height: 96, borderRadius: "50%", margin: "0 auto 18px",
-          background: foto ? `url(${foto}) center/cover no-repeat` : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
-          display: "flex", alignItems: "center", justifyContent: "center",
-          border: "3px solid rgba(255,255,255,0.25)",
-          fontSize: 34, fontWeight: 800, color: "#fff",
+          width: 104, height: 104, borderRadius: "50%", margin: "0 auto 18px",
+          position: "relative", padding: 4,
         }}>
-          {!foto && nombre.charAt(0).toUpperCase()}
+          <div style={{
+            position: "absolute", inset: 0, borderRadius: "50%",
+            background: "conic-gradient(from 0deg, transparent 0%, transparent 78%, #60a5fa 92%, #fff 97%, transparent 100%)",
+            animation: "linksRingSpin 2.6s linear infinite",
+          }} />
+          <div style={{
+            position: "absolute", inset: 4, borderRadius: "50%",
+            background: foto ? `url(${foto}) center/cover no-repeat` : "linear-gradient(135deg, #3b82f6, #8b5cf6)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+            border: "3px solid rgba(14,31,60,0.9)",
+            fontSize: 34, fontWeight: 800, color: "#fff",
+          }}>
+            {!foto && nombre.charAt(0).toUpperCase()}
+          </div>
         </div>
+        <style>{`
+          @keyframes linksRingSpin {
+            from { transform: rotate(0deg); }
+            to   { transform: rotate(360deg); }
+          }
+        `}</style>
 
         <h1 style={{ color: "#fff", fontSize: 22, fontWeight: 800, margin: "0 0 6px" }}>{nombre}</h1>
         {bio && (
