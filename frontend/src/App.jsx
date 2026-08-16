@@ -41,6 +41,7 @@ const SoporteHistorial         = lazy(() => import("./pages/superadmin/SoporteHi
 const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdminPersonalizacion"));
 const LandingPageAdmin          = lazy(() => import("./pages/superadmin/LandingPageAdmin"));
 const LandingPage               = lazy(() => import("./pages/LandingPage"));
+const LinksPage                 = lazy(() => import("./pages/LinksPage"));
 
 // Módulos de Cirugía Estética
 const GaleriaEstetica          = lazy(() => import("./pages/estetica/GaleriaEstetica"));
@@ -121,6 +122,7 @@ export default function App() {
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
       <Route path="/agenda-tu-consulta" element={<DirectorioMedicos />} />
       <Route path="/inicio"           element={<LandingPage />} />
+      <Route path="/links"            element={<LinksPage />} />
       <Route path="/"                         element={<LandingPage />} />
 
       <Route

@@ -27,6 +27,10 @@ const DEFAULTS = {
   landing_tiktok:               "",
   landing_youtube:              "",
   landing_linkedin:             "",
+  // Página "Mi Link" (/links)
+  links_nombre:                 "Medic-KG",
+  links_bio:                    "Todos mis enlaces en un solo lugar 👇",
+  links_foto_url:               "",
   landing_plan_trial_precio:    "",
   landing_plan_trial_duracion:  "Semestral / Anual",
   landing_plan_trial_features:  '["Hasta 2 usuarios: 1 médico + 1 recepcionista","Pacientes ilimitados con expediente digital","Agenda médica: vista diaria y semanal","Historia clínica en formato SOAP","Recetas digitales con QR verificable","Solicitud y registro de estudios","10 GB de almacenamiento","Soporte por WhatsApp en horario hábil"]',
@@ -106,6 +110,7 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
       "landing_whatsapp", "landing_email_contacto", "landing_nosotros_texto",
       "landing_instagram", "landing_facebook", "landing_tiktok",
       "landing_youtube", "landing_linkedin",
+      "links_nombre", "links_bio",
       "landing_plan_trial_precio", "landing_plan_trial_duracion", "landing_plan_trial_features",
       "landing_plan_semestral_precio", "landing_plan_semestral_features",
       "landing_plan_anual_precio", "landing_plan_anual_features",
@@ -176,6 +181,44 @@ router.post(
     }
   }
 );
+
+// ── POST /api/config-sistema/upload-links-foto  (solo SUPER_ADMIN) ───────
+router.post(
+  "/upload-links-foto",
+  auth("SUPER_ADMIN"),
+  uploadSistemaMemory.single("foto"),
+  async (req, res) => {
+    try {
+      if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });
+      await ensureSchema();
+      const dataUrl = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+      await pool.query(
+        `INSERT INTO config_sistema (clave, valor) VALUES ('links_foto_url', ?)
+         ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
+        [dataUrl]
+      );
+      res.json({ ok: true, url: dataUrl });
+    } catch (e) {
+      console.error("[config-sistema upload-links-foto]", e);
+      res.status(500).json({ ok: false, msg: e.message });
+    }
+  }
+);
+
+// ── DELETE /api/config-sistema/links-foto  (solo SUPER_ADMIN) ────────────
+router.delete("/links-foto", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await ensureSchema();
+    await pool.query(
+      `INSERT INTO config_sistema (clave, valor) VALUES ('links_foto_url', '')
+       ON DUPLICATE KEY UPDATE valor = ''`
+    );
+    res.json({ ok: true });
+  } catch (e) {
+    console.error("[config-sistema delete-links-foto]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
 
 // ── DELETE /api/config-sistema/logo  (solo SUPER_ADMIN) ─────────────────
 router.delete("/logo", auth("SUPER_ADMIN"), async (req, res) => {

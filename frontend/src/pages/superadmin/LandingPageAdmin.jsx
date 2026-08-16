@@ -7,6 +7,7 @@ const TABS = [
   { id: "nosotros",   label: "Nosotros",   icon: "bi-people-fill" },
   { id: "contacto",   label: "Contacto",   icon: "bi-chat-dots-fill" },
   { id: "directorio", label: "Directorio", icon: "bi-hospital-fill" },
+  { id: "milink",     label: "Mi Link",    icon: "bi-link-45deg" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -17,6 +18,10 @@ export default function LandingPageAdmin() {
   const [logoPreview,   setLogoPreview]   = useState(null);
   const [subiendoLogo,  setSubiendoLogo]  = useState(false);
   const logoInputRef = useRef();
+  const [linksFotoPreview,  setLinksFotoPreview]  = useState(null);
+  const [subiendoLinksFoto, setSubiendoLinksFoto] = useState(false);
+  const linksFotoInputRef = useRef();
+  const [copiado, setCopiado] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg,       setMsg]       = useState(null);
 
@@ -27,6 +32,11 @@ export default function LandingPageAdmin() {
         c.logo_url.startsWith("data:") || c.logo_url.startsWith("http")
           ? c.logo_url
           : `${API_URL}${c.logo_url}`
+      );
+      if (c.links_foto_url) setLinksFotoPreview(
+        c.links_foto_url.startsWith("data:") || c.links_foto_url.startsWith("http")
+          ? c.links_foto_url
+          : `${API_URL}${c.links_foto_url}`
       );
       setForm({
         landing_activo:               c.landing_activo               ?? "1",
@@ -61,6 +71,9 @@ export default function LandingPageAdmin() {
         directorio_cta_titulo:        c.directorio_cta_titulo         ?? "",
         directorio_cta_texto:         c.directorio_cta_texto          ?? "",
         directorio_cta_boton:         c.directorio_cta_boton          ?? "",
+        // Mi Link (/links)
+        links_nombre:                 c.links_nombre                  ?? "",
+        links_bio:                    c.links_bio                     ?? "",
       });
     }).catch(() => {});
   }, []);
@@ -95,6 +108,37 @@ export default function LandingPageAdmin() {
       setTimeout(() => setMsg(null), 3000);
     } catch {
       setMsg({ ok: false, text: "Error al eliminar logo" });
+    }
+  };
+
+  const subirLinksFoto = async (file) => {
+    if (!file) return;
+    setSubiendoLinksFoto(true);
+    setMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append("foto", file);
+      const r = await api.post("/config-sistema/upload-links-foto", fd, {
+        headers: { "Content-Type": "multipart/form-data" },
+      });
+      setLinksFotoPreview(r.data.url);
+      setMsg({ ok: true, text: "Foto actualizada correctamente" });
+    } catch (e) {
+      setMsg({ ok: false, text: e.response?.data?.msg || "Error al subir foto" });
+    } finally {
+      setSubiendoLinksFoto(false);
+      setTimeout(() => setMsg(null), 3500);
+    }
+  };
+
+  const eliminarLinksFoto = async () => {
+    try {
+      await api.delete("/config-sistema/links-foto");
+      setLinksFotoPreview(null);
+      setMsg({ ok: true, text: "Foto eliminada" });
+      setTimeout(() => setMsg(null), 3000);
+    } catch {
+      setMsg({ ok: false, text: "Error al eliminar foto" });
     }
   };
 
@@ -758,6 +802,135 @@ export default function LandingPageAdmin() {
           >
             <i className="bi bi-eye me-1" />Ver directorio público
           </a>
+        </div>
+      )}
+
+      {/* ── TAB: MI LINK ── */}
+      {tab === "milink" && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+              <i className="bi bi-info-circle me-1" />
+              Un único enlace público (<code>/links</code>) con todas tus redes sociales, estilo
+              "link en bio". Las redes que se muestran son las configuradas en la pestaña <strong>Contacto</strong>.
+            </p>
+          </div>
+
+          {/* URL para compartir */}
+          <div>
+            <label className="form-label fw-bold"><i className="bi bi-share-fill me-1" />Tu link para compartir</label>
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+              <input
+                className="form-control"
+                readOnly
+                value={`${window.location.origin}/links`}
+                style={{ background: "#f8fafc", fontWeight: 600 }}
+              />
+              <button
+                type="button"
+                className="btn btn-primary btn-sm"
+                style={{ borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}
+                onClick={() => {
+                  navigator.clipboard.writeText(`${window.location.origin}/links`);
+                  setCopiado(true);
+                  setTimeout(() => setCopiado(false), 2000);
+                }}
+              >
+                <i className={`bi ${copiado ? "bi-check2" : "bi-clipboard"} me-1`} />{copiado ? "Copiado" : "Copiar"}
+              </button>
+              <a
+                href="/links"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn btn-outline-primary btn-sm"
+                style={{ borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}
+              >
+                <i className="bi bi-eye me-1" />Ver
+              </a>
+            </div>
+          </div>
+
+          {/* Foto de perfil */}
+          <div>
+            <label className="form-label fw-bold">
+              <i className="bi bi-person-circle me-1" />Foto de perfil
+            </label>
+            <div style={{
+              display: "flex", alignItems: "center", gap: 20,
+              background: "#f8fafc", border: "2px dashed #e2e8f0",
+              borderRadius: 16, padding: "20px 24px",
+            }}>
+              <div style={{
+                width: 90, height: 90, borderRadius: "50%", flexShrink: 0,
+                background: "#1e293b", display: "flex", alignItems: "center", justifyContent: "center",
+                border: "1px solid #334155", overflow: "hidden",
+              }}>
+                {linksFotoPreview
+                  ? <img src={linksFotoPreview} alt="foto" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                  : <i className="bi bi-person" style={{ fontSize: 32, color: "#475569" }} />}
+              </div>
+
+              <div style={{ flex: 1 }}>
+                <p style={{ fontWeight: 600, color: "#1e293b", marginBottom: 6, fontSize: 14 }}>
+                  {linksFotoPreview ? "Foto actual" : "Sin foto configurada"}
+                </p>
+                <p style={{ fontSize: 12, color: "#64748b", marginBottom: 14 }}>
+                  Se recomienda una imagen cuadrada (mín. 300x300px).
+                </p>
+                <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+                  <input
+                    ref={linksFotoInputRef}
+                    type="file"
+                    accept="image/*"
+                    style={{ display: "none" }}
+                    onChange={e => subirLinksFoto(e.target.files[0])}
+                  />
+                  <button
+                    type="button"
+                    className="btn btn-primary btn-sm"
+                    onClick={() => linksFotoInputRef.current?.click()}
+                    disabled={subiendoLinksFoto}
+                    style={{ borderRadius: 8, fontWeight: 600 }}
+                  >
+                    {subiendoLinksFoto
+                      ? <><span className="spinner-border spinner-border-sm me-1" />Subiendo...</>
+                      : <><i className="bi bi-upload me-1" />{linksFotoPreview ? "Cambiar foto" : "Subir foto"}</>}
+                  </button>
+                  {linksFotoPreview && (
+                    <button
+                      type="button"
+                      className="btn btn-outline-danger btn-sm"
+                      onClick={eliminarLinksFoto}
+                      style={{ borderRadius: 8, fontWeight: 600 }}
+                    >
+                      <i className="bi bi-trash me-1" />Eliminar
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="row g-3">
+            <div className="col-sm-6">
+              <label className="form-label fw-bold">Nombre a mostrar</label>
+              <input
+                className="form-control"
+                value={form.links_nombre}
+                onChange={e => set("links_nombre", e.target.value)}
+                placeholder="Medic-KG"
+              />
+            </div>
+            <div className="col-12">
+              <label className="form-label fw-bold">Bio / descripción corta</label>
+              <input
+                className="form-control"
+                value={form.links_bio}
+                onChange={e => set("links_bio", e.target.value)}
+                placeholder="Todos mis enlaces en un solo lugar 👇"
+              />
+            </div>
+          </div>
         </div>
       )}
 
