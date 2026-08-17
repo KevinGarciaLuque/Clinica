@@ -293,6 +293,46 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
 });
 
 // ══════════════════════════════════════════════════════════
+// POST /solicitudes/:id/reenviar-credenciales  (SUPER_ADMIN)
+// Genera una contraseña nueva y la reenvía por si el correo original no llegó.
+// ══════════════════════════════════════════════════════════
+router.post("/solicitudes/:id/reenviar-credenciales", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const [[solicitud]] = await pool.query(
+      `SELECT * FROM solicitudes_plan_publico WHERE id=? LIMIT 1`,
+      [id]
+    );
+    if (!solicitud) return res.status(404).json({ ok: false, msg: "Solicitud no encontrada" });
+    if (solicitud.estado !== "aprobada" || !solicitud.usuario_id) {
+      return res.status(409).json({ ok: false, msg: "Esta solicitud todavía no ha sido aprobada" });
+    }
+
+    const password = generarPassword();
+    const hash = await argon2.hash(password);
+    await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, solicitud.usuario_id]);
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    await enviarEmail({
+      to: solicitud.email,
+      subject: "🔑 Tus credenciales de acceso",
+      html: templateCredenciales({
+        nombres: `${solicitud.nombres} ${solicitud.apellidos}`,
+        email: solicitud.email,
+        password,
+        loginUrl: `${frontendUrl}/login`,
+        clinicaNombre: solicitud.nombre_clinica,
+      }),
+    });
+
+    res.json({ ok: true, msg: "Credenciales reenviadas" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // PUT /solicitudes/:id/rechazar  (SUPER_ADMIN)
 // ══════════════════════════════════════════════════════════
 router.put("/solicitudes/:id/rechazar", auth("SUPER_ADMIN"), async (req, res) => {

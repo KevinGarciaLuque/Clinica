@@ -91,6 +91,21 @@ export default function SolicitudesPlan() {
     }
   };
 
+  const [reenviando, setReenviando] = useState(null); // id de la solicitud en proceso
+
+  const reenviarCredenciales = async (sol) => {
+    if (!window.confirm(`Se generará una nueva contraseña y se reenviará por correo a ${sol.email}. ¿Continuar?`)) return;
+    setReenviando(sol.id);
+    try {
+      await api.post(`/planes-publicos/solicitudes/${sol.id}/reenviar-credenciales`);
+      alert("Credenciales reenviadas correctamente.");
+    } catch (err) {
+      alert(err?.response?.data?.msg || "Error al reenviar las credenciales");
+    } finally {
+      setReenviando(null);
+    }
+  };
+
   return (
     <div className="container-fluid py-4">
       <div className="d-flex justify-content-between align-items-center mb-3">
@@ -142,6 +157,16 @@ export default function SolicitudesPlan() {
                         <i className="bi bi-x-lg me-1" />Rechazar
                       </button>
                     </div>
+                  )}
+                  {sol.estado === "aprobada" && (
+                    <button
+                      className="btn btn-outline-primary btn-sm w-100 mt-3"
+                      onClick={() => reenviarCredenciales(sol)}
+                      disabled={reenviando === sol.id}
+                    >
+                      <i className="bi bi-envelope-arrow-up me-1" />
+                      {reenviando === sol.id ? "Reenviando..." : "Reenviar credenciales"}
+                    </button>
                   )}
                   {sol.estado === "rechazada" && sol.motivo_rechazo && (
                     <div className="alert alert-danger small mt-2 mb-0 py-1">{sol.motivo_rechazo}</div>
