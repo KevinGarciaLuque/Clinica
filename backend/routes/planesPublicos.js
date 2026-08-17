@@ -31,7 +31,7 @@ const {
   templateCredenciales,
   templateSolicitudRechazada,
   templateFacturaRecibo,
-  NOMBRE_PLAN,
+  planCompletoLabel,
 } = require("../utils/mailer");
 const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
 
@@ -44,6 +44,7 @@ const solicitarLimiter = rateLimit({
 });
 
 const PLANES_VALIDOS = ["trial", "semestral", "anual"];
+const NIVELES_VALIDOS = ["basico", "avanzado", "empresarial"];
 
 function calcularVigencia(planTipo, inicio = new Date()) {
   const fin = new Date(inicio);
@@ -75,13 +76,17 @@ function slugify(texto) {
 // ══════════════════════════════════════════════════════════
 router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobante"), async (req, res) => {
   try {
-    const { nombres, apellidos, email, telefono, nombre_clinica, plan_solicitado, mensaje } = req.body;
+    const { nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje } = req.body;
 
     if (!nombres || !apellidos || !email || !nombre_clinica || !plan_solicitado) {
       return res.status(400).json({ ok: false, msg: "Faltan datos obligatorios" });
     }
     if (!PLANES_VALIDOS.includes(plan_solicitado)) {
       return res.status(400).json({ ok: false, msg: "plan_solicitado inválido" });
+    }
+    const nivel = NIVELES_VALIDOS.includes(nivel_plan) ? nivel_plan : "basico";
+    if (nivel !== "basico" && plan_solicitado === "trial") {
+      return res.status(400).json({ ok: false, msg: "Los planes Avanzado y Empresarial no tienen prueba gratis, elige Semestral o Anual" });
     }
     if (!req.file) {
       return res.status(400).json({ ok: false, msg: "Debes adjuntar el comprobante de la transferencia" });
@@ -97,12 +102,13 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
 
     const [r] = await pool.query(
       `INSERT INTO solicitudes_plan_publico
-       (nombres, apellidos, email, telefono, nombre_clinica, plan_solicitado, mensaje, comprobante_url, comprobante_public_id)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [nombres, apellidos, email, telefono || null, nombre_clinica, plan_solicitado,
+       (nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje, comprobante_url, comprobante_public_id)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [nombres, apellidos, email, telefono || null, nombre_clinica, nivel, plan_solicitado,
        mensaje || null, uploadResult.secure_url, uploadResult.public_id]
     );
     const solicitudId = r.insertId;
+    const planNombre = planCompletoLabel(nivel, plan_solicitado);
 
     // Notifica a todos los SUPER_ADMIN activos
     try {
@@ -112,7 +118,7 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
       const data = {
         solicitud_id: solicitudId,
         nombres, apellidos, nombre_clinica,
-        plan_solicitado,
+        nivel_plan: nivel, plan_solicitado,
       };
       sse.notifySuperAdmins("nueva_solicitud_plan", data);
       await webPush.sendToUsers(
@@ -120,7 +126,7 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
         admins.map((a) => a.id),
         {
           title: "Nueva solicitud de plan",
-          body: `${nombres} ${apellidos} solicita el plan ${NOMBRE_PLAN[plan_solicitado]} para ${nombre_clinica}`,
+          body: `${nombres} ${apellidos} solicita el plan ${planNombre} para ${nombre_clinica}`,
           tag: "nueva_solicitud_plan",
           data: { url: "/superadmin/solicitudes-plan" },
         }
@@ -134,7 +140,7 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
       await enviarEmail({
         to: email,
         subject: "Recibimos tu comprobante",
-        html: templateSolicitudRecibida({ nombres, planNombre: NOMBRE_PLAN[plan_solicitado] }),
+        html: templateSolicitudRecibida({ nombres, planNombre }),
       });
     } catch (e) {
       console.error("[email solicitud recibida]", e.message);
@@ -216,10 +222,12 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
     );
     const usuarioId = rUsuario.insertId;
 
+    const planNombre = planCompletoLabel(solicitud.nivel_plan, solicitud.plan_solicitado);
+
     await pool.query(
       `INSERT INTO licencias_historial (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas)
        VALUES (?,?,?,?,?,?)`,
-      [clinicaId, solicitud.plan_solicitado, inicio, fin, req.user.id, `Alta desde solicitud pública #${id}`]
+      [clinicaId, solicitud.plan_solicitado, inicio, fin, req.user.id, `Alta desde solicitud pública #${id} — Plan ${planNombre}`]
     );
 
     const montoFinal = monto != null && monto !== "" ? Number(monto) : null;
@@ -229,8 +237,6 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
        WHERE id=?`,
       [clinicaId, usuarioId, req.user.id, montoFinal, moneda || "HNL", id]
     );
-
-    const planNombre = NOMBRE_PLAN[solicitud.plan_solicitado];
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
 
     // 1) Confirmación

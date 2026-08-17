@@ -357,6 +357,28 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] config_pagos OK");
 
+    // Ampliar config_pagos: precio por nivel (básico/avanzado/empresarial) × duración (semestral/anual)
+    const [colPrecioNivel] = await pool.query(`SHOW COLUMNS FROM config_pagos LIKE 'precio_avanzado_semestral'`);
+    if (!colPrecioNivel.length) {
+      await pool.query(`
+        ALTER TABLE config_pagos
+          ADD COLUMN precio_basico_semestral      DECIMAL(10,2) NULL AFTER moneda,
+          ADD COLUMN precio_basico_anual          DECIMAL(10,2) NULL AFTER precio_basico_semestral,
+          ADD COLUMN precio_avanzado_semestral    DECIMAL(10,2) NULL AFTER precio_basico_anual,
+          ADD COLUMN precio_avanzado_anual        DECIMAL(10,2) NULL AFTER precio_avanzado_semestral,
+          ADD COLUMN precio_empresarial_semestral DECIMAL(10,2) NULL AFTER precio_avanzado_anual,
+          ADD COLUMN precio_empresarial_anual     DECIMAL(10,2) NULL AFTER precio_empresarial_semestral
+      `);
+      // Los precios semestral/anual previos correspondían al Plan Avanzado — se conservan ahí
+      await pool.query(`
+        UPDATE config_pagos
+        SET precio_avanzado_semestral = precio_semestral,
+            precio_avanzado_anual     = precio_anual
+        WHERE id = 1
+      `);
+      console.log("✅ [auto-migrate] config_pagos → precios por nivel de plan agregados");
+    }
+
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitudes_plan_publico (
@@ -366,6 +388,7 @@ const pool = require("./db");
         email                 VARCHAR(150) NOT NULL,
         telefono              VARCHAR(30)  NULL,
         nombre_clinica        VARCHAR(150) NOT NULL,
+        nivel_plan            ENUM('basico','avanzado','empresarial') NOT NULL DEFAULT 'basico',
         plan_solicitado       ENUM('trial','semestral','anual') NOT NULL,
         mensaje               VARCHAR(500) NULL,
         comprobante_url       VARCHAR(500) NOT NULL,
@@ -386,6 +409,16 @@ const pool = require("./db");
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
     console.log("✅ [auto-migrate] solicitudes_plan_publico OK");
+
+    // Si la tabla ya existía sin la columna nivel_plan, se agrega
+    const [colNivelPlan] = await pool.query(`SHOW COLUMNS FROM solicitudes_plan_publico LIKE 'nivel_plan'`);
+    if (!colNivelPlan.length) {
+      await pool.query(`
+        ALTER TABLE solicitudes_plan_publico
+          ADD COLUMN nivel_plan ENUM('basico','avanzado','empresarial') NOT NULL DEFAULT 'basico' AFTER nombre_clinica
+      `);
+      console.log("✅ [auto-migrate] solicitudes_plan_publico.nivel_plan agregado");
+    }
 
     // Tabla catálogo de procedimientos dermatológicos/estéticos
     await pool.query(`

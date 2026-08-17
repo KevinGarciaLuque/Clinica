@@ -550,7 +550,7 @@ export default function LandingPage() {
                   </button>
                 )}
                 <a
-                  href={`/solicitar-plan?plan=${plan.id}`}
+                  href={`/solicitar-plan?nivel=${{ trial: "basico", semestral: "avanzado", anual: "empresarial" }[plan.id] || "basico"}`}
                   style={{
                     display: "block", textAlign: "center", textDecoration: "none",
                     color: "#64748b", fontSize: 12.5, fontWeight: 600, marginTop: 10,

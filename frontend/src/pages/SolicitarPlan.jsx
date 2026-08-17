@@ -1,24 +1,19 @@
 /**
  * Portal público de compra de plan
- * URL: /solicitar-plan?plan=anual
+ * URL: /solicitar-plan?nivel=avanzado
  *
  * Flujo en 3 pasos:
- *   1. Datos del médico/clínica y plan deseado (muestra el total a transferir)
+ *   1. Datos del médico/clínica, nivel de plan y duración (muestra el total a transferir)
  *   2. Datos de la cuenta bancaria para transferir
  *   3. Subir la captura de la transferencia
  */
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
+import { NIVELES_PLAN, DURACION_LABEL, duracionesDisponibles, precioClave } from "../utils/planes";
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
-
-const PLANES = {
-  trial:     { label: "Prueba (14 días)" },
-  semestral: { label: "Semestral" },
-  anual:     { label: "Anual" },
-};
 
 const TOTAL_PASOS = 3;
 
@@ -40,12 +35,12 @@ function formatearMonto(monto, moneda) {
 
 export default function SolicitarPlan() {
   const [params] = useSearchParams();
-  const planInicial = PLANES[params.get("plan")] ? params.get("plan") : "anual";
+  const nivelInicial = NIVELES_PLAN[params.get("nivel")] ? params.get("nivel") : "avanzado";
 
   const [paso, setPaso] = useState(1);
   const [form, setForm] = useState({
     nombres: "", apellidos: "", email: "", telefono: "",
-    nombre_clinica: "", plan_solicitado: planInicial, mensaje: "",
+    nombre_clinica: "", nivel_plan: nivelInicial, plan_solicitado: "semestral", mensaje: "",
   });
   const [archivo, setArchivo]   = useState(null);
   const [preview, setPreview]   = useState(null);
@@ -59,6 +54,16 @@ export default function SolicitarPlan() {
       .then((r) => setPagos(r.data.data))
       .catch(() => setPagos({}));
   }, []);
+
+  const duraciones = useMemo(() => duracionesDisponibles(form.nivel_plan), [form.nivel_plan]);
+
+  // Si cambia el nivel y la duración actual ya no aplica (ej: trial en Avanzado), ajustar
+  useEffect(() => {
+    if (!duraciones.includes(form.plan_solicitado)) {
+      setForm((f) => ({ ...f, plan_solicitado: duraciones[0] }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.nivel_plan]);
 
   const cambio = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -100,7 +105,10 @@ export default function SolicitarPlan() {
     }
   };
 
-  const montoPlan = pagos ? formatearMonto(pagos[`precio_${form.plan_solicitado}`], pagos.moneda) : null;
+  const esGratis = form.plan_solicitado === "trial";
+  const montoPlan = esGratis
+    ? null
+    : (pagos ? formatearMonto(pagos[precioClave(form.nivel_plan, form.plan_solicitado)], pagos.moneda) : null);
 
   if (enviado) {
     return (
@@ -149,15 +157,23 @@ export default function SolicitarPlan() {
                 <label className="form-label small fw-semibold">Teléfono</label>
                 <input className="form-control" name="telefono" value={form.telefono} onChange={cambio} />
               </div>
-              <div className="col-md-8">
+              <div className="col-12">
                 <label className="form-label small fw-semibold">Nombre de la clínica</label>
                 <input className="form-control" name="nombre_clinica" value={form.nombre_clinica} onChange={cambio} required />
               </div>
-              <div className="col-md-4">
+              <div className="col-md-6">
                 <label className="form-label small fw-semibold">Plan</label>
-                <select className="form-select" name="plan_solicitado" value={form.plan_solicitado} onChange={cambio}>
-                  {Object.entries(PLANES).map(([id, p]) => (
+                <select className="form-select" name="nivel_plan" value={form.nivel_plan} onChange={cambio}>
+                  {Object.entries(NIVELES_PLAN).map(([id, p]) => (
                     <option key={id} value={id}>{p.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="col-md-6">
+                <label className="form-label small fw-semibold">Duración</label>
+                <select className="form-select" name="plan_solicitado" value={form.plan_solicitado} onChange={cambio}>
+                  {duraciones.map((d) => (
+                    <option key={d} value={d}>{DURACION_LABEL[d]}</option>
                   ))}
                 </select>
               </div>
@@ -167,12 +183,10 @@ export default function SolicitarPlan() {
               </div>
             </div>
 
-            {montoPlan && (
-              <div className="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 rounded-3 px-3 py-2 mt-3">
-                <span className="small fw-semibold text-primary">Total a transferir</span>
-                <span className="fw-bold text-primary fs-5">{montoPlan}</span>
-              </div>
-            )}
+            <div className="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 rounded-3 px-3 py-2 mt-3">
+              <span className="small fw-semibold text-primary">Total a transferir</span>
+              <span className="fw-bold text-primary fs-5">{esGratis ? "Gratis" : (montoPlan || "—")}</span>
+            </div>
 
             <button type="submit" className="btn btn-primary w-100 mt-4">
               Continuar <i className="bi bi-arrow-right ms-1" />
@@ -184,8 +198,8 @@ export default function SolicitarPlan() {
         {paso === 2 && (
           <div>
             <p className="text-muted">
-              Transfiere{montoPlan ? <> <strong>{montoPlan}</strong></> : ""} correspondiente al plan{" "}
-              <strong>{PLANES[form.plan_solicitado].label}</strong> a la siguiente cuenta:
+              Transfiere {esGratis ? "" : montoPlan ? <strong>{montoPlan}</strong> : ""} correspondiente al plan{" "}
+              <strong>{NIVELES_PLAN[form.nivel_plan].label} — {DURACION_LABEL[form.plan_solicitado]}</strong> a la siguiente cuenta:
             </p>
             <div className="bg-light rounded-3 p-3 mb-4">
               <div className="row row-cols-2 g-2 small">
@@ -193,7 +207,7 @@ export default function SolicitarPlan() {
                 <div className="text-muted">Titular</div><div className="fw-semibold">{pagos?.titular || "—"}</div>
                 <div className="text-muted">Cuenta</div><div className="fw-semibold">{pagos?.numero_cuenta || "—"}</div>
                 {pagos?.numero_cci && (<><div className="text-muted">CCI</div><div className="fw-semibold">{pagos.numero_cci}</div></>)}
-                {montoPlan && (<><div className="text-muted">Monto</div><div className="fw-bold text-primary">{montoPlan}</div></>)}
+                <div className="text-muted">Monto</div><div className="fw-bold text-primary">{esGratis ? "Gratis" : (montoPlan || "—")}</div>
               </div>
             </div>
             <div className="d-flex gap-2">

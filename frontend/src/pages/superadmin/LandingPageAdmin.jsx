@@ -1111,11 +1111,19 @@ function TabCorreoSmtp() {
   );
 }
 
+const NIVELES_PRECIO = [
+  { id: "basico",      label: "Básico" },
+  { id: "avanzado",    label: "Avanzado" },
+  { id: "empresarial", label: "Empresarial" },
+];
+
 // ── TAB: Pagos (cuenta bancaria + precios por plan) ──────────────────────
 function TabPagos() {
   const [form, setForm] = useState({
     banco: "", titular: "", numero_cuenta: "", numero_cci: "", moneda: "HNL",
-    precio_trial: "", precio_semestral: "", precio_anual: "",
+    precio_basico_semestral: "", precio_basico_anual: "",
+    precio_avanzado_semestral: "", precio_avanzado_anual: "",
+    precio_empresarial_semestral: "", precio_empresarial_anual: "",
   });
   const [cargando, setCargando]   = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -1127,10 +1135,13 @@ function TabPagos() {
     api.get("/config-sistema/pagos")
       .then(r => {
         const d = r.data.data;
-        setForm({
-          banco: d.banco, titular: d.titular, numero_cuenta: d.numero_cuenta, numero_cci: d.numero_cci,
-          moneda: d.moneda,
-          precio_trial: d.precio_trial ?? "", precio_semestral: d.precio_semestral ?? "", precio_anual: d.precio_anual ?? "",
+        setForm(p => {
+          const next = { ...p, banco: d.banco, titular: d.titular, numero_cuenta: d.numero_cuenta, numero_cci: d.numero_cci, moneda: d.moneda };
+          for (const n of NIVELES_PRECIO) {
+            next[`precio_${n.id}_semestral`] = d[`precio_${n.id}_semestral`] ?? "";
+            next[`precio_${n.id}_anual`]     = d[`precio_${n.id}_anual`] ?? "";
+          }
+          return next;
         });
       })
       .catch(() => {})
@@ -1204,29 +1215,34 @@ function TabPagos() {
 
       <div>
         <h6 className="fw-bold mb-3"><i className="bi bi-cash-coin me-2" />Precios por plan</h6>
-        <div className="row g-3">
+        <div className="row g-3 mb-3">
           <div className="col-md-3">
             <label className="form-label fw-bold">Moneda</label>
             <select className="form-select" value={form.moneda} onChange={e => set("moneda", e.target.value)}>
               {MONEDAS.map(m => <option key={m.code} value={m.code}>{m.label}</option>)}
             </select>
           </div>
-          <div className="col-md-3">
-            <label className="form-label fw-bold">Prueba (14 días)</label>
-            <input type="number" step="0.01" className="form-control" value={form.precio_trial}
-                   onChange={e => set("precio_trial", e.target.value)} placeholder="0.00" />
-          </div>
-          <div className="col-md-3">
-            <label className="form-label fw-bold">Semestral</label>
-            <input type="number" step="0.01" className="form-control" value={form.precio_semestral}
-                   onChange={e => set("precio_semestral", e.target.value)} placeholder="0.00" />
-          </div>
-          <div className="col-md-3">
-            <label className="form-label fw-bold">Anual</label>
-            <input type="number" step="0.01" className="form-control" value={form.precio_anual}
-                   onChange={e => set("precio_anual", e.target.value)} placeholder="0.00" />
-          </div>
         </div>
+        <p className="small text-muted mb-3">
+          El <strong>Básico</strong> también ofrece 15 días de prueba gratis (no requiere precio).
+        </p>
+        {NIVELES_PRECIO.map(n => (
+          <div key={n.id} className="row g-3 align-items-end mb-2">
+            <div className="col-md-3">
+              <span className="badge bg-secondary-subtle text-secondary-emphasis">{n.label}</span>
+            </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold">Semestral</label>
+              <input type="number" step="0.01" className="form-control" value={form[`precio_${n.id}_semestral`]}
+                     onChange={e => set(`precio_${n.id}_semestral`, e.target.value)} placeholder="0.00" />
+            </div>
+            <div className="col-md-4">
+              <label className="form-label small fw-bold">Anual</label>
+              <input type="number" step="0.01" className="form-control" value={form[`precio_${n.id}_anual`]}
+                     onChange={e => set(`precio_${n.id}_anual`, e.target.value)} placeholder="0.00" />
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

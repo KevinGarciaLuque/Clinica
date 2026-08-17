@@ -5,13 +5,13 @@
 import { useEffect, useState } from "react";
 import api from "../../api/api";
 import { MONEDAS } from "../../utils/monedas";
-
-const PLAN_LABEL = { trial: "Prueba (14 días)", semestral: "Semestral", anual: "Anual" };
+import { planCompletoLabel, precioClave } from "../../utils/planes";
 
 export default function SolicitudesPlan() {
   const [estado, setEstado]         = useState("pendiente");
   const [solicitudes, setSolicitudes] = useState([]);
   const [tipos, setTipos]           = useState([]);
+  const [pagosCfg, setPagosCfg]     = useState(null);
   const [cargando, setCargando]     = useState(true);
   const [modal, setModal]           = useState(null); // solicitud en aprobación
   const [form, setForm]             = useState({ slug: "", tipo_id: "", es_pediatrica: false, monto: "", moneda: "HNL" });
@@ -37,11 +37,18 @@ export default function SolicitudesPlan() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { cargar(); }, [estado]);
 
+  useEffect(() => {
+    api.get("/config-sistema/pagos").then((r) => setPagosCfg(r.data.data)).catch(() => {});
+  }, []);
+
   const abrirAprobar = (sol) => {
     setModal(sol);
+    const precioSugerido = sol.plan_solicitado === "trial"
+      ? ""
+      : pagosCfg?.[precioClave(sol.nivel_plan, sol.plan_solicitado)] ?? "";
     setForm({
       slug: sol.nombre_clinica.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
-      tipo_id: "", es_pediatrica: false, monto: "", moneda: "HNL",
+      tipo_id: "", es_pediatrica: false, monto: precioSugerido, moneda: pagosCfg?.moneda || "HNL",
     });
     setError("");
   };
@@ -107,7 +114,7 @@ export default function SolicitudesPlan() {
                   <div className="fw-bold">{sol.nombres} {sol.apellidos}</div>
                   <div className="text-muted small mb-1">{sol.email} · {sol.telefono || "sin teléfono"}</div>
                   <div className="small mb-2"><strong>Clínica:</strong> {sol.nombre_clinica}</div>
-                  <span className="badge bg-primary-subtle text-primary-emphasis">{PLAN_LABEL[sol.plan_solicitado]}</span>
+                  <span className="badge bg-primary-subtle text-primary-emphasis">{planCompletoLabel(sol.nivel_plan, sol.plan_solicitado)}</span>
                   {sol.monto != null && (
                     <span className="badge bg-success-subtle text-success-emphasis ms-1">{sol.moneda} {Number(sol.monto).toFixed(2)}</span>
                   )}
@@ -143,7 +150,7 @@ export default function SolicitudesPlan() {
                   <div>
                     <h5 className="modal-title mb-1">Aprobar solicitud — {modal.nombre_clinica}</h5>
                     <span className="badge bg-primary-subtle text-primary-emphasis">
-                      Plan solicitado: {PLAN_LABEL[modal.plan_solicitado]}
+                      Plan solicitado: {planCompletoLabel(modal.nivel_plan, modal.plan_solicitado)}
                     </span>
                   </div>
                   <button type="button" className="btn-close" onClick={() => setModal(null)} />

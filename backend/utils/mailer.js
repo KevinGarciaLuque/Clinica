@@ -179,6 +179,13 @@ function templateResetPassword({ nombres, link, clinicaNombre }) {
 }
 
 const NOMBRE_PLAN = { trial: "Prueba (14 días)", semestral: "Semestral", anual: "Anual" };
+const NIVEL_PLAN_LABEL = { basico: "Básico", avanzado: "Avanzado", empresarial: "Empresarial" };
+
+function planCompletoLabel(nivel, duracion) {
+  const n = NIVEL_PLAN_LABEL[nivel] || nivel;
+  if (duracion === "trial") return `${n} — Prueba gratis`;
+  return `${n} — ${NOMBRE_PLAN[duracion] || duracion}`;
+}
 
 function templateSolicitudRecibida({ nombres, planNombre }) {
   return `
@@ -358,4 +365,6 @@ module.exports = {
   templateSolicitudRechazada,
   templateFacturaRecibo,
   NOMBRE_PLAN,
+  NIVEL_PLAN_LABEL,
+  planCompletoLabel,
 };

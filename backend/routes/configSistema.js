@@ -137,22 +137,29 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
   }
 });
 
+// Nivel × duración de pago que soporta cada precio configurable
+const PRECIOS_CAMPOS = [
+  "precio_basico_semestral",      "precio_basico_anual",
+  "precio_avanzado_semestral",    "precio_avanzado_anual",
+  "precio_empresarial_semestral", "precio_empresarial_anual",
+];
+
 // ── GET /api/config-sistema/pagos  (público, sin auth) ────────────────────
 // Se consulta desde /solicitar-plan para mostrar cuenta bancaria + precios
 router.get("/pagos", async (req, res) => {
   try {
     const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1");
+    const precios = {};
+    for (const campo of PRECIOS_CAMPOS) precios[campo] = row?.[campo] ?? null;
     res.json({
       ok: true,
       data: {
-        banco:            row?.banco || "",
-        titular:          row?.titular || "",
-        numero_cuenta:    row?.numero_cuenta || "",
-        numero_cci:       row?.numero_cci || "",
-        moneda:           row?.moneda || "HNL",
-        precio_trial:     row?.precio_trial ?? null,
-        precio_semestral: row?.precio_semestral ?? null,
-        precio_anual:     row?.precio_anual ?? null,
+        banco:         row?.banco || "",
+        titular:       row?.titular || "",
+        numero_cuenta: row?.numero_cuenta || "",
+        numero_cci:    row?.numero_cci || "",
+        moneda:        row?.moneda || "HNL",
+        ...precios,
       },
     });
   } catch (e) {
@@ -164,20 +171,20 @@ router.get("/pagos", async (req, res) => {
 // ── PUT /api/config-sistema/pagos  (solo SUPER_ADMIN) ─────────────────────
 router.put("/pagos", auth("SUPER_ADMIN"), async (req, res) => {
   try {
-    const { banco, titular, numero_cuenta, numero_cci, moneda, precio_trial, precio_semestral, precio_anual } = req.body;
+    const { banco, titular, numero_cuenta, numero_cci, moneda } = req.body;
+    const precios = PRECIOS_CAMPOS.map((campo) => {
+      const v = req.body[campo];
+      return v === "" || v == null ? null : Number(v);
+    });
+
     await pool.query(
-      `INSERT INTO config_pagos (id, banco, titular, numero_cuenta, numero_cci, moneda, precio_trial, precio_semestral, precio_anual)
-       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO config_pagos (id, banco, titular, numero_cuenta, numero_cci, moneda, ${PRECIOS_CAMPOS.join(", ")})
+       VALUES (1, ?, ?, ?, ?, ?, ${PRECIOS_CAMPOS.map(() => "?").join(", ")})
        ON DUPLICATE KEY UPDATE
          banco=VALUES(banco), titular=VALUES(titular), numero_cuenta=VALUES(numero_cuenta),
          numero_cci=VALUES(numero_cci), moneda=VALUES(moneda),
-         precio_trial=VALUES(precio_trial), precio_semestral=VALUES(precio_semestral), precio_anual=VALUES(precio_anual)`,
-      [
-        banco || null, titular || null, numero_cuenta || null, numero_cci || null, moneda || "HNL",
-        precio_trial === "" || precio_trial == null ? null : Number(precio_trial),
-        precio_semestral === "" || precio_semestral == null ? null : Number(precio_semestral),
-        precio_anual === "" || precio_anual == null ? null : Number(precio_anual),
-      ]
+         ${PRECIOS_CAMPOS.map((c) => `${c}=VALUES(${c})`).join(", ")}`,
+      [banco || null, titular || null, numero_cuenta || null, numero_cci || null, moneda || "HNL", ...precios]
     );
     res.json({ ok: true, msg: "Configuración de pagos guardada" });
   } catch (e) {
