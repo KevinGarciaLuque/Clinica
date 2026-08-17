@@ -261,10 +261,10 @@ function templateCredenciales({ nombres, email, password, loginUrl, clinicaNombr
     .banner h2 { color:#fff; margin:0; font-size:22px; }
     .body { padding:28px 32px 32px; }
     .creds { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 20px; margin:20px 0; }
-    .creds .row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
-    .creds .row + .row { border-top:1px dashed #e2e8f0; }
-    .creds .label { font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; }
-    .creds .value { font-size:15px; font-weight:700; color:#0f172a; font-family:'Courier New',monospace; }
+    .creds .item { padding:10px 0; }
+    .creds .item + .item { border-top:1px dashed #e2e8f0; margin-top:4px; padding-top:14px; }
+    .creds .label { display:block; font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:.06em; margin:0 0 6px; }
+    .creds .value { display:block; font-size:16px; font-weight:700; color:#0f172a; font-family:'Courier New',monospace; word-break:break-all; }
     .btn  { display:block; text-align:center; background:linear-gradient(135deg,#0d6efd,#2563eb); color:#fff !important;
             padding:13px 0; border-radius:10px; text-decoration:none; font-weight:700; margin-top:16px; font-size:15px; }
     .tip  { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px 16px; margin-top:18px; }
@@ -283,8 +283,14 @@ function templateCredenciales({ nombres, email, password, loginUrl, clinicaNombr
           y lista para usarse. Aquí tienes tus datos de acceso:
         </p>
         <div class="creds">
-          <div class="row"><span class="label">Usuario</span><span class="value">${email}</span></div>
-          <div class="row"><span class="label">Contraseña</span><span class="value">${password}</span></div>
+          <div class="item">
+            <span class="label">Usuario</span>
+            <span class="value">${email}</span>
+          </div>
+          <div class="item">
+            <span class="label">Contraseña</span>
+            <span class="value">${password}</span>
+          </div>
         </div>
         <a class="btn" href="${loginUrl}">Ingresar al sistema →</a>
         <div class="tip">

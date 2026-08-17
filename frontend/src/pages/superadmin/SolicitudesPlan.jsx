@@ -80,34 +80,82 @@ export default function SolicitudesPlan() {
     }
   };
 
-  const rechazar = async (sol) => {
-    const motivo = window.prompt("Motivo del rechazo (se enviará al médico):", "No se pudo validar el comprobante");
-    if (motivo === null) return;
+  const [toast, setToast] = useState(null); // { ok, text }
+  const mostrarToast = (ok, text) => {
+    setToast({ ok, text });
+    setTimeout(() => setToast(null), 4000);
+  };
+
+  const [rechazarModal, setRechazarModal] = useState(null); // solicitud a rechazar
+  const [motivoRechazo, setMotivoRechazo] = useState("No se pudo validar el comprobante");
+  const [rechazando, setRechazando] = useState(false);
+
+  const abrirRechazar = (sol) => {
+    setRechazarModal(sol);
+    setMotivoRechazo("No se pudo validar el comprobante");
+  };
+
+  const confirmarRechazo = async (e) => {
+    e.preventDefault();
+    setRechazando(true);
     try {
-      await api.put(`/planes-publicos/solicitudes/${sol.id}/rechazar`, { motivo });
+      await api.put(`/planes-publicos/solicitudes/${rechazarModal.id}/rechazar`, { motivo: motivoRechazo });
+      setRechazarModal(null);
       cargar();
+      mostrarToast(true, "Solicitud rechazada.");
     } catch (err) {
-      alert(err?.response?.data?.msg || "Error al rechazar la solicitud");
+      mostrarToast(false, err?.response?.data?.msg || "Error al rechazar la solicitud");
+    } finally {
+      setRechazando(false);
     }
   };
 
-  const [reenviando, setReenviando] = useState(null); // id de la solicitud en proceso
+  const [confirmReenvio, setConfirmReenvio] = useState(null); // solicitud a confirmar
+  const [reenviando, setReenviando]         = useState(null); // id de la solicitud en proceso
 
-  const reenviarCredenciales = async (sol) => {
-    if (!window.confirm(`Se generará una nueva contraseña y se reenviará por correo a ${sol.email}. ¿Continuar?`)) return;
+  const confirmarReenvio = async () => {
+    const sol = confirmReenvio;
+    setConfirmReenvio(null);
     setReenviando(sol.id);
     try {
       await api.post(`/planes-publicos/solicitudes/${sol.id}/reenviar-credenciales`);
-      alert("Credenciales reenviadas correctamente.");
+      mostrarToast(true, "Credenciales reenviadas correctamente.");
     } catch (err) {
-      alert(err?.response?.data?.msg || "Error al reenviar las credenciales");
+      mostrarToast(false, err?.response?.data?.msg || "Error al reenviar las credenciales");
     } finally {
       setReenviando(null);
     }
   };
 
+  const [confirmEliminar, setConfirmEliminar] = useState(null); // solicitud a confirmar
+  const [eliminando, setEliminando]           = useState(false);
+
+  const confirmarEliminar = async () => {
+    setEliminando(true);
+    try {
+      await api.delete(`/planes-publicos/solicitudes/${confirmEliminar.id}`);
+      setConfirmEliminar(null);
+      cargar();
+      mostrarToast(true, "Solicitud eliminada.");
+    } catch (err) {
+      mostrarToast(false, err?.response?.data?.msg || "Error al eliminar la solicitud");
+    } finally {
+      setEliminando(false);
+    }
+  };
+
   return (
     <div className="container-fluid py-4">
+      {toast && (
+        <div
+          className={`alert py-2 px-3 shadow-sm ${toast.ok ? "alert-success" : "alert-danger"}`}
+          style={{ position: "fixed", top: 20, right: 20, zIndex: 2000, minWidth: 280, borderRadius: 10 }}
+        >
+          <i className={`bi ${toast.ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2`} />
+          {toast.text}
+        </div>
+      )}
+
       <div className="d-flex justify-content-between align-items-center mb-3">
         <h4 className="fw-bold mb-0">Solicitudes de plan</h4>
         <select className="form-select w-auto" value={estado} onChange={(e) => setEstado(e.target.value)}>
@@ -126,7 +174,15 @@ export default function SolicitudesPlan() {
         <div className="row g-3">
           {solicitudes.map((sol) => (
             <div className="col-md-6 col-lg-4" key={sol.id}>
-              <div className="card h-100 border-0 shadow-sm rounded-4">
+              <div className="card h-100 border-0 shadow-sm rounded-4" style={{ position: "relative" }}>
+                <button
+                  className="btn btn-sm btn-light shadow-sm"
+                  title="Eliminar solicitud"
+                  onClick={() => setConfirmEliminar(sol)}
+                  style={{ position: "absolute", top: 10, left: 10, zIndex: 2, borderRadius: 8, padding: "5px 9px" }}
+                >
+                  <i className="bi bi-trash text-danger" />
+                </button>
                 <a href={sol.comprobante_url} target="_blank" rel="noopener noreferrer" style={{ position: "relative" }}>
                   <img src={sol.comprobante_url} alt="Comprobante" className="card-img-top" style={{ maxHeight: 220, objectFit: "cover" }} />
                   {estado === "todas" && (
@@ -153,7 +209,7 @@ export default function SolicitudesPlan() {
                       <button className="btn btn-success btn-sm flex-fill" onClick={() => abrirAprobar(sol)}>
                         <i className="bi bi-check-lg me-1" />Aprobar
                       </button>
-                      <button className="btn btn-outline-danger btn-sm flex-fill" onClick={() => rechazar(sol)}>
+                      <button className="btn btn-outline-danger btn-sm flex-fill" onClick={() => abrirRechazar(sol)}>
                         <i className="bi bi-x-lg me-1" />Rechazar
                       </button>
                     </div>
@@ -161,7 +217,7 @@ export default function SolicitudesPlan() {
                   {sol.estado === "aprobada" && (
                     <button
                       className="btn btn-outline-primary btn-sm w-100 mt-3"
-                      onClick={() => reenviarCredenciales(sol)}
+                      onClick={() => setConfirmReenvio(sol)}
                       disabled={reenviando === sol.id}
                     >
                       <i className="bi bi-envelope-arrow-up me-1" />
@@ -255,6 +311,90 @@ export default function SolicitudesPlan() {
                   </button>
                 </div>
               </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: rechazar solicitud ── */}
+      {rechazarModal && (
+        <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }} onClick={() => setRechazarModal(null)}>
+          <div className="modal-dialog modal-dialog-centered" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content rounded-4">
+              <form onSubmit={confirmarRechazo}>
+                <div className="modal-header">
+                  <h5 className="modal-title">Rechazar solicitud — {rechazarModal.nombre_clinica}</h5>
+                  <button type="button" className="btn-close" onClick={() => setRechazarModal(null)} />
+                </div>
+                <div className="modal-body">
+                  <label className="form-label small fw-semibold">Motivo del rechazo (se enviará al médico)</label>
+                  <textarea
+                    className="form-control" rows={3} value={motivoRechazo}
+                    onChange={(e) => setMotivoRechazo(e.target.value)}
+                    required
+                  />
+                </div>
+                <div className="modal-footer">
+                  <button type="button" className="btn btn-outline-secondary" onClick={() => setRechazarModal(null)}>Cancelar</button>
+                  <button type="submit" className="btn btn-danger" disabled={rechazando}>
+                    {rechazando ? "Rechazando..." : "Rechazar solicitud"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: confirmar reenvío de credenciales ── */}
+      {confirmReenvio && (
+        <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }} onClick={() => setConfirmReenvio(null)}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4">
+              <div className="modal-header">
+                <h5 className="modal-title"><i className="bi bi-envelope-arrow-up me-2 text-primary" />Reenviar credenciales</h5>
+                <button type="button" className="btn-close" onClick={() => setConfirmReenvio(null)} />
+              </div>
+              <div className="modal-body">
+                <p className="mb-0">
+                  Se generará una <strong>contraseña nueva</strong> (la anterior dejará de funcionar) y se enviará
+                  por correo a <strong>{confirmReenvio.email}</strong>. ¿Continuar?
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setConfirmReenvio(null)}>Cancelar</button>
+                <button type="button" className="btn btn-primary" onClick={confirmarReenvio}>
+                  <i className="bi bi-send-fill me-1" />Sí, reenviar
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: confirmar eliminación ── */}
+      {confirmEliminar && (
+        <div className="modal d-block" style={{ background: "rgba(0,0,0,.5)" }} onClick={() => setConfirmEliminar(null)}>
+          <div className="modal-dialog modal-dialog-centered">
+            <div className="modal-content rounded-4">
+              <div className="modal-header">
+                <h5 className="modal-title"><i className="bi bi-trash-fill me-2 text-danger" />Eliminar solicitud</h5>
+                <button type="button" className="btn-close" onClick={() => setConfirmEliminar(null)} />
+              </div>
+              <div className="modal-body">
+                <p className="mb-0">
+                  ¿Eliminar la solicitud de <strong>{confirmEliminar.nombres} {confirmEliminar.apellidos}</strong> ({confirmEliminar.nombre_clinica})?
+                  {confirmEliminar.estado === "aprobada" && (
+                    <> La clínica y el usuario que ya se crearon <strong>no</strong> se eliminarán, solo este registro de la solicitud.</>
+                  )}
+                </p>
+              </div>
+              <div className="modal-footer">
+                <button type="button" className="btn btn-outline-secondary" onClick={() => setConfirmEliminar(null)}>Cancelar</button>
+                <button type="button" className="btn btn-danger" onClick={confirmarEliminar} disabled={eliminando}>
+                  <i className="bi bi-trash me-1" />{eliminando ? "Eliminando..." : "Sí, eliminar"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

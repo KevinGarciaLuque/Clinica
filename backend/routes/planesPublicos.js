@@ -333,6 +333,21 @@ router.post("/solicitudes/:id/reenviar-credenciales", auth("SUPER_ADMIN"), async
 });
 
 // ══════════════════════════════════════════════════════════
+// DELETE /solicitudes/:id  (SUPER_ADMIN)
+// Solo borra el registro de la solicitud; si ya fue aprobada, la clínica
+// y el usuario creados NO se eliminan.
+// ══════════════════════════════════════════════════════════
+router.delete("/solicitudes/:id", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const [r] = await pool.query("DELETE FROM solicitudes_plan_publico WHERE id=?", [req.params.id]);
+    if (!r.affectedRows) return res.status(404).json({ ok: false, msg: "Solicitud no encontrada" });
+    res.json({ ok: true, msg: "Solicitud eliminada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // PUT /solicitudes/:id/rechazar  (SUPER_ADMIN)
 // ══════════════════════════════════════════════════════════
 router.put("/solicitudes/:id/rechazar", auth("SUPER_ADMIN"), async (req, res) => {
