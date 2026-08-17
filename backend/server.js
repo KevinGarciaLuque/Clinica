@@ -339,6 +339,24 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] config_smtp OK");
 
+    // Configuración de pagos (cuenta bancaria + precios por plan), editable por el SUPER_ADMIN
+    // y consultada públicamente desde /solicitar-plan
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS config_pagos (
+        id                TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+        banco             VARCHAR(120) NULL,
+        titular           VARCHAR(150) NULL,
+        numero_cuenta     VARCHAR(60)  NULL,
+        numero_cci        VARCHAR(60)  NULL,
+        moneda            CHAR(3) DEFAULT 'HNL',
+        precio_trial      DECIMAL(10,2) NULL,
+        precio_semestral  DECIMAL(10,2) NULL,
+        precio_anual      DECIMAL(10,2) NULL,
+        updated_at        DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] config_pagos OK");
+
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS solicitudes_plan_publico (
@@ -353,7 +371,7 @@ const pool = require("./db");
         comprobante_url       VARCHAR(500) NOT NULL,
         comprobante_public_id VARCHAR(200) NULL,
         monto                 DECIMAL(10,2) NULL,
-        moneda                CHAR(3) DEFAULT 'PEN',
+        moneda                CHAR(3) DEFAULT 'HNL',
         estado                ENUM('pendiente','aprobada','rechazada') DEFAULT 'pendiente',
         motivo_rechazo        VARCHAR(300) NULL,
         clinica_id            INT UNSIGNED NULL,

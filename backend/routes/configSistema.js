@@ -137,6 +137,55 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
   }
 });
 
+// ── GET /api/config-sistema/pagos  (público, sin auth) ────────────────────
+// Se consulta desde /solicitar-plan para mostrar cuenta bancaria + precios
+router.get("/pagos", async (req, res) => {
+  try {
+    const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1");
+    res.json({
+      ok: true,
+      data: {
+        banco:            row?.banco || "",
+        titular:          row?.titular || "",
+        numero_cuenta:    row?.numero_cuenta || "",
+        numero_cci:       row?.numero_cci || "",
+        moneda:           row?.moneda || "HNL",
+        precio_trial:     row?.precio_trial ?? null,
+        precio_semestral: row?.precio_semestral ?? null,
+        precio_anual:     row?.precio_anual ?? null,
+      },
+    });
+  } catch (e) {
+    console.error("[config-sistema GET pagos]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── PUT /api/config-sistema/pagos  (solo SUPER_ADMIN) ─────────────────────
+router.put("/pagos", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const { banco, titular, numero_cuenta, numero_cci, moneda, precio_trial, precio_semestral, precio_anual } = req.body;
+    await pool.query(
+      `INSERT INTO config_pagos (id, banco, titular, numero_cuenta, numero_cci, moneda, precio_trial, precio_semestral, precio_anual)
+       VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         banco=VALUES(banco), titular=VALUES(titular), numero_cuenta=VALUES(numero_cuenta),
+         numero_cci=VALUES(numero_cci), moneda=VALUES(moneda),
+         precio_trial=VALUES(precio_trial), precio_semestral=VALUES(precio_semestral), precio_anual=VALUES(precio_anual)`,
+      [
+        banco || null, titular || null, numero_cuenta || null, numero_cci || null, moneda || "HNL",
+        precio_trial === "" || precio_trial == null ? null : Number(precio_trial),
+        precio_semestral === "" || precio_semestral == null ? null : Number(precio_semestral),
+        precio_anual === "" || precio_anual == null ? null : Number(precio_anual),
+      ]
+    );
+    res.json({ ok: true, msg: "Configuración de pagos guardada" });
+  } catch (e) {
+    console.error("[config-sistema PUT pagos]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // ── GET /api/config-sistema/smtp  (solo SUPER_ADMIN) ─────────────────────
 // Nunca devuelve la contraseña, solo si ya hay una guardada (`tiene_password`)
 router.get("/smtp", auth("SUPER_ADMIN"), async (req, res) => {

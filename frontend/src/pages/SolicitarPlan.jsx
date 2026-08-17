@@ -3,13 +3,14 @@
  * URL: /solicitar-plan?plan=anual
  *
  * Flujo en 3 pasos:
- *   1. Datos del médico/clínica y plan deseado
+ *   1. Datos del médico/clínica y plan deseado (muestra el total a transferir)
  *   2. Datos de la cuenta bancaria para transferir
  *   3. Subir la captura de la transferencia
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
+import { SIMBOLO_MONEDA } from "../utils/monedas";
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 
@@ -17,13 +18,6 @@ const PLANES = {
   trial:     { label: "Prueba (14 días)" },
   semestral: { label: "Semestral" },
   anual:     { label: "Anual" },
-};
-
-const DATOS_BANCARIOS = {
-  banco: "BBVA",
-  titular: "Multi-Clínica S.A.C.",
-  cuenta: "0011-0000-0000000000",
-  cci: "00200011000000000000",
 };
 
 const TOTAL_PASOS = 3;
@@ -36,6 +30,12 @@ function PasoIndicador({ paso }) {
       ))}
     </div>
   );
+}
+
+function formatearMonto(monto, moneda) {
+  if (monto == null) return null;
+  const simbolo = SIMBOLO_MONEDA[moneda] || moneda;
+  return `${simbolo} ${Number(monto).toFixed(2)}`;
 }
 
 export default function SolicitarPlan() {
@@ -52,6 +52,13 @@ export default function SolicitarPlan() {
   const [enviando, setEnviando] = useState(false);
   const [error, setError]       = useState("");
   const [enviado, setEnviado]   = useState(false);
+  const [pagos, setPagos]       = useState(null); // config de cuenta bancaria + precios
+
+  useEffect(() => {
+    axios.get(`${BASE}/config-sistema/pagos`)
+      .then((r) => setPagos(r.data.data))
+      .catch(() => setPagos({}));
+  }, []);
 
   const cambio = (e) => setForm((f) => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -92,6 +99,8 @@ export default function SolicitarPlan() {
       setEnviando(false);
     }
   };
+
+  const montoPlan = pagos ? formatearMonto(pagos[`precio_${form.plan_solicitado}`], pagos.moneda) : null;
 
   if (enviado) {
     return (
@@ -158,6 +167,13 @@ export default function SolicitarPlan() {
               </div>
             </div>
 
+            {montoPlan && (
+              <div className="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 rounded-3 px-3 py-2 mt-3">
+                <span className="small fw-semibold text-primary">Total a transferir</span>
+                <span className="fw-bold text-primary fs-5">{montoPlan}</span>
+              </div>
+            )}
+
             <button type="submit" className="btn btn-primary w-100 mt-4">
               Continuar <i className="bi bi-arrow-right ms-1" />
             </button>
@@ -167,13 +183,17 @@ export default function SolicitarPlan() {
         {/* ── Paso 2: datos bancarios ── */}
         {paso === 2 && (
           <div>
-            <p className="text-muted">Transfiere el monto correspondiente al plan <strong>{PLANES[form.plan_solicitado].label}</strong> a la siguiente cuenta:</p>
+            <p className="text-muted">
+              Transfiere{montoPlan ? <> <strong>{montoPlan}</strong></> : ""} correspondiente al plan{" "}
+              <strong>{PLANES[form.plan_solicitado].label}</strong> a la siguiente cuenta:
+            </p>
             <div className="bg-light rounded-3 p-3 mb-4">
               <div className="row row-cols-2 g-2 small">
-                <div className="text-muted">Banco</div><div className="fw-semibold">{DATOS_BANCARIOS.banco}</div>
-                <div className="text-muted">Titular</div><div className="fw-semibold">{DATOS_BANCARIOS.titular}</div>
-                <div className="text-muted">Cuenta</div><div className="fw-semibold">{DATOS_BANCARIOS.cuenta}</div>
-                <div className="text-muted">CCI</div><div className="fw-semibold">{DATOS_BANCARIOS.cci}</div>
+                <div className="text-muted">Banco</div><div className="fw-semibold">{pagos?.banco || "—"}</div>
+                <div className="text-muted">Titular</div><div className="fw-semibold">{pagos?.titular || "—"}</div>
+                <div className="text-muted">Cuenta</div><div className="fw-semibold">{pagos?.numero_cuenta || "—"}</div>
+                {pagos?.numero_cci && (<><div className="text-muted">CCI</div><div className="fw-semibold">{pagos.numero_cci}</div></>)}
+                {montoPlan && (<><div className="text-muted">Monto</div><div className="fw-bold text-primary">{montoPlan}</div></>)}
               </div>
             </div>
             <div className="d-flex gap-2">

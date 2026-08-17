@@ -4,6 +4,7 @@
  */
 import { useEffect, useState } from "react";
 import api from "../../api/api";
+import { MONEDAS } from "../../utils/monedas";
 
 const PLAN_LABEL = { trial: "Prueba (14 días)", semestral: "Semestral", anual: "Anual" };
 
@@ -13,7 +14,7 @@ export default function SolicitudesPlan() {
   const [tipos, setTipos]           = useState([]);
   const [cargando, setCargando]     = useState(true);
   const [modal, setModal]           = useState(null); // solicitud en aprobación
-  const [form, setForm]             = useState({ slug: "", tipo_id: "", es_pediatrica: false, monto: "", moneda: "PEN" });
+  const [form, setForm]             = useState({ slug: "", tipo_id: "", es_pediatrica: false, monto: "", moneda: "HNL" });
   const [guardando, setGuardando]   = useState(false);
   const [error, setError]           = useState("");
 
@@ -40,7 +41,7 @@ export default function SolicitudesPlan() {
     setModal(sol);
     setForm({
       slug: sol.nombre_clinica.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
-      tipo_id: "", es_pediatrica: false, monto: "", moneda: "PEN",
+      tipo_id: "", es_pediatrica: false, monto: "", moneda: "HNL",
     });
     setError("");
   };
@@ -79,30 +80,41 @@ export default function SolicitudesPlan() {
           <option value="pendiente">Pendientes</option>
           <option value="aprobada">Aprobadas</option>
           <option value="rechazada">Rechazadas</option>
+          <option value="todas">Historial completo</option>
         </select>
       </div>
 
       {cargando ? (
         <div className="text-muted">Cargando...</div>
       ) : !solicitudes.length ? (
-        <div className="text-muted">No hay solicitudes {estado === "pendiente" ? "pendientes" : `en estado "${estado}"`}.</div>
+        <div className="text-muted">No hay solicitudes {estado === "todas" ? "" : `en estado "${estado}"`}.</div>
       ) : (
         <div className="row g-3">
           {solicitudes.map((sol) => (
             <div className="col-md-6 col-lg-4" key={sol.id}>
               <div className="card h-100 border-0 shadow-sm rounded-4">
-                <a href={sol.comprobante_url} target="_blank" rel="noopener noreferrer">
+                <a href={sol.comprobante_url} target="_blank" rel="noopener noreferrer" style={{ position: "relative" }}>
                   <img src={sol.comprobante_url} alt="Comprobante" className="card-img-top" style={{ maxHeight: 220, objectFit: "cover" }} />
+                  {estado === "todas" && (
+                    <span className={`badge position-absolute top-0 end-0 m-2 ${
+                      sol.estado === "pendiente" ? "bg-warning text-dark" : sol.estado === "aprobada" ? "bg-success" : "bg-danger"
+                    }`}>
+                      {sol.estado}
+                    </span>
+                  )}
                 </a>
                 <div className="card-body">
                   <div className="fw-bold">{sol.nombres} {sol.apellidos}</div>
                   <div className="text-muted small mb-1">{sol.email} · {sol.telefono || "sin teléfono"}</div>
                   <div className="small mb-2"><strong>Clínica:</strong> {sol.nombre_clinica}</div>
                   <span className="badge bg-primary-subtle text-primary-emphasis">{PLAN_LABEL[sol.plan_solicitado]}</span>
+                  {sol.monto != null && (
+                    <span className="badge bg-success-subtle text-success-emphasis ms-1">{sol.moneda} {Number(sol.monto).toFixed(2)}</span>
+                  )}
                   {sol.mensaje && <p className="small text-muted mt-2 mb-2">"{sol.mensaje}"</p>}
-                  <div className="small text-muted">{new Date(sol.creado_en).toLocaleString("es-PE")}</div>
+                  <div className="small text-muted">{new Date(sol.creado_en).toLocaleString("es-HN")}</div>
 
-                  {estado === "pendiente" && (
+                  {sol.estado === "pendiente" && (
                     <div className="d-flex gap-2 mt-3">
                       <button className="btn btn-success btn-sm flex-fill" onClick={() => abrirAprobar(sol)}>
                         <i className="bi bi-check-lg me-1" />Aprobar
@@ -128,7 +140,12 @@ export default function SolicitudesPlan() {
             <div className="modal-content rounded-4">
               <form onSubmit={aprobar}>
                 <div className="modal-header">
-                  <h5 className="modal-title">Aprobar solicitud — {modal.nombre_clinica}</h5>
+                  <div>
+                    <h5 className="modal-title mb-1">Aprobar solicitud — {modal.nombre_clinica}</h5>
+                    <span className="badge bg-primary-subtle text-primary-emphasis">
+                      Plan solicitado: {PLAN_LABEL[modal.plan_solicitado]}
+                    </span>
+                  </div>
                   <button type="button" className="btn-close" onClick={() => setModal(null)} />
                 </div>
                 <div className="modal-body">
@@ -159,8 +176,12 @@ export default function SolicitudesPlan() {
                     </div>
                     <div className="col-4">
                       <label className="form-label small fw-semibold">Moneda</label>
-                      <input className="form-control" value={form.moneda}
-                             onChange={(e) => setForm((f) => ({ ...f, moneda: e.target.value }))} />
+                      <select className="form-select" value={form.moneda}
+                              onChange={(e) => setForm((f) => ({ ...f, moneda: e.target.value }))}>
+                        {MONEDAS.map((m) => (
+                          <option key={m.code} value={m.code}>{m.label}</option>
+                        ))}
+                      </select>
                     </div>
                   </div>
                 </div>

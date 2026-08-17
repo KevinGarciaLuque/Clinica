@@ -151,6 +151,12 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
 // ══════════════════════════════════════════════════════════
 router.get("/solicitudes", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    if (req.query.estado === "todas") {
+      const [rows] = await pool.query(
+        `SELECT * FROM solicitudes_plan_publico ORDER BY creado_en DESC`
+      );
+      return res.json({ ok: true, data: rows });
+    }
     const estado = ["pendiente", "aprobada", "rechazada"].includes(req.query.estado)
       ? req.query.estado
       : "pendiente";
@@ -221,7 +227,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
       `UPDATE solicitudes_plan_publico
        SET estado='aprobada', clinica_id=?, usuario_id=?, atendida_por=?, atendida_en=NOW(), monto=?, moneda=?
        WHERE id=?`,
-      [clinicaId, usuarioId, req.user.id, montoFinal, moneda || "PEN", id]
+      [clinicaId, usuarioId, req.user.id, montoFinal, moneda || "HNL", id]
     );
 
     const planNombre = NOMBRE_PLAN[solicitud.plan_solicitado];
@@ -258,7 +264,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
         clinicaNombre: solicitud.nombre_clinica,
         planNombre,
         monto: montoFinal,
-        moneda: moneda || "PEN",
+        moneda: moneda || "HNL",
         fecha: new Date().toLocaleDateString("es-PE"),
         numeroRecibo: `SP-${String(id).padStart(6, "0")}`,
       });

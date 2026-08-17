@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../../api/api";
+import { MONEDAS } from "../../utils/monedas";
 
 const TABS = [
   { id: "hero",       label: "Hero",       icon: "bi-house-heart-fill" },
@@ -9,6 +10,7 @@ const TABS = [
   { id: "directorio", label: "Directorio", icon: "bi-hospital-fill" },
   { id: "milink",     label: "Mi Link",    icon: "bi-link-45deg" },
   { id: "correo",     label: "Correo",     icon: "bi-envelope-fill" },
+  { id: "pagos",      label: "Pagos",      icon: "bi-credit-card-fill" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -938,8 +940,11 @@ export default function LandingPageAdmin() {
       {/* ── TAB: CORREO (SMTP) ── */}
       {tab === "correo" && <TabCorreoSmtp />}
 
-      {/* Botón guardar inferior — no aplica a la pestaña Correo, que tiene su propio guardado */}
-      {tab !== "correo" && (
+      {/* ── TAB: PAGOS (cuenta bancaria + precios) ── */}
+      {tab === "pagos" && <TabPagos />}
+
+      {/* Botón guardar inferior — no aplica a las pestañas con guardado propio */}
+      {tab !== "correo" && tab !== "pagos" && (
         <div style={{ marginTop: 28, display: "flex", justifyContent: "flex-end", gap: 10 }}>
           <a href={tab === "milink" ? "/links" : "/inicio"} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary" style={{ borderRadius: 8 }}>
             <i className="bi bi-eye me-1" />{tab === "milink" ? "Ver mi link" : "Ver página pública"}
@@ -1100,6 +1105,135 @@ function TabCorreoSmtp() {
           {guardando
             ? <><span className="spinner-border spinner-border-sm me-1" />Guardando...</>
             : <><i className="bi bi-floppy-fill me-1" />Guardar correo</>}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── TAB: Pagos (cuenta bancaria + precios por plan) ──────────────────────
+function TabPagos() {
+  const [form, setForm] = useState({
+    banco: "", titular: "", numero_cuenta: "", numero_cci: "", moneda: "HNL",
+    precio_trial: "", precio_semestral: "", precio_anual: "",
+  });
+  const [cargando, setCargando]   = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [msg, setMsg] = useState(null);
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    api.get("/config-sistema/pagos")
+      .then(r => {
+        const d = r.data.data;
+        setForm({
+          banco: d.banco, titular: d.titular, numero_cuenta: d.numero_cuenta, numero_cci: d.numero_cci,
+          moneda: d.moneda,
+          precio_trial: d.precio_trial ?? "", precio_semestral: d.precio_semestral ?? "", precio_anual: d.precio_anual ?? "",
+        });
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  const guardar = async () => {
+    setGuardando(true);
+    setMsg(null);
+    try {
+      await api.put("/config-sistema/pagos", form);
+      setMsg({ ok: true, text: "Configuración de pagos guardada correctamente" });
+    } catch (e) {
+      setMsg({ ok: false, text: e.response?.data?.msg || "Error al guardar" });
+    } finally {
+      setGuardando(false);
+      setTimeout(() => setMsg(null), 3500);
+    }
+  };
+
+  if (cargando) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 200 }}>
+        <div className="spinner-border text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 14, padding: "18px 22px" }}>
+        <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+          <i className="bi bi-info-circle me-1" />
+          Esta cuenta bancaria y estos precios son los que ve el médico en <strong>/solicitar-plan</strong>
+          al pedir un plan y transferir el pago.
+        </p>
+      </div>
+
+      {msg && (
+        <div className={`alert alert-${msg.ok ? "success" : "danger"} py-2 mb-0`} style={{ borderRadius: 10, fontSize: 14 }}>
+          <i className={`bi ${msg.ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2`} />
+          {msg.text}
+        </div>
+      )}
+
+      <div>
+        <h6 className="fw-bold mb-3"><i className="bi bi-bank me-2" />Cuenta bancaria</h6>
+        <div className="row g-3">
+          <div className="col-md-6">
+            <label className="form-label fw-bold">Banco</label>
+            <input className="form-control" value={form.banco}
+                   onChange={e => set("banco", e.target.value)} placeholder="BBVA" />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label fw-bold">Titular de la cuenta</label>
+            <input className="form-control" value={form.titular}
+                   onChange={e => set("titular", e.target.value)} placeholder="Multi-Clínica S.A.C." />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label fw-bold">Número de cuenta</label>
+            <input className="form-control" value={form.numero_cuenta}
+                   onChange={e => set("numero_cuenta", e.target.value)} placeholder="0011-0000-0000000000" />
+          </div>
+          <div className="col-md-6">
+            <label className="form-label fw-bold">Cuenta interbancaria (CCI / opcional)</label>
+            <input className="form-control" value={form.numero_cci}
+                   onChange={e => set("numero_cci", e.target.value)} placeholder="00200011000000000000" />
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <h6 className="fw-bold mb-3"><i className="bi bi-cash-coin me-2" />Precios por plan</h6>
+        <div className="row g-3">
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Moneda</label>
+            <select className="form-select" value={form.moneda} onChange={e => set("moneda", e.target.value)}>
+              {MONEDAS.map(m => <option key={m.code} value={m.code}>{m.label}</option>)}
+            </select>
+          </div>
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Prueba (14 días)</label>
+            <input type="number" step="0.01" className="form-control" value={form.precio_trial}
+                   onChange={e => set("precio_trial", e.target.value)} placeholder="0.00" />
+          </div>
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Semestral</label>
+            <input type="number" step="0.01" className="form-control" value={form.precio_semestral}
+                   onChange={e => set("precio_semestral", e.target.value)} placeholder="0.00" />
+          </div>
+          <div className="col-md-3">
+            <label className="form-label fw-bold">Anual</label>
+            <input type="number" step="0.01" className="form-control" value={form.precio_anual}
+                   onChange={e => set("precio_anual", e.target.value)} placeholder="0.00" />
+          </div>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", justifyContent: "flex-end" }}>
+        <button className="btn btn-primary" onClick={guardar} disabled={guardando} style={{ borderRadius: 8, fontWeight: 700, minWidth: 130 }}>
+          {guardando
+            ? <><span className="spinner-border spinner-border-sm me-1" />Guardando...</>
+            : <><i className="bi bi-floppy-fill me-1" />Guardar pagos</>}
         </button>
       </div>
     </div>
