@@ -7,26 +7,37 @@ import api from "../../api/api";
 import { MONEDAS } from "../../utils/monedas";
 import { planCompletoLabel, precioClave } from "../../utils/planes";
 
+const ROLES_USUARIO = [
+  { id: "ADMIN",         label: "Administrador de la clínica" },
+  { id: "MEDICO",        label: "Médico" },
+  { id: "PSICOLOGO",     label: "Psicólogo/a" },
+  { id: "ENFERMERA",     label: "Enfermero/a" },
+  { id: "RECEPCIONISTA", label: "Recepcionista" },
+];
+
 export default function SolicitudesPlan() {
   const [estado, setEstado]         = useState("pendiente");
   const [solicitudes, setSolicitudes] = useState([]);
   const [tipos, setTipos]           = useState([]);
+  const [especialidades, setEspecialidades] = useState([]);
   const [pagosCfg, setPagosCfg]     = useState(null);
   const [cargando, setCargando]     = useState(true);
   const [modal, setModal]           = useState(null); // solicitud en aprobación
-  const [form, setForm]             = useState({ slug: "", tipo_id: "", es_pediatrica: false, monto: "", moneda: "HNL" });
+  const [form, setForm]             = useState({ slug: "", tipo_id: "", es_pediatrica: false, monto: "", moneda: "HNL", tipo_usuario: "ADMIN" });
   const [guardando, setGuardando]   = useState(false);
   const [error, setError]           = useState("");
 
   const cargar = async () => {
     setCargando(true);
     try {
-      const [rS, rT] = await Promise.all([
+      const [rS, rT, rE] = await Promise.all([
         api.get(`/planes-publicos/solicitudes?estado=${estado}`),
         api.get("/clinicas/tipos"),
+        api.get("/usuarios/especialidades"),
       ]);
       setSolicitudes(rS.data.data || []);
       setTipos(rT.data.data || []);
+      setEspecialidades(rE.data.data || []);
     } catch (e) {
       console.error(e);
     } finally {
@@ -49,6 +60,7 @@ export default function SolicitudesPlan() {
     setForm({
       slug: sol.nombre_clinica.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
       tipo_id: "", es_pediatrica: false, monto: precioSugerido, moneda: pagosCfg?.moneda || "HNL",
+      tipo_usuario: "ADMIN", especialidad_id: "",
     });
     setError("");
   };
@@ -169,6 +181,25 @@ export default function SolicitudesPlan() {
                       <option value="">Sin especificar</option>
                       {tipos.map((t) => <option key={t.id} value={t.id}>{t.nombre}</option>)}
                     </select>
+                  </div>
+                  <div className="row g-2 mb-3">
+                    <div className={form.tipo_usuario === "MEDICO" ? "col-6" : "col-12"}>
+                      <label className="form-label small fw-semibold">Rol del usuario a crear</label>
+                      <select className="form-select" value={form.tipo_usuario}
+                              onChange={(e) => setForm((f) => ({ ...f, tipo_usuario: e.target.value }))}>
+                        {ROLES_USUARIO.map((r) => <option key={r.id} value={r.id}>{r.label}</option>)}
+                      </select>
+                    </div>
+                    {form.tipo_usuario === "MEDICO" && (
+                      <div className="col-6">
+                        <label className="form-label small fw-semibold">Especialidad</label>
+                        <select className="form-select" value={form.especialidad_id}
+                                onChange={(e) => setForm((f) => ({ ...f, especialidad_id: e.target.value }))}>
+                          <option value="">Sin especificar</option>
+                          {especialidades.map((esp) => <option key={esp.id} value={esp.id}>{esp.nombre}</option>)}
+                        </select>
+                      </div>
+                    )}
                   </div>
                   <div className="form-check mb-3">
                     <input type="checkbox" className="form-check-input" id="esPed" checked={form.es_pediatrica}

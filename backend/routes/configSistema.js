@@ -250,7 +250,7 @@ router.post("/smtp/probar", auth("SUPER_ADMIN"), async (req, res) => {
     const { enviarEmail } = require("../utils/mailer");
     const info = await enviarEmail({
       to: destino,
-      subject: "Correo de prueba — Multi-Clínica",
+      subject: "Correo de prueba — Medic-KG",
       html: "<p>Si recibiste este correo, tu configuración SMTP funciona correctamente.</p>",
     });
     if (info?.simulated) {

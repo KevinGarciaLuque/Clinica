@@ -49,7 +49,7 @@ async function buildTransporter() {
     secure: db ? db.secure : process.env.SMTP_SECURE === "true",
     auth: { user, pass },
   });
-  const from = db?.from || process.env.EMAIL_FROM || '"Multi-Clínica" <noreply@multiclinica.app>';
+  const from = db?.from || process.env.EMAIL_FROM || '"Medic-KG" <noreply@medickg.com>';
   return { transporter, from };
 }
 
@@ -103,7 +103,7 @@ function templateVerificacion({ nombres, apellidos, link, clinicaNombre }) {
         Este enlace expira en <strong>24 horas</strong>.
         Si no solicitaste este registro, puedes ignorar este mensaje.
       </p>
-      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre || "Multi-Clínica"}</div>
+      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre || "Medic-KG"}</div>
     </div>
   </body>
   </html>`;
@@ -145,7 +145,7 @@ function templateCodigo2FA({ nombres, codigo, clinicaNombre }) {
       <p style="color:#94a3b8; font-size:13px;">
         Expira en <strong>10 minutos</strong>. Si no intentaste iniciar sesión, ignora este correo.
       </p>
-      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre || "Multi-Clínica"}</div>
+      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre || "Medic-KG"}</div>
     </div>
   </body>
   </html>`;
@@ -172,7 +172,7 @@ function templateResetPassword({ nombres, link, clinicaNombre }) {
         Este enlace expira en <strong>1 hora</strong>.
         Si no solicitaste este cambio, puedes ignorar este mensaje — tu contraseña actual seguirá funcionando.
       </p>
-      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre || "Multi-Clínica"}</div>
+      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre || "Medic-KG"}</div>
     </div>
   </body>
   </html>`;
@@ -203,7 +203,7 @@ function templateSolicitudRecibida({ nombres, planNombre }) {
          <strong>${planNombre}</strong> junto con el comprobante de transferencia.</p>
       <p style="color:#475569">Nuestro equipo validará el pago en banca en línea y te avisaremos
          por este mismo correo apenas quede activado.</p>
-      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+      <div class="footer">© ${new Date().getFullYear()} Medic-KG</div>
     </div>
   </body>
   </html>`;
@@ -233,7 +233,7 @@ function templateSolicitudAprobada({ nombres, planNombre }) {
       <div class="body">
         <p style="color:#334155; font-size:15px; line-height:1.6;">
           Confirmamos tu transferencia y con mucho gusto activamos tu plan
-          <strong style="color:#059669">${planNombre}</strong>. ¡Bienvenido/a a Multi-Clínica!
+          <strong style="color:#059669">${planNombre}</strong>. ¡Bienvenido/a a Medic-KG!
         </p>
         <div class="steps">
           <p>📬 En unos minutos te llegará <strong>otro correo</strong> con tu usuario y contraseña.</p>
@@ -243,7 +243,7 @@ function templateSolicitudAprobada({ nombres, planNombre }) {
           Gracias por confiar en nosotros. Si tienes cualquier duda, estamos para ayudarte.
         </p>
       </div>
-      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+      <div class="footer">© ${new Date().getFullYear()} Medic-KG</div>
     </div>
   </body>
   </html>`;
@@ -316,7 +316,7 @@ function templateSolicitudRechazada({ nombres, motivo }) {
          con el comprobante enviado.</p>
       ${motivo ? `<p style="color:#475569"><strong>Motivo:</strong> ${motivo}</p>` : ""}
       <p style="color:#475569">Por favor contáctanos o vuelve a enviar tu solicitud con un comprobante válido.</p>
-      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+      <div class="footer">© ${new Date().getFullYear()} Medic-KG</div>
     </div>
   </body>
   </html>`;
@@ -386,7 +386,7 @@ function templateSolicitudResena({ nombreMedico, link, clinicaNombre }) {
           Tu reseña podría aparecer en nuestra página de inicio, ayudando a otros médicos a conocernos.
         </p>
       </div>
-      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+      <div class="footer">© ${new Date().getFullYear()} Medic-KG</div>
     </div>
   </body>
   </html>`;

@@ -227,7 +227,7 @@ export default function ModalAyudaSoporte({ open, onClose }) {
                         Kevin García
                       </div>
                       <div style={{ color: "rgba(255,255,255,.45)", fontSize: "0.78rem", marginTop: 2 }}>
-                        Desarrollador · Multi-Clínica v1.0
+                        Desarrollador · Medic-KG v1.0
                       </div>
                       <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 6 }}>
                         {["React", "Node.js", "MySQL"].map(tag => (

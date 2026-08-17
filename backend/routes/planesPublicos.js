@@ -45,6 +45,7 @@ const solicitarLimiter = rateLimit({
 
 const PLANES_VALIDOS = ["trial", "semestral", "anual"];
 const NIVELES_VALIDOS = ["basico", "avanzado", "empresarial"];
+const ROLES_USUARIO_VALIDOS = ["ADMIN", "MEDICO", "PSICOLOGO", "ENFERMERA", "RECEPCIONISTA"];
 
 function calcularVigencia(planTipo, inicio = new Date()) {
   const fin = new Date(inicio);
@@ -140,7 +141,7 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
       await enviarEmail({
         to: email,
         subject: "Recibimos tu comprobante",
-        html: templateSolicitudRecibida({ nombres, planNombre }),
+        html: templateSolicitudRecibida({ nombres: `${nombres} ${apellidos}`, planNombre }),
       });
     } catch (e) {
       console.error("[email solicitud recibida]", e.message);
@@ -182,7 +183,9 @@ router.get("/solicitudes", auth("SUPER_ADMIN"), async (req, res) => {
 router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const { id } = req.params;
-    const { slug, tipo_id, es_pediatrica, monto, moneda } = req.body;
+    const { slug, tipo_id, es_pediatrica, monto, moneda, tipo_usuario, especialidad_id } = req.body;
+    const rolUsuario = ROLES_USUARIO_VALIDOS.includes(tipo_usuario) ? tipo_usuario : "ADMIN";
+    const especialidadIdFinal = rolUsuario === "MEDICO" && especialidad_id ? parseInt(especialidad_id, 10) : null;
 
     const [[solicitud]] = await pool.query(
       `SELECT * FROM solicitudes_plan_publico WHERE id=? LIMIT 1`,
@@ -216,9 +219,9 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
     const password = generarPassword();
     const hash = await argon2.hash(password);
     const [rUsuario] = await pool.query(
-      `INSERT INTO usuarios (clinica_id, nombres, apellidos, email, password_hash, tipo)
-       VALUES (?,?,?,?,?, 'ADMIN')`,
-      [clinicaId, solicitud.nombres, solicitud.apellidos, solicitud.email, hash]
+      `INSERT INTO usuarios (clinica_id, nombres, apellidos, email, password_hash, tipo, especialidad_id)
+       VALUES (?,?,?,?,?,?,?)`,
+      [clinicaId, solicitud.nombres, solicitud.apellidos, solicitud.email, hash, rolUsuario, especialidadIdFinal]
     );
     const usuarioId = rUsuario.insertId;
 
@@ -227,7 +230,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
     await pool.query(
       `INSERT INTO licencias_historial (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas)
        VALUES (?,?,?,?,?,?)`,
-      [clinicaId, solicitud.plan_solicitado, inicio, fin, req.user.id, `Alta desde solicitud pública #${id} — Plan ${planNombre}`]
+      [clinicaId, solicitud.plan_solicitado, inicio, fin, req.user.id, `Alta desde solicitud pública #${id} — Plan ${planNombre} — Usuario creado como ${rolUsuario}`]
     );
 
     const montoFinal = monto != null && monto !== "" ? Number(monto) : null;
@@ -244,7 +247,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
       await enviarEmail({
         to: solicitud.email,
         subject: "🎉 ¡Tu solicitud fue aceptada!",
-        html: templateSolicitudAprobada({ nombres: solicitud.nombres, planNombre }),
+        html: templateSolicitudAprobada({ nombres: `${solicitud.nombres} ${solicitud.apellidos}`, planNombre }),
       });
     } catch (e) { console.error("[email solicitud aprobada]", e.message); }
 
@@ -254,7 +257,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
         to: solicitud.email,
         subject: "🔑 Tus credenciales de acceso",
         html: templateCredenciales({
-          nombres: solicitud.nombres,
+          nombres: `${solicitud.nombres} ${solicitud.apellidos}`,
           email: solicitud.email,
           password,
           loginUrl: `${frontendUrl}/login`,
@@ -317,7 +320,7 @@ router.put("/solicitudes/:id/rechazar", auth("SUPER_ADMIN"), async (req, res) =>
       await enviarEmail({
         to: solicitud.email,
         subject: "No pudimos validar tu pago",
-        html: templateSolicitudRechazada({ nombres: solicitud.nombres, motivo }),
+        html: templateSolicitudRechazada({ nombres: `${solicitud.nombres} ${solicitud.apellidos}`, motivo }),
       });
     } catch (e) { console.error("[email solicitud rechazada]", e.message); }
 

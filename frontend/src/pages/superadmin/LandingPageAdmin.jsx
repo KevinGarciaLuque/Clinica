@@ -1119,7 +1119,7 @@ function TabCorreoSmtp() {
           <label className="form-label fw-bold">Remitente que verá el destinatario</label>
           <input className="form-control" value={form.email_from}
                  onChange={e => set("email_from", e.target.value)}
-                 placeholder='"Multi-Clínica" <soporte.medickg@gmail.com>' />
+                 placeholder='"Medic-KG" <soporte.medickg@gmail.com>' />
         </div>
         <div className="col-12">
           <div className="form-check">
@@ -1238,7 +1238,7 @@ function TabPagos() {
           <div className="col-md-6">
             <label className="form-label fw-bold">Titular de la cuenta</label>
             <input className="form-control" value={form.titular}
-                   onChange={e => set("titular", e.target.value)} placeholder="Multi-Clínica S.A.C." />
+                   onChange={e => set("titular", e.target.value)} placeholder="Medic-KG S.A.C." />
           </div>
           <div className="col-md-6">
             <label className="form-label fw-bold">Número de cuenta</label>
