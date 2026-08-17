@@ -27,6 +27,7 @@ export default function LandingPageAdmin() {
   const [copiado, setCopiado] = useState(false);
   const [guardando, setGuardando] = useState(false);
   const [msg,       setMsg]       = useState(null);
+  const [previewKey, setPreviewKey] = useState(0);
 
   useEffect(() => {
     api.get("/config-sistema").then(r => {
@@ -151,6 +152,7 @@ export default function LandingPageAdmin() {
     try {
       await api.put("/config-sistema", form);
       setMsg({ ok: true, text: "Cambios guardados correctamente" });
+      setPreviewKey(k => k + 1);
     } catch (e) {
       setMsg({ ok: false, text: e.response?.data?.msg || "Error al guardar" });
     } finally {
@@ -200,8 +202,10 @@ export default function LandingPageAdmin() {
     </div>
   );
 
+  const previewUrl = tab === "correo" ? null : tab === "milink" ? "/links" : tab === "pagos" ? "/solicitar-plan" : "/inicio";
+
   return (
-    <div style={{ padding: "24px 28px", maxWidth: 860, margin: "0 auto" }}>
+    <div style={{ padding: "24px clamp(16px, 3vw, 40px)", maxWidth: 1600, margin: "0 auto", width: "100%" }}>
 
       {/* Header */}
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 24, flexWrap: "wrap", gap: 12 }}>
@@ -266,17 +270,20 @@ export default function LandingPageAdmin() {
       )}
 
       {/* Tabs */}
-      <div style={{ display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid #e2e8f0", paddingBottom: 0 }}>
+      <div style={{
+        display: "flex", gap: 4, marginBottom: 20, borderBottom: "2px solid #e2e8f0", paddingBottom: 0,
+        overflowX: "auto", overflowY: "hidden", flexWrap: "nowrap", scrollbarWidth: "thin",
+      }}>
         {TABS.map(t => (
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
             style={{
-              border: "none", background: "none", padding: "10px 18px",
+              border: "none", background: "none", padding: "10px 16px",
               fontWeight: tab === t.id ? 700 : 500,
               color: tab === t.id ? "#3b82f6" : "#64748b",
               borderBottom: tab === t.id ? "2px solid #3b82f6" : "2px solid transparent",
-              marginBottom: -2, cursor: "pointer", fontSize: 14,
+              marginBottom: -2, cursor: "pointer", fontSize: 14, whiteSpace: "nowrap", flexShrink: 0,
               display: "flex", alignItems: "center", gap: 7,
               transition: "color .15s",
             }}
@@ -285,6 +292,9 @@ export default function LandingPageAdmin() {
           </button>
         ))}
       </div>
+
+      <div className="row g-4">
+      <div className={previewUrl ? "col-12 col-xl-8" : "col-12"} style={{ minWidth: 0 }}>
 
       {/* ── TAB: HERO ── */}
       {tab === "hero" && (
@@ -956,6 +966,36 @@ export default function LandingPageAdmin() {
           </button>
         </div>
       )}
+
+      </div>
+
+      {/* ── Panel derecho: vista previa en vivo (solo pantallas grandes) ── */}
+      {previewUrl && (
+        <div className="col-12 col-xl-4 d-none d-xl-block">
+          <div style={{ position: "sticky", top: 20, background: "#fff", borderRadius: 16, border: "1px solid #e2e8f0", overflow: "hidden", boxShadow: "0 4px 20px rgba(0,0,0,.06)" }}>
+            <div style={{ padding: "12px 16px", borderBottom: "1px solid #e2e8f0", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                <i className="bi bi-eye me-2" />Vista previa en vivo
+              </span>
+              <button
+                onClick={() => setPreviewKey(k => k + 1)}
+                title="Actualizar vista previa"
+                style={{ border: "none", background: "none", color: "#94a3b8", cursor: "pointer", padding: 4 }}
+              >
+                <i className="bi bi-arrow-clockwise" />
+              </button>
+            </div>
+            <iframe
+              key={previewKey}
+              src={previewUrl}
+              title="Vista previa"
+              style={{ width: "100%", height: "calc(100vh - 220px)", minHeight: 480, border: "none", display: "block" }}
+            />
+          </div>
+        </div>
+      )}
+
+      </div>
     </div>
   );
 }

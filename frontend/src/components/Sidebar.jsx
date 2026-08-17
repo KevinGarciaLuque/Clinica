@@ -48,6 +48,7 @@ const medicoItems = [
 const superItems = [
   { to: "/superadmin/clinicas",        label: "Clínicas",        icon: "bi-building-fill" },
   { to: "/superadmin/solicitudes-plan", label: "Solicitudes de Plan", icon: "bi-credit-card-fill" },
+  { to: "/superadmin/resenas",         label: "Reseñas",          icon: "bi-star-fill" },
   { to: "/superadmin/reportes",        label: "Reportes",         icon: "bi-bar-chart-line-fill" },
   { to: "/superadmin/database",        label: "Base de Datos",   icon: "bi-database-fill-gear" },
   { to: "/superadmin/personalizacion", label: "Personalización", icon: "bi-palette-fill" },

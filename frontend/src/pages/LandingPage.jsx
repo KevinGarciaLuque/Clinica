@@ -46,12 +46,17 @@ export default function LandingPage() {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [resenas, setResenas] = useState([]);
 
   useEffect(() => {
     fetch(`${API_URL}/api/config-sistema`)
       .then(r => r.json())
       .then(d => setCfg(d.data || {}))
       .catch(() => setCfg({}));
+    fetch(`${API_URL}/api/resenas/publicas`)
+      .then(r => r.json())
+      .then(d => setResenas(d.data || []))
+      .catch(() => {});
   }, []);
 
   if (!cfg) return (
@@ -241,6 +246,7 @@ export default function LandingPage() {
             <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
             <button className="nav-link-lp" onClick={() => scrollTo("especialidades")}>Especialidades</button>
             <button className="nav-link-lp" onClick={() => scrollTo("planes")}>Planes</button>
+            <button className="nav-link-lp" onClick={() => scrollTo("resenas")}>Reseñas</button>
             <button className="nav-link-lp" onClick={() => scrollTo("nosotros")}>Nosotros</button>
             <button className="nav-link-lp" onClick={() => scrollTo("contacto")}>Contacto</button>
           </div>
@@ -279,7 +285,7 @@ export default function LandingPage() {
           <button className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => { setMenuOpen(false); navigate("/agenda-tu-consulta"); }}>
             Agenda tu consulta médica
           </button>
-          {["Características|caracteristicas","Especialidades|especialidades","Planes|planes","Nosotros|nosotros","Contacto|contacto"].map(item => {
+          {["Características|caracteristicas","Especialidades|especialidades","Planes|planes","Reseñas|resenas","Nosotros|nosotros","Contacto|contacto"].map(item => {
             const [label, id] = item.split("|");
             return (
               <button key={id} className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => scrollTo(id)}>
@@ -497,7 +503,7 @@ export default function LandingPage() {
                 }}>
                   <i className={`bi ${plan.icon}`} style={{ fontSize: 22, color: plan.color }} />
                 </div>
-                <div style={{ fontSize: 13, fontWeight: 700, color: plan.color, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>
+                <div style={{ fontSize: "clamp(15px, 1.6vw, 17px)", fontWeight: 800, color: plan.color, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>
                   Plan {plan.label}
                 </div>
                 <div style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>
@@ -552,17 +558,93 @@ export default function LandingPage() {
                 <a
                   href={`/solicitar-plan?nivel=${{ trial: "basico", semestral: "avanzado", anual: "empresarial" }[plan.id] || "basico"}`}
                   style={{
-                    display: "block", textAlign: "center", textDecoration: "none",
-                    color: "#64748b", fontSize: 12.5, fontWeight: 600, marginTop: 10,
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                    textAlign: "center", textDecoration: "none",
+                    background: `${plan.color}12`, color: plan.color,
+                    border: `1.5px solid ${plan.color}40`,
+                    borderRadius: 12, padding: "11px 0", fontWeight: 700, fontSize: 13.5,
+                    marginTop: 10, transition: "background .18s, border-color .18s",
                   }}
+                  onMouseOver={e => { e.currentTarget.style.background = `${plan.color}22`; e.currentTarget.style.borderColor = plan.color; }}
+                  onMouseOut={e  => { e.currentTarget.style.background = `${plan.color}12`; e.currentTarget.style.borderColor = `${plan.color}40`; }}
                 >
-                  <i className="bi bi-upload me-1" />Ya transferí, subir comprobante
+                  <i className="bi bi-credit-card-fill" />Comprar ahora
                 </a>
               </div>
             ))}
           </div>
         </div>
       </section>
+
+      {/* ── RESEÑAS ── */}
+      {resenas.length > 0 && (
+        <section id="resenas" style={{ background: "#fff", padding: "80px 24px" }}>
+          <div style={{ maxWidth: 1140, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 52 }}>
+              <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
+                Testimonios
+              </span>
+              <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
+                Médicos que ya confían en nosotros
+              </h2>
+              <p style={{ fontSize: 16, color: "#64748b", marginTop: 12, maxWidth: 560, margin: "12px auto 0" }}>
+                Esto es lo que opinan los profesionales que ya usan el sistema en su día a día.
+              </p>
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
+              {resenas.map((r, i) => (
+                <div
+                  key={i}
+                  style={{
+                    background: "#fff",
+                    borderRadius: 20,
+                    padding: "28px 26px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 4px 20px rgba(15,23,42,.05)",
+                    position: "relative",
+                    transition: "transform .25s, box-shadow .25s",
+                    animation: `fadeUp .5s ${i * 0.08}s ease both`,
+                    cursor: "default",
+                  }}
+                  onMouseOver={e => { e.currentTarget.style.transform = "translateY(-6px)"; e.currentTarget.style.boxShadow = `0 16px 36px rgba(${colorRgb},.18)`; }}
+                  onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 20px rgba(15,23,42,.05)"; }}
+                >
+                  <i className="bi bi-quote" style={{
+                    position: "absolute", top: 16, right: 20, fontSize: 34,
+                    color: `rgba(${colorRgb},.12)`,
+                  }} />
+                  <div style={{ marginBottom: 14 }}>
+                    {Array.from({ length: 5 }).map((_, s) => (
+                      <i key={s} className={`bi ${s < r.estrellas ? "bi-star-fill" : "bi-star"}`} style={{ color: "#f59e0b", fontSize: 15, marginRight: 2 }} />
+                    ))}
+                  </div>
+                  <p style={{ fontSize: 14.5, color: "#334155", lineHeight: 1.65, marginBottom: 22, minHeight: 72 }}>
+                    "{r.opinion}"
+                  </p>
+                  <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
+                    <div style={{
+                      width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
+                      background: `linear-gradient(135deg, ${color}, ${color}99)`,
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                      color: "#fff", fontWeight: 800, fontSize: 15,
+                    }}>
+                      {r.nombre_medico?.trim()?.[0]?.toUpperCase() || "M"}
+                    </div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {r.nombre_medico}
+                      </div>
+                      <div style={{ fontSize: 12.5, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                        {[r.especialidad, r.lugar].filter(Boolean).join(" · ")}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── NOSOTROS ── */}
       <section id="nosotros" style={{ background: "#0f172a", padding: "96px 24px", position: "relative", overflow: "hidden" }}>

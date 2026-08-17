@@ -352,11 +352,52 @@ function templateFacturaRecibo({ nombres, clinicaNombre, planNombre, monto, mone
   </html>`;
 }
 
+function templateSolicitudResena({ nombreMedico, link, clinicaNombre }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:16px; max-width:520px; margin:auto; overflow:hidden; box-shadow:0 4px 24px rgba(15,23,42,.06); }
+    .banner { background:linear-gradient(135deg,#f59e0b,#f97316); padding:36px 32px 28px; text-align:center; }
+    .banner .emoji { font-size:44px; line-height:1; margin-bottom:8px; }
+    .banner h2 { color:#fff; margin:0; font-size:22px; }
+    .body { padding:28px 32px 32px; }
+    .stars { text-align:center; font-size:26px; letter-spacing:4px; color:#f59e0b; margin:18px 0; }
+    .btn  { display:block; text-align:center; background:linear-gradient(135deg,#f59e0b,#f97316); color:#fff !important;
+            padding:13px 0; border-radius:10px; text-decoration:none; font-weight:700; margin-top:8px; font-size:15px; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:24px; padding-bottom:8px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="banner">
+        <div class="emoji">⭐</div>
+        <h2>¡Tu opinión nos importa!</h2>
+      </div>
+      <div class="body">
+        <p style="color:#334155; font-size:15px; line-height:1.6;">
+          Hola <strong>${nombreMedico}</strong>, gracias por confiar en nosotros para gestionar
+          <strong>${clinicaNombre || "tu clínica"}</strong>. Nos encantaría conocer tu experiencia
+          con el sistema — toma menos de un minuto.
+        </p>
+        <div class="stars">★★★★★</div>
+        <a class="btn" href="${link}">Dejar mi reseña →</a>
+        <p style="color:#94a3b8; font-size:13px; margin-top:18px; text-align:center;">
+          Tu reseña podría aparecer en nuestra página de inicio, ayudando a otros médicos a conocernos.
+        </p>
+      </div>
+      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+    </div>
+  </body>
+  </html>`;
+}
+
 module.exports = {
   enviarEmail,
   invalidateSmtpCache,
   templateVerificacion,
   templateBienvenida,
+  templateSolicitudResena,
   templateCodigo2FA,
   templateResetPassword,
   templateSolicitudRecibida,

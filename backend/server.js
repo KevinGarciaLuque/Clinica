@@ -165,6 +165,7 @@ app.use("/api/catalogos-condiciones-medicas", require("./routes/catalogosCondici
 app.use("/api/catalogos-procedimientos", require("./routes/catalogosProcedimientos"));
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/planes-publicos", require("./routes/planesPublicos"));
+app.use("/api/resenas", require("./routes/resenas"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
 app.use("/api/biopsias",        require("./routes/biopsias"));
@@ -378,6 +379,29 @@ const pool = require("./db");
       `);
       console.log("✅ [auto-migrate] config_pagos → precios por nivel de plan agregados");
     }
+
+    // Reseñas de médicos clientes (encuesta enviada por el SUPER_ADMIN, publicada en /inicio)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS resenas_medicos (
+        id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        clinica_id    INT UNSIGNED NULL,
+        usuario_id    INT UNSIGNED NULL,
+        token         VARCHAR(64) NOT NULL UNIQUE,
+        nombre_medico VARCHAR(150) NOT NULL,
+        especialidad  VARCHAR(100) NULL,
+        lugar         VARCHAR(150) NULL,
+        estrellas     TINYINT UNSIGNED NULL,
+        opinion       VARCHAR(600) NULL,
+        estado        ENUM('pendiente','respondida') DEFAULT 'pendiente',
+        activo        TINYINT(1) DEFAULT 1,
+        enviada_en    DATETIME DEFAULT CURRENT_TIMESTAMP,
+        respondida_en DATETIME NULL,
+        INDEX idx_resenas_estado_activo (estado, activo),
+        FOREIGN KEY (clinica_id) REFERENCES clinicas(id) ON DELETE SET NULL,
+        FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] resenas_medicos OK");
 
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`
