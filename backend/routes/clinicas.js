@@ -1244,4 +1244,5 @@ router.get("/:id/bitacora", auth("SUPER_ADMIN"), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.aplicarPresetModulosClinica = aplicarPresetModulosClinica;
 

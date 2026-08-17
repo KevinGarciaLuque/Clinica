@@ -164,6 +164,7 @@ app.use("/api/catalogos-tipos-cita", require("./routes/catalogosTiposCita"));
 app.use("/api/catalogos-condiciones-medicas", require("./routes/catalogosCondicionesMedicas"));
 app.use("/api/catalogos-procedimientos", require("./routes/catalogosProcedimientos"));
 app.use("/api/registro", require("./routes/registro"));
+app.use("/api/planes-publicos", require("./routes/planesPublicos"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
 app.use("/api/biopsias",        require("./routes/biopsias"));
@@ -322,6 +323,51 @@ const pool = require("./db");
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
     console.log("✅ [auto-migrate] push_subscriptions OK");
+
+    // Configuración de correo saliente (SMTP), editable por el SUPER_ADMIN
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS config_smtp (
+        id           TINYINT UNSIGNED PRIMARY KEY DEFAULT 1,
+        smtp_host    VARCHAR(150) NULL,
+        smtp_port    SMALLINT UNSIGNED NULL,
+        smtp_secure  TINYINT(1) DEFAULT 0,
+        smtp_user    VARCHAR(150) NULL,
+        smtp_pass_enc TEXT NULL,
+        email_from   VARCHAR(200) NULL,
+        updated_at   DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] config_smtp OK");
+
+    // Solicitudes públicas de compra de plan (antes de que exista la clínica)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS solicitudes_plan_publico (
+        id                    BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        nombres               VARCHAR(100) NOT NULL,
+        apellidos             VARCHAR(100) NOT NULL,
+        email                 VARCHAR(150) NOT NULL,
+        telefono              VARCHAR(30)  NULL,
+        nombre_clinica        VARCHAR(150) NOT NULL,
+        plan_solicitado       ENUM('trial','semestral','anual') NOT NULL,
+        mensaje               VARCHAR(500) NULL,
+        comprobante_url       VARCHAR(500) NOT NULL,
+        comprobante_public_id VARCHAR(200) NULL,
+        monto                 DECIMAL(10,2) NULL,
+        moneda                CHAR(3) DEFAULT 'PEN',
+        estado                ENUM('pendiente','aprobada','rechazada') DEFAULT 'pendiente',
+        motivo_rechazo        VARCHAR(300) NULL,
+        clinica_id            INT UNSIGNED NULL,
+        usuario_id            INT UNSIGNED NULL,
+        atendida_por          INT UNSIGNED NULL,
+        atendida_en           DATETIME NULL,
+        creado_en             DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_spp_estado (estado, creado_en),
+        FOREIGN KEY (clinica_id)   REFERENCES clinicas(id) ON DELETE SET NULL,
+        FOREIGN KEY (usuario_id)   REFERENCES usuarios(id) ON DELETE SET NULL,
+        FOREIGN KEY (atendida_por) REFERENCES usuarios(id) ON DELETE SET NULL
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] solicitudes_plan_publico OK");
 
     // Tabla catálogo de procedimientos dermatológicos/estéticos
     await pool.query(`

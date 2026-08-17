@@ -549,6 +549,15 @@ export default function LandingPage() {
                     Comenzar
                   </button>
                 )}
+                <a
+                  href={`/solicitar-plan?plan=${plan.id}`}
+                  style={{
+                    display: "block", textAlign: "center", textDecoration: "none",
+                    color: "#64748b", fontSize: 12.5, fontWeight: 600, marginTop: 10,
+                  }}
+                >
+                  <i className="bi bi-upload me-1" />Ya transferí, subir comprobante
+                </a>
               </div>
             ))}
           </div>

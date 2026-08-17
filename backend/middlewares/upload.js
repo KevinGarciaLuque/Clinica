@@ -62,6 +62,13 @@ const uploadClinicas = multer({
   fileFilter: imageFilter,
 });
 
+// ── Storage engine para comprobantes de transferencia (memory → Cloudinary) ──
+const uploadComprobante = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB máximo
+  fileFilter,
+});
+
 // ── Storage engine para assets del sistema (logo, fondo login) ────────────
 const storageSistema = multer.diskStorage({
   destination(req, file, cb) {
@@ -94,3 +101,4 @@ module.exports.uploadPacientes     = uploadPacientes;
 module.exports.uploadClinicas      = uploadClinicas;
 module.exports.uploadSistema       = uploadSistema;
 module.exports.uploadSistemaMemory = uploadSistemaMemory;
+module.exports.uploadComprobante   = uploadComprobante;

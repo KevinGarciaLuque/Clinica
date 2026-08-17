@@ -8,6 +8,7 @@ const TABS = [
   { id: "contacto",   label: "Contacto",   icon: "bi-chat-dots-fill" },
   { id: "directorio", label: "Directorio", icon: "bi-hospital-fill" },
   { id: "milink",     label: "Mi Link",    icon: "bi-link-45deg" },
+  { id: "correo",     label: "Correo",     icon: "bi-envelope-fill" },
 ];
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -934,15 +935,171 @@ export default function LandingPageAdmin() {
         </div>
       )}
 
-      {/* Botón guardar inferior */}
-      <div style={{ marginTop: 28, display: "flex", justifyContent: "flex-end", gap: 10 }}>
-        <a href={tab === "milink" ? "/links" : "/inicio"} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary" style={{ borderRadius: 8 }}>
-          <i className="bi bi-eye me-1" />{tab === "milink" ? "Ver mi link" : "Ver página pública"}
-        </a>
+      {/* ── TAB: CORREO (SMTP) ── */}
+      {tab === "correo" && <TabCorreoSmtp />}
+
+      {/* Botón guardar inferior — no aplica a la pestaña Correo, que tiene su propio guardado */}
+      {tab !== "correo" && (
+        <div style={{ marginTop: 28, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <a href={tab === "milink" ? "/links" : "/inicio"} target="_blank" rel="noopener noreferrer" className="btn btn-outline-secondary" style={{ borderRadius: 8 }}>
+            <i className="bi bi-eye me-1" />{tab === "milink" ? "Ver mi link" : "Ver página pública"}
+          </a>
+          <button className="btn btn-primary" onClick={guardar} disabled={guardando} style={{ borderRadius: 8, fontWeight: 700, minWidth: 130 }}>
+            {guardando
+              ? <><span className="spinner-border spinner-border-sm me-1" />Guardando...</>
+              : <><i className="bi bi-floppy-fill me-1" />Guardar cambios</>}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── TAB: Correo saliente (SMTP) ──────────────────────────────────────────
+function TabCorreoSmtp() {
+  const [form, setForm] = useState({
+    smtp_host: "", smtp_port: 587, smtp_secure: false,
+    smtp_user: "", smtp_pass: "", email_from: "",
+  });
+  const [tienePassword, setTienePassword] = useState(false);
+  const [cargando, setCargando]   = useState(true);
+  const [guardando, setGuardando] = useState(false);
+  const [probando, setProbando]   = useState(false);
+  const [correoPrueba, setCorreoPrueba] = useState("");
+  const [msg, setMsg] = useState(null); // { ok, text }
+
+  const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
+
+  useEffect(() => {
+    api.get("/config-sistema/smtp")
+      .then(r => {
+        const d = r.data.data;
+        setForm(p => ({
+          ...p,
+          smtp_host: d.smtp_host, smtp_port: d.smtp_port, smtp_secure: d.smtp_secure,
+          smtp_user: d.smtp_user, email_from: d.email_from,
+        }));
+        setTienePassword(d.tiene_password);
+      })
+      .catch(() => {})
+      .finally(() => setCargando(false));
+  }, []);
+
+  const guardar = async () => {
+    setGuardando(true);
+    setMsg(null);
+    try {
+      await api.put("/config-sistema/smtp", form);
+      if (form.smtp_pass) setTienePassword(true);
+      setForm(p => ({ ...p, smtp_pass: "" }));
+      setMsg({ ok: true, text: "Configuración de correo guardada correctamente" });
+    } catch (e) {
+      setMsg({ ok: false, text: e.response?.data?.msg || "Error al guardar" });
+    } finally {
+      setGuardando(false);
+      setTimeout(() => setMsg(null), 3500);
+    }
+  };
+
+  const probar = async () => {
+    if (!correoPrueba) return;
+    setProbando(true);
+    setMsg(null);
+    try {
+      const r = await api.post("/config-sistema/smtp/probar", { destino: correoPrueba });
+      setMsg({
+        ok: !r.data.simulado,
+        text: r.data.simulado ? r.data.msg : `Correo de prueba enviado a ${correoPrueba}`,
+      });
+    } catch (e) {
+      setMsg({ ok: false, text: e.response?.data?.msg || "No se pudo enviar el correo de prueba" });
+    } finally {
+      setProbando(false);
+    }
+  };
+
+  if (cargando) {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: 200 }}>
+        <div className="spinner-border text-primary" />
+      </div>
+    );
+  }
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
+      <div style={{
+        background: "#f8fafc", border: "1px solid #e2e8f0",
+        borderRadius: 14, padding: "18px 22px",
+      }}>
+        <p style={{ margin: 0, fontSize: 13, color: "#64748b" }}>
+          <i className="bi bi-info-circle me-1" />
+          La cuenta de correo que usa el sistema para enviar notificaciones: verificación de pacientes,
+          credenciales de nuevas clínicas, recibos, recordatorios, etc.
+        </p>
+      </div>
+
+      {msg && (
+        <div className={`alert alert-${msg.ok ? "success" : "danger"} py-2 mb-0`} style={{ borderRadius: 10, fontSize: 14 }}>
+          <i className={`bi ${msg.ok ? "bi-check-circle-fill" : "bi-exclamation-triangle-fill"} me-2`} />
+          {msg.text}
+        </div>
+      )}
+
+      <div className="row g-3">
+        <div className="col-md-8">
+          <label className="form-label fw-bold">Servidor SMTP</label>
+          <input className="form-control" value={form.smtp_host}
+                 onChange={e => set("smtp_host", e.target.value)} placeholder="smtp.gmail.com" />
+        </div>
+        <div className="col-md-4">
+          <label className="form-label fw-bold">Puerto</label>
+          <input type="number" className="form-control" value={form.smtp_port}
+                 onChange={e => set("smtp_port", e.target.value)} placeholder="587" />
+        </div>
+        <div className="col-md-6">
+          <label className="form-label fw-bold">Correo de la cuenta</label>
+          <input type="email" className="form-control" value={form.smtp_user}
+                 onChange={e => set("smtp_user", e.target.value)} placeholder="soporte.medickg@gmail.com" />
+        </div>
+        <div className="col-md-6">
+          <label className="form-label fw-bold">
+            Contraseña {tienePassword && <span className="text-success" style={{ fontSize: 12, fontWeight: 500 }}>(ya configurada)</span>}
+          </label>
+          <input type="password" className="form-control" value={form.smtp_pass}
+                 onChange={e => set("smtp_pass", e.target.value)}
+                 placeholder={tienePassword ? "••••••••  (déjala en blanco para no cambiarla)" : "Contraseña de aplicación"} />
+        </div>
+        <div className="col-12">
+          <label className="form-label fw-bold">Remitente que verá el destinatario</label>
+          <input className="form-control" value={form.email_from}
+                 onChange={e => set("email_from", e.target.value)}
+                 placeholder='"Multi-Clínica" <soporte.medickg@gmail.com>' />
+        </div>
+        <div className="col-12">
+          <div className="form-check">
+            <input type="checkbox" className="form-check-input" id="smtpSecure" checked={form.smtp_secure}
+                   onChange={e => set("smtp_secure", e.target.checked)} />
+            <label className="form-check-label" htmlFor="smtpSecure">Usar conexión segura (puerto 465)</label>
+          </div>
+        </div>
+      </div>
+
+      <div style={{ marginTop: 10, display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div className="d-flex gap-2 align-items-center">
+          <input
+            type="email" className="form-control form-control-sm" style={{ width: 240 }}
+            placeholder="Enviar correo de prueba a..."
+            value={correoPrueba} onChange={e => setCorreoPrueba(e.target.value)}
+          />
+          <button onClick={probar} disabled={probando || !correoPrueba} className="btn btn-outline-secondary btn-sm">
+            {probando ? "Enviando..." : "Enviar prueba"}
+          </button>
+        </div>
         <button className="btn btn-primary" onClick={guardar} disabled={guardando} style={{ borderRadius: 8, fontWeight: 700, minWidth: 130 }}>
           {guardando
             ? <><span className="spinner-border spinner-border-sm me-1" />Guardando...</>
-            : <><i className="bi bi-floppy-fill me-1" />Guardar cambios</>}
+            : <><i className="bi bi-floppy-fill me-1" />Guardar correo</>}
         </button>
       </div>
     </div>

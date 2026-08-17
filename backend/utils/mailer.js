@@ -1,42 +1,81 @@
 const nodemailer = require("nodemailer");
+const pool = require("../db");
+const { decrypt } = require("./crypto");
 
-// Crea el transporter según la configuración .env
-// Si no hay SMTP_USER configurado, sólo imprime el email en consola (útil en dev sin cuenta email)
-function buildTransporter() {
-  if (!process.env.SMTP_USER) return null;
+// La config SMTP la puede editar el SUPER_ADMIN desde el panel (tabla config_smtp).
+// Si no hay nada guardado ahí, se usa el .env como respaldo (modo clásico).
+let cachedSmtp = null;
+let cachedAt = 0;
+const CACHE_TTL_MS = 60 * 1000;
 
-  return nodemailer.createTransport({
-    host:   process.env.SMTP_HOST || "smtp.gmail.com",
-    port:   Number(process.env.SMTP_PORT || 587),
-    secure: process.env.SMTP_SECURE === "true",
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASS,
-    },
-  });
+function invalidateSmtpCache() {
+  cachedSmtp = null;
+  cachedAt = 0;
 }
 
-const FROM = process.env.EMAIL_FROM || '"Multi-Clínica" <noreply@multiclinica.app>';
+async function getSmtpConfigFromDb() {
+  const now = Date.now();
+  if ((now - cachedAt) < CACHE_TTL_MS) return cachedSmtp;
+  try {
+    const [[row]] = await pool.query("SELECT * FROM config_smtp WHERE id=1 LIMIT 1");
+    cachedSmtp = (row?.smtp_user && row?.smtp_pass_enc)
+      ? {
+          host:   row.smtp_host || "smtp.gmail.com",
+          port:   Number(row.smtp_port || 587),
+          secure: !!row.smtp_secure,
+          user:   row.smtp_user,
+          pass:   decrypt(row.smtp_pass_enc),
+          from:   row.email_from || null,
+        }
+      : null;
+  } catch {
+    cachedSmtp = null;
+  }
+  cachedAt = now;
+  return cachedSmtp;
+}
+
+// Crea el transporter: primero intenta la config guardada por el SUPER_ADMIN (BD),
+// si no existe cae al .env. Si tampoco hay .env, sólo imprime en consola (modo dev).
+async function buildTransporter() {
+  const db = await getSmtpConfigFromDb();
+  const user = db?.user || process.env.SMTP_USER;
+  const pass = db?.pass || process.env.SMTP_PASS;
+  if (!user || !pass) return null;
+
+  const transporter = nodemailer.createTransport({
+    host:   db?.host || process.env.SMTP_HOST || "smtp.gmail.com",
+    port:   db?.port || Number(process.env.SMTP_PORT || 587),
+    secure: db ? db.secure : process.env.SMTP_SECURE === "true",
+    auth: { user, pass },
+  });
+  const from = db?.from || process.env.EMAIL_FROM || '"Multi-Clínica" <noreply@multiclinica.app>';
+  return { transporter, from };
+}
 
 /**
  * Envía un email.
- * @param {object} opts  { to, subject, html }
+ * @param {object} opts  { to, subject, html, attachments }
  * @returns Promise<object>  info de nodemailer (o objeto simulado)
  */
-async function enviarEmail({ to, subject, html }) {
-  const transporter = buildTransporter();
+async function enviarEmail({ to, subject, html, attachments }) {
+  const built = await buildTransporter();
 
-  if (!transporter) {
+  if (!built) {
     // Modo desarrollo sin SMTP configurado → solo log
     console.log("\n📧 [MAILER simulado]");
     console.log("  Para:    ", to);
     console.log("  Asunto:  ", subject);
     console.log("  HTML (resumen):", html.replace(/<[^>]*>/g, "").slice(0, 200));
+    if (attachments?.length) {
+      console.log("  Adjuntos:", attachments.map((a) => a.filename).join(", "));
+    }
     console.log("─────────────────────────────────\n");
     return { messageId: "simulado", simulated: true };
   }
 
-  return transporter.sendMail({ from: FROM, to, subject, html });
+  const { transporter, from } = built;
+  return transporter.sendMail({ from, to, subject, html, attachments });
 }
 
 // ────── Templates ──────────────────────────────────────
@@ -139,4 +178,184 @@ function templateResetPassword({ nombres, link, clinicaNombre }) {
   </html>`;
 }
 
-module.exports = { enviarEmail, templateVerificacion, templateBienvenida, templateCodigo2FA, templateResetPassword };
+const NOMBRE_PLAN = { trial: "Prueba (14 días)", semestral: "Semestral", anual: "Anual" };
+
+function templateSolicitudRecibida({ nombres, planNombre }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:12px; max-width:520px; margin:auto; padding:32px; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:24px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <h2 style="color:#0d6efd; margin:0 0 8px">¡Recibimos tu comprobante!</h2>
+      <p style="color:#475569">Hola <strong>${nombres}</strong>, recibimos tu solicitud del plan
+         <strong>${planNombre}</strong> junto con el comprobante de transferencia.</p>
+      <p style="color:#475569">Nuestro equipo validará el pago en banca en línea y te avisaremos
+         por este mismo correo apenas quede activado.</p>
+      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function templateSolicitudAprobada({ nombres, planNombre }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:16px; max-width:520px; margin:auto; overflow:hidden; box-shadow:0 4px 24px rgba(15,23,42,.06); }
+    .banner { background:linear-gradient(135deg,#10b981,#059669); padding:36px 32px 28px; text-align:center; }
+    .banner .emoji { font-size:44px; line-height:1; margin-bottom:8px; }
+    .banner h2 { color:#fff; margin:0; font-size:22px; }
+    .body { padding:28px 32px 32px; }
+    .steps { background:#f0fdf4; border:1px solid #bbf7d0; border-radius:10px; padding:14px 18px; margin:18px 0; }
+    .steps p { margin:4px 0; font-size:14px; color:#166534; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:24px; padding-bottom:8px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="banner">
+        <div class="emoji">🎉</div>
+        <h2>¡Felicidades, ${nombres}!</h2>
+      </div>
+      <div class="body">
+        <p style="color:#334155; font-size:15px; line-height:1.6;">
+          Confirmamos tu transferencia y con mucho gusto activamos tu plan
+          <strong style="color:#059669">${planNombre}</strong>. ¡Bienvenido/a a Multi-Clínica!
+        </p>
+        <div class="steps">
+          <p>📬 En unos minutos te llegará <strong>otro correo</strong> con tu usuario y contraseña.</p>
+          <p>🚀 Con eso ya podrás entrar al sistema y empezar a usarlo.</p>
+        </div>
+        <p style="color:#64748b; font-size:13px;">
+          Gracias por confiar en nosotros. Si tienes cualquier duda, estamos para ayudarte.
+        </p>
+      </div>
+      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function templateCredenciales({ nombres, email, password, loginUrl, clinicaNombre }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:16px; max-width:520px; margin:auto; overflow:hidden; box-shadow:0 4px 24px rgba(15,23,42,.06); }
+    .banner { background:linear-gradient(135deg,#0d6efd,#2563eb); padding:36px 32px 28px; text-align:center; }
+    .banner .emoji { font-size:44px; line-height:1; margin-bottom:8px; }
+    .banner h2 { color:#fff; margin:0; font-size:22px; }
+    .body { padding:28px 32px 32px; }
+    .creds { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:18px 20px; margin:20px 0; }
+    .creds .row { display:flex; justify-content:space-between; align-items:center; padding:6px 0; }
+    .creds .row + .row { border-top:1px dashed #e2e8f0; }
+    .creds .label { font-size:12px; color:#94a3b8; text-transform:uppercase; letter-spacing:.04em; }
+    .creds .value { font-size:15px; font-weight:700; color:#0f172a; font-family:'Courier New',monospace; }
+    .btn  { display:block; text-align:center; background:linear-gradient(135deg,#0d6efd,#2563eb); color:#fff !important;
+            padding:13px 0; border-radius:10px; text-decoration:none; font-weight:700; margin-top:16px; font-size:15px; }
+    .tip  { background:#fffbeb; border:1px solid #fde68a; border-radius:10px; padding:12px 16px; margin-top:18px; }
+    .tip p { margin:0; font-size:13px; color:#92400e; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:24px; padding-bottom:8px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="banner">
+        <div class="emoji">🔑</div>
+        <h2>¡Tu cuenta ya está lista!</h2>
+      </div>
+      <div class="body">
+        <p style="color:#334155; font-size:15px; line-height:1.6;">
+          Hola <strong>${nombres}</strong>, tu clínica <strong>${clinicaNombre}</strong> quedó configurada
+          y lista para usarse. Aquí tienes tus datos de acceso:
+        </p>
+        <div class="creds">
+          <div class="row"><span class="label">Usuario</span><span class="value">${email}</span></div>
+          <div class="row"><span class="label">Contraseña</span><span class="value">${password}</span></div>
+        </div>
+        <a class="btn" href="${loginUrl}">Ingresar al sistema →</a>
+        <div class="tip">
+          <p>🔒 Por tu seguridad, te recomendamos cambiar esta contraseña apenas ingreses por primera vez.</p>
+        </div>
+        <p style="color:#64748b; font-size:13px; margin-top:18px;">
+          ¡Gracias por confiar en nosotros para gestionar tu clínica! Cualquier duda, aquí estamos.
+        </p>
+      </div>
+      <div class="footer">© ${new Date().getFullYear()} ${clinicaNombre}</div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function templateSolicitudRechazada({ nombres, motivo }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family: 'Segoe UI', sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:12px; max-width:520px; margin:auto; padding:32px; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:24px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <h2 style="color:#dc3545; margin:0 0 8px">No pudimos validar tu pago</h2>
+      <p style="color:#475569">Hola <strong>${nombres}</strong>, no pudimos confirmar tu transferencia
+         con el comprobante enviado.</p>
+      ${motivo ? `<p style="color:#475569"><strong>Motivo:</strong> ${motivo}</p>` : ""}
+      <p style="color:#475569">Por favor contáctanos o vuelve a enviar tu solicitud con un comprobante válido.</p>
+      <div class="footer">© ${new Date().getFullYear()} Multi-Clínica</div>
+    </div>
+  </body>
+  </html>`;
+}
+
+function templateFacturaRecibo({ nombres, clinicaNombre, planNombre, monto, moneda, fecha, numeroRecibo }) {
+  const montoLabel = monto != null ? `${moneda || "PEN"} ${Number(monto).toFixed(2)}` : "—";
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family: 'Segoe UI', sans-serif; margin:0; padding:32px; color:#1e293b; }
+    .card { max-width:560px; margin:auto; border:1px solid #e2e8f0; border-radius:12px; padding:32px; }
+    h2 { color:#0d6efd; margin:0 0 4px }
+    table { width:100%; border-collapse:collapse; margin-top:20px; }
+    td { padding:8px 0; border-bottom:1px solid #e2e8f0; font-size:14px; }
+    td.label { color:#64748b; width:40%; }
+    .total { font-size:18px; font-weight:700; color:#0d6efd; }
+  </style></head>
+  <body>
+    <div class="card">
+      <h2>Recibo de pago</h2>
+      <p style="color:#64748b; font-size:13px; margin:0">N° ${numeroRecibo}</p>
+      <table>
+        <tr><td class="label">Cliente</td><td>${nombres}</td></tr>
+        <tr><td class="label">Clínica</td><td>${clinicaNombre}</td></tr>
+        <tr><td class="label">Plan</td><td>${planNombre}</td></tr>
+        <tr><td class="label">Fecha</td><td>${fecha}</td></tr>
+        <tr><td class="label">Total</td><td class="total">${montoLabel}</td></tr>
+      </table>
+    </div>
+  </body>
+  </html>`;
+}
+
+module.exports = {
+  enviarEmail,
+  invalidateSmtpCache,
+  templateVerificacion,
+  templateBienvenida,
+  templateCodigo2FA,
+  templateResetPassword,
+  templateSolicitudRecibida,
+  templateSolicitudAprobada,
+  templateCredenciales,
+  templateSolicitudRechazada,
+  templateFacturaRecibo,
+  NOMBRE_PLAN,
+};

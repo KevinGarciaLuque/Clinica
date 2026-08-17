@@ -44,6 +44,7 @@ export default function NavbarApp({ onMenuClick }) {
   // ── Notificaciones de solicitudes de licencia (solo SUPER_ADMIN) ──
   const [solicitudes, setSolicitudes]     = useState([]);
   const [reportes, setReportes]           = useState([]);
+  const [solicitudesPlan, setSolicitudesPlan] = useState([]);
   const [showDropdown, setShowDropdown]   = useState(false);
   const dropdownRef                       = useRef(null);
   const [showUserMenu, setShowUserMenu]   = useState(false);
@@ -193,6 +194,9 @@ export default function NavbarApp({ onMenuClick }) {
       api.get("/soporte/reportes")
         .then(r => setReportes(r.data.data || []))
         .catch(() => {});
+      api.get("/planes-publicos/solicitudes?estado=pendiente")
+        .then(r => setSolicitudesPlan(r.data.data || []))
+        .catch(() => {});
     };
     fetchTodo();
 
@@ -210,6 +214,17 @@ export default function NavbarApp({ onMenuClick }) {
           api.get("/soporte/reportes")
             .then(r => {
               setReportes(prev => {
+                const nuevos = r.data.data || [];
+                if (nuevos.length > prev.length) playNotificationSound();
+                return nuevos;
+              });
+            })
+            .catch(() => {});
+        });
+        es.addEventListener("nueva_solicitud_plan", () => {
+          api.get("/planes-publicos/solicitudes?estado=pendiente")
+            .then(r => {
+              setSolicitudesPlan(prev => {
                 const nuevos = r.data.data || [];
                 if (nuevos.length > prev.length) playNotificationSound();
                 return nuevos;
@@ -469,7 +484,7 @@ export default function NavbarApp({ onMenuClick }) {
           <div ref={dropdownRef} style={{ position: "relative" }}>
             {/* Botón campana — total = licencias + reportes */}
             {(() => {
-              const total = solicitudes.length + reportes.length;
+              const total = solicitudes.length + reportes.length + solicitudesPlan.length;
               return (
                 <button
                   onClick={() => setShowDropdown(v => !v)}
@@ -520,11 +535,11 @@ export default function NavbarApp({ onMenuClick }) {
                     Notificaciones
                   </span>
                   <span style={{
-                    background: (solicitudes.length + reportes.length) ? "rgba(245,158,11,.2)" : "rgba(255,255,255,.05)",
-                    color: (solicitudes.length + reportes.length) ? "#f59e0b" : "#94a3b8",
+                    background: (solicitudes.length + reportes.length + solicitudesPlan.length) ? "rgba(245,158,11,.2)" : "rgba(255,255,255,.05)",
+                    color: (solicitudes.length + reportes.length + solicitudesPlan.length) ? "#f59e0b" : "#94a3b8",
                     fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
                   }}>
-                    {solicitudes.length + reportes.length} pendiente{(solicitudes.length + reportes.length) !== 1 ? "s" : ""}
+                    {solicitudes.length + reportes.length + solicitudesPlan.length} pendiente{(solicitudes.length + reportes.length + solicitudesPlan.length) !== 1 ? "s" : ""}
                   </span>
                 </div>
 
@@ -560,6 +575,43 @@ export default function NavbarApp({ onMenuClick }) {
                                   borderRadius: 6, padding: "3px 9px", color, fontSize: 10, fontWeight: 700, cursor: "pointer",
                                 }}>
                                   <i className="bi bi-key-fill me-1" />Gestionar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </>
+                  )}
+
+                  {/* ── Sección: Solicitudes públicas de compra de plan ── */}
+                  {solicitudesPlan.length > 0 && (
+                    <>
+                      <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#10b981", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        <i className="bi bi-credit-card-fill me-1" /> Compra de plan
+                      </div>
+                      {solicitudesPlan.map(s => {
+                        const fecha = new Date(s.creado_en).toLocaleDateString("es-HN", { day: "2-digit", month: "short" });
+                        return (
+                          <div key={s.id} style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                              <div style={{
+                                width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                                background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.4)",
+                                display: "flex", alignItems: "center", justifyContent: "center",
+                              }}>
+                                <i className="bi bi-receipt" style={{ color: "#10b981", fontSize: 13 }} />
+                              </div>
+                              <div style={{ flex: 1, minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>{s.nombre_clinica}</div>
+                                <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
+                                  {s.nombres} {s.apellidos} · Plan <span style={{ color: "#10b981", fontWeight: 700 }}>{s.plan_solicitado}</span> · {fecha}
+                                </div>
+                                <button onClick={() => { navigate("/superadmin/solicitudes-plan"); setShowDropdown(false); }} style={{
+                                  marginTop: 5, background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.4)",
+                                  borderRadius: 6, padding: "3px 9px", color: "#10b981", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                }}>
+                                  <i className="bi bi-eye-fill me-1" />Revisar comprobante
                                 </button>
                               </div>
                             </div>
@@ -615,7 +667,7 @@ export default function NavbarApp({ onMenuClick }) {
                   )}
 
                   {/* Sin notificaciones */}
-                  {solicitudes.length === 0 && reportes.length === 0 && (
+                  {solicitudes.length === 0 && reportes.length === 0 && solicitudesPlan.length === 0 && (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
                       <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
                       Sin notificaciones pendientes

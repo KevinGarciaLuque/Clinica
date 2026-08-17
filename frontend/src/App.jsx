@@ -25,6 +25,7 @@ const RestablecerContrasena = lazy(() => import("./pages/RestablecerContrasena")
 const RecetaPublica     = lazy(() => import("./pages/RecetaPublica"));
 const PublicClinicaPage = lazy(() => import("./pages/PublicClinicaPage"));
 const DirectorioMedicos = lazy(() => import("./pages/DirectorioMedicos"));
+const SolicitarPlan     = lazy(() => import("./pages/SolicitarPlan"));
 
 // Admin
 const Usuarios     = lazy(() => import("./pages/admin/Usuarios"));
@@ -38,6 +39,7 @@ const Clinicas                 = lazy(() => import("./pages/superadmin/Clinicas"
 const Database                 = lazy(() => import("./pages/superadmin/Database"));
 const Reportes                 = lazy(() => import("./pages/superadmin/Reportes"));
 const SoporteHistorial         = lazy(() => import("./pages/superadmin/SoporteHistorial"));
+const SolicitudesPlan          = lazy(() => import("./pages/superadmin/SolicitudesPlan"));
 const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdminPersonalizacion"));
 const LandingPageAdmin          = lazy(() => import("./pages/superadmin/LandingPageAdmin"));
 const LandingPage               = lazy(() => import("./pages/LandingPage"));
@@ -121,6 +123,7 @@ export default function App() {
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
       <Route path="/agenda-tu-consulta" element={<DirectorioMedicos />} />
+      <Route path="/solicitar-plan"   element={<SolicitarPlan />} />
       <Route path="/inicio"           element={<LandingPage />} />
       <Route path="/links"            element={<LinksPage />} />
       <Route path="/"                         element={<LandingPage />} />
@@ -213,6 +216,11 @@ export default function App() {
         <Route path="/superadmin/soporte" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <SoporteHistorial />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/solicitudes-plan" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <SolicitudesPlan />
           </RolRoute>
         } />
         <Route path="/superadmin/personalizacion" element={

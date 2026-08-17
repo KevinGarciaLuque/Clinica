@@ -2,6 +2,7 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const { uploadSistemaMemory } = require("../middlewares/upload");
+const { encrypt } = require("../utils/crypto");
 
 const DEFAULTS = {
   nombre_sistema:      "Medic-KG",
@@ -132,6 +133,76 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
     res.json({ ok: true, data: rowsToObj(rows) });
   } catch (e) {
     console.error("[config-sistema PUT]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /api/config-sistema/smtp  (solo SUPER_ADMIN) ─────────────────────
+// Nunca devuelve la contraseña, solo si ya hay una guardada (`tiene_password`)
+router.get("/smtp", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const [[row]] = await pool.query("SELECT * FROM config_smtp WHERE id=1 LIMIT 1");
+    res.json({
+      ok: true,
+      data: {
+        smtp_host:   row?.smtp_host || "",
+        smtp_port:   row?.smtp_port || 587,
+        smtp_secure: !!row?.smtp_secure,
+        smtp_user:   row?.smtp_user || "",
+        email_from:  row?.email_from || "",
+        tiene_password: !!row?.smtp_pass_enc,
+      },
+    });
+  } catch (e) {
+    console.error("[config-sistema GET smtp]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── PUT /api/config-sistema/smtp  (solo SUPER_ADMIN) ──────────────────────
+// Si `smtp_pass` viene vacío, conserva la contraseña ya guardada.
+router.put("/smtp", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const { smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass, email_from } = req.body;
+
+    const [[actual]] = await pool.query("SELECT smtp_pass_enc FROM config_smtp WHERE id=1 LIMIT 1");
+    const passEnc = smtp_pass ? encrypt(smtp_pass) : (actual?.smtp_pass_enc || null);
+
+    await pool.query(
+      `INSERT INTO config_smtp (id, smtp_host, smtp_port, smtp_secure, smtp_user, smtp_pass_enc, email_from)
+       VALUES (1, ?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         smtp_host=VALUES(smtp_host), smtp_port=VALUES(smtp_port), smtp_secure=VALUES(smtp_secure),
+         smtp_user=VALUES(smtp_user), smtp_pass_enc=VALUES(smtp_pass_enc), email_from=VALUES(email_from)`,
+      [smtp_host || null, smtp_port || null, smtp_secure ? 1 : 0, smtp_user || null, passEnc, email_from || null]
+    );
+
+    require("../utils/mailer").invalidateSmtpCache();
+    res.json({ ok: true, msg: "Configuración de correo guardada" });
+  } catch (e) {
+    console.error("[config-sistema PUT smtp]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── POST /api/config-sistema/smtp/probar  (solo SUPER_ADMIN) ─────────────
+// Envía un correo de prueba a la dirección indicada usando la config guardada
+router.post("/smtp/probar", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const { destino } = req.body;
+    if (!destino) return res.status(400).json({ ok: false, msg: "Falta el correo de destino" });
+    const { enviarEmail } = require("../utils/mailer");
+    const info = await enviarEmail({
+      to: destino,
+      subject: "Correo de prueba — Multi-Clínica",
+      html: "<p>Si recibiste este correo, tu configuración SMTP funciona correctamente.</p>",
+    });
+    if (info?.simulated) {
+      return res.json({ ok: true, simulado: true, msg: "SMTP no configurado: se simuló en consola, no se envió de verdad." });
+    }
+    res.json({ ok: true, msg: "Correo de prueba enviado" });
+  } catch (e) {
+    console.error("[config-sistema smtp probar]", e);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });
