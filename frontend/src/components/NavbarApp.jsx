@@ -4,6 +4,7 @@ import { useAuth } from "../auth/AuthContext";
 import { useConfigSistema } from "../context/ConfigSistemaContext";
 import api from "../api/api";
 import ModalAyudaSoporte from "./ModalAyudaSoporte";
+import ModalResenaEncuesta from "./ModalResenaEncuesta";
 import { playNotificationSound } from "../utils/notificationSound";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -54,6 +55,9 @@ export default function NavbarApp({ onMenuClick }) {
   const [notifsPortal, setNotifsPortal]       = useState([]);
   const [showRespuestasDD, setShowRespuestasDD] = useState(false);
   const respuestasRef                         = useRef(null);
+  const [encuestasResena, setEncuestasResena] = useState([]); // encuestas de reseña pendientes (usuario regular)
+  const [modalResenaToken, setModalResenaToken] = useState(null);
+  const [resenasPendientes, setResenasPendientes] = useState([]); // reseñas respondidas por aprobar (SUPER_ADMIN)
 
   // ── Cumpleañeros (usuarios regulares no-super) ──────────────────
   const [cumpleaneros, setCumpleaneros]         = useState([]);
@@ -77,10 +81,12 @@ export default function NavbarApp({ onMenuClick }) {
     Promise.all([
       api.get("/soporte/mis-respuestas"),
       api.get("/soporte/notificaciones-portal"),
+      api.get("/resenas/mis-pendientes"),
     ])
-      .then(([respSoporte, respPortal]) => {
+      .then(([respSoporte, respPortal, respResenas]) => {
         setMisRespuestas(respSoporte.data.data || []);
         setNotifsPortal(respPortal.data.data || []);
+        setEncuestasResena(respResenas.data.data || []);
       })
       .catch(() => {});
 
@@ -115,6 +121,14 @@ export default function NavbarApp({ onMenuClick }) {
               creado_en: new Date().toISOString(),
               _live: true,
             }, ...prev];
+          });
+        });
+        es.addEventListener("nueva_encuesta_resena", (e) => {
+          const d = JSON.parse(e.data);
+          setEncuestasResena(prev => {
+            if (prev.find(r => r.token === d.token)) return prev;
+            playNotificationSound();
+            return [{ token: d.token, nombre_medico: d.nombre_medico, especialidad: "", lugar: "", enviada_en: new Date().toISOString() }, ...prev];
           });
         });
         // Al expirar el token (401) el browser cierra la conexión; reconectar con nuevo token
@@ -197,6 +211,9 @@ export default function NavbarApp({ onMenuClick }) {
       api.get("/planes-publicos/solicitudes?estado=pendiente")
         .then(r => setSolicitudesPlan(r.data.data || []))
         .catch(() => {});
+      api.get("/resenas")
+        .then(r => setResenasPendientes((r.data.data || []).filter(x => x.estado === "respondida" && !x.activo)))
+        .catch(() => {});
     };
     fetchTodo();
 
@@ -228,6 +245,17 @@ export default function NavbarApp({ onMenuClick }) {
                 const nuevos = r.data.data || [];
                 if (nuevos.length > prev.length) playNotificationSound();
                 return nuevos;
+              });
+            })
+            .catch(() => {});
+        });
+        es.addEventListener("nueva_resena_recibida", () => {
+          api.get("/resenas")
+            .then(r => {
+              const nuevas = (r.data.data || []).filter(x => x.estado === "respondida" && !x.activo);
+              setResenasPendientes(prev => {
+                if (nuevas.length > prev.length) playNotificationSound();
+                return nuevas;
               });
             })
             .catch(() => {});
@@ -391,6 +419,20 @@ export default function NavbarApp({ onMenuClick }) {
     } catch {}
   };
 
+  const aceptarResena = async (id) => {
+    try {
+      await api.put(`/resenas/${id}/activo`, { activo: true });
+      setResenasPendientes(prev => prev.filter(r => r.id !== id));
+    } catch {}
+  };
+
+  const rechazarResena = async (id) => {
+    try {
+      await api.delete(`/resenas/${id}`);
+      setResenasPendientes(prev => prev.filter(r => r.id !== id));
+    } catch {}
+  };
+
   return (
     <>
     <style>{`
@@ -484,7 +526,7 @@ export default function NavbarApp({ onMenuClick }) {
           <div ref={dropdownRef} style={{ position: "relative" }}>
             {/* Botón campana — total = licencias + reportes */}
             {(() => {
-              const total = solicitudes.length + reportes.length + solicitudesPlan.length;
+              const total = solicitudes.length + reportes.length + solicitudesPlan.length + resenasPendientes.length;
               return (
                 <button
                   onClick={() => setShowDropdown(v => !v)}
@@ -535,11 +577,11 @@ export default function NavbarApp({ onMenuClick }) {
                     Notificaciones
                   </span>
                   <span style={{
-                    background: (solicitudes.length + reportes.length + solicitudesPlan.length) ? "rgba(245,158,11,.2)" : "rgba(255,255,255,.05)",
-                    color: (solicitudes.length + reportes.length + solicitudesPlan.length) ? "#f59e0b" : "#94a3b8",
+                    background: (solicitudes.length + reportes.length + solicitudesPlan.length + resenasPendientes.length) ? "rgba(245,158,11,.2)" : "rgba(255,255,255,.05)",
+                    color: (solicitudes.length + reportes.length + solicitudesPlan.length + resenasPendientes.length) ? "#f59e0b" : "#94a3b8",
                     fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
                   }}>
-                    {solicitudes.length + reportes.length + solicitudesPlan.length} pendiente{(solicitudes.length + reportes.length + solicitudesPlan.length) !== 1 ? "s" : ""}
+                    {solicitudes.length + reportes.length + solicitudesPlan.length + resenasPendientes.length} pendiente{(solicitudes.length + reportes.length + solicitudesPlan.length + resenasPendientes.length) !== 1 ? "s" : ""}
                   </span>
                 </div>
 
@@ -621,6 +663,53 @@ export default function NavbarApp({ onMenuClick }) {
                     </>
                   )}
 
+                  {/* ── Sección: Reseñas por aprobar ── */}
+                  {resenasPendientes.length > 0 && (
+                    <>
+                      <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                        <i className="bi bi-star-fill me-1" /> Reseñas nuevas
+                      </div>
+                      {resenasPendientes.map(r => (
+                        <div key={r.id} style={{ padding: "10px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                          <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                            <div style={{
+                              width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                              background: "rgba(251,191,36,.15)", border: "1px solid rgba(251,191,36,.4)",
+                              display: "flex", alignItems: "center", justifyContent: "center",
+                            }}>
+                              <i className="bi bi-star-fill" style={{ color: "#fbbf24", fontSize: 13 }} />
+                            </div>
+                            <div style={{ flex: 1, minWidth: 0 }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>{r.nombre_medico}</div>
+                              <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1, marginBottom: 4 }}>
+                                {Array.from({ length: 5 }).map((_, i) => (
+                                  <i key={i} className={`bi ${i < r.estrellas ? "bi-star-fill" : "bi-star"}`} style={{ color: "#fbbf24", fontSize: 10 }} />
+                                ))}
+                              </div>
+                              <div style={{ fontSize: 11, color: "rgba(255,255,255,.6)", marginBottom: 8, lineHeight: 1.4 }}>
+                                "{r.opinion}"
+                              </div>
+                              <div style={{ display: "flex", gap: 6 }}>
+                                <button onClick={() => aceptarResena(r.id)} style={{
+                                  background: "rgba(16,185,129,.2)", border: "1px solid rgba(16,185,129,.5)",
+                                  borderRadius: 6, padding: "4px 11px", color: "#10b981", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                }}>
+                                  <i className="bi bi-check-lg me-1" />Aceptar
+                                </button>
+                                <button onClick={() => rechazarResena(r.id)} style={{
+                                  background: "rgba(239,68,68,.15)", border: "1px solid rgba(239,68,68,.4)",
+                                  borderRadius: 6, padding: "4px 11px", color: "#f87171", fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                }}>
+                                  <i className="bi bi-x-lg me-1" />Rechazar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </>
+                  )}
+
                   {/* ── Sección: Reportes de soporte ── */}
                   {reportes.length > 0 && (
                     <>
@@ -667,7 +756,7 @@ export default function NavbarApp({ onMenuClick }) {
                   )}
 
                   {/* Sin notificaciones */}
-                  {solicitudes.length === 0 && reportes.length === 0 && solicitudesPlan.length === 0 && (
+                  {solicitudes.length === 0 && reportes.length === 0 && solicitudesPlan.length === 0 && resenasPendientes.length === 0 && (
                     <div style={{ padding: "24px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
                       <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
                       Sin notificaciones pendientes
@@ -702,7 +791,7 @@ export default function NavbarApp({ onMenuClick }) {
         {!user?.super && (
           <div ref={respuestasRef} style={{ position: "relative" }}>
             {(() => {
-              const totalNotifs = misRespuestas.length + notifsPortal.length;
+              const totalNotifs = misRespuestas.length + notifsPortal.length + encuestasResena.length;
               return (
             <button
               onClick={() => setShowRespuestasDD(v => !v)}
@@ -754,7 +843,7 @@ export default function NavbarApp({ onMenuClick }) {
                     background: "rgba(16,185,129,.2)", color: "#10b981",
                     fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 7px",
                   }}>
-                    {misRespuestas.length + notifsPortal.length} pendiente{(misRespuestas.length + notifsPortal.length) !== 1 ? "s" : ""}
+                    {misRespuestas.length + notifsPortal.length + encuestasResena.length} pendiente{(misRespuestas.length + notifsPortal.length + encuestasResena.length) !== 1 ? "s" : ""}
                   </span>
                 </div>
 
@@ -820,7 +909,7 @@ export default function NavbarApp({ onMenuClick }) {
                                 </div>
                               ) : (
                                 <button
-                                  onClick={() => { marcarNotifPortalLeida(n.id); if ((misRespuestas.length + notifsPortal.length) <= 1) setShowRespuestasDD(false); }}
+                                  onClick={() => { marcarNotifPortalLeida(n.id); if ((misRespuestas.length + notifsPortal.length + encuestasResena.length) <= 1) setShowRespuestasDD(false); }}
                                   style={{
                                     background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
                                     borderRadius: 6, padding: "4px 10px", color: "#7dd3fc",
@@ -835,6 +924,45 @@ export default function NavbarApp({ onMenuClick }) {
                         </div>
                       );
                     })}
+                  </>
+                )}
+
+                {encuestasResena.length > 0 && (
+                  <>
+                    <div style={{ padding: "8px 16px 4px", fontSize: 11, fontWeight: 700, color: "#fbbf24", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                      <i className="bi bi-star-fill me-1" /> Encuestas
+                    </div>
+                    {encuestasResena.map((r) => (
+                      <div key={r.token} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
+                        <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+                          <div style={{
+                            width: 34, height: 34, borderRadius: 10, flexShrink: 0,
+                            background: "rgba(251,191,36,.15)", border: "1px solid rgba(251,191,36,.35)",
+                            display: "flex", alignItems: "center", justifyContent: "center",
+                          }}>
+                            <i className="bi bi-star-fill" style={{ color: "#fbbf24", fontSize: 14 }} />
+                          </div>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0", marginBottom: 3 }}>
+                              ¡Cuéntanos tu experiencia!
+                            </div>
+                            <div style={{ fontSize: 11, color: "rgba(255,255,255,.5)", marginBottom: 8 }}>
+                              Tu opinión nos ayuda a mejorar. Toma menos de un minuto.
+                            </div>
+                            <button
+                              onClick={() => { setModalResenaToken(r.token); setShowRespuestasDD(false); }}
+                              style={{
+                                background: "rgba(251,191,36,.18)", border: "1px solid rgba(251,191,36,.4)",
+                                borderRadius: 6, padding: "4px 11px", color: "#fbbf24",
+                                fontSize: 11, fontWeight: 700, cursor: "pointer",
+                              }}
+                            >
+                              <i className="bi bi-star-fill me-1" />Dejar mi reseña
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </>
                 )}
 
@@ -861,7 +989,7 @@ export default function NavbarApp({ onMenuClick }) {
                               {r.respuesta}
                             </div>
                             <button
-                              onClick={() => { marcarRespuestaLeida(r.id); if ((misRespuestas.length + notifsPortal.length) <= 1) setShowRespuestasDD(false); }}
+                              onClick={() => { marcarRespuestaLeida(r.id); if ((misRespuestas.length + notifsPortal.length + encuestasResena.length) <= 1) setShowRespuestasDD(false); }}
                               style={{
                                 background: "rgba(16,185,129,.15)", border: "1px solid rgba(16,185,129,.3)",
                                 borderRadius: 6, padding: "4px 10px", color: "#10b981",
@@ -877,7 +1005,7 @@ export default function NavbarApp({ onMenuClick }) {
                   </>
                 )}
 
-                {misRespuestas.length === 0 && notifsPortal.length === 0 ? (
+                {misRespuestas.length === 0 && notifsPortal.length === 0 && encuestasResena.length === 0 ? (
                   <div style={{ padding: "28px 16px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
                     <i className="bi bi-check-circle" style={{ fontSize: 22, display: "block", marginBottom: 8, color: "#10b981" }} />
                     Sin notificaciones pendientes
@@ -1255,6 +1383,15 @@ export default function NavbarApp({ onMenuClick }) {
     )}
 
     <ModalAyudaSoporte open={showAyuda} onClose={() => setShowAyuda(false)} />
+
+    {/* ⭐ Modal de encuesta de reseña (enviada "por el sistema") */}
+    {modalResenaToken && (
+      <ModalResenaEncuesta
+        token={modalResenaToken}
+        onClose={() => setModalResenaToken(null)}
+        onEnviada={(token) => setEncuestasResena(prev => prev.filter(r => r.token !== token))}
+      />
+    )}
 
     {/* 🎂 Modal de felicitación de cumpleaños */}
     {modalFelicitar && (

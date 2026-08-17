@@ -10,6 +10,7 @@ export default function ResenasMedicos() {
   const [medicos, setMedicos]       = useState([]);
   const [clinicaId, setClinicaId]   = useState("");
   const [usuarioId, setUsuarioId]   = useState("");
+  const [canal, setCanal]           = useState("correo");
   const [enviando, setEnviando]     = useState(false);
   const [msg, setMsg]               = useState(null);
 
@@ -38,8 +39,9 @@ export default function ResenasMedicos() {
     setEnviando(true);
     setMsg(null);
     try {
-      await api.post("/resenas/solicitar", { usuario_id: usuarioId });
-      setMsg({ ok: true, text: "Encuesta enviada por correo." });
+      await api.post("/resenas/solicitar", { usuario_id: usuarioId, canal });
+      const textoCanal = canal === "correo" ? "por correo" : canal === "sistema" ? "en el sistema (campanita)" : "por correo y en el sistema";
+      setMsg({ ok: true, text: `Encuesta enviada ${textoCanal}.` });
       setUsuarioId("");
       cargarResenas();
     } catch (err) {
@@ -91,6 +93,24 @@ export default function ResenasMedicos() {
                 {enviando ? "Enviando..." : "Enviar"}
               </button>
             </div>
+            <div className="col-12">
+              <label className="form-label small fw-semibold d-block">Enviar por</label>
+              <div className="btn-group" role="group">
+                {[
+                  { id: "correo", label: "Correo", icon: "bi-envelope" },
+                  { id: "sistema", label: "Sistema (campanita)", icon: "bi-bell" },
+                  { id: "ambos", label: "Ambos", icon: "bi-broadcast" },
+                ].map((op) => (
+                  <button
+                    key={op.id} type="button"
+                    className={`btn btn-sm ${canal === op.id ? "btn-warning" : "btn-outline-secondary"}`}
+                    onClick={() => setCanal(op.id)}
+                  >
+                    <i className={`bi ${op.icon} me-1`} />{op.label}
+                  </button>
+                ))}
+              </div>
+            </div>
           </form>
         </div>
       </div>
@@ -108,9 +128,13 @@ export default function ResenasMedicos() {
                 <div className="card-body">
                   <div className="d-flex justify-content-between align-items-start mb-1">
                     <div className="fw-bold">{r.nombre_medico}</div>
-                    <span className={`badge ${r.estado === "respondida" ? "bg-success" : "bg-secondary"}`}>
-                      {r.estado === "respondida" ? "Respondida" : "Pendiente"}
-                    </span>
+                    {r.estado !== "respondida" ? (
+                      <span className="badge bg-secondary">Sin responder</span>
+                    ) : r.activo ? (
+                      <span className="badge bg-success">Publicada</span>
+                    ) : (
+                      <span className="badge bg-warning text-dark">Por aprobar</span>
+                    )}
                   </div>
                   <div className="text-muted small mb-2">
                     {r.especialidad || "—"} · {r.lugar || "—"} {r.clinica_nombre ? `· ${r.clinica_nombre}` : ""}
@@ -127,8 +151,8 @@ export default function ResenasMedicos() {
                   )}
                   <div className="d-flex gap-2 mt-2">
                     {r.estado === "respondida" && (
-                      <button className={`btn btn-sm flex-fill ${r.activo ? "btn-outline-secondary" : "btn-outline-success"}`} onClick={() => toggleActivo(r)}>
-                        <i className={`bi ${r.activo ? "bi-eye-slash" : "bi-eye"} me-1`} />{r.activo ? "Ocultar de landing" : "Mostrar en landing"}
+                      <button className={`btn btn-sm flex-fill ${r.activo ? "btn-outline-secondary" : "btn-success"}`} onClick={() => toggleActivo(r)}>
+                        <i className={`bi ${r.activo ? "bi-eye-slash" : "bi-check-lg"} me-1`} />{r.activo ? "Ocultar de landing" : "Aceptar y publicar"}
                       </button>
                     )}
                     <button className="btn btn-sm btn-outline-danger" onClick={() => eliminar(r)}>
