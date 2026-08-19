@@ -8,7 +8,13 @@
 const router = require("express").Router();
 const pool   = require("../db");
 const argon2 = require("argon2");
+const crypto = require("crypto");
 const auth   = require("../middlewares/auth");
+const { enviarEmail, templateCredenciales } = require("../utils/mailer");
+
+function generarPassword() {
+  return crypto.randomBytes(9).toString("base64url");
+}
 
 // ──────────────────────────────────────────────
 // GET /api/usuarios  → lista de usuarios de la clínica
@@ -245,6 +251,48 @@ router.post("/:id/reset-password", auth("SUPER_ADMIN","ADMIN"), async (req, res)
     const hash = await argon2.hash(nueva_password);
     await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, req.params.id]);
     res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /api/usuarios/:id/reenviar-credenciales  (SUPER_ADMIN, ADMIN)
+// Genera una contraseña nueva para el usuario y se la envía por correo.
+router.post("/:id/reenviar-credenciales", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
+  try {
+    const [[usuario]] = await pool.query(
+      `SELECT u.id, u.nombres, u.apellidos, u.email, u.tipo, u.clinica_id, c.nombre AS clinica_nombre
+       FROM usuarios u
+       LEFT JOIN clinicas c ON c.id = u.clinica_id
+       WHERE u.id=? LIMIT 1`,
+      [req.params.id]
+    );
+    if (!usuario) return res.status(404).json({ ok: false, msg: "Usuario no encontrado" });
+    if (!req.user.super && Number(usuario.clinica_id) !== Number(req.user.clinica_id)) {
+      return res.status(403).json({ ok: false, msg: "No autorizado" });
+    }
+    if (!usuario.email) {
+      return res.status(409).json({ ok: false, msg: "Este usuario no tiene correo registrado" });
+    }
+
+    const password = generarPassword();
+    const hash = await argon2.hash(password);
+    await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, usuario.id]);
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    await enviarEmail({
+      to: usuario.email,
+      subject: "🔑 Tus credenciales de acceso",
+      html: templateCredenciales({
+        nombres: `${usuario.nombres} ${usuario.apellidos}`,
+        email: usuario.email,
+        password,
+        loginUrl: `${frontendUrl}/login`,
+        clinicaNombre: usuario.clinica_nombre,
+      }),
+    });
+
+    res.json({ ok: true, msg: "Credenciales reenviadas" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

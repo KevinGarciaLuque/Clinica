@@ -67,6 +67,9 @@ export default function Usuarios() {
   const [deleteConfirm, setDeleteConfirm] = useState({ id: null, nombre: "", texto: "" });
   const [showResetPass, setShowResetPass] = useState(false);
   const [showPass,      setShowPass]      = useState(false);
+  const [reenviarCred, setReenviarCred]   = useState({ id: null, nombre: "", email: "" });
+  const [reenviandoCred, setReenviandoCred] = useState(false);
+  const [credEnviada, setCredEnviada]     = useState(false);
 
   useEffect(() => {
     if (!esSuperAdmin) return;
@@ -134,6 +137,15 @@ export default function Usuarios() {
       await api.post(`/usuarios/${resetPass.id}/reset-password`, { nueva_password: resetPass.pass });
       setResetPass({ id: null, pass: "" });
     } catch (e) { setError(e.response?.data?.msg || e.message); }
+  };
+
+  const confirmarReenvioCred = async () => {
+    setError(""); setReenviandoCred(true);
+    try {
+      await api.post(`/usuarios/${reenviarCred.id}/reenviar-credenciales`);
+      setCredEnviada(true);
+    } catch (e) { setError(e.response?.data?.msg || e.message); }
+    finally { setReenviandoCred(false); }
   };
 
   const eliminarUsuario = async () => {
@@ -347,6 +359,8 @@ export default function Usuarios() {
                       />
                       <ActionBtn icon="bi-key-fill" color="#8b5cf6" title="Contraseña"
                         onClick={() => { setResetPass({ id: u.id, pass: "" }); setShowResetPass(false); }} />
+                      <ActionBtn icon="bi-envelope-arrow-up-fill" color="#f59e0b" title="Reenviar credenciales por correo"
+                        onClick={() => { setReenviarCred({ id: u.id, nombre: `${u.nombres} ${u.apellidos}`, email: u.email }); setCredEnviada(false); setError(""); }} />
                       <ActionBtn icon="bi-trash3-fill" color="#ef4444" title="Eliminar"
                         onClick={() => setDeleteConfirm({ id: u.id, nombre: `${u.nombres} ${u.apellidos}`, texto: "" })} />
                     </div>
@@ -647,6 +661,66 @@ export default function Usuarios() {
                 <i className="bi bi-check-lg me-1" />
                 Cambiar contraseña
               </button>
+            </ModalFooter>
+          </div>
+        </ModalOverlay>,
+        document.body
+      )}
+
+      {/* ── Modal reenviar credenciales por correo ── */}
+      {reenviarCred.id && createPortal(
+        <ModalOverlay onClose={() => setReenviarCred({ id: null, nombre: "", email: "" })} maxWidth={440}>
+          <div>
+            <ModalHeader
+              title="Reenviar credenciales"
+              icon="bi-envelope-arrow-up-fill"
+              color="#f59e0b"
+              onClose={() => setReenviarCred({ id: null, nombre: "", email: "" })}
+            />
+            <div style={{ padding: "20px 24px" }}>
+              {error && <ErrorAlert msg={error} />}
+              {credEnviada ? (
+                <div style={{
+                  background: "#f0fdf4", border: "1px solid #bbf7d0",
+                  borderRadius: 8, padding: "14px 16px", display: "flex", gap: 10, alignItems: "center",
+                }}>
+                  <i className="bi bi-check-circle-fill" style={{ color: "#16a34a", fontSize: 18 }} />
+                  <span style={{ fontSize: 13, color: "#166534" }}>
+                    Credenciales enviadas a <strong>{reenviarCred.email}</strong>.
+                  </span>
+                </div>
+              ) : (
+                <>
+                  <p style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>
+                    Se generará una <strong>contraseña nueva</strong> para:
+                  </p>
+                  <p style={{ fontWeight: 700, color: "#1e293b", fontSize: 14, marginBottom: 12 }}>
+                    <i className="bi bi-person-fill me-2" />{reenviarCred.nombre}
+                  </p>
+                  <div style={{
+                    background: "#fffbeb", border: "1px solid #fde68a",
+                    borderRadius: 8, padding: "12px 14px", fontSize: 12.5, color: "#92400e", lineHeight: 1.6,
+                  }}>
+                    Se enviará a <strong>{reenviarCred.email || "(sin correo)"}</strong>.
+                    La contraseña anterior dejará de funcionar de inmediato — si el usuario
+                    tiene una sesión abierta, no se cerrará, pero deberá usar la nueva contraseña
+                    la próxima vez que inicie sesión.
+                  </div>
+                </>
+              )}
+            </div>
+            <ModalFooter>
+              <button className="btn btn-light" onClick={() => setReenviarCred({ id: null, nombre: "", email: "" })}>
+                {credEnviada ? "Cerrar" : "Cancelar"}
+              </button>
+              {!credEnviada && (
+                <button className="btn px-4" onClick={confirmarReenvioCred}
+                  disabled={reenviandoCred || !reenviarCred.email}
+                  style={{ background: "#f59e0b", borderColor: "#f59e0b", color: "#fff" }}>
+                  <i className="bi bi-send-fill me-1" />
+                  {reenviandoCred ? "Enviando..." : "Sí, reenviar"}
+                </button>
+              )}
             </ModalFooter>
           </div>
         </ModalOverlay>,

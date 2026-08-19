@@ -2,12 +2,18 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const argon2 = require("argon2");
+const crypto = require("crypto");
 const { seedPacienteDemo } = require("../utils/seedPacienteDemo");
 const cloudinary  = require("../utils/cloudinary");
 const multer      = require("multer");
 const streamifier = require("streamifier");
 const fs          = require("fs");
 const path        = require("path");
+const { enviarEmail, templateCredenciales } = require("../utils/mailer");
+
+function generarPassword() {
+  return crypto.randomBytes(9).toString("base64url");
+}
 
 const USE_CLOUDINARY = !!(process.env.CLOUDINARY_CLOUD_NAME || process.env.CLOUDINARY_URL);
 
@@ -716,6 +722,50 @@ router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req,
       [id]
     );
     res.json({ ok: true, data: { ...rows[0], config } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /api/clinicas/:id/reenviar-credenciales  (SUPER_ADMIN)
+// Genera una contraseña nueva para el admin de la clínica y se la reenvía por correo.
+router.post("/:id/reenviar-credenciales", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId = req.params.id;
+
+    const [[clinica]] = await pool.query(
+      "SELECT id, nombre FROM clinicas WHERE id=? LIMIT 1",
+      [clinicaId]
+    );
+    if (!clinica) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+
+    const [[admin]] = await pool.query(
+      `SELECT id, nombres, apellidos, email FROM usuarios
+       WHERE clinica_id=? AND tipo='ADMIN' ORDER BY id ASC LIMIT 1`,
+      [clinicaId]
+    );
+    if (!admin || !admin.email) {
+      return res.status(409).json({ ok: false, msg: "Esta clínica no tiene un usuario administrador con correo registrado" });
+    }
+
+    const password = generarPassword();
+    const hash = await argon2.hash(password);
+    await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, admin.id]);
+
+    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    await enviarEmail({
+      to: admin.email,
+      subject: "🔑 Tus credenciales de acceso",
+      html: templateCredenciales({
+        nombres: `${admin.nombres} ${admin.apellidos}`,
+        email: admin.email,
+        password,
+        loginUrl: `${frontendUrl}/login`,
+        clinicaNombre: clinica.nombre,
+      }),
+    });
+
+    res.json({ ok: true, msg: "Credenciales reenviadas" });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

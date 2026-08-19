@@ -61,6 +61,11 @@ export default function Clinicas() {
   const [clinicaEliminar, setClinicaEliminar] = useState(null);
   const [textoConfirmacion, setTextoConfirmacion] = useState("");
 
+  // Modal de reenvío de credenciales
+  const [modalCredenciales, setModalCredenciales] = useState(false);
+  const [clinicaCredenciales, setClinicaCredenciales] = useState(null);
+  const [reenviandoCred, setReenviandoCred] = useState(false);
+
   // Modal de configuración de módulos
   const [showModulosModal, setShowModulosModal] = useState(false);
   const [allModulos, setAllModulos] = useState([]);
@@ -202,6 +207,27 @@ export default function Clinicas() {
       cargar();
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const abrirReenviarCredenciales = (c) => {
+    setClinicaCredenciales(c);
+    setError("");
+    setModalCredenciales(true);
+  };
+
+  const confirmarReenvioCredenciales = async () => {
+    if (!clinicaCredenciales) return;
+    setReenviandoCred(true);
+    setError("");
+    try {
+      await api.post(`/clinicas/${clinicaCredenciales.id}/reenviar-credenciales`);
+      setModalCredenciales(false);
+      setClinicaCredenciales(null);
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    } finally {
+      setReenviandoCred(false);
     }
   };
 
@@ -781,6 +807,20 @@ export default function Clinicas() {
                     onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
                   >
                     <i className="bi bi-key-fill" />
+                  </button>
+                  <button
+                    onClick={() => abrirReenviarCredenciales(c)}
+                    title="Reenviar credenciales de acceso al administrador"
+                    style={{
+                      background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.25)",
+                      borderRadius: 8, padding: "8px 10px",
+                      color: C.warning, fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(245,158,11,.18)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(245,158,11,.08)"}
+                  >
+                    <i className="bi bi-envelope-arrow-up-fill" />
                   </button>
                   <button
                     onClick={() => abrirEditar(c)}
@@ -1406,6 +1446,110 @@ export default function Clinicas() {
               >
                 <i className="bi bi-trash-fill" />
                 Eliminar permanentemente
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Modal: confirmar reenvío de credenciales ── */}
+      {modalCredenciales && clinicaCredenciales && createPortal(
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9000,
+          background: "rgba(0,0,0,.72)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: `1px solid rgba(245,158,11,.4)`,
+            borderRadius: 18, width: "100%", maxWidth: 480,
+            boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+          }}>
+            {/* Header modal */}
+            <div style={{
+              padding: "20px 24px", borderBottom: `1px solid ${C.border}`,
+              display: "flex", alignItems: "center", gap: 12,
+            }}>
+              <div style={{
+                width: 40, height: 40, borderRadius: 10,
+                background: "rgba(245,158,11,.15)", border: "1px solid rgba(245,158,11,.3)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-envelope-arrow-up-fill" style={{ color: "#f59e0b", fontSize: 17 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h5 style={{ margin: 0, fontWeight: 700, color: C.text, fontSize: 16 }}>
+                  Reenviar credenciales
+                </h5>
+                <span style={{ fontSize: 12, color: C.muted }}>{clinicaCredenciales.nombre}</span>
+              </div>
+              <button
+                onClick={() => { setModalCredenciales(false); setClinicaCredenciales(null); setError(""); }}
+                style={{
+                  background: "rgba(255,255,255,.05)", border: `1px solid ${C.border}`,
+                  borderRadius: 8, width: 32, height: 32,
+                  color: C.muted, cursor: "pointer", fontSize: 15,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                <i className="bi bi-x-lg" />
+              </button>
+            </div>
+
+            {/* Body modal */}
+            <div style={{ padding: "20px 24px" }}>
+              {error && (
+                <div style={{
+                  background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)",
+                  borderRadius: 10, padding: "12px 16px", marginBottom: 16, color: "#f87171",
+                  display: "flex", alignItems: "center", gap: 10, fontSize: 14,
+                }}>
+                  <i className="bi bi-exclamation-triangle-fill" /> {error}
+                </div>
+              )}
+              <div style={{
+                background: "rgba(245,158,11,.08)", border: "1px solid rgba(245,158,11,.2)",
+                borderRadius: 10, padding: "14px 16px", fontSize: 13, color: C.muted, lineHeight: 1.6,
+              }}>
+                Se generará una <strong style={{ color: C.text }}>contraseña nueva</strong> para el administrador
+                de esta clínica y se le enviará por correo. La contraseña anterior dejará de funcionar
+                de inmediato — si el administrador tiene una sesión abierta, no se cerrará, pero al
+                volver a iniciar sesión deberá usar la nueva contraseña.
+              </div>
+            </div>
+
+            {/* Footer modal */}
+            <div style={{
+              padding: "16px 24px", borderTop: `1px solid ${C.border}`,
+              display: "flex", justifyContent: "flex-end", gap: 12,
+            }}>
+              <button
+                type="button"
+                onClick={() => { setModalCredenciales(false); setClinicaCredenciales(null); setError(""); }}
+                disabled={reenviandoCred}
+                style={{
+                  background: "transparent", border: `1px solid ${C.border}`,
+                  borderRadius: 9, padding: "9px 20px",
+                  color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={confirmarReenvioCredenciales}
+                disabled={reenviandoCred}
+                style={{
+                  background: "linear-gradient(135deg, #f59e0b, #d97706)",
+                  border: "none", borderRadius: 9, padding: "9px 24px",
+                  color: "#fff", fontSize: 14, fontWeight: 600,
+                  cursor: reenviandoCred ? "not-allowed" : "pointer",
+                  display: "flex", alignItems: "center", gap: 8,
+                  opacity: reenviandoCred ? 0.7 : 1,
+                }}
+              >
+                <i className="bi bi-send-fill" />
+                {reenviandoCred ? "Reenviando..." : "Sí, reenviar"}
               </button>
             </div>
           </div>

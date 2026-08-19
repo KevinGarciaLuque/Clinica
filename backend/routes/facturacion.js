@@ -12,6 +12,7 @@
 const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
+const ExcelJS = require("exceljs");
 const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
 
 function escHtml(s) {
@@ -202,6 +203,247 @@ router.get("/prefill", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
   }
 });
 
+// ── GET /kpis — tarjetas resumen (cobrado, pendiente, emitidas, ticket promedio) ──
+// Respeta el mismo alcance que el listado: un MEDICO solo ve sus propias facturas.
+router.get("/kpis", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
+  try {
+    const clinicaId = req.user.clinica_id;
+    const soloPropio = req.user.tipo === "MEDICO";
+    const filtroMedico = soloPropio ? " AND f.medico_id = ? " : "";
+    const paramsBase = soloPropio ? [clinicaId, req.user.id] : [clinicaId];
+
+    let { desde, hasta } = req.query;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || "") || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || "")) {
+      const hoy = new Date();
+      desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
+      hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10);
+    }
+    const rangoSql = " AND DATE(f.creado_en) BETWEEN ? AND ? ";
+    const paramsRango = [...paramsBase, desde, hasta];
+
+    const [
+      [[cobrado]],
+      [[pendiente]],
+      [[emitidas]],
+      [[hoy]],
+    ] = await Promise.all([
+      pool.query(
+        `SELECT COALESCE(SUM(total),0) AS total, COUNT(*) AS cnt
+         FROM facturas f WHERE f.clinica_id=? ${filtroMedico} AND f.estado='PAGADA' ${rangoSql}`,
+        paramsRango
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(total - COALESCE((SELECT SUM(monto) FROM pagos WHERE factura_id=f.id),0)),0) AS total, COUNT(*) AS cnt
+         FROM facturas f WHERE f.clinica_id=? ${filtroMedico} AND f.estado='PENDIENTE'`,
+        paramsBase
+      ),
+      pool.query(
+        `SELECT COUNT(*) AS cnt FROM facturas f WHERE f.clinica_id=? ${filtroMedico} AND f.estado != 'ANULADA' ${rangoSql}`,
+        paramsRango
+      ),
+      pool.query(
+        `SELECT COALESCE(SUM(total),0) AS total
+         FROM facturas f WHERE f.clinica_id=? ${filtroMedico} AND f.estado='PAGADA' AND DATE(f.creado_en) = CURDATE()`,
+        paramsBase
+      ),
+    ]);
+
+    res.json({
+      ok: true,
+      data: {
+        rango: { desde, hasta },
+        cobrado: Number(cobrado.total),
+        facturas_pagadas: cobrado.cnt,
+        pendiente: Number(pendiente.total),
+        facturas_pendientes: pendiente.cnt,
+        facturas_emitidas: emitidas.cnt,
+        cobrado_hoy: Number(hoy.total),
+        ticket_promedio: cobrado.cnt > 0 ? Number(cobrado.total) / cobrado.cnt : 0,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /serie — ingresos por día (para el gráfico) ─────────────────────────
+router.get("/serie", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
+  try {
+    const clinicaId = req.user.clinica_id;
+    const soloPropio = req.user.tipo === "MEDICO";
+    const filtroMedico = soloPropio ? " AND f.medico_id = ? " : "";
+    const paramsBase = soloPropio ? [clinicaId, req.user.id] : [clinicaId];
+
+    let { desde, hasta } = req.query;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || "") || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || "")) {
+      hasta = new Date().toISOString().slice(0, 10);
+      desde = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    }
+
+    const [rows] = await pool.query(
+      `SELECT DATE(f.creado_en) AS fecha,
+              COALESCE(SUM(f.total), 0) AS facturado,
+              COALESCE(SUM(CASE WHEN f.estado='PAGADA' THEN f.total ELSE 0 END), 0) AS cobrado
+       FROM facturas f
+       WHERE f.clinica_id=? ${filtroMedico} AND f.estado != 'ANULADA' AND DATE(f.creado_en) BETWEEN ? AND ?
+       GROUP BY DATE(f.creado_en)
+       ORDER BY fecha ASC`,
+      [...paramsBase, desde, hasta]
+    );
+
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /cai-status — estado del CAI vigente (vencimiento / folios restantes) ──
+router.get("/cai-status", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
+  try {
+    const clinicaId = req.user.clinica_id;
+    const cfg = await getClinicaConfig(clinicaId, [
+      "factura_cai", "factura_rango_inicio", "factura_rango_fin", "factura_correlativo_actual",
+      "factura_fecha_limite_emision",
+    ]);
+
+    if (!cfg.factura_cai || !cfg.factura_rango_inicio || !cfg.factura_rango_fin) {
+      return res.json({ ok: true, data: null }); // La clínica solo emite RECIBO interno, no aplica CAI.
+    }
+
+    const inicio = parseInt(cfg.factura_rango_inicio, 10);
+    const fin = parseInt(cfg.factura_rango_fin, 10);
+    const actual = cfg.factura_correlativo_actual ? parseInt(cfg.factura_correlativo_actual, 10) : inicio;
+    const foliosTotales = Math.max(1, fin - inicio + 1);
+    const foliosRestantes = Math.max(0, fin - actual + 1);
+    const fechaLimite = cfg.factura_fecha_limite_emision || null;
+    const diasRestantes = fechaLimite
+      ? Math.ceil((new Date(fechaLimite) - new Date()) / (24 * 60 * 60 * 1000))
+      : null;
+
+    res.json({
+      ok: true,
+      data: {
+        cai: cfg.factura_cai,
+        fecha_limite_emision: fechaLimite,
+        dias_restantes: diasRestantes,
+        folios_restantes: foliosRestantes,
+        folios_totales: foliosTotales,
+        vencido: diasRestantes !== null && diasRestantes < 0,
+        agotado: foliosRestantes <= 0,
+      },
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /por-medico — ingresos agrupados por médico (solo ADMIN/SUPER_ADMIN) ──
+router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId = req.user.clinica_id;
+    let { desde, hasta } = req.query;
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || "") || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || "")) {
+      const hoy = new Date();
+      desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
+      hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10);
+    }
+
+    const [rows] = await pool.query(
+      `SELECT u.id AS medico_id, u.nombres, u.apellidos,
+              COUNT(*) AS facturas,
+              COALESCE(SUM(CASE WHEN f.estado='PAGADA' THEN f.total ELSE 0 END), 0) AS cobrado,
+              COALESCE(SUM(CASE WHEN f.estado='PENDIENTE' THEN f.total ELSE 0 END), 0) AS pendiente
+       FROM facturas f
+       JOIN usuarios u ON u.id = f.medico_id
+       WHERE f.clinica_id=? AND f.estado != 'ANULADA' AND DATE(f.creado_en) BETWEEN ? AND ?
+       GROUP BY u.id, u.nombres, u.apellidos
+       ORDER BY cobrado DESC`,
+      [clinicaId, desde, hasta]
+    );
+
+    res.json({ ok: true, data: rows.map(r => ({ ...r, cobrado: Number(r.cobrado), pendiente: Number(r.pendiente) })) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /exportar — descarga Excel (.xlsx) del listado filtrado ─────────────
+router.get("/exportar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
+  try {
+    const clinicaId = req.user.clinica_id;
+    const { estado, desde, hasta } = req.query;
+
+    let sql = `
+      SELECT f.numero_completo, f.numero, f.tipo_comprobante, f.creado_en, f.estado,
+             f.subtotal, f.impuestos, f.total, f.rtn_cliente, f.nombre_cliente,
+             p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
+             u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
+             COALESCE((SELECT SUM(monto) FROM pagos WHERE factura_id=f.id), 0) AS total_pagado
+      FROM facturas f
+      JOIN pacientes p ON p.id = f.paciente_id
+      LEFT JOIN usuarios u ON u.id = f.medico_id
+      WHERE f.clinica_id = ?
+    `;
+    const params = [clinicaId];
+    if (req.user.tipo === "MEDICO") { sql += " AND f.medico_id = ? "; params.push(req.user.id); }
+    if (estado) { sql += " AND f.estado = ? "; params.push(estado); }
+    if (desde)  { sql += " AND DATE(f.creado_en) >= ? "; params.push(desde); }
+    if (hasta)  { sql += " AND DATE(f.creado_en) <= ? "; params.push(hasta); }
+    sql += " ORDER BY f.creado_en DESC LIMIT 5000";
+
+    const [rows] = await pool.query(sql, params);
+
+    const workbook = new ExcelJS.Workbook();
+    const sheet = workbook.addWorksheet("Facturación");
+    sheet.columns = [
+      { header: "Número", key: "numero", width: 18 },
+      { header: "Tipo", key: "tipo", width: 10 },
+      { header: "Fecha", key: "fecha", width: 12 },
+      { header: "Paciente", key: "paciente", width: 28 },
+      { header: "Cliente fiscal", key: "cliente", width: 26 },
+      { header: "RTN/DNI", key: "rtn", width: 16 },
+      { header: "Médico", key: "medico", width: 24 },
+      { header: "Subtotal", key: "subtotal", width: 13 },
+      { header: "ISV", key: "isv", width: 11 },
+      { header: "Total", key: "total", width: 13 },
+      { header: "Pagado", key: "pagado", width: 13 },
+      { header: "Saldo", key: "saldo", width: 13 },
+      { header: "Estado", key: "estado", width: 13 },
+    ];
+    sheet.getRow(1).font = { bold: true };
+    sheet.getRow(1).fill = { type: "pattern", pattern: "solid", fgColor: { argb: "FFE2E8F0" } };
+
+    rows.forEach(f => {
+      const pagado = Number(f.total_pagado);
+      sheet.addRow({
+        numero: f.numero_completo || f.numero,
+        tipo: f.tipo_comprobante,
+        fecha: new Date(f.creado_en).toISOString().slice(0, 10),
+        paciente: `${f.paciente_nombres} ${f.paciente_apellidos}`,
+        cliente: f.nombre_cliente || "",
+        rtn: f.rtn_cliente || "",
+        medico: f.medico_nombres ? `${f.medico_nombres} ${f.medico_apellidos}` : "",
+        subtotal: Number(f.subtotal),
+        isv: Number(f.impuestos),
+        total: Number(f.total),
+        pagado,
+        saldo: Number(f.total) - pagado,
+        estado: f.estado,
+      });
+    });
+    ["subtotal", "isv", "total", "pagado", "saldo"].forEach(k => {
+      sheet.getColumn(k).numFmt = "#,##0.00";
+    });
+
+    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+    res.setHeader("Content-Disposition", `attachment; filename="facturacion_${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // ── GET /:id — detalle ──────────────────────────────────────────────────────
 router.get("/:id", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
   try {
@@ -324,10 +566,11 @@ router.post("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async 
       const cantidad = Number(it.cantidad || 1);
       const precioUnit = Number(it.precio_unit);
       if (!it.descripcion || !Number.isFinite(precioUnit)) continue;
-      const total = Math.round(cantidad * precioUnit * 100) / 100;
+      const descuento = Math.max(0, Number(it.descuento) || 0);
+      const total = Math.max(0, Math.round((cantidad * precioUnit - descuento) * 100) / 100);
       await conn.query(
-        "INSERT INTO factura_items (factura_id, descripcion, cantidad, precio_unit, total) VALUES (?,?,?,?,?)",
-        [facturaId, it.descripcion, cantidad, precioUnit, total]
+        "INSERT INTO factura_items (factura_id, descripcion, cantidad, precio_unit, descuento, total) VALUES (?,?,?,?,?,?)",
+        [facturaId, it.descripcion, cantidad, precioUnit, descuento, total]
       );
     }
 
@@ -377,10 +620,11 @@ router.put("/:id", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), asyn
         const cantidad = Number(it.cantidad || 1);
         const precioUnit = Number(it.precio_unit);
         if (!it.descripcion || !Number.isFinite(precioUnit)) continue;
-        const total = Math.round(cantidad * precioUnit * 100) / 100;
+        const descuento = Math.max(0, Number(it.descuento) || 0);
+        const total = Math.max(0, Math.round((cantidad * precioUnit - descuento) * 100) / 100);
         await conn.query(
-          "INSERT INTO factura_items (factura_id, descripcion, cantidad, precio_unit, total) VALUES (?,?,?,?,?)",
-          [req.params.id, it.descripcion, cantidad, precioUnit, total]
+          "INSERT INTO factura_items (factura_id, descripcion, cantidad, precio_unit, descuento, total) VALUES (?,?,?,?,?,?)",
+          [req.params.id, it.descripcion, cantidad, precioUnit, descuento, total]
         );
       }
       await recalcularTotales(conn, req.params.id);
@@ -573,6 +817,7 @@ router.get("/:id/pdf", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
 
     const superaLimite = total > 5000;
     const clienteIncompleto = superaLimite && (!factura.rtn_cliente || !factura.nombre_cliente);
+    const hayDescuento = items.some(it => Number(it.descuento) > 0);
 
     const html = `<!DOCTYPE html>
 <html lang="es"><head><meta charset="UTF-8"><title>${esFactura ? "Factura" : "Recibo"} ${escHtml(factura.numero_completo || factura.numero)}</title>
@@ -655,6 +900,7 @@ router.get("/:id/pdf", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
         <th class="c">Cant.</th>
         <th>Descripción</th>
         <th class="r">Precio unit.</th>
+        ${hayDescuento ? `<th class="r">Desc.</th>` : ""}
         <th class="r">Total</th>
       </tr></thead>
       <tbody>
@@ -662,6 +908,7 @@ router.get("/:id/pdf", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
           <td class="c">${Number(it.cantidad)}</td>
           <td>${escHtml(it.descripcion)}</td>
           <td class="r">L ${Number(it.precio_unit).toFixed(2)}</td>
+          ${hayDescuento ? `<td class="r">${Number(it.descuento) > 0 ? `L ${Number(it.descuento).toFixed(2)}` : "—"}</td>` : ""}
           <td class="r">L ${Number(it.total).toFixed(2)}</td>
         </tr>`).join("")}
       </tbody>

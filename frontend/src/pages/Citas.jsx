@@ -239,6 +239,11 @@ function AgendaEventoPendientes({ event }) {
   );
 }
 
+// ─── Contenido de evento para vistas Semana/Día: nombre en una línea con tooltip
+function TimeGridEventContent({ event }) {
+  return <span title={event.title}>{event.title}</span>;
+}
+
 function dayPropGetter(date) {
   const today = new Date();
   const isToday =
@@ -248,25 +253,28 @@ function dayPropGetter(date) {
   if (!isToday) return {};
   return {
     style: {
-      boxShadow: "inset 0 0 0 3px #0D1B2E",
+      boxShadow: "inset 0 0 0 2px #2563eb",
       borderRadius: "4px",
     },
   };
 }
 
 function eventPropGetter(event) {
-  const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff" };
-  return { 
-    style: { 
-      backgroundColor: col.bg, 
-      color: col.fg, 
-      borderRadius: "4px", 
-      border: "none", 
+  const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff", dot: "#0d6efd" };
+  return {
+    style: {
+      backgroundColor: col.bg,
+      color: col.fg,
+      borderRadius: "6px",
+      border: "none",
+      borderLeft: `3px solid ${col.dot}`,
+      boxShadow: "0 1px 2px rgba(0,0,0,.08)",
       fontSize: "0.78rem",
+      fontWeight: 600,
       cursor: "pointer",
-      transition: "all 0.2s ease"
+      transition: "all 0.15s ease"
     },
-    className: "event-hover" 
+    className: "event-hover"
   };
 }
 
@@ -565,9 +573,45 @@ export default function Citas() {
       <style>{`
         .event-hover:hover {
           transform: translateY(-1px);
-          box-shadow: 0 2px 8px rgba(0,0,0,0.15);
-          opacity: 0.95;
+          box-shadow: 0 3px 10px rgba(0,0,0,0.18) !important;
+          opacity: 0.97;
+          z-index: 5;
         }
+
+        /* ── Contenedor general del calendario ─────────────────────── */
+        .rbc-calendar { font-family: inherit; }
+        .rbc-month-view, .rbc-time-view {
+          border: 1px solid #e2e8f0 !important;
+          border-radius: 10px !important;
+          overflow: hidden;
+        }
+        .rbc-off-range-bg { background: #f8fafc !important; }
+        .rbc-today { background-color: rgba(37, 99, 235, 0.05) !important; }
+
+        /* ── Encabezados de día ─────────────────────────────────────── */
+        .rbc-header {
+          padding: 10px 6px !important;
+          font-weight: 700 !important;
+          font-size: 0.78rem !important;
+          color: #334155 !important;
+          background: #f8fafc !important;
+          border-bottom: 1px solid #e2e8f0 !important;
+          text-transform: capitalize;
+        }
+        .rbc-time-header-content, .rbc-time-content, .rbc-month-row, .rbc-day-bg {
+          border-color: #e2e8f0 !important;
+        }
+        .rbc-time-gutter .rbc-timeslot-group,
+        .rbc-time-gutter .rbc-time-slot {
+          font-size: 0.72rem !important;
+          color: #64748b !important;
+        }
+        .rbc-current-time-indicator {
+          background-color: #ef4444 !important;
+          height: 2px !important;
+        }
+
+        /* ── Interacción sobre celdas vacías ────────────────────────── */
         .rbc-time-slot:hover {
           background-color: rgba(59, 130, 246, 0.06) !important;
           cursor: pointer;
@@ -577,10 +621,78 @@ export default function Citas() {
           cursor: pointer;
         }
         .rbc-month-row { min-height: 90px; }
-        .rbc-event { padding: 1px 4px !important; font-size: 0.72rem !important; line-height: 1.3 !important; }
-        .rbc-event-content { font-size: 0.72rem !important; }
-        .rbc-toolbar button { font-size: 0.83rem !important; padding: 5px 13px !important; border-radius: 7px !important; }
-        .rbc-toolbar button.rbc-active { background: #2563eb !important; color: #fff !important; border-color: #2563eb !important; }
+
+        /* ── Eventos: vista Mes (compactos, muchos por celda) ───────── */
+        .rbc-month-view .rbc-event {
+          padding: 2px 6px !important;
+          font-size: 0.72rem !important;
+          line-height: 1.3 !important;
+        }
+        .rbc-month-view .rbc-event-content { font-size: 0.72rem !important; }
+        .rbc-row-segment { padding: 1px 2px; }
+
+        /* ── Eventos: vistas Semana / Día (más espacio, deben leerse bien) */
+        .rbc-time-view .rbc-timeslot-group { min-height: 64px !important; }
+        .rbc-time-view .rbc-event {
+          padding: 3px 7px !important;
+          line-height: 1.3 !important;
+          box-shadow: 0 1px 3px rgba(0,0,0,.12) !important;
+          overflow: hidden !important;
+        }
+        .rbc-time-view .rbc-event-label {
+          font-size: 0.7rem !important;
+          font-weight: 700 !important;
+          opacity: 0.85;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
+        .rbc-time-view .rbc-event-content {
+          font-size: 0.8rem !important;
+          font-weight: 700 !important;
+          white-space: nowrap !important;
+          overflow: hidden !important;
+          text-overflow: ellipsis !important;
+        }
+        .rbc-day-slot .rbc-events-container { margin-right: 4px; }
+
+        /* ── Vista Agenda ────────────────────────────────────────────── */
+        .rbc-agenda-view table.rbc-agenda-table { font-size: 0.85rem; }
+        .rbc-agenda-view table.rbc-agenda-table thead > tr > th {
+          background: #f8fafc; color: #334155; font-weight: 700;
+          padding: 8px 10px !important; border-bottom: 1px solid #e2e8f0 !important;
+          text-transform: capitalize;
+        }
+        .rbc-agenda-view table.rbc-agenda-table tbody > tr > td {
+          padding: 8px 10px !important; border-color: #f1f5f9 !important;
+        }
+
+        /* ── Barra de herramientas (Hoy/Anterior/Siguiente/Mes/Semana...) */
+        .rbc-toolbar { margin-bottom: 14px !important; }
+        .rbc-toolbar-label {
+          font-weight: 700 !important;
+          font-size: 0.98rem !important;
+          color: #1e293b !important;
+          text-transform: capitalize;
+        }
+        .rbc-toolbar button {
+          font-size: 0.83rem !important;
+          padding: 5px 13px !important;
+          border-radius: 7px !important;
+          border-color: #e2e8f0 !important;
+          color: #334155 !important;
+          transition: all .15s ease;
+        }
+        .rbc-toolbar button:hover {
+          background: #f1f5f9 !important;
+          border-color: #cbd5e1 !important;
+        }
+        .rbc-toolbar button.rbc-active {
+          background: #2563eb !important;
+          color: #fff !important;
+          border-color: #2563eb !important;
+          box-shadow: 0 1px 4px rgba(37,99,235,.35) !important;
+        }
       `}</style>
 
       {/* Header */}
@@ -692,21 +804,28 @@ export default function Citas() {
                 ) : null;
               })()}
             </div>
-            <div style={{ display: "flex", gap: 5, flexWrap: "wrap", marginLeft: "auto" }}>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginLeft: "auto", alignItems: "center" }}>
+              <span style={{ fontSize: "0.68rem", fontWeight: 700, color: "#94a3b8", textTransform: "uppercase", letterSpacing: 0.4, marginRight: 2 }}>
+                Estados
+              </span>
               {ESTADOS.map(est => (
                 <span key={est} style={{
                   background: ESTADO_COLOR[est].bg, color: ESTADO_COLOR[est].fg,
-                  borderRadius: 20, padding: "3px 9px", fontSize: "0.69rem", fontWeight: 700,
-                  display: "inline-flex", alignItems: "center", gap: 4,
+                  borderRadius: 20, padding: "3px 10px", fontSize: "0.69rem", fontWeight: 700,
+                  display: "inline-flex", alignItems: "center", gap: 5,
+                  border: `1px solid ${ESTADO_COLOR[est].dot}33`,
                 }}>
-                  <span style={{ width: 5, height: 5, borderRadius: "50%", background: ESTADO_COLOR[est].dot, display: "inline-block" }}></span>
+                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: ESTADO_COLOR[est].dot, display: "inline-block" }}></span>
                   {est}
                 </span>
               ))}
             </div>
           </div>
           {loading && <div style={{ fontSize: "0.82rem", color: "#9ca3af", marginBottom: 8 }}>Cargando citas...</div>}
-          <div style={{ height: "calc(100vh - 310px)", minHeight: 480 }}>
+          <div style={{
+            height: "calc(100vh - 310px)", minHeight: 480,
+            background: "#fff", borderRadius: 10,
+          }}>
             <DnDCalendar
               localizer={localizer}
               events={events}
@@ -739,6 +858,8 @@ export default function Citas() {
                 agenda: {
                   event: AgendaEventoPendientes,
                 },
+                week: { event: TimeGridEventContent },
+                day:  { event: TimeGridEventContent },
               }}
             />
           </div>
