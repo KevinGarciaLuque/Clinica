@@ -157,6 +157,7 @@ app.use("/api/facturacion", require("./routes/facturacion"));
 app.use("/api/historias", require("./routes/historias"));
 app.use("/api/prescripciones", require("./routes/prescripciones"));
 app.use("/api/estudios", require("./routes/estudios"));
+app.use("/api/recepcion", require("./routes/recepcion"));
 app.use("/api/medicamentos", require("./routes/medicamentos"));
 app.use("/api/catalogos-diagnostico", require("./routes/catalogosDiagnostico"));
 app.use("/api/catalogos-estudios", require("./routes/catalogosEstudios"));

@@ -122,6 +122,9 @@ export default function NavbarApp({ onMenuClick }) {
               _live: true,
             }, ...prev];
           });
+          if (d.tipo === "RECETA_ENVIADA_RECEPCION" || d.tipo === "ESTUDIO_ENVIADO_RECEPCION") {
+            window.dispatchEvent(new CustomEvent("recepcion:nuevo-envio"));
+          }
         });
         es.addEventListener("nueva_encuesta_resena", (e) => {
           const d = JSON.parse(e.data);
@@ -854,6 +857,7 @@ export default function NavbarApp({ onMenuClick }) {
                     </div>
                     {notifsPortal.map((n) => {
                       const esSolicitud = n.tipo === "CITA_SOLICITUD_PORTAL";
+                      const esRecepcion = n.tipo === "RECETA_ENVIADA_RECEPCION" || n.tipo === "ESTUDIO_ENVIADO_RECEPCION";
                       const cargando    = accionandoNotif === n.id;
                       return (
                         <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
@@ -865,7 +869,7 @@ export default function NavbarApp({ onMenuClick }) {
                               display: "flex", alignItems: "center", justifyContent: "center",
                             }}>
                               <i
-                                className={`bi ${esSolicitud ? "bi-calendar2-plus-fill" : n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`}
+                                className={`bi ${esSolicitud ? "bi-calendar2-plus-fill" : esRecepcion ? "bi-send-check-fill" : n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`}
                                 style={{ color: esSolicitud ? "#fbbf24" : "#7dd3fc", fontSize: 14 }}
                               />
                             </div>
@@ -907,6 +911,18 @@ export default function NavbarApp({ onMenuClick }) {
                                     Rechazar
                                   </button>
                                 </div>
+                              ) : esRecepcion ? (
+                                <button
+                                  onClick={() => { marcarNotifPortalLeida(n.id); setShowRespuestasDD(false); navigate("/recepcion"); }}
+                                  style={{
+                                    background: "rgba(125,211,252,.15)", border: "1px solid rgba(125,211,252,.3)",
+                                    borderRadius: 6, padding: "4px 10px", color: "#7dd3fc",
+                                    fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                    display: "flex", alignItems: "center", gap: 4,
+                                  }}
+                                >
+                                  <i className="bi bi-box-arrow-up-right" />Ir a recepción
+                                </button>
                               ) : (
                                 <button
                                   onClick={() => { marcarNotifPortalLeida(n.id); if ((misRespuestas.length + notifsPortal.length + encuestasResena.length) <= 1) setShowRespuestasDD(false); }}

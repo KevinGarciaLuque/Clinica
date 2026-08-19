@@ -437,7 +437,7 @@ const ESP_META = {
   GINECOLOGIA:          { label: "Ginecología",          color: "#e91e63", bg: "rgba(233,30,99,.12)",   border: "rgba(233,30,99,.3)"   },
   DERMATOLOGIA:         { label: "Dermatología",         color: "#FF5722", bg: "rgba(255,87,34,.12)",   border: "rgba(255,87,34,.3)"   },
   OFTALMOLOGIA:         { label: "Oftalmología",         color: "#00BCD4", bg: "rgba(0,188,212,.12)",   border: "rgba(0,188,212,.3)"   },
-  TRAUMATOLOGIA:        { label: "Traumatología",        color: "#607D8B", bg: "rgba(96,125,139,.12)",  border: "rgba(96,125,139,.3)"  },
+  TRAUMATOLOGIA:        { label: "Traumatología y Ortopedia", color: "#607D8B", bg: "rgba(96,125,139,.12)",  border: "rgba(96,125,139,.3)"  },
   NUTRICION:            { label: "Nutrición",            color: "#4CAF50", bg: "rgba(76,175,80,.12)",   border: "rgba(76,175,80,.3)"   },
   PSICOLOGIA:           { label: "Psicología",           color: "#673AB7", bg: "rgba(103,58,183,.12)",  border: "rgba(103,58,183,.3)"  },
   ENDOCRINOLOGIA:       { label: "Endocrinología",       color: "#FF7043", bg: "rgba(255,112,67,.12)",  border: "rgba(255,112,67,.3)"  },

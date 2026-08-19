@@ -2155,6 +2155,19 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
                 <i className="bi bi-check-lg me-1"></i>Entregar
               </button>
             )}
+            {!p.enviado_recepcion_en ? (
+              <button className="btn btn-outline-primary btn-sm"
+                style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                onClick={() => api.patch(`/prescripciones/${p.id}/enviar-recepcion`)
+                  .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, enviado_recepcion_en: new Date().toISOString() } : x)))}>
+                <i className="bi bi-send me-1"></i>Enviar a recepción
+              </button>
+            ) : (
+              <span className="badge bg-light text-primary border border-primary-subtle d-flex align-items-center"
+                style={{ fontSize: "0.7rem" }}>
+                <i className="bi bi-check2-circle me-1"></i>Enviado
+              </span>
+            )}
             <button
               onClick={() => printRx(p.id)}
               style={{
@@ -2673,6 +2686,20 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
                   .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, estado: "EN_PROCESO" } : x)))}>
                 <i className="bi bi-arrow-right me-1" />En Proceso
               </button>
+            )}
+            {!s.enviado_recepcion_en ? (
+              <button
+                className="btn btn-outline-primary btn-sm"
+                style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                onClick={() => api.patch(`/estudios/${s.id}/enviar-recepcion`)
+                  .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, enviado_recepcion_en: new Date().toISOString() } : x)))}>
+                <i className="bi bi-send me-1" />Enviar a recepción
+              </button>
+            ) : (
+              <span className="badge bg-light text-primary border border-primary-subtle d-flex align-items-center"
+                style={{ fontSize: "0.7rem" }}>
+                <i className="bi bi-check2-circle me-1"></i>Enviado
+              </span>
             )}
             <button
               style={{ background: "transparent", border: "1px solid #3b82f6", borderRadius: 7, color: "#3b82f6", padding: "4px 12px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}

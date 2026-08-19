@@ -1,3 +1,4 @@
+import { createPortal } from "react-dom";
 import { FaCheckCircle, FaExclamationTriangle, FaInfoCircle, FaTimesCircle } from "react-icons/fa";
 
 const THEME = {
@@ -51,7 +52,7 @@ export default function AnimatedFeedbackModal({
   const t = THEME[type] || THEME.info;
   const Icon = t.icon;
 
-  return (
+  return createPortal(
     <div style={{
       position: "fixed",
       inset: 0,
@@ -115,7 +116,8 @@ export default function AnimatedFeedbackModal({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }
 

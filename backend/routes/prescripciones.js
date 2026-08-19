@@ -11,6 +11,9 @@ const https   = require("https");
 const http    = require("http");
 const PDFDoc  = require("pdfkit");
 const QRCode  = require("qrcode");
+const sse     = require("../utils/sseManager");
+const webPush = require("../utils/webPush");
+const { notificarRecepcionistas } = require("../utils/notificarRecepcion");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
@@ -35,6 +38,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
 
     let sql = `
       SELECT pr.id, pr.estado, pr.notas, pr.creado_en, pr.codigo_qr,
+             pr.enviado_recepcion_en, pr.recibido_recepcion_en,
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
              (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
@@ -313,6 +317,41 @@ router.patch("/:id/estado", auth("MEDICO","RECEPCIONISTA","ADMIN","SUPER_ADMIN")
     const params = cid ? [estado, req.params.id, cid] : [estado, req.params.id];
 
     await pool.query(sql, params);
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+/**
+ * PATCH /api/prescripciones/:id/enviar-recepcion
+ * El médico envía la receta a la cola de recepción y notifica a los recepcionistas.
+ */
+router.patch("/:id/enviar-recepcion", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    const [[pr]] = await pool.query(
+      `SELECT pr.paciente_id, p.nombres, p.apellidos
+       FROM prescripciones pr
+       JOIN pacientes p ON p.id = pr.paciente_id
+       WHERE pr.id=? AND pr.clinica_id=? LIMIT 1`,
+      [req.params.id, cid]
+    );
+    if (!pr) return res.status(404).json({ ok: false, msg: "Receta no encontrada" });
+
+    await pool.query(
+      `UPDATE prescripciones SET enviado_recepcion_en=NOW()
+       WHERE id=? AND clinica_id=? AND enviado_recepcion_en IS NULL`,
+      [req.params.id, cid]
+    );
+
+    await notificarRecepcionistas(pool, sse, webPush, {
+      clinicaId: cid,
+      tipo: "RECETA_ENVIADA_RECEPCION",
+      mensaje: `Nueva receta para ${pr.nombres} ${pr.apellidos} lista para recepción`,
+      pacienteId: pr.paciente_id,
+    });
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

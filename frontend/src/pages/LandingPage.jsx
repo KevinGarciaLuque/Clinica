@@ -28,7 +28,7 @@ const ESPECIALIDADES = [
   { icon: "bi-gender-female",          label: "Ginecología",             desc: "Control prenatal, consultas ginecológicas y seguimiento obstétrico.",                 color: "#f43f5e" },
   { icon: "bi-heart-fill",             label: "Cardiología",             desc: "Historial cardiovascular, ECG adjunto y control de factores de riesgo.",              color: "#ef4444" },
   { icon: "bi-droplet-fill",           label: "Dermatología",            desc: "Registro de lesiones, seguimiento fotográfico y tratamientos dermatológicos.",        color: "#fb923c" },
-  { icon: "bi-bandaid-fill",           label: "Traumatología",           desc: "Manejo de lesiones, imágenes adjuntas y seguimiento de recuperación.",                color: "#84cc16" },
+  { icon: "bi-bandaid-fill",           label: "Traumatología y Ortopedia", desc: "Manejo de lesiones, imágenes adjuntas y seguimiento de recuperación.",              color: "#84cc16" },
   { icon: "bi-lightning-charge-fill",  label: "Neurología",              desc: "Evaluaciones neurológicas, escala de síntomas y seguimiento clínico.",               color: "#a855f7" },
   { icon: "bi-eye-fill",               label: "Oftalmología",            desc: "Agudeza visual, historial ocular y control de patologías refractivas.",              color: "#14b8a6" },
   { icon: "bi-ear-fill",               label: "Otorrinolaringología",    desc: "Evaluación auditiva, nasal y laríngea con historial completo.",                       color: "#f97316" },

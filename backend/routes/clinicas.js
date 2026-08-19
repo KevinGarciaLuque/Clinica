@@ -234,6 +234,24 @@ router.get("/:id/modulos-permisos", auth("SUPER_ADMIN"), async (req, res) => {
       [clinica.tipo_id, clinicaId, clinica.es_pediatrica ? 1 : 0, clinica.es_pediatrica ? 1 : 0]
     );
 
+    // Fallback: curva_crecimiento se sirve al sidebar en clínicas pediátricas aunque
+    // el tipo de clínica no la tenga asignada en tipo_clinica_modulos (ver GET /modulos).
+    // La incluimos aquí también para que sea visible y se pueda desactivar.
+    if (clinica.es_pediatrica && !modulos.some(m => m.clave === "curva_crecimiento")) {
+      const [[curva]] = await pool.query(
+        `SELECT ms.id, ms.clave, ms.nombre, ms.icono, ms.ruta, ms.orden,
+                IFNULL(cm.habilitado, 1) AS habilitado_clinica
+         FROM modulos_sistema ms
+         LEFT JOIN clinica_modulos cm ON cm.clinica_id=? AND cm.modulo_id=ms.id
+         WHERE ms.clave='curva_crecimiento' AND ms.disponible=1 LIMIT 1`,
+        [clinicaId]
+      );
+      if (curva) {
+        modulos.push(curva);
+        modulos.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+      }
+    }
+
     const [usuarios] = await pool.query(
       `
       SELECT u.id, u.nombres, u.apellidos, u.tipo, u.email
@@ -311,6 +329,23 @@ router.get("/:id/modulos-permisos/usuario/:usuarioId", auth("SUPER_ADMIN"), asyn
       `,
       [clinica.tipo_id, clinicaId, usuarioId, clinica.es_pediatrica ? 1 : 0, clinica.es_pediatrica ? 1 : 0]
     );
+
+    // Mismo fallback que en /modulos-permisos: curva_crecimiento puede llegar al
+    // sidebar aunque el tipo de clínica no la tenga asignada; la exponemos aquí
+    // también para poder desactivarla por usuario.
+    if (clinica.es_pediatrica && !rows.some(m => m.clave === "curva_crecimiento")) {
+      const [[curva]] = await pool.query(
+        `SELECT ms.id AS modulo_id, ms.clave, ms.nombre,
+                IFNULL(cm.habilitado, 1) AS habilitado_clinica,
+                um.habilitado AS habilitado_usuario
+         FROM modulos_sistema ms
+         LEFT JOIN clinica_modulos cm ON cm.clinica_id=? AND cm.modulo_id=ms.id
+         LEFT JOIN usuario_modulos um ON um.usuario_id=? AND um.modulo_id=ms.id
+         WHERE ms.clave='curva_crecimiento' AND ms.disponible=1 LIMIT 1`,
+        [clinicaId, usuarioId]
+      );
+      if (curva) rows.push(curva);
+    }
 
     res.json({ ok: true, data: { usuario, modulos: rows } });
   } catch (e) {

@@ -9,6 +9,9 @@ const https   = require("https");
 const http    = require("http");
 const fs      = require("fs");
 const path    = require("path");
+const sse     = require("../utils/sseManager");
+const webPush = require("../utils/webPush");
+const { notificarRecepcionistas } = require("../utils/notificarRecepcion");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
@@ -63,7 +66,17 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
 router.get("/pdf", auth(), async (req, res) => {
   try {
     const cid = clinicaOf(req);
-    const { paciente_id, historia_id } = req.query;
+    let { paciente_id, historia_id, estudio_id } = req.query;
+
+    // Si viene estudio_id, resolvemos el paciente_id desde ese registro (imprimir un solo estudio)
+    if (estudio_id) {
+      const [[est]] = await pool.query(
+        "SELECT paciente_id FROM estudios_solicitudes WHERE id=? AND clinica_id=? LIMIT 1",
+        [estudio_id, cid]
+      );
+      if (!est) return res.status(404).json({ ok: false, msg: "Estudio no encontrado" });
+      paciente_id = est.paciente_id;
+    }
     if (!paciente_id) return res.status(400).json({ ok: false, msg: "paciente_id requerido" });
 
     // 1. Datos del paciente, médico y clínica
@@ -91,7 +104,8 @@ router.get("/pdf", auth(), async (req, res) => {
       FROM estudios_solicitudes s
       WHERE s.clinica_id=? AND s.paciente_id=?`;
     const params = [cid, paciente_id];
-    if (historia_id) { sql += " AND s.historia_id=?"; params.push(historia_id); }
+    if (estudio_id)       { sql += " AND s.id=?";          params.push(estudio_id); }
+    else if (historia_id) { sql += " AND s.historia_id=?"; params.push(historia_id); }
     sql += " ORDER BY s.creado_en ASC";
     const [estudios] = await pool.query(sql, params);
 
@@ -388,6 +402,41 @@ router.patch("/:id/estado", auth("ADMIN","MEDICO","ENFERMERA","SUPER_ADMIN"), as
       "UPDATE estudios_solicitudes SET estado=? WHERE id=? AND clinica_id=?",
       [estado, req.params.id, cid]
     );
+    res.json({ ok: true });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+/**
+ * PATCH /api/estudios/:id/enviar-recepcion
+ * El médico envía el estudio a la cola de recepción y notifica a los recepcionistas.
+ */
+router.patch("/:id/enviar-recepcion", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    const [[s]] = await pool.query(
+      `SELECT s.paciente_id, s.tipo, p.nombres, p.apellidos
+       FROM estudios_solicitudes s
+       JOIN pacientes p ON p.id = s.paciente_id
+       WHERE s.id=? AND s.clinica_id=? LIMIT 1`,
+      [req.params.id, cid]
+    );
+    if (!s) return res.status(404).json({ ok: false, msg: "Estudio no encontrado" });
+
+    await pool.query(
+      `UPDATE estudios_solicitudes SET enviado_recepcion_en=NOW()
+       WHERE id=? AND clinica_id=? AND enviado_recepcion_en IS NULL`,
+      [req.params.id, cid]
+    );
+
+    await notificarRecepcionistas(pool, sse, webPush, {
+      clinicaId: cid,
+      tipo: "ESTUDIO_ENVIADO_RECEPCION",
+      mensaje: `Nuevo estudio (${s.tipo}) para ${s.nombres} ${s.apellidos} listo para recepción`,
+      pacienteId: s.paciente_id,
+    });
+
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

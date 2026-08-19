@@ -96,6 +96,15 @@ function getMenuSections(tipo, modulos) {
       : [...mainItems, consulta];
   }
 
+  // RECEPCIONISTA y ADMIN ven "Recepción" (cola de recetas/estudios enviados desde consulta)
+  if ((tipo === "RECEPCIONISTA" || tipo === "ADMIN") && !mainItems.some(m => m.to === "/recepcion")) {
+    const recepcion = { to: "/recepcion", label: "Recepción", icon: "bi-inbox-fill" };
+    const citasIdxRec = mainItems.findIndex(m => m.to === "/citas");
+    mainItems = citasIdxRec >= 0
+      ? [...mainItems.slice(0, citasIdxRec + 1), recepcion, ...mainItems.slice(citasIdxRec + 1)]
+      : [...mainItems, recepcion];
+  }
+
   // Cumpleañeros — siempre visible para todos los roles (después de Vacunas)
   if (!mainItems.some(m => m.to === "/cumpleaneros")) {
     const cumple = { to: "/cumpleaneros", label: "Cumpleañeros", icon: "bi-cake2-fill" };

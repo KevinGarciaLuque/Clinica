@@ -70,6 +70,7 @@ const ConsultaEducacion = lazy(() => import("./pages/educacion/ConsultaEducacion
 
 // Módulos adicionales
 const Recordatorios   = lazy(() => import("./pages/Recordatorios"));
+const Recepcion       = lazy(() => import("./pages/Recepcion"));
 const PerfilUsuario   = lazy(() => import("./pages/PerfilUsuario"));
 const Catalogos       = lazy(() => import("./pages/Catalogos"));
 const CrecimientoPage = lazy(() => import("./pages/CrecimientoPage"));
@@ -197,6 +198,13 @@ export default function App() {
         <Route path="/recordatorios" element={
           <RolRoute roles={["ADMIN","SUPER_ADMIN","MEDICO"]}>
             <Recordatorios />
+          </RolRoute>
+        } />
+
+        {/* Módulo de recepción — cola de recetas/estudios enviados desde consulta */}
+        <Route path="/recepcion" element={
+          <RolRoute roles={["RECEPCIONISTA","ADMIN","SUPER_ADMIN"]}>
+            <Recepcion />
           </RolRoute>
         } />
 
