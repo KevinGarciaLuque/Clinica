@@ -8,6 +8,7 @@ import Login from "./pages/Login";
 const Dashboard       = lazy(() => import("./pages/Dashboard"));
 const Estadisticas    = lazy(() => import("./pages/Estadisticas"));
 const Facturacion     = lazy(() => import("./pages/Facturacion"));
+const Caja            = lazy(() => import("./pages/Caja"));
 const Pacientes       = lazy(() => import("./pages/Pacientes"));
 const ExportarPacientes = lazy(() => import("./pages/ExportarPacientes"));
 const Citas           = lazy(() => import("./pages/Citas"));
@@ -147,6 +148,7 @@ export default function App() {
         <Route path="/pacientes/:id/perfil"   element={<Suspense fallback={<PageSkeleton />}><PerfilPaciente /></Suspense>} />
         <Route path="/citas"                  element={<Citas />} />
         <Route path="/facturacion"            element={<Facturacion />} />
+        <Route path="/caja"                   element={<Caja />} />
         <Route path="/chat-ia"                element={<ChatIA />} />
         <Route path="/consulta"               element={<Consulta />} />
         <Route path="/consulta-medica"        element={<Suspense fallback={<PageSkeleton />}><ConsultaMedica /></Suspense>} />

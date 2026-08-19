@@ -27,7 +27,17 @@ export default function Consulta() {
     setLoading(true);
     const hoy = dayjs().format("YYYY-MM-DD");
     api.get("/citas", { params: { desde: hoy, hasta: hoy } })
-      .then(r => setCitasHoy(r.data.data || []))
+      .then(r => {
+        // Solo consultas ya iniciadas o finalizadas por el médico — mientras el
+        // paciente solo está agendado/en espera, vive en la pestaña Sala de Espera.
+        const iniciadas = (r.data.data || [])
+          .filter(c => c.estado === "EN_ATENCION" || c.estado === "COMPLETADA")
+          .sort((a, b) => {
+            if (a.estado !== b.estado) return a.estado === "EN_ATENCION" ? -1 : 1;
+            return new Date(a.inicio) - new Date(b.inicio);
+          });
+        setCitasHoy(iniciadas);
+      })
       .catch(() => setCitasHoy([]))
       .finally(() => setLoading(false));
   }, []);
@@ -35,7 +45,17 @@ export default function Consulta() {
   const loadSalaEspera = useCallback(() => {
     setLoading(true);
     api.get("/dashboard/sala-espera")
-      .then(r => setSalaEspera(r.data.data || []))
+      .then(r => {
+        const activos = (r.data.data || [])
+          .filter(c => c.estado === "EN_ESPERA" || c.estado === "EN_ATENCION")
+          .sort((a, b) => {
+            // EN_ATENCION primero (el médico ya está con ese paciente)
+            if (a.estado !== b.estado) return a.estado === "EN_ATENCION" ? -1 : 1;
+            // luego por hora de cita, el que lleva más tiempo esperando primero
+            return new Date(a.inicio) - new Date(b.inicio);
+          });
+        setSalaEspera(activos);
+      })
       .catch(() => setSalaEspera([]))
       .finally(() => setLoading(false));
   }, []);
@@ -55,7 +75,7 @@ export default function Consulta() {
   };
 
   const TABS = [
-    { id: "citas-hoy",   icon: "bi-calendar-check",   label: "Calendario" },
+    { id: "citas-hoy",   icon: "bi-clipboard2-pulse", label: "Consultas de hoy" },
     { id: "sala-espera", icon: "bi-person-lines-fill", label: "Sala de Espera" },
   ];
 
@@ -169,7 +189,7 @@ function CitasDelDia({ citas, onEstadoChange, navigate }) {
       {citas.length === 0 && (
         <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
           <i className="bi bi-calendar2-x" style={{ fontSize: "2.8rem", opacity: .3 }}></i>
-          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay citas programadas para hoy.</p>
+          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>Ninguna consulta iniciada todavía hoy.</p>
         </div>
       )}
 
@@ -181,7 +201,7 @@ function CitasDelDia({ citas, onEstadoChange, navigate }) {
             display: "flex", alignItems: "center", gap: 7,
           }}>
             <i className="bi bi-info-circle"></i>
-            Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIO
+            Pacientes cuya consulta ya inició o finalizó hoy. Los que solo están agendados o en espera aparecen en Sala de Espera.
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -239,7 +259,7 @@ function SalaDeEspera({ citas, onEstadoChange, navigate }) {
             display: "flex", alignItems: "center", gap: 7,
           }}>
             <i className="bi bi-info-circle"></i>
-            Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIO
+            Solo pacientes admitidos por recepción (en espera o en atención). Los ya atendidos aparecen en Consultas de hoy.
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -313,7 +333,14 @@ function FilaCita({ cita, idx, onEstadoChange, navigate, estadosDisponibles }) {
       <td style={{ padding: "12px 14px" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap", alignItems: "center" }}>
           <button
-            onClick={() => navigate(`/consulta-medica?paciente_id=${cita.paciente_id}&cita_id=${cita.id}`)}
+            onClick={() => {
+              // Marcar EN_ATENCION al entrar a la consulta para que el paciente
+              // pase de la sala de espera al listado de Consultas de hoy de inmediato.
+              if (cita.estado !== "EN_ATENCION" && cita.estado !== "COMPLETADA") {
+                onEstadoChange(cita.id, "EN_ATENCION");
+              }
+              navigate(`/consulta-medica?paciente_id=${cita.paciente_id}&cita_id=${cita.id}`);
+            }}
             style={{
               background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none",
               borderRadius: 7, color: "#fff", padding: "5px 12px",

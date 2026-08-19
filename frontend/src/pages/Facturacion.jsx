@@ -136,8 +136,8 @@ function ModalNuevaFactura({ onClose, onCreated, prefill }) {
   };
 
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: "min(640px, 100%)", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)", margin: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
+      <div style={{ background: "#fff", borderRadius: 14, width: "min(640px, 100%)", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)", margin: "auto" }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h6 style={{ margin: 0, fontWeight: 700 }}>Nueva factura / recibo</h6>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
@@ -322,8 +322,8 @@ function ModalConfigCai({ clinicaId, onClose, onSaved }) {
   };
 
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: "min(680px, 100%)", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)", margin: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
+      <div style={{ background: "#fff", borderRadius: 14, width: "min(680px, 100%)", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)", margin: "auto" }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <h6 style={{ margin: 0, fontWeight: 700 }}><i className="bi bi-gear me-2" style={{ color: "#166ae8" }} />Configuración del CAI</h6>
           <button onClick={onClose} style={{ background: "none", border: "none", fontSize: 20, cursor: "pointer", color: "#6b7280" }}>×</button>
@@ -490,15 +490,16 @@ function ModalDetalle({ facturaId, onClose, onChanged, esAdmin }) {
     onChanged();
   };
 
-  const descargarPdf = () => abrirPdfFactura(facturaId);
-  const imprimirRecibo = () => imprimirPdfFactura(facturaId);
+  const [pdfBusy, setPdfBusy] = useState(null); // "print" | "dl" | null
+  const descargarPdf = async () => { setPdfBusy("dl"); try { await abrirPdfFactura(facturaId); } finally { setPdfBusy(null); } };
+  const imprimirRecibo = async () => { setPdfBusy("print"); try { await imprimirPdfFactura(facturaId); } finally { setPdfBusy(null); } };
 
   if (!factura) return null;
   const col = ESTADO_COLOR[factura.estado] || ESTADO_COLOR.PENDIENTE;
 
   return createPortal(
-    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
-      <div onClick={e => e.stopPropagation()} style={{ background: "#fff", borderRadius: 14, width: "min(600px, 100%)", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)", margin: "auto" }}>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 9999, display: "flex", alignItems: "flex-start", justifyContent: "center", padding: "24px 16px", overflowY: "auto" }}>
+      <div style={{ background: "#fff", borderRadius: 14, width: "min(600px, 100%)", maxHeight: "calc(100vh - 48px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)", margin: "auto" }}>
         <div style={{ padding: "16px 22px", borderBottom: "1px solid #e5e7eb", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <div>
             <h6 style={{ margin: 0, fontWeight: 700 }}>{factura.numero_completo || factura.numero}</h6>
@@ -634,11 +635,11 @@ function ModalDetalle({ facturaId, onClose, onChanged, esAdmin }) {
               )}
             </div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={imprimirRecibo} style={{ background: "#0f766e", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                <i className="bi bi-printer me-1" /> Imprimir
+              <button onClick={imprimirRecibo} disabled={!!pdfBusy} style={{ background: "#0f766e", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: 13, fontWeight: 600, cursor: pdfBusy ? "wait" : "pointer", opacity: pdfBusy === "print" ? .7 : 1 }}>
+                {pdfBusy === "print" ? <span className="spinner-border spinner-border-sm me-1" style={{ width: 12, height: 12 }} /> : <i className="bi bi-printer me-1" />} Imprimir
               </button>
-              <button onClick={descargarPdf} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>
-                <i className="bi bi-file-earmark-pdf me-1" /> Descargar PDF
+              <button onClick={descargarPdf} disabled={!!pdfBusy} style={{ background: "#2563eb", border: "none", borderRadius: 8, color: "#fff", padding: "7px 18px", fontSize: 13, fontWeight: 600, cursor: pdfBusy ? "wait" : "pointer", opacity: pdfBusy === "dl" ? .7 : 1 }}>
+                {pdfBusy === "dl" ? <span className="spinner-border spinner-border-sm me-1" style={{ width: 12, height: 12 }} /> : <i className="bi bi-file-earmark-pdf me-1" />} Descargar PDF
               </button>
             </div>
           </div>
@@ -700,6 +701,7 @@ export default function Facturacion() {
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const esAdmin = user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN";
+  const esRecepcionista = user?.tipo === "RECEPCIONISTA";
   const puedeConfigCai = ["ADMIN", "SUPER_ADMIN", "MEDICO", "PSICOLOGO"].includes(user?.tipo);
 
   const [list, setList] = useState([]);
@@ -718,6 +720,7 @@ export default function Facturacion() {
   const [exportando, setExportando] = useState(false);
   const [showConfigCai, setShowConfigCai] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
+  const [pdfBusyId, setPdfBusyId] = useState(null); // `${accion}-${facturaId}` mientras se genera el PDF
 
   const cargar = useCallback(() => {
     setLoading(true);
@@ -909,77 +912,81 @@ export default function Facturacion() {
           </div>
         )}
 
-        {/* KPIs */}
-        <motion.div className={`row ${isMobile ? "g-1" : "g-3"}`} style={{ marginBottom: isMobile ? 10 : 16 }}
-          variants={containerVariants} initial="hidden" animate="visible">
-          <KpiCard label="Cobrado" value={kpis ? fmtL(kpis.cobrado) : "—"} icon="bi-cash-coin"
-            gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" isMobile={isMobile}
-            sub={kpis ? `Hoy: ${fmtL(kpis.cobrado_hoy)}` : undefined} />
-          <KpiCard label="Por cobrar" value={kpis ? fmtL(kpis.pendiente) : "—"} icon="bi-hourglass-split"
-            gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" isMobile={isMobile}
-            sub={kpis ? `${kpis.facturas_pendientes} factura${kpis.facturas_pendientes === 1 ? "" : "s"}` : undefined} />
-          <KpiCard label="Facturas emitidas" value={kpis?.facturas_emitidas ?? "—"} icon="bi-receipt"
-            gradient="linear-gradient(135deg, #4facfe 0%, #00c2fe 100%)" isMobile={isMobile} />
-          <KpiCard label="Ticket promedio" value={kpis ? fmtL(kpis.ticket_promedio) : "—"} icon="bi-graph-up-arrow"
-            gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)" isMobile={isMobile} />
-        </motion.div>
+        {!esRecepcionista && (
+          <>
+            {/* KPIs */}
+            <motion.div className={`row ${isMobile ? "g-1" : "g-3"}`} style={{ marginBottom: isMobile ? 10 : 16 }}
+              variants={containerVariants} initial="hidden" animate="visible">
+              <KpiCard label="Cobrado" value={kpis ? fmtL(kpis.cobrado) : "—"} icon="bi-cash-coin"
+                gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" isMobile={isMobile}
+                sub={kpis ? `Hoy: ${fmtL(kpis.cobrado_hoy)}` : undefined} />
+              <KpiCard label="Por cobrar" value={kpis ? fmtL(kpis.pendiente) : "—"} icon="bi-hourglass-split"
+                gradient="linear-gradient(135deg, #f59e0b 0%, #d97706 100%)" isMobile={isMobile}
+                sub={kpis ? `${kpis.facturas_pendientes} factura${kpis.facturas_pendientes === 1 ? "" : "s"}` : undefined} />
+              <KpiCard label="Facturas emitidas" value={kpis?.facturas_emitidas ?? "—"} icon="bi-receipt"
+                gradient="linear-gradient(135deg, #4facfe 0%, #00c2fe 100%)" isMobile={isMobile} />
+              <KpiCard label="Ticket promedio" value={kpis ? fmtL(kpis.ticket_promedio) : "—"} icon="bi-graph-up-arrow"
+                gradient="linear-gradient(135deg, #667eea 0%, #764ba2 100%)" isMobile={isMobile} />
+            </motion.div>
 
-        {/* Gráfico de ingresos + desglose por médico */}
-        <div className={`row ${isMobile ? "g-1" : "g-3"}`} style={{ marginBottom: isMobile ? 12 : 18 }}>
-          <div className={esAdmin && porMedico.length > 0 ? "col-lg-8" : "col-12"}>
-            <div style={{ background: "#fff", borderRadius: 12, padding: isMobile ? 12 : 20, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.06)", height: "100%" }}>
-              <h6 style={{ fontWeight: 700, margin: "0 0 14px", fontSize: "0.92rem", color: "#1e293b" }}>
-                <i className="bi bi-bar-chart-line me-2" style={{ color: "#166ae8" }} />
-                Ingresos {desde || hasta ? "en el rango seleccionado" : "del mes"}
-              </h6>
-              {serieChart.length === 0 ? (
-                <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Sin datos en este rango.</p>
-              ) : (
-                <ResponsiveContainer width="100%" height={240}>
-                  <ComposedChart data={serieChart} margin={{ top: 4, right: 16, left: -14, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
-                    <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                    <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9ca3af" }} />
-                    <Tooltip formatter={v => fmtL(v)} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar dataKey="facturado" name="Facturado" fill="#93c5fd" radius={[5, 5, 0, 0]} maxBarSize={40} />
-                    <Line type="monotone" dataKey="cobrado" name="Cobrado" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 3 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              )}
-            </div>
-          </div>
-
-          {esAdmin && porMedico.length > 0 && (
-            <div className="col-lg-4">
-              <div style={{ background: "#fff", borderRadius: 12, padding: isMobile ? 12 : 20, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.06)", height: "100%" }}>
-                <h6 style={{ fontWeight: 700, margin: "0 0 14px", fontSize: "0.92rem", color: "#1e293b" }}>
-                  <i className="bi bi-people me-2" style={{ color: "#166ae8" }} />
-                  Cobrado por médico
-                </h6>
-                <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 240, overflowY: "auto" }}>
-                  {porMedico.map(m => (
-                    <div key={m.medico_id}>
-                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 3 }}>
-                        <span style={{ fontWeight: 600, color: "#374151" }}>Dr. {m.nombres} {m.apellidos}</span>
-                        <span style={{ fontWeight: 700, color: "#16a34a" }}>{fmtL(m.cobrado)}</span>
-                      </div>
-                      <div style={{ background: "#f1f5f9", borderRadius: 6, height: 6, overflow: "hidden" }}>
-                        <div style={{
-                          width: `${Math.min(100, (m.cobrado / Math.max(...porMedico.map(x => x.cobrado), 1)) * 100)}%`,
-                          background: "linear-gradient(90deg, #4facfe, #16a34a)", height: "100%",
-                        }} />
-                      </div>
-                      {m.pendiente > 0 && (
-                        <div style={{ fontSize: 10.5, color: "#d97706", marginTop: 2 }}>Por cobrar: {fmtL(m.pendiente)}</div>
-                      )}
-                    </div>
-                  ))}
+            {/* Gráfico de ingresos + desglose por médico */}
+            <div className={`row ${isMobile ? "g-1" : "g-3"}`} style={{ marginBottom: isMobile ? 12 : 18 }}>
+              <div className={esAdmin && porMedico.length > 0 ? "col-lg-8" : "col-12"}>
+                <div style={{ background: "#fff", borderRadius: 12, padding: isMobile ? 12 : 20, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.06)", height: "100%" }}>
+                  <h6 style={{ fontWeight: 700, margin: "0 0 14px", fontSize: "0.92rem", color: "#1e293b" }}>
+                    <i className="bi bi-bar-chart-line me-2" style={{ color: "#166ae8" }} />
+                    Ingresos {desde || hasta ? "en el rango seleccionado" : "del mes"}
+                  </h6>
+                  {serieChart.length === 0 ? (
+                    <p style={{ color: "#999", fontSize: 13, margin: 0 }}>Sin datos en este rango.</p>
+                  ) : (
+                    <ResponsiveContainer width="100%" height={240}>
+                      <ComposedChart data={serieChart} margin={{ top: 4, right: 16, left: -14, bottom: 0 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
+                        <XAxis dataKey="fecha" tick={{ fontSize: 11, fill: "#9ca3af" }} />
+                        <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: "#9ca3af" }} />
+                        <Tooltip formatter={v => fmtL(v)} contentStyle={{ fontSize: 12, borderRadius: 8 }} />
+                        <Legend wrapperStyle={{ fontSize: 12 }} />
+                        <Bar dataKey="facturado" name="Facturado" fill="#93c5fd" radius={[5, 5, 0, 0]} maxBarSize={40} />
+                        <Line type="monotone" dataKey="cobrado" name="Cobrado" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 3 }} />
+                      </ComposedChart>
+                    </ResponsiveContainer>
+                  )}
                 </div>
               </div>
+
+              {esAdmin && porMedico.length > 0 && (
+                <div className="col-lg-4">
+                  <div style={{ background: "#fff", borderRadius: 12, padding: isMobile ? 12 : 20, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.06)", height: "100%" }}>
+                    <h6 style={{ fontWeight: 700, margin: "0 0 14px", fontSize: "0.92rem", color: "#1e293b" }}>
+                      <i className="bi bi-people me-2" style={{ color: "#166ae8" }} />
+                      Cobrado por médico
+                    </h6>
+                    <div style={{ display: "flex", flexDirection: "column", gap: 10, maxHeight: 240, overflowY: "auto" }}>
+                      {porMedico.map(m => (
+                        <div key={m.medico_id}>
+                          <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 3 }}>
+                            <span style={{ fontWeight: 600, color: "#374151" }}>Dr. {m.nombres} {m.apellidos}</span>
+                            <span style={{ fontWeight: 700, color: "#16a34a" }}>{fmtL(m.cobrado)}</span>
+                          </div>
+                          <div style={{ background: "#f1f5f9", borderRadius: 6, height: 6, overflow: "hidden" }}>
+                            <div style={{
+                              width: `${Math.min(100, (m.cobrado / Math.max(...porMedico.map(x => x.cobrado), 1)) * 100)}%`,
+                              background: "linear-gradient(90deg, #4facfe, #16a34a)", height: "100%",
+                            }} />
+                          </div>
+                          {m.pendiente > 0 && (
+                            <div style={{ fontSize: 10.5, color: "#d97706", marginTop: 2 }}>Por cobrar: {fmtL(m.pendiente)}</div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          </>
+        )}
 
         {/* Filtros */}
         <div style={{ display: "flex", gap: 8, marginBottom: 14, flexWrap: "wrap", alignItems: "center" }}>
@@ -1053,13 +1060,23 @@ export default function Facturacion() {
                           </span>
                         </td>
                         <td style={{ padding: "11px 14px", textAlign: "right", whiteSpace: "nowrap" }}>
-                          <button title="Imprimir" onClick={e => { e.stopPropagation(); imprimirPdfFactura(f.id); }}
-                            style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, color: "#0f766e", padding: "5px 9px", fontSize: 13, cursor: "pointer", marginRight: 6 }}>
-                            <i className="bi bi-printer" />
+                          <button title="Imprimir" disabled={pdfBusyId === `print-${f.id}`}
+                            onClick={async e => {
+                              e.stopPropagation();
+                              setPdfBusyId(`print-${f.id}`);
+                              try { await imprimirPdfFactura(f.id); } finally { setPdfBusyId(null); }
+                            }}
+                            style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, color: "#0f766e", padding: "5px 9px", fontSize: 13, cursor: pdfBusyId === `print-${f.id}` ? "wait" : "pointer", marginRight: 6 }}>
+                            {pdfBusyId === `print-${f.id}` ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> : <i className="bi bi-printer" />}
                           </button>
-                          <button title="Descargar PDF" onClick={e => { e.stopPropagation(); abrirPdfFactura(f.id); }}
-                            style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, color: "#2563eb", padding: "5px 9px", fontSize: 13, cursor: "pointer" }}>
-                            <i className="bi bi-file-earmark-pdf" />
+                          <button title="Descargar PDF" disabled={pdfBusyId === `dl-${f.id}`}
+                            onClick={async e => {
+                              e.stopPropagation();
+                              setPdfBusyId(`dl-${f.id}`);
+                              try { await abrirPdfFactura(f.id); } finally { setPdfBusyId(null); }
+                            }}
+                            style={{ background: "none", border: "1px solid #e5e7eb", borderRadius: 8, color: "#2563eb", padding: "5px 9px", fontSize: 13, cursor: pdfBusyId === `dl-${f.id}` ? "wait" : "pointer" }}>
+                            {pdfBusyId === `dl-${f.id}` ? <span className="spinner-border spinner-border-sm" style={{ width: 12, height: 12 }} /> : <i className="bi bi-file-earmark-pdf" />}
                           </button>
                         </td>
                       </tr>

@@ -16,7 +16,7 @@ router.get("/pendientes", auth("RECEPCIONISTA","ADMIN","SUPER_ADMIN"), async (re
     const cid = clinicaOf(req);
 
     const [recetas] = await pool.query(
-      `SELECT pr.id, pr.estado, pr.enviado_recepcion_en,
+      `SELECT pr.id, pr.estado, pr.enviado_recepcion_en, pr.cita_id,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos,
               (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
@@ -29,7 +29,7 @@ router.get("/pendientes", auth("RECEPCIONISTA","ADMIN","SUPER_ADMIN"), async (re
     );
 
     const [estudios] = await pool.query(
-      `SELECT s.id, s.estado, s.tipo, s.urgente, s.enviado_recepcion_en,
+      `SELECT s.id, s.estado, s.tipo, s.urgente, s.enviado_recepcion_en, s.cita_id,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos
        FROM estudios_solicitudes s
@@ -54,7 +54,7 @@ router.get("/historial", auth("RECEPCIONISTA","ADMIN","SUPER_ADMIN"), async (req
     const cid = clinicaOf(req);
 
     const [recetas] = await pool.query(
-      `SELECT pr.id, pr.estado, pr.recibido_recepcion_en,
+      `SELECT pr.id, pr.estado, pr.recibido_recepcion_en, pr.cita_id,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos,
               (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
@@ -67,7 +67,7 @@ router.get("/historial", auth("RECEPCIONISTA","ADMIN","SUPER_ADMIN"), async (req
     );
 
     const [estudios] = await pool.query(
-      `SELECT s.id, s.estado, s.tipo, s.urgente, s.recibido_recepcion_en,
+      `SELECT s.id, s.estado, s.tipo, s.urgente, s.recibido_recepcion_en, s.cita_id,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos
        FROM estudios_solicitudes s

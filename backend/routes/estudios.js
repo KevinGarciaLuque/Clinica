@@ -366,20 +366,20 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     const cid = clinicaOf(req);
     if (!cid) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
 
-    const { paciente_id, historia_id, tipo = "LABORATORIO", descripcion, urgente = 0, firma_digital_url } = req.body;
+    const { paciente_id, historia_id, cita_id, tipo = "LABORATORIO", descripcion, urgente = 0, firma_digital_url } = req.body;
     if (!paciente_id || !descripcion) {
       return res.status(400).json({ ok: false, msg: "paciente_id y descripcion son requeridos" });
     }
 
     const hasFirmaCol = await hasEstudiosFirmaCol();
     const insertSql = hasFirmaCol
-      ? `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, tipo, descripcion, urgente, firma_digital_url)
-         VALUES (?,?,?,?,?,?,?,?)`
-      : `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, tipo, descripcion, urgente)
-         VALUES (?,?,?,?,?,?,?)`;
+      ? `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, cita_id, tipo, descripcion, urgente, firma_digital_url)
+         VALUES (?,?,?,?,?,?,?,?,?)`
+      : `INSERT INTO estudios_solicitudes (clinica_id, paciente_id, medico_id, historia_id, cita_id, tipo, descripcion, urgente)
+         VALUES (?,?,?,?,?,?,?,?)`;
     const insertParams = hasFirmaCol
-      ? [cid, paciente_id, req.user.id, historia_id || null, tipo, descripcion, urgente ? 1 : 0, firma_digital_url || null]
-      : [cid, paciente_id, req.user.id, historia_id || null, tipo, descripcion, urgente ? 1 : 0];
+      ? [cid, paciente_id, req.user.id, historia_id || null, cita_id || null, tipo, descripcion, urgente ? 1 : 0, firma_digital_url || null]
+      : [cid, paciente_id, req.user.id, historia_id || null, cita_id || null, tipo, descripcion, urgente ? 1 : 0];
 
     const [r] = await pool.query(insertSql, insertParams);
     res.json({ ok: true, id: r.insertId });

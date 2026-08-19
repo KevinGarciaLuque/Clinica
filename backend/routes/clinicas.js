@@ -208,6 +208,23 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIO
   }
 });
 
+// GET /api/clinicas/tiene-recepcionista
+// Indica si la clínica del usuario tiene al menos un RECEPCIONISTA activo,
+// para que el frontend muestre u oculte el flujo de "enviar a recepción".
+router.get("/tiene-recepcionista", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+  try {
+    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    if (!clinicaId) return res.json({ ok: true, data: false });
+    const [[row]] = await pool.query(
+      "SELECT COUNT(*) AS total FROM usuarios WHERE clinica_id=? AND tipo='RECEPCIONISTA' AND activo=1",
+      [clinicaId]
+    );
+    res.json({ ok: true, data: row.total > 0 });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // GET /api/clinicas/:id/modulos-permisos
 router.get("/:id/modulos-permisos", auth("SUPER_ADMIN"), async (req, res) => {
   try {

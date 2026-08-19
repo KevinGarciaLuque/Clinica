@@ -96,7 +96,9 @@ function getMenuSections(tipo, modulos) {
       : [...mainItems, consulta];
   }
 
-  // RECEPCIONISTA y ADMIN ven "Recepción" (cola de recetas/estudios enviados desde consulta)
+  // RECEPCIONISTA y ADMIN ven "Recepción" (cola de recetas/estudios enviados desde consulta).
+  // MEDICO no lo necesita: si la clínica no tiene recepcionista, el botón "Enviar a
+  // recepción" ni siquiera aparece (ver tieneRecepcionista en AuthContext).
   if ((tipo === "RECEPCIONISTA" || tipo === "ADMIN") && !mainItems.some(m => m.to === "/recepcion")) {
     const recepcion = { to: "/recepcion", label: "Recepción", icon: "bi-inbox-fill" };
     const citasIdxRec = mainItems.findIndex(m => m.to === "/citas");
@@ -105,19 +107,21 @@ function getMenuSections(tipo, modulos) {
       : [...mainItems, recepcion];
   }
 
-  // Cumpleañeros — siempre visible para todos los roles (después de Vacunas)
+  // Cumpleañeros — siempre visible para todos los roles, al final del menú
   if (!mainItems.some(m => m.to === "/cumpleaneros")) {
-    const cumple = { to: "/cumpleaneros", label: "Cumpleañeros", icon: "bi-cake2-fill" };
-    const vacIdx = mainItems.findIndex(m => m.to === "/vacunas");
-    if (vacIdx >= 0) {
-      mainItems = [...mainItems.slice(0, vacIdx + 1), cumple, ...mainItems.slice(vacIdx + 1)];
-    } else {
-      // Si no hay vacunas, ponerlo después de pacientes
-      const pacIdx = mainItems.findIndex(m => m.to === "/pacientes");
-      mainItems = pacIdx >= 0
-        ? [...mainItems.slice(0, pacIdx + 1), cumple, ...mainItems.slice(pacIdx + 1)]
-        : [...mainItems, cumple];
-    }
+    mainItems = [...mainItems, { to: "/cumpleaneros", label: "Cumpleañeros", icon: "bi-cake2-fill" }];
+  }
+
+  // RECEPCIONISTA — orden lógico de flujo de trabajo (agenda → recepción →
+  // pacientes → cobro → resto). Cumpleañeros se queda de último de todos modos.
+  if (tipo === "RECEPCIONISTA") {
+    const prioridad = ["/dashboard", "/citas", "/recepcion", "/pacientes", "/facturacion", "/caja", "/consulta", "/estadisticas", "/inventario"];
+    const enPrioridad = prioridad
+      .map(to => mainItems.find(m => m.to === to))
+      .filter(Boolean);
+    const resto = mainItems.filter(m => !prioridad.includes(m.to) && m.to !== "/cumpleaneros");
+    const cumple = mainItems.find(m => m.to === "/cumpleaneros");
+    mainItems = [...enPrioridad, ...resto, ...(cumple ? [cumple] : [])];
   }
 
   if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: adminItems };

@@ -154,6 +154,7 @@ app.use("/api/ia", require("./routes/ia"));
 app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/estadisticas", require("./routes/estadisticas"));
 app.use("/api/facturacion", require("./routes/facturacion"));
+app.use("/api/caja", require("./routes/caja"));
 app.use("/api/historias", require("./routes/historias"));
 app.use("/api/prescripciones", require("./routes/prescripciones"));
 app.use("/api/estudios", require("./routes/estudios"));

@@ -665,9 +665,15 @@ router.post("/:id/pagos", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"
 
     await conn.beginTransaction();
 
+    const [[turnoAbierto]] = await conn.query(
+      "SELECT id FROM caja_turnos WHERE clinica_id=? AND estado='ABIERTO' LIMIT 1",
+      [clinicaId]
+    );
+    const cajaTurnoId = turnoAbierto?.id || null;
+
     await conn.query(
-      "INSERT INTO pagos (clinica_id, factura_id, metodo, monto, referencia, registrado_por) VALUES (?,?,?,?,?,?)",
-      [clinicaId, req.params.id, metodo, montoNum, referencia || null, req.user.id]
+      "INSERT INTO pagos (clinica_id, factura_id, metodo, monto, referencia, registrado_por, caja_turno_id) VALUES (?,?,?,?,?,?,?)",
+      [clinicaId, req.params.id, metodo, montoNum, referencia || null, req.user.id, cajaTurnoId]
     );
 
     const [[{ totalPagado }]] = await conn.query(
@@ -720,10 +726,16 @@ router.post("/:id/cobrar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA
 
     await conn.beginTransaction();
 
+    const [[turnoAbierto]] = await conn.query(
+      "SELECT id FROM caja_turnos WHERE clinica_id=? AND estado='ABIERTO' LIMIT 1",
+      [clinicaId]
+    );
+    const cajaTurnoId = turnoAbierto?.id || null;
+
     for (const p of limpios) {
       await conn.query(
-        "INSERT INTO pagos (clinica_id, factura_id, metodo, monto, referencia, registrado_por) VALUES (?,?,?,?,?,?)",
-        [clinicaId, req.params.id, p.metodo, p.monto, p.referencia, req.user.id]
+        "INSERT INTO pagos (clinica_id, factura_id, metodo, monto, referencia, registrado_por, caja_turno_id) VALUES (?,?,?,?,?,?,?)",
+        [clinicaId, req.params.id, p.metodo, p.monto, p.referencia, req.user.id, cajaTurnoId]
       );
     }
 

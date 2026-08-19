@@ -500,6 +500,7 @@ export default function Consulta() {
             <EstudiosTab
               historiaId={hid}
               pacienteId={paciente?.id || pacId}
+              citaId={citaId}
               firmada={soloLectura}
               firmaDigitalUrl={usarFirmaDigital ? user?.firma_url || null : null}
             />
@@ -1751,6 +1752,7 @@ function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoC
 
 // ── Sub-tab: Receta de esta consulta ──────────────────────────────────────────
 function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugItems = [], onClearPending, firmaDigitalUrl }) {
+  const { tieneRecepcionista } = useAuth();
   const [list,      setList]      = useState([]);
   const [showForm,  setShowForm]  = useState(false);
   const [items,     setItems]     = useState([newRxItem()]);
@@ -2155,18 +2157,20 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
                 <i className="bi bi-check-lg me-1"></i>Entregar
               </button>
             )}
-            {!p.enviado_recepcion_en ? (
-              <button className="btn btn-outline-primary btn-sm"
-                style={{ fontSize: "0.75rem", borderRadius: 7 }}
-                onClick={() => api.patch(`/prescripciones/${p.id}/enviar-recepcion`)
-                  .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, enviado_recepcion_en: new Date().toISOString() } : x)))}>
-                <i className="bi bi-send me-1"></i>Enviar a recepción
-              </button>
-            ) : (
-              <span className="badge bg-light text-primary border border-primary-subtle d-flex align-items-center"
-                style={{ fontSize: "0.7rem" }}>
-                <i className="bi bi-check2-circle me-1"></i>Enviado
-              </span>
+            {tieneRecepcionista && (
+              !p.enviado_recepcion_en ? (
+                <button className="btn btn-outline-primary btn-sm"
+                  style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                  onClick={() => api.patch(`/prescripciones/${p.id}/enviar-recepcion`)
+                    .then(() => setList(prev => prev.map(x => x.id === p.id ? { ...x, enviado_recepcion_en: new Date().toISOString() } : x)))}>
+                  <i className="bi bi-send me-1"></i>Enviar a recepción
+                </button>
+              ) : (
+                <span className="badge bg-light text-primary border border-primary-subtle d-flex align-items-center"
+                  style={{ fontSize: "0.7rem" }}>
+                  <i className="bi bi-check2-circle me-1"></i>Enviado
+                </span>
+              )
             )}
             <button
               onClick={() => printRx(p.id)}
@@ -2451,7 +2455,8 @@ const ESTADO_BADGE = {
   CANCELADO:   "secondary",
 };
 
-function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
+function EstudiosTab({ historiaId, pacienteId, citaId, firmada, firmaDigitalUrl }) {
+  const { tieneRecepcionista } = useAuth();
   const [list,     setList]     = useState([]);
   const [showForm, setShowForm] = useState(false);
   const [form,     setForm]     = useState({ tipo: "LABORATORIO", descripcion: "", urgente: false });
@@ -2509,6 +2514,7 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
       await api.post("/estudios", {
         paciente_id: pacienteId,
         historia_id: historiaId || null,
+        cita_id:     citaId || null,
         tipo:        form.tipo,
         descripcion: form.descripcion,
         urgente:     form.urgente ? 1 : 0,
@@ -2687,19 +2693,21 @@ function EstudiosTab({ historiaId, pacienteId, firmada, firmaDigitalUrl }) {
                 <i className="bi bi-arrow-right me-1" />En Proceso
               </button>
             )}
-            {!s.enviado_recepcion_en ? (
-              <button
-                className="btn btn-outline-primary btn-sm"
-                style={{ fontSize: "0.75rem", borderRadius: 7 }}
-                onClick={() => api.patch(`/estudios/${s.id}/enviar-recepcion`)
-                  .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, enviado_recepcion_en: new Date().toISOString() } : x)))}>
-                <i className="bi bi-send me-1" />Enviar a recepción
-              </button>
-            ) : (
-              <span className="badge bg-light text-primary border border-primary-subtle d-flex align-items-center"
-                style={{ fontSize: "0.7rem" }}>
-                <i className="bi bi-check2-circle me-1"></i>Enviado
-              </span>
+            {tieneRecepcionista && (
+              !s.enviado_recepcion_en ? (
+                <button
+                  className="btn btn-outline-primary btn-sm"
+                  style={{ fontSize: "0.75rem", borderRadius: 7 }}
+                  onClick={() => api.patch(`/estudios/${s.id}/enviar-recepcion`)
+                    .then(() => setList(prev => prev.map(x => x.id === s.id ? { ...x, enviado_recepcion_en: new Date().toISOString() } : x)))}>
+                  <i className="bi bi-send me-1" />Enviar a recepción
+                </button>
+              ) : (
+                <span className="badge bg-light text-primary border border-primary-subtle d-flex align-items-center"
+                  style={{ fontSize: "0.7rem" }}>
+                  <i className="bi bi-check2-circle me-1"></i>Enviado
+                </span>
+              )
             )}
             <button
               style={{ background: "transparent", border: "1px solid #3b82f6", borderRadius: 7, color: "#3b82f6", padding: "4px 12px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600 }}

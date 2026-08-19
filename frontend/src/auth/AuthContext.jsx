@@ -21,6 +21,13 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : null;
   });
 
+  // Si la clínica tiene al menos un RECEPCIONISTA activo (activa/desactiva el
+  // flujo de "enviar a recepción" en consulta sin necesidad de configuración manual)
+  const [tieneRecepcionista, setTieneRecepcionista] = useState(() => {
+    const raw = localStorage.getItem("tiene_recepcionista");
+    return raw ? JSON.parse(raw) : false;
+  });
+
   const isAuth = !!user;
 
   /** Carga (o recarga) los módulos del usuario autenticado */
@@ -36,11 +43,25 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /** Consulta si la clínica tiene un recepcionista activo */
+  const cargarTieneRecepcionista = async () => {
+    try {
+      const res = await api.get("/clinicas/tiene-recepcionista");
+      const valor = !!res.data.data;
+      localStorage.setItem("tiene_recepcionista", JSON.stringify(valor));
+      setTieneRecepcionista(valor);
+      return valor;
+    } catch {
+      return false;
+    }
+  };
+
   // Si hay token al montar (refresh de página), siempre recargar módulos del servidor
   // para que cambios en BD (nuevos módulos asignados) se reflejen sin necesidad de re-login
   useEffect(() => {
     if (user) {
       cargarModulos();
+      cargarTieneRecepcionista();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -67,6 +88,7 @@ export function AuthProvider({ children }) {
 
     // Cargar módulos inmediatamente tras login
     await cargarModulos();
+    await cargarTieneRecepcionista();
 
     return usuario;
   };
@@ -85,6 +107,7 @@ export function AuthProvider({ children }) {
     setLicenciaInfo(licencia_info || null);
 
     await cargarModulos();
+    await cargarTieneRecepcionista();
 
     return usuario;
   };
@@ -102,6 +125,7 @@ export function AuthProvider({ children }) {
     setLicenciaInfo(licencia_info || null);
 
     await cargarModulos();
+    await cargarTieneRecepcionista();
 
     return usuario;
   };
@@ -111,9 +135,11 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("user");
     localStorage.removeItem("modulos");
     localStorage.removeItem("licencia_info");
+    localStorage.removeItem("tiene_recepcionista");
     setUser(null);
     setModulos([]);
     setLicenciaInfo(null);
+    setTieneRecepcionista(false);
   };
 
   /** Actualiza el usuario en estado y localStorage (tras editar perfil) */
@@ -126,7 +152,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, login, verificar2FA, loginConGoogle, logout, cargarModulos, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, tieneRecepcionista, login, verificar2FA, loginConGoogle, logout, cargarModulos, cargarTieneRecepcionista, updateUser }}>
       {children}
     </AuthContext.Provider>
   );
