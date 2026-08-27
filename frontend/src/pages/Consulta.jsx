@@ -47,7 +47,7 @@ export default function Consulta() {
     api.get("/dashboard/sala-espera")
       .then(r => {
         const activos = (r.data.data || [])
-          .filter(c => c.estado === "EN_ESPERA" || c.estado === "EN_ATENCION")
+          .filter(c => c.estado !== "COMPLETADA")
           .sort((a, b) => {
             // EN_ATENCION primero (el médico ya está con ese paciente)
             if (a.estado !== b.estado) return a.estado === "EN_ATENCION" ? -1 : 1;
@@ -259,7 +259,7 @@ function SalaDeEspera({ citas, onEstadoChange, navigate }) {
             display: "flex", alignItems: "center", gap: 7,
           }}>
             <i className="bi bi-info-circle"></i>
-            Solo pacientes admitidos por recepción (en espera o en atención). Los ya atendidos aparecen en Consultas de hoy.
+            Todos los pacientes citados hoy que aún no han sido atendidos. Al darles consulta pasan a Consultas de hoy.
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

@@ -583,7 +583,7 @@ export default function Citas() {
         .rbc-month-view, .rbc-time-view {
           border: 1px solid #e2e8f0 !important;
           border-radius: 10px !important;
-          overflow: hidden;
+          overflow-y: auto;
         }
         .rbc-off-range-bg { background: #f8fafc !important; }
         .rbc-today { background-color: rgba(37, 99, 235, 0.05) !important; }
@@ -823,7 +823,7 @@ export default function Citas() {
           </div>
           {loading && <div style={{ fontSize: "0.82rem", color: "#9ca3af", marginBottom: 8 }}>Cargando citas...</div>}
           <div style={{
-            height: "calc(100vh - 310px)", minHeight: 480,
+            height: "calc(100vh - 310px)", minHeight: 650,
             background: "#fff", borderRadius: 10,
           }}>
             <DnDCalendar
