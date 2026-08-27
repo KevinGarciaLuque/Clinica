@@ -250,7 +250,10 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
     case "listar_citas_paciente": {
       const desde = args.desde || new Date().toISOString().slice(0, 10);
       const [rows] = await pool.query(
-        `SELECT c.id, c.inicio, c.fin, c.tipo_consulta, c.estado, c.motivo,
+        `SELECT c.id,
+                DATE_FORMAT(c.inicio, '%Y-%m-%dT%H:%i:%s') AS inicio,
+                DATE_FORMAT(c.fin, '%Y-%m-%dT%H:%i:%s') AS fin,
+                c.tipo_consulta, c.estado, c.motivo,
                 u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
          FROM citas c
          JOIN usuarios u ON u.id = c.medico_id

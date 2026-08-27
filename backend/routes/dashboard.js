@@ -85,7 +85,10 @@ router.get("/sala-espera", auth(), async (req, res) => {
       : new Date().toLocaleDateString('en-CA');
 
     const [rows] = await pool.query(
-      `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,
+      `SELECT c.id,
+              DATE_FORMAT(c.inicio, '%Y-%m-%dT%H:%i:%s') AS inicio,
+              DATE_FORMAT(c.fin, '%Y-%m-%dT%H:%i:%s') AS fin,
+              c.estado, c.tipo_consulta, c.motivo, c.canal,
               p.id AS paciente_id, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
               p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
               u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
