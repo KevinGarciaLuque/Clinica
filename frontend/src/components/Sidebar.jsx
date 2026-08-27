@@ -112,10 +112,10 @@ function getMenuSections(tipo, modulos) {
     mainItems = [...mainItems, { to: "/cumpleaneros", label: "Cumpleañeros", icon: "bi-cake2-fill" }];
   }
 
-  // RECEPCIONISTA — orden lógico de flujo de trabajo (agenda → recepción →
-  // pacientes → cobro → resto). Cumpleañeros se queda de último de todos modos.
+  // RECEPCIONISTA — orden pedido: Dashboard, Pacientes, Recepción, Citas,
+  // Consulta → resto. Cumpleañeros se queda de último de todos modos.
   if (tipo === "RECEPCIONISTA") {
-    const prioridad = ["/dashboard", "/citas", "/recepcion", "/pacientes", "/facturacion", "/caja", "/consulta", "/estadisticas", "/inventario"];
+    const prioridad = ["/dashboard", "/pacientes", "/recepcion", "/citas", "/consulta", "/facturacion", "/caja", "/estadisticas", "/inventario"];
     const enPrioridad = prioridad
       .map(to => mainItems.find(m => m.to === to))
       .filter(Boolean);
