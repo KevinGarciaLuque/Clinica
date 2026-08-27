@@ -781,6 +781,25 @@ const pool = require("./db");
       console.log("✅ [auto-migrate] usuarios.two_factor_enabled OK");
     }
 
+    // Columna timezone en clinicas (crons de recordatorios y cumpleaños la usan
+    // para calcular "hoy"/"ahora" en la hora local de la clínica, no en UTC del servidor)
+    const [colTz] = await pool.query(`
+      SELECT COUNT(*) AS n FROM information_schema.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME   = 'clinicas'
+        AND COLUMN_NAME  = 'timezone'
+    `);
+    if (colTz[0].n === 0) {
+      await pool.query(`
+        ALTER TABLE clinicas
+          ADD COLUMN timezone VARCHAR(60) DEFAULT 'America/Tegucigalpa'
+          COMMENT 'Zona horaria IANA usada por crons y reportes'
+      `);
+      console.log("✅ [auto-migrate] clinicas.timezone agregada");
+    } else {
+      console.log("✅ [auto-migrate] clinicas.timezone OK");
+    }
+
     // Códigos de un solo uso para 2FA por correo (login y activación)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuario_2fa_codigos (

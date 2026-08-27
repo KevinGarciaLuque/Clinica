@@ -192,7 +192,7 @@ export default function Recepcion() {
   const cargarCitasHoy = useCallback(async () => {
     setCargando(true);
     try {
-      const r = await api.get("/dashboard/sala-espera");
+      const r = await api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } });
       setCitasHoy(r.data.data || []);
     } catch { /* noop */ }
     finally { setCargando(false); }

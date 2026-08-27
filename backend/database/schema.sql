@@ -24,6 +24,7 @@ CREATE TABLE IF NOT EXISTS clinicas (
   pais          VARCHAR(60)  DEFAULT 'PE',
   ruc           VARCHAR(20)  COMMENT 'RUC / NIT / RFC según país',
   datos_fiscales JSON        COMMENT 'Nombre fiscal, dirección fiscal, etc.',
+  timezone      VARCHAR(60)  DEFAULT 'America/Tegucigalpa' COMMENT 'Zona horaria IANA usada por crons y reportes (recordatorios, cumpleaños)',
   activo        TINYINT(1)   DEFAULT 1,
   creado_en     DATETIME     DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;

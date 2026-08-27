@@ -763,7 +763,7 @@ router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req,
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const [rows] = await pool.query(
-      "SELECT id, nombre, slug, tipo_id, logo_url, email, telefono, direccion, ciudad, pais, ruc, datos_fiscales, activo FROM clinicas WHERE id=?",
+      "SELECT id, nombre, slug, tipo_id, logo_url, email, telefono, direccion, ciudad, pais, ruc, datos_fiscales, activo, timezone FROM clinicas WHERE id=?",
       [id]
     );
     if (!rows.length) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
@@ -881,7 +881,7 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
 router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
     const id = req.user.super ? req.params.id : req.user.clinica_id;
-    const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo } = req.body;
+    const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo, timezone } = req.body;
 
     if (slug) {
       const [exist] = await pool.query("SELECT id FROM clinicas WHERE slug=? AND id!=?", [slug, id]);
@@ -901,14 +901,15 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req,
          email=COALESCE(?,email),
          telefono=COALESCE(?,telefono), direccion=COALESCE(?,direccion),
          ciudad=COALESCE(?,ciudad), pais=COALESCE(?,pais), ruc=COALESCE(?,ruc),
-         logo_url=COALESCE(?,logo_url), activo=COALESCE(?,activo)
+         logo_url=COALESCE(?,logo_url), activo=COALESCE(?,activo),
+         timezone=COALESCE(?,timezone)
        WHERE id=?`,
       [nombre||null, slug||null,
        tipoIdFinal, tipoIdFinal,
        es_pediatrica !== undefined ? (es_pediatrica ? 1 : 0) : null,
        email||null, telefono||null, direccion||null,
        ciudad||null, pais||null, ruc||null, logo_url||null,
-       activo !== undefined ? activo : null, id]
+       activo !== undefined ? activo : null, timezone||null, id]
     );
     res.json({ ok: true });
   } catch (e) {

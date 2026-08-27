@@ -376,7 +376,7 @@ export default function Citas() {
   }, [loadCitas]);
 
   const loadSalaEspera = useCallback(() => {
-    api.get("/dashboard/sala-espera")
+    api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } })
       .then(r => setSala(r.data.data || []))
       .catch(() => setSala([]));
   }, []);

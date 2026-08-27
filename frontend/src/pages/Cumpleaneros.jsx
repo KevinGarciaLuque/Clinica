@@ -23,11 +23,11 @@ const C = {
 /* ──────────────────────────────────────────────────────────────────────── */
 /*  Modal de felicitación                                                    */
 /* ──────────────────────────────────────────────────────────────────────── */
-function ModalFelicitar({ paciente, onClose }) {
+function ModalFelicitar({ paciente, onClose, whatsappActivo }) {
   const nombre = `${paciente.nombres} ${paciente.apellidos}`;
   const [canales, setCanales] = useState({
     email:    !!(paciente.email),
-    whatsapp: !!(paciente.telefono),
+    whatsapp: whatsappActivo && !!(paciente.telefono),
   });
   const [mensaje, setMensaje] = useState(
     `¡Hola ${paciente.nombres}! 🎂\n\nEn el día de tu cumpleaños, todo el equipo de nuestra clínica te desea un maravilloso día lleno de salud, alegría y momentos especiales.\n\n¡Que cumplas muchos más años! 🎉\n\nCon cariño,\nEl equipo de tu clínica`
@@ -146,20 +146,22 @@ function ModalFelicitar({ paciente, onClose }) {
 
               <button
                 onClick={() => toggleCanal("whatsapp")}
-                disabled={!paciente.telefono}
+                disabled={!paciente.telefono || !whatsappActivo}
+                title={!whatsappActivo ? "Deshabilitado por el administrador de la clínica" : undefined}
                 style={{
-                  flex: 1, padding: "9px 14px", borderRadius: 10, cursor: paciente.telefono ? "pointer" : "not-allowed",
+                  flex: 1, padding: "9px 14px", borderRadius: 10,
+                  cursor: (paciente.telefono && whatsappActivo) ? "pointer" : "not-allowed",
                   background: canales.whatsapp ? "rgba(37,211,102,.1)" : "rgba(0,0,0,.03)",
                   border: canales.whatsapp ? "2px solid #25d366" : "2px solid #e5e7eb",
                   display: "flex", alignItems: "center", gap: 8, transition: "all .15s",
-                  opacity: paciente.telefono ? 1 : 0.45,
+                  opacity: (paciente.telefono && whatsappActivo) ? 1 : 0.45,
                 }}
               >
                 <i className="bi bi-whatsapp" style={{ color: canales.whatsapp ? "#25d366" : "#9ca3af", fontSize: 16 }} />
                 <div style={{ textAlign: "left" }}>
                   <div style={{ fontSize: 12, fontWeight: 700, color: canales.whatsapp ? "#25d366" : "#374151" }}>WhatsApp</div>
                   <div style={{ fontSize: 10, color: C.muted, marginTop: 1 }}>
-                    {paciente.telefono || "Sin teléfono"}
+                    {!whatsappActivo ? "Deshabilitado por el admin" : (paciente.telefono || "Sin teléfono")}
                   </div>
                 </div>
                 {canales.whatsapp && <i className="bi bi-check-circle-fill" style={{ marginLeft: "auto", color: "#25d366", fontSize: 14 }} />}
@@ -272,6 +274,7 @@ export default function Cumpleaneros() {
   const [mesSelec,  setMesSelec]  = useState(dayjs().startOf("month"));
   const [modalPac,  setModalPac]  = useState(null);
   const [isMobile,  setIsMobile]  = useState(window.innerWidth < 640);
+  const [whatsappActivo, setWhatsappActivo] = useState(true);
   const panelRef = useRef(null);
 
   useEffect(() => {
@@ -283,8 +286,9 @@ export default function Cumpleaneros() {
   const cargar = async () => {
     setCargando(true);
     try {
-      const res = await api.get("/cumpleanos", { params: { dias: 365 } });
+      const res = await api.get("/cumpleanos", { params: { dias: 365, fecha: dayjs().format("YYYY-MM-DD") } });
       setLista(res.data.data || []);
+      setWhatsappActivo(res.data.whatsapp_activo !== false);
     } catch {
       setLista([]);
     } finally {
@@ -594,7 +598,7 @@ export default function Cumpleaneros() {
 
       {/* Modal felicitación */}
       {modalPac && (
-        <ModalFelicitar paciente={modalPac} onClose={() => setModalPac(null)} />
+        <ModalFelicitar paciente={modalPac} onClose={() => setModalPac(null)} whatsappActivo={whatsappActivo} />
       )}
     </div>
   );

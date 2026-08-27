@@ -20,6 +20,9 @@ const mysql = require("mysql2/promise");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const db = require("../db");
+const dayjs = require("dayjs");
+dayjs.extend(require("dayjs/plugin/utc"));
+dayjs.extend(require("dayjs/plugin/timezone"));
 
 // ═══════════════════════════════════════════════════════════════
 // UTILIDADES
@@ -63,7 +66,7 @@ async function enviarRecordatoriosAutomaticos() {
 
     // Obtener todas las clínicas con recordatorios activos
     const [clinicas] = await connection.query(`
-      SELECT c.id AS clinica_id, c.nombre, crc.*
+      SELECT c.id AS clinica_id, c.nombre, c.timezone, crc.*
       FROM clinicas c
       INNER JOIN clinica_recordatorios_config crc ON c.id = crc.clinica_id
       WHERE c.activo = 1
@@ -88,7 +91,12 @@ async function enviarRecordatoriosAutomaticos() {
 }
 
 async function procesarClinica(connection, clinica) {
-  const ahora = new Date();
+  // citas.inicio se guarda como hora local "naive" de la clínica (sin zona horaria).
+  // Este script corre en el servidor (Railway, en UTC), así que "ahora" debe calcularse
+  // en la zona horaria de la clínica y compararse como texto plano, no como Date/UTC,
+  // para no desfasar las ventanas de recordatorio por la diferencia horaria.
+  const tz = clinica.timezone || "America/Tegucigalpa";
+  const ahoraLocal = dayjs().tz(tz);
   const tiempos = [];
 
   // Determinar qué ventanas de tiempo verificar
@@ -101,11 +109,13 @@ async function procesarClinica(connection, clinica) {
   console.log(`   Ventanas activas: ${tiempos.join(", ")}h`);
 
   for (const horas of tiempos) {
-    // Ventana de ±1h centrada en la marca objetivo para mayor resiliencia
-    const inicio = new Date(ahora.getTime() + (horas - 1) * 60 * 60 * 1000);
-    const fin = new Date(ahora.getTime() + (horas + 1) * 60 * 60 * 1000);
+    // Ventana de ±1h centrada en la marca objetivo para mayor resiliencia.
+    // Se formatean como texto (no Date) para comparar tal cual contra el valor
+    // naive-local guardado en citas.inicio.
+    const inicio = ahoraLocal.add(horas - 1, "hour").format("YYYY-MM-DD HH:mm:ss");
+    const fin    = ahoraLocal.add(horas + 1, "hour").format("YYYY-MM-DD HH:mm:ss");
 
-    console.log(`   🔍 Verificando ventana ${horas}h (${inicio.toLocaleTimeString()} – ${fin.toLocaleTimeString()})...`);
+    console.log(`   🔍 Verificando ventana ${horas}h (${inicio} – ${fin}, ${tz})...`);
 
     // Obtener citas en esta ventana de tiempo
     const [citas] = await connection.query(

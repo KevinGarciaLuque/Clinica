@@ -35,10 +35,18 @@ router.get(
 
       const dias = Math.min(parseInt(req.query.dias ?? 0, 10) || 0, 365);
 
+      // "Hoy" lo decide el navegador del usuario (req.query.fecha), no el servidor:
+      // Railway corre en UTC y calcular "hoy" ahí desfasa el día en horarios
+      // nocturnos de Centroamérica (mismo bug que /dashboard/sala-espera).
+      const hoyStr = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || "")
+        ? req.query.fecha
+        : new Date().toLocaleDateString('en-CA');
+      const hoy = new Date(`${hoyStr}T00:00:00`);
+
       // Construimos condiciones mes/día para hoy + días siguientes
       const conditions = [];
       for (let d = 0; d <= dias; d++) {
-        const fecha = new Date();
+        const fecha = new Date(hoy);
         fecha.setDate(fecha.getDate() + d);
         const mes = fecha.getMonth() + 1;
         const dia = fecha.getDate();
@@ -50,12 +58,12 @@ router.get(
         SELECT
           id, nombres, apellidos, telefono, email,
           fecha_nacimiento, foto_perfil, sexo,
-          TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad,
+          TIMESTAMPDIFF(YEAR, fecha_nacimiento, ?) AS edad,
           CASE
-            WHEN MONTH(fecha_nacimiento)=MONTH(CURDATE()) AND DAY(fecha_nacimiento)=DAY(CURDATE()) THEN 0
+            WHEN MONTH(fecha_nacimiento)=MONTH(?) AND DAY(fecha_nacimiento)=DAY(?) THEN 0
             ELSE DATEDIFF(
-              DATE_FORMAT(CONCAT(YEAR(CURDATE()),'-',MONTH(fecha_nacimiento),'-',DAY(fecha_nacimiento)), '%Y-%m-%d'),
-              CURDATE()
+              DATE_FORMAT(CONCAT(YEAR(?),'-',MONTH(fecha_nacimiento),'-',DAY(fecha_nacimiento)), '%Y-%m-%d'),
+              ?
             )
           END AS dias_para_cumplir
         FROM pacientes
@@ -65,11 +73,21 @@ router.get(
         ORDER BY dias_para_cumplir ASC, nombres ASC
       `;
 
-      const params = [];
+      const params = [hoyStr, hoyStr, hoyStr, hoyStr, hoyStr];
       if (!isSuperAdmin) params.push(clinicaId);
 
       const [rows] = await pool.query(sql, params);
-      res.json({ ok: true, data: rows });
+
+      let whatsappActivo = true;
+      if (!isSuperAdmin) {
+        const [[cfg]] = await pool.query(
+          "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='whatsapp_cumpleanos_activo'",
+          [clinicaId]
+        );
+        whatsappActivo = !cfg || cfg.valor !== "0";
+      }
+
+      res.json({ ok: true, data: rows, whatsapp_activo: whatsappActivo });
     } catch (e) {
       console.error("[GET /cumpleanos]", e.message);
       res.status(500).json({ ok: false, msg: e.message });
@@ -165,7 +183,15 @@ router.post(
 
       // ── WHATSAPP (Twilio) ─────────────────────────────────────────
       if (canales.includes("whatsapp")) {
-        if (!paciente.telefono) {
+        const [[cfgWa]] = await pool.query(
+          "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='whatsapp_cumpleanos_activo'",
+          [clinicaIdFinal]
+        );
+        const whatsappActivo = !cfgWa || cfgWa.valor !== "0";
+
+        if (!whatsappActivo) {
+          resultados.whatsapp = { ok: false, msg: "El envío de felicitaciones por WhatsApp está deshabilitado por el administrador de la clínica" };
+        } else if (!paciente.telefono) {
           resultados.whatsapp = { ok: false, msg: "El paciente no tiene teléfono registrado" };
         } else {
           try {

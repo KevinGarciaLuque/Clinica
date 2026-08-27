@@ -14,7 +14,12 @@ router.get("/stats", auth(), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
 
-    const hoy       = new Date().toISOString().slice(0, 10);
+    // La fecha "de hoy" la decide el navegador del usuario (req.query.fecha), no el
+    // servidor: Railway corre en UTC y calcular "hoy" ahí desfasa el día en horarios
+    // nocturnos de Centroamérica.
+    const hoy = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || "")
+      ? req.query.fecha
+      : new Date().toLocaleDateString('en-CA');
     const inicioSem = new Date();
     inicioSem.setDate(inicioSem.getDate() - inicioSem.getDay() + 1); // Lunes
     const finSem    = new Date(inicioSem);
@@ -72,8 +77,12 @@ router.get("/stats", auth(), async (req, res) => {
 router.get("/sala-espera", auth(), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
-    // Usar fecha local de México/América para evitar problemas de zona horaria
-    const hoy = new Date().toLocaleDateString('en-CA'); // Formato YYYY-MM-DD
+    // La fecha "de hoy" la decide el navegador del usuario (req.query.fecha), no el
+    // servidor: Railway corre en UTC y calcular "hoy" ahí desfasa el día en horarios
+    // nocturnos de Centroamérica, dejando la sala de espera vacía sin motivo aparente.
+    const hoy = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || "")
+      ? req.query.fecha
+      : new Date().toLocaleDateString('en-CA');
 
     const [rows] = await pool.query(
       `SELECT c.id, c.inicio, c.fin, c.estado, c.tipo_consulta, c.motivo, c.canal,

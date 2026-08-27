@@ -60,6 +60,7 @@ export default function ConfigClinica() {
           pais: data.pais || "HN",
           ruc: data.ruc || "",
           logo_url: data.logo_url || "",
+          timezone: data.timezone || "America/Tegucigalpa",
         });
 
         const cfgMap = {};
@@ -77,6 +78,7 @@ export default function ConfigClinica() {
           perfil_color_primario:  cfgMap.perfil_color_primario  || "#213665",
           perfil_agendar_activo:  cfgMap.perfil_agendar_activo  !== undefined ? cfgMap.perfil_agendar_activo : "1",
           perfil_mostrar_directorio: cfgMap.perfil_mostrar_directorio || "0",
+          whatsapp_cumpleanos_activo: cfgMap.whatsapp_cumpleanos_activo !== undefined ? cfgMap.whatsapp_cumpleanos_activo : "1",
         });
 
         setFormFactura({
@@ -422,6 +424,40 @@ export default function ConfigClinica() {
                     ))}
                   </select>
                 </div>
+                <div className="col-md-6">
+                  <label className="form-label">Zona horaria</label>
+                  <select
+                    className="form-select"
+                    value={form.timezone || "America/Tegucigalpa"}
+                    onChange={(e) => setForm({ ...form, timezone: e.target.value })}
+                  >
+                    {[
+                      ["America/Tegucigalpa", "Honduras (Tegucigalpa)"],
+                      ["America/Guatemala", "Guatemala"],
+                      ["America/El_Salvador", "El Salvador"],
+                      ["America/Managua", "Nicaragua"],
+                      ["America/Costa_Rica", "Costa Rica"],
+                      ["America/Panama", "Panama"],
+                      ["America/Mexico_City", "Mexico (Ciudad de Mexico)"],
+                      ["America/Bogota", "Colombia"],
+                      ["America/Lima", "Peru"],
+                      ["America/Guayaquil", "Ecuador"],
+                      ["America/La_Paz", "Bolivia"],
+                      ["America/Santiago", "Chile"],
+                      ["America/Argentina/Buenos_Aires", "Argentina"],
+                      ["America/Asuncion", "Paraguay"],
+                      ["America/Montevideo", "Uruguay"],
+                      ["America/Caracas", "Venezuela"],
+                      ["America/Santo_Domingo", "Republica Dominicana"],
+                      ["America/Sao_Paulo", "Brasil"],
+                    ].map(([v, l]) => (
+                      <option key={v} value={v}>{l}</option>
+                    ))}
+                  </select>
+                  <div className="form-text">
+                    Se usa para calcular "hoy" en recordatorios de citas y cumpleaños.
+                  </div>
+                </div>
 
                 <div className="col-12">
                   <label className="form-label">Logo de la clinica</label>
@@ -595,6 +631,43 @@ export default function ConfigClinica() {
                   <div style={{
                     position: "absolute",
                     top: 2, left: formPerfil.perfil_mostrar_directorio === "1" ? 22 : 2,
+                    width: 27, height: 27, borderRadius: "50%",
+                    background: "#fff",
+                    boxShadow: "0 2px 6px rgba(0,0,0,.22)",
+                    transition: "left .25s cubic-bezier(.4,0,.2,1)",
+                  }} />
+                </div>
+              </div>
+
+              {/* Switch: Felicitaciones de cumpleaños por WhatsApp */}
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between",
+                background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
+                padding: "14px 18px", marginBottom: 20,
+              }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14 }}>
+                    <i className="bi bi-whatsapp me-2" style={{ color: "#25d366" }} />
+                    Felicitaciones de cumpleaños por WhatsApp
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                    Si está desactivado, el canal WhatsApp no estará disponible al enviar felicitaciones de cumpleaños a pacientes.
+                  </div>
+                </div>
+                <div
+                  onClick={() => setFormPerfil({ ...formPerfil, whatsapp_cumpleanos_activo: formPerfil.whatsapp_cumpleanos_activo === "1" ? "0" : "1" })}
+                  style={{
+                    flexShrink: 0, marginLeft: 16,
+                    width: 51, height: 31, borderRadius: 31,
+                    background: formPerfil.whatsapp_cumpleanos_activo === "1" ? "#34c759" : "#e5e7eb",
+                    position: "relative", cursor: "pointer",
+                    transition: "background .25s cubic-bezier(.4,0,.2,1)",
+                    boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+                  }}
+                >
+                  <div style={{
+                    position: "absolute",
+                    top: 2, left: formPerfil.whatsapp_cumpleanos_activo === "1" ? 22 : 2,
                     width: 27, height: 27, borderRadius: "50%",
                     background: "#fff",
                     boxShadow: "0 2px 6px rgba(0,0,0,.22)",

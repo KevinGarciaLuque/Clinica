@@ -45,7 +45,7 @@ export default function Consulta() {
 
   const loadSalaEspera = useCallback(() => {
     setLoading(true);
-    api.get("/dashboard/sala-espera")
+    api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } })
       .then(r => {
         // Si la clínica tiene recepcionista, solo se muestran los pacientes que
         // recepción ya admitió (EN_ESPERA/EN_ATENCION). Sin recepcionista, el

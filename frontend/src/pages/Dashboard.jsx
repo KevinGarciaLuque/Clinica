@@ -471,8 +471,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      api.get("/dashboard/stats"),
-      api.get("/dashboard/sala-espera"),
+      api.get("/dashboard/stats", { params: { fecha: dayjs().format("YYYY-MM-DD") } }),
+      api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } }),
     ])
     .then(([s, e]) => {
       setStats(s.data.data);
