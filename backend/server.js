@@ -818,6 +818,28 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] eventos_festivos OK");
 
+    // Seed inicial de feriados fijos de Honduras (solo si la tabla está vacía)
+    const [[{ n: totalEventos }]] = await pool.query(
+      "SELECT COUNT(*) AS n FROM eventos_festivos"
+    );
+    if (totalEventos === 0) {
+      await pool.query(`
+        INSERT INTO eventos_festivos
+          (nombre, emoji, mensaje, color, fecha_inicio, fecha_fin, recurrente_anual, activo) VALUES
+        ('Año Nuevo',                 '🎊', '¡Feliz Año Nuevo!',                '#2563eb', '2025-01-01', '2025-01-01', 1, 1),
+        ('Día de las Américas',       '🕊️', 'Feliz Día de las Américas',        '#0ea5e9', '2025-04-14', '2025-04-14', 1, 1),
+        ('Día del Trabajador',        '🛠️', 'Feliz Día del Trabajador',         '#f59e0b', '2025-05-01', '2025-05-01', 1, 1),
+        ('Día de la Independencia',   '🇭🇳', '¡Feliz Día de la Independencia!',  '#2563eb', '2025-09-15', '2025-09-15', 1, 1),
+        ('Día de Morazán',            '⚔️', 'Feliz Día de Morazán',             '#7c3aed', '2025-10-03', '2025-10-03', 1, 1),
+        ('Día de la Raza',            '🌎', 'Feliz Día de la Raza',             '#16a34a', '2025-10-12', '2025-10-12', 1, 1),
+        ('Día de las Fuerzas Armadas','🎖️', 'Feliz Día de las Fuerzas Armadas', '#475569', '2025-10-21', '2025-10-21', 1, 1),
+        ('Navidad',                   '🎄', '¡Feliz Navidad!',                  '#dc2626', '2025-12-24', '2025-12-25', 1, 1)
+      `);
+      console.log("✅ [auto-migrate] eventos_festivos seed Honduras insertado");
+    } else {
+      console.log("✅ [auto-migrate] eventos_festivos seed ya existe, omitido");
+    }
+
     // Códigos de un solo uso para 2FA por correo (login y activación)
     await pool.query(`
       CREATE TABLE IF NOT EXISTS usuario_2fa_codigos (

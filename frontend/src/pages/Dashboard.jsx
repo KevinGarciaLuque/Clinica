@@ -134,31 +134,62 @@ function EventoFestivoBanner({ isMobile, evento }) {
       <style>{`
         @keyframes evfest-float {
           0%,100% { transform: translateY(0) rotate(0deg); }
-          50%     { transform: translateY(-8px) rotate(6deg); }
+          50%     { transform: translateY(-9px) rotate(5deg); }
+        }
+        @keyframes evfest-glow {
+          0%,100% { opacity:0.35; transform: scale(1); }
+          50%     { opacity:0.55; transform: scale(1.08); }
         }
       `}</style>
 
-      {/* Nombre del evento — watermark izquierda */}
+      {/* Tarjeta del evento — banda izquierda, elegante */}
       <div style={{
-        position:'absolute', left: isMobile ? 8 : 20, top:'50%', transform:'translateY(-50%)',
-        opacity:0.22, pointerEvents:'none', zIndex:0, textAlign:'center', lineHeight:1.15,
-        userSelect:'none', maxWidth: isMobile ? 90 : 160,
+        position:'absolute', left: isMobile ? 10 : 24, top:'50%', transform:'translateY(-50%)',
+        pointerEvents:'none', zIndex:0, textAlign:'left', lineHeight:1.15,
+        userSelect:'none', maxWidth: isMobile ? 150 : 280,
+        background: `linear-gradient(135deg, ${color}12, ${color}05)`,
+        border: `1px solid ${color}22`,
+        borderRadius: 14,
+        padding: isMobile ? '8px 12px' : '10px 18px',
+        backdropFilter: 'blur(2px)',
       }}>
         <div style={{
-          fontSize: isMobile ? 11 : 14, fontWeight:900, color, letterSpacing:'0.06em',
-          textTransform:'uppercase',
+          display:'flex', alignItems:'center', gap: 6,
+          fontSize: isMobile ? 8.5 : 10.5, fontWeight:800, color, letterSpacing:'0.16em',
+          textTransform:'uppercase', opacity:0.7, marginBottom: 3,
+        }}>
+          <span style={{ width:5, height:5, borderRadius:'50%', background:color, display:'inline-block' }} />
+          Evento especial
+        </div>
+        <div style={{
+          fontSize: isMobile ? 17 : 27, fontWeight:800, letterSpacing:'-0.01em',
+          background: `linear-gradient(135deg, ${color}, ${color}99)`,
+          WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
+          backgroundClip: 'text',
         }}>
           {evento.nombre}
         </div>
       </div>
 
-      {/* Emoji del evento — derecha, con animación suave */}
+      {/* Emoji del evento — derecha, con halo suave y animación */}
       <div style={{
-        position:'absolute', right: isMobile ? 12 : 28, top:'50%', transform:'translateY(-50%)',
-        fontSize: isMobile ? 34 : 52, lineHeight:1, pointerEvents:'none', zIndex:0,
-        userSelect:'none', animation:'evfest-float 3.2s ease-in-out infinite',
+        position:'absolute', right: isMobile ? 14 : 34, top:'50%', transform:'translateY(-50%)',
+        pointerEvents:'none', zIndex:0, userSelect:'none',
+        display:'flex', alignItems:'center', justifyContent:'center',
       }}>
-        {evento.emoji}
+        <div style={{
+          position:'absolute', width: isMobile ? 60 : 92, height: isMobile ? 60 : 92,
+          borderRadius:'50%',
+          background: `radial-gradient(circle, ${color}33 0%, transparent 70%)`,
+          animation:'evfest-glow 3.2s ease-in-out infinite',
+        }} />
+        <div style={{
+          fontSize: isMobile ? 42 : 64, lineHeight:1, position:'relative',
+          animation:'evfest-float 3.2s ease-in-out infinite',
+          filter: 'drop-shadow(0 4px 10px rgba(0,0,0,.12))',
+        }}>
+          {evento.emoji}
+        </div>
       </div>
     </>
   );
