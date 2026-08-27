@@ -404,12 +404,14 @@ export default function SuperAdminPersonalizacion() {
                       maxLength={4}
                     />
                   </Field>
-                  <Field label="Nombre del evento">
-                    <input
+                  <Field label="Nombre del evento" hint="Presiona Enter para forzar un salto de línea en el banner del Dashboard.">
+                    <textarea
                       className="form-control"
+                      rows={2}
                       value={eventoForm.nombre}
                       onChange={e => setEventoForm({ ...eventoForm, nombre: e.target.value })}
                       placeholder="Ej: Día de la Independencia"
+                      style={{ resize: "vertical" }}
                     />
                   </Field>
                 </div>

@@ -172,6 +172,7 @@ function EventoFestivoBanner({ isMobile, evento }) {
           background: `linear-gradient(135deg, ${color}, ${color}99)`,
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
           backgroundClip: 'text', overflowWrap: 'normal', wordBreak: 'keep-all',
+          whiteSpace: 'pre-line',
         }}>
           {nombreSinCortes}
         </div>
@@ -198,6 +199,39 @@ function EventoFestivoBanner({ isMobile, evento }) {
         </div>
       </div>
     </>
+  );
+}
+
+// Versión compacta para móvil: en flujo normal (no absoluta) para que nunca
+// se monte encima del saludo — en pantallas angostas no hay espacio para las
+// bandas laterales de la versión de escritorio.
+function EventoFestivoBannerMobile({ evento }) {
+  if (!evento) return null;
+  const color = evento.color || "#1e40af";
+  return (
+    <div style={{
+      display: "inline-flex", alignItems: "center", gap: 8,
+      background: `linear-gradient(135deg, ${color}12, ${color}05)`,
+      border: `1px solid ${color}22`,
+      borderRadius: 12, padding: "6px 14px",
+      maxWidth: "100%",
+    }}>
+      <span style={{ fontSize: 22, lineHeight: 1, flexShrink: 0 }}>{evento.emoji}</span>
+      <div style={{ textAlign: "left", lineHeight: 1.15, minWidth: 0 }}>
+        <div style={{
+          fontSize: 8, fontWeight: 800, color, letterSpacing: "0.14em",
+          textTransform: "uppercase", opacity: 0.7,
+        }}>
+          Evento especial
+        </div>
+        <div style={{
+          fontSize: 13, fontWeight: 800, color,
+          overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+        }}>
+          {evento.nombre.replace(/\n/g, " ")}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -487,15 +521,18 @@ export default function Dashboard() {
           style={{
             background: "#fff",
             borderBottom: "1px solid #e9ecef",
-            padding: isMobile ? "14px 16px" : "18px 32px",
+            padding: isMobile ? "16px 16px" : "18px 32px",
             display: "flex",
+            flexDirection: isMobile ? "column" : "row",
             alignItems: "center",
             justifyContent: "center",
+            gap: isMobile ? 10 : 0,
             position: "relative",
             overflow: "hidden",
           }}
         >
-          <EventoFestivoBanner isMobile={isMobile} evento={eventoFestivo} />
+          {!isMobile && <EventoFestivoBanner isMobile={isMobile} evento={eventoFestivo} />}
+          {isMobile && <EventoFestivoBannerMobile evento={eventoFestivo} />}
 
           <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
             {/* Emoji saludo animado: flota + saluda continuamente */}
