@@ -357,11 +357,6 @@ export default function Dashboard() {
   const hora = dayjs().hour();
   const saludo = hora < 12 ? "Buenos días" : hora < 19 ? "Buenas tardes" : "Buenas noches";
   const emojiSaludo = hora < 12 ? "☀️" : hora < 19 ? "🌤️" : "🌙";
-  const fraseMedico = hora < 12
-    ? "Listo/a para hacer la diferencia hoy"
-    : hora < 19
-    ? "Continúa con el gran trabajo de hoy"
-    : "Gracias por tu dedicación de hoy";
 
   return (
     <div style={{
@@ -535,33 +530,13 @@ export default function Dashboard() {
               </motion.span>
             </div>
 
-            {/* Frase motivacional */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              style={{
-                marginTop: 5,
-                color: "#9ca3af",
-                fontSize: isMobile ? "0.73rem" : "0.8rem",
-                fontStyle: "italic",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 6,
-              }}
-            >
-              <i className="bi bi-activity" style={{ color: "#10b981", fontSize: "0.8rem" }} />
-              {fraseMedico}
-            </motion.div>
-
             {eventoFestivo?.mensaje && (
               <motion.div
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 1 }}
+                transition={{ delay: 0.8 }}
                 style={{
-                  marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6,
+                  marginTop: 16, display: "inline-flex", alignItems: "center", gap: 6,
                   background: `${eventoFestivo.color || "#1e40af"}14`,
                   border: `1px solid ${eventoFestivo.color || "#1e40af"}33`,
                   color: eventoFestivo.color || "#1e40af",
