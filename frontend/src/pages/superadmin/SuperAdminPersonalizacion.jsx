@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useState, useRef, useCallback, useEffect } from "react";
 import api from "../../api/api";
 import { useConfigSistema } from "../../context/ConfigSistemaContext";
 
@@ -23,7 +23,14 @@ export default function SuperAdminPersonalizacion() {
     color_nombre1:       cfg.color_nombre1 || "#ffffff",
     color_nombre2:       cfg.color_nombre2 || "#2D6BE8",
     inactividad_minutos: cfg.inactividad_minutos || "20",
+    eventos_festivos_activo: cfg.eventos_festivos_activo !== undefined ? cfg.eventos_festivos_activo : "1",
   });
+
+  // Eventos/banners festivos del dashboard
+  const [eventos, setEventos] = useState([]);
+  const [cargandoEventos, setCargandoEventos] = useState(true);
+  const [eventoForm, setEventoForm] = useState(null); // null = form cerrado
+  const [guardandoEvento, setGuardandoEvento] = useState(false);
 
   // Preview local de logo / fondo
   const [logoPreview,  setLogoPreview]  = useState(cfg.logoUrl || null);
@@ -94,6 +101,64 @@ export default function SuperAdminPersonalizacion() {
     } finally {
       setGuardando(false);
     }
+  };
+
+  const cargarEventos = useCallback(async () => {
+    setCargandoEventos(true);
+    try {
+      const r = await api.get("/eventos-festivos");
+      setEventos(r.data.data || []);
+    } catch {
+      setEventos([]);
+    } finally {
+      setCargandoEventos(false);
+    }
+  }, []);
+
+  useEffect(() => { cargarEventos(); }, [cargarEventos]);
+
+  const nuevoEventoVacio = () => ({
+    id: null, nombre: "", emoji: "🎉", mensaje: "", color: "#1e40af",
+    fecha_inicio: "", fecha_fin: "", recurrente_anual: 1, activo: 1,
+  });
+
+  const guardarEvento = async () => {
+    if (!eventoForm?.nombre || !eventoForm?.fecha_inicio || !eventoForm?.fecha_fin) {
+      setError("Nombre, fecha de inicio y fecha de fin son requeridos para el evento");
+      return;
+    }
+    setGuardandoEvento(true);
+    setError("");
+    try {
+      if (eventoForm.id) {
+        await api.put(`/eventos-festivos/${eventoForm.id}`, eventoForm);
+      } else {
+        await api.post("/eventos-festivos", eventoForm);
+      }
+      setEventoForm(null);
+      await cargarEventos();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message || "Error al guardar el evento");
+    } finally {
+      setGuardandoEvento(false);
+    }
+  };
+
+  const eliminarEvento = async (id) => {
+    if (!window.confirm("¿Eliminar este evento festivo?")) return;
+    try {
+      await api.delete(`/eventos-festivos/${id}`);
+      await cargarEventos();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message || "Error al eliminar el evento");
+    }
+  };
+
+  const toggleEventoActivo = async (ev) => {
+    try {
+      await api.put(`/eventos-festivos/${ev.id}`, { activo: ev.activo ? 0 : 1 });
+      await cargarEventos();
+    } catch {}
   };
 
   const eliminarLogo = async () => {
@@ -227,6 +292,201 @@ export default function SuperAdminPersonalizacion() {
                 })()}
               </span>
             </div>
+          </Section>
+
+          {/* Eventos y banners festivos del Dashboard */}
+          <Section title="Eventos y banners festivos" icon="bi-calendar2-heart">
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12,
+              padding: "14px 18px", marginBottom: 18,
+            }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>Mostrar banners festivos</div>
+                <div style={{ fontSize: 12, color: "#64748b", marginTop: 2 }}>
+                  Al activarlo, cada evento de la lista aparece automáticamente en el Dashboard de todas las
+                  clínicas durante su rango de fechas y desaparece solo al terminar. Al desactivarlo, no se
+                  muestra ninguno aunque tengan fechas vigentes.
+                </div>
+              </div>
+              <div
+                onClick={() => set("eventos_festivos_activo", form.eventos_festivos_activo === "1" ? "0" : "1")}
+                style={{
+                  flexShrink: 0, marginLeft: 16,
+                  width: 51, height: 31, borderRadius: 31,
+                  background: form.eventos_festivos_activo === "1" ? "#34c759" : "#e5e7eb",
+                  position: "relative", cursor: "pointer",
+                  transition: "background .25s cubic-bezier(.4,0,.2,1)",
+                  boxShadow: "inset 0 0 0 1px rgba(0,0,0,.08)",
+                }}
+              >
+                <div style={{
+                  position: "absolute",
+                  top: 2, left: form.eventos_festivos_activo === "1" ? 22 : 2,
+                  width: 27, height: 27, borderRadius: "50%",
+                  background: "#fff",
+                  boxShadow: "0 2px 6px rgba(0,0,0,.22)",
+                  transition: "left .25s cubic-bezier(.4,0,.2,1)",
+                }} />
+              </div>
+            </div>
+            <p style={{ fontSize: 12, color: "#94a3b8", marginTop: -10, marginBottom: 14 }}>
+              Recuerda usar el botón "Guardar cambios" al final de la página para que este interruptor quede aplicado.
+            </p>
+
+            {cargandoEventos ? (
+              <div style={{ textAlign: "center", padding: 20, color: "#94a3b8", fontSize: 13 }}>Cargando eventos...</div>
+            ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 14 }}>
+                {eventos.length === 0 && (
+                  <div style={{ textAlign: "center", padding: 20, color: "#94a3b8", fontSize: 13 }}>
+                    Sin eventos festivos registrados todavía.
+                  </div>
+                )}
+                {eventos.map(ev => (
+                  <div key={ev.id} style={{
+                    display: "flex", alignItems: "center", gap: 12,
+                    padding: "10px 14px", borderRadius: 10,
+                    background: ev.activo ? "#fff" : "#f8fafc",
+                    border: "1px solid #e2e8f0", opacity: ev.activo ? 1 : 0.55,
+                  }}>
+                    <span style={{ fontSize: 22, lineHeight: 1 }}>{ev.emoji}</span>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 13, color: "#1e293b" }}>{ev.nombre}</div>
+                      <div style={{ fontSize: 11.5, color: "#64748b" }}>
+                        {ev.fecha_inicio} → {ev.fecha_fin} {ev.recurrente_anual ? "· cada año" : "· una vez"}
+                        {ev.mensaje ? ` · "${ev.mensaje}"` : ""}
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => toggleEventoActivo(ev)}
+                      title={ev.activo ? "Desactivar este evento" : "Activar este evento"}
+                      style={{
+                        background: "none", border: "1px solid #e2e8f0", borderRadius: 7,
+                        padding: "5px 9px", cursor: "pointer", color: ev.activo ? "#16a34a" : "#94a3b8",
+                      }}
+                    >
+                      <i className={`bi ${ev.activo ? "bi-eye-fill" : "bi-eye-slash"}`} />
+                    </button>
+                    <button
+                      onClick={() => setEventoForm({ ...ev, recurrente_anual: !!ev.recurrente_anual, activo: !!ev.activo })}
+                      title="Editar"
+                      style={{
+                        background: "none", border: "1px solid #e2e8f0", borderRadius: 7,
+                        padding: "5px 9px", cursor: "pointer", color: "#475569",
+                      }}
+                    >
+                      <i className="bi bi-pencil" />
+                    </button>
+                    <button
+                      onClick={() => eliminarEvento(ev.id)}
+                      title="Eliminar"
+                      style={{
+                        background: "none", border: "1px solid #fecaca", borderRadius: 7,
+                        padding: "5px 9px", cursor: "pointer", color: "#dc2626",
+                      }}
+                    >
+                      <i className="bi bi-trash" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {eventoForm ? (
+              <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "80px 1fr", gap: 12, marginBottom: 12 }}>
+                  <Field label="Emoji">
+                    <input
+                      className="form-control text-center"
+                      value={eventoForm.emoji}
+                      onChange={e => setEventoForm({ ...eventoForm, emoji: e.target.value })}
+                      maxLength={4}
+                    />
+                  </Field>
+                  <Field label="Nombre del evento">
+                    <input
+                      className="form-control"
+                      value={eventoForm.nombre}
+                      onChange={e => setEventoForm({ ...eventoForm, nombre: e.target.value })}
+                      placeholder="Ej: Día de la Independencia"
+                    />
+                  </Field>
+                </div>
+                <Field label="Mensaje corto (opcional)" hint="Se muestra como una pequeña etiqueta bajo el saludo.">
+                  <input
+                    className="form-control"
+                    value={eventoForm.mensaje || ""}
+                    onChange={e => setEventoForm({ ...eventoForm, mensaje: e.target.value })}
+                    placeholder="Ej: ¡Feliz día de la Independencia!"
+                  />
+                </Field>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 90px", gap: 12 }}>
+                  <Field label="Fecha inicio">
+                    <input
+                      type="date" className="form-control"
+                      value={eventoForm.fecha_inicio}
+                      onChange={e => setEventoForm({ ...eventoForm, fecha_inicio: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Fecha fin">
+                    <input
+                      type="date" className="form-control"
+                      value={eventoForm.fecha_fin}
+                      onChange={e => setEventoForm({ ...eventoForm, fecha_fin: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Color">
+                    <input
+                      type="color" className="form-control"
+                      style={{ height: 38, padding: 2 }}
+                      value={eventoForm.color}
+                      onChange={e => setEventoForm({ ...eventoForm, color: e.target.value })}
+                    />
+                  </Field>
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+                  <input
+                    type="checkbox" id="ev-recurrente"
+                    checked={eventoForm.recurrente_anual}
+                    onChange={e => setEventoForm({ ...eventoForm, recurrente_anual: e.target.checked })}
+                  />
+                  <label htmlFor="ev-recurrente" style={{ fontSize: 13, color: "#475569", margin: 0 }}>
+                    Se repite cada año automáticamente (usa solo el mes/día de las fechas, ideal para feriados fijos)
+                  </label>
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+                  <button
+                    onClick={() => setEventoForm(null)}
+                    style={{ background: "transparent", border: "1px solid #d1d5db", borderRadius: 8, padding: "7px 16px", fontSize: 13, cursor: "pointer" }}
+                  >
+                    Cancelar
+                  </button>
+                  <button
+                    onClick={guardarEvento}
+                    disabled={guardandoEvento}
+                    style={{
+                      background: "linear-gradient(135deg,#7c3aed,#a855f7)", border: "none", borderRadius: 8,
+                      padding: "7px 18px", color: "#fff", fontWeight: 700, fontSize: 13,
+                      cursor: guardandoEvento ? "wait" : "pointer",
+                    }}
+                  >
+                    {guardandoEvento ? "Guardando..." : (eventoForm.id ? "Guardar evento" : "Crear evento")}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setEventoForm(nuevoEventoVacio())}
+                style={{
+                  background: "#f5f3ff", border: "1px dashed #a855f7", borderRadius: 10,
+                  padding: "9px 16px", color: "#7c3aed", fontWeight: 700, fontSize: 13,
+                  cursor: "pointer", width: "100%",
+                }}
+              >
+                <i className="bi bi-plus-circle me-1" /> Agregar evento festivo
+              </button>
+            )}
           </Section>
 
           {/* Logo */}

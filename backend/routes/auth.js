@@ -210,6 +210,9 @@ router.post("/login/verificar-2fa", limiterSensible, async (req, res) => {
 async function construirSesion(user) {
   const esSuper = user.tipo === "SUPER_ADMIN";
 
+  // Registrar último acceso para el panel de "Staff · Últimos accesos" (superadmin)
+  pool.query("UPDATE usuarios SET ultimo_acceso = NOW() WHERE id = ?", [user.id]).catch(() => {});
+
   // Obtener nombre e info de licencia de la clínica
   let clinicaNombre = null;
   let licencia_info = null;

@@ -180,6 +180,7 @@ app.use("/api/vacunas",    require("./routes/vacunas"));
 app.use("/api/soporte",        require("./routes/soporte"));
 app.use("/api/cumpleanos",     require("./routes/cumpleanos"));
 app.use("/api/config-sistema", require("./routes/configSistema"));
+app.use("/api/eventos-festivos", require("./routes/eventosFestivos"));
 app.use("/api/psicologia",     require("./routes/psicologia"));
 app.use("/api/odontologia",    require("./routes/odontologia"));
 app.use("/api/nefrologia",     require("./routes/nefrologia"));
@@ -799,6 +800,23 @@ const pool = require("./db");
     } else {
       console.log("✅ [auto-migrate] clinicas.timezone OK");
     }
+
+    // Calendario de eventos/banners festivos del dashboard (global, todas las clínicas)
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS eventos_festivos (
+        id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        nombre           VARCHAR(120) NOT NULL,
+        emoji            VARCHAR(10)  DEFAULT '🎉',
+        mensaje          VARCHAR(200),
+        color            VARCHAR(20)  DEFAULT '#1e40af',
+        fecha_inicio     DATE NOT NULL,
+        fecha_fin        DATE NOT NULL,
+        recurrente_anual TINYINT(1)  NOT NULL DEFAULT 1 COMMENT 'Si es 1, se repite cada año usando solo mes/día',
+        activo           TINYINT(1)  NOT NULL DEFAULT 1,
+        creado_en        DATETIME DEFAULT CURRENT_TIMESTAMP
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `);
+    console.log("✅ [auto-migrate] eventos_festivos OK");
 
     // Códigos de un solo uso para 2FA por correo (login y activación)
     await pool.query(`

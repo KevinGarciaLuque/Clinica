@@ -125,209 +125,40 @@ function CalendarioPopup({ onClose }) {
   );
 }
 
-function WorldCupBannerAnimation({ isMobile }) {
-  const dur = '10s';
-  const ballSize = isMobile ? 28 : 40;
-  // ancho SVG portería: 110 desktop, 72 mobile
-  const gW = isMobile ? 72 : 110;
-  const gH = isMobile ? 56 : 84;
+function EventoFestivoBanner({ isMobile, evento }) {
+  if (!evento) return null;
+  const color = evento.color || "#1e40af";
 
   return (
     <>
       <style>{`
-        @keyframes wc26-move {
-          0%   { left:3%;  top:55%; opacity:1; }
-          10%  { left:14%; top:4%;  }
-          22%  { left:26%; top:57%; }
-          33%  { left:39%; top:5%;  }
-          45%  { left:51%; top:57%; }
-          55%  { left:61%; top:10%; }
-          65%  { left:71%; top:57%; }
-          73%  { left:79%; top:12%; }
-          80%  { left:89%; top:33%; opacity:1; }
-          86%  { left:89%; top:33%; opacity:0; }
-          87%  { left:3%;  top:55%; opacity:0; }
-          91%  { left:3%;  top:55%; opacity:1; }
-          100% { left:3%;  top:55%; opacity:1; }
-        }
-        @keyframes wc26-spin {
-          0%   { transform: rotate(0deg) scale(1); }
-          64%  { transform: rotate(480deg) scale(1); }
-          79%  { transform: rotate(640deg) scale(0.55) scaleX(1.6); }
-          82%  { transform: rotate(660deg) scale(1.1); }
-          84%  { transform: rotate(670deg) scale(1); }
-          86%  { transform: rotate(680deg) scale(0.05); }
-          87%  { transform: rotate(0deg) scale(0.05); }
-          91%  { transform: rotate(0deg) scale(1); }
-          100% { transform: rotate(0deg) scale(1); }
-        }
-        @keyframes wc26-gol {
-          0%,78%   { opacity:0; transform:scale(0.15) rotate(-20deg); }
-          82%      { opacity:1; transform:scale(1.6) rotate(6deg); }
-          87%      { opacity:1; transform:scale(1.0) rotate(0deg); }
-          93%      { opacity:1; transform:scale(1.0) rotate(0deg); }
-          97%,100% { opacity:0; transform:scale(0.3) rotate(-8deg); }
-        }
-        @keyframes wc26-glow {
-          0%,78%   { filter:none; }
-          82%,93%  { filter:drop-shadow(0 0 14px #fbbf24) drop-shadow(0 0 30px #f59e0b); }
-          97%,100% { filter:none; }
-        }
-        @keyframes wc26-s1 {
-          0%,79%   { opacity:0; transform:translate(0,0) scale(0) rotate(0deg); }
-          83%      { opacity:1; transform:translate(-28px,-35px) scale(1.3) rotate(30deg); }
-          89%      { opacity:0.8; transform:translate(-44px,10px) scale(1.0) rotate(90deg); }
-          94%,100% { opacity:0; transform:translate(-55px,28px) scale(0) rotate(150deg); }
-        }
-        @keyframes wc26-s2 {
-          0%,79%   { opacity:0; transform:translate(0,0) scale(0) rotate(0deg); }
-          83%      { opacity:1; transform:translate(32px,-30px) scale(1.3) rotate(-30deg); }
-          89%      { opacity:0.8; transform:translate(50px,12px) scale(1.0) rotate(-90deg); }
-          94%,100% { opacity:0; transform:translate(62px,30px) scale(0) rotate(-150deg); }
-        }
-        @keyframes wc26-s3 {
-          0%,81%   { opacity:0; transform:translate(0,0) scale(0); }
-          85%      { opacity:1; transform:translate(6px,-42px) scale(1.4); }
-          91%      { opacity:0.7; transform:translate(-8px,-58px) scale(1.0); }
-          95%,100% { opacity:0; transform:translate(-14px,-72px) scale(0); }
+        @keyframes evfest-float {
+          0%,100% { transform: translateY(0) rotate(0deg); }
+          50%     { transform: translateY(-8px) rotate(6deg); }
         }
       `}</style>
 
-      {/* FIFA 2026 watermark izquierda */}
+      {/* Nombre del evento — watermark izquierda */}
       <div style={{
         position:'absolute', left: isMobile ? 8 : 20, top:'50%', transform:'translateY(-50%)',
-        opacity:0.2, pointerEvents:'none', zIndex:0, textAlign:'center', lineHeight:1.15,
-        userSelect:'none',
+        opacity:0.22, pointerEvents:'none', zIndex:0, textAlign:'center', lineHeight:1.15,
+        userSelect:'none', maxWidth: isMobile ? 90 : 160,
       }}>
-        <div style={{fontSize: isMobile ? 9 : 12, fontWeight:900, color:'#1e40af', letterSpacing:'0.12em'}}>FIFA WORLD CUP</div>
-        <div style={{fontSize: isMobile ? 28 : 42, fontWeight:900, color:'#1e40af', letterSpacing:'-0.02em'}}>2026</div>
+        <div style={{
+          fontSize: isMobile ? 11 : 14, fontWeight:900, color, letterSpacing:'0.06em',
+          textTransform:'uppercase',
+        }}>
+          {evento.nombre}
+        </div>
       </div>
 
-      {/* Portería 3D perspectiva */}
+      {/* Emoji del evento — derecha, con animación suave */}
       <div style={{
-        position:'absolute', right: isMobile ? 6 : 16, top:'50%', transform:'translateY(-50%)',
-        animation:`wc26-glow ${dur} ease-in-out infinite`,
-        pointerEvents:'none', zIndex:0,
+        position:'absolute', right: isMobile ? 12 : 28, top:'50%', transform:'translateY(-50%)',
+        fontSize: isMobile ? 34 : 52, lineHeight:1, pointerEvents:'none', zIndex:0,
+        userSelect:'none', animation:'evfest-float 3.2s ease-in-out infinite',
       }}>
-        <svg width={gW} height={gH} viewBox="0 0 110 84" fill="none">
-
-          {/* ── CARA TRASERA (fondo de red) ── */}
-          <rect x="28" y="4" width="72" height="54" fill="rgba(180,215,255,0.10)"/>
-          {/* red vertical trasera */}
-          <line x1="46" y1="4"  x2="46" y2="58" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
-          <line x1="64" y1="4"  x2="64" y2="58" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
-          <line x1="82" y1="4"  x2="82" y2="58" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
-          {/* red horizontal trasera */}
-          <line x1="28" y1="22" x2="100" y2="22" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
-          <line x1="28" y1="38" x2="100" y2="38" stroke="rgba(255,255,255,0.38)" strokeWidth="0.9"/>
-
-          {/* ── CARA LATERAL IZQUIERDA ── */}
-          <polygon points="7,14 28,4 28,58 7,68" fill="rgba(160,200,255,0.13)"/>
-          {/* red diagonal izquierda */}
-          <line x1="7"  y1="32" x2="28" y2="23" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8"/>
-          <line x1="7"  y1="50" x2="28" y2="41" stroke="rgba(255,255,255,0.28)" strokeWidth="0.8"/>
-          <line x1="14" y1="14" x2="28" y2="8"  stroke="rgba(255,255,255,0.22)" strokeWidth="0.8"/>
-
-          {/* ── CARA LATERAL DERECHA (visible en perspectiva) ── */}
-          <polygon points="85,14 100,4 100,58 85,68" fill="rgba(140,185,255,0.08)"/>
-
-          {/* ── CARA SUPERIOR (techo de la portería) ── */}
-          <polygon points="7,14 85,14 100,4 28,4" fill="rgba(200,230,255,0.12)"/>
-          <line x1="7"  y1="14" x2="28" y2="4"  stroke="rgba(255,255,255,0.25)" strokeWidth="0.8"/>
-          <line x1="40" y1="14" x2="55" y2="4"  stroke="rgba(255,255,255,0.18)" strokeWidth="0.7"/>
-          <line x1="65" y1="14" x2="77" y2="4"  stroke="rgba(255,255,255,0.18)" strokeWidth="0.7"/>
-
-          {/* ── ARMAZÓN TRASERO (postes grises) ── */}
-          {/* poste izquierdo trasero */}
-          <rect x="26" y="4" width="3" height="55" fill="rgba(210,220,230,0.85)" rx="1.5"/>
-          {/* poste derecho trasero */}
-          <rect x="97" y="4" width="3" height="55" fill="rgba(210,220,230,0.75)" rx="1.5"/>
-          {/* travesaño trasero */}
-          <rect x="26" y="4" width="74" height="3" fill="rgba(210,220,230,0.85)" rx="1.5"/>
-          {/* base trasera */}
-          <rect x="26" y="57" width="74" height="2.5" fill="rgba(210,220,230,0.6)" rx="1.2"/>
-
-          {/* ── CONECTORES DE PROFUNDIDAD ── */}
-          {/* arriba izquierda */}
-          <line x1="7"  y1="14" x2="28" y2="4"  stroke="rgba(190,200,210,0.9)" strokeWidth="2.5" strokeLinecap="round"/>
-          {/* arriba derecha */}
-          <line x1="85" y1="14" x2="100" y2="4" stroke="rgba(190,200,210,0.85)" strokeWidth="2.5" strokeLinecap="round"/>
-          {/* abajo izquierda */}
-          <line x1="7"  y1="68" x2="28" y2="58" stroke="rgba(190,200,210,0.7)" strokeWidth="2" strokeLinecap="round"/>
-          {/* abajo derecha */}
-          <line x1="85" y1="68" x2="100" y2="58" stroke="rgba(190,200,210,0.65)" strokeWidth="2" strokeLinecap="round"/>
-
-          {/* ── MARCO FRONTAL (lo más visible — blanco brillante) ── */}
-          {/* poste izquierdo frontal */}
-          <rect x="5" y="13" width="4.5" height="56" fill="white" rx="2.2"/>
-          {/* poste derecho frontal */}
-          <rect x="82" y="13" width="4.5" height="56" fill="white" rx="2.2"/>
-          {/* travesaño frontal */}
-          <rect x="5" y="13" width="82" height="4.5" fill="white" rx="2.2"/>
-          {/* sombra suave travesaño */}
-          <rect x="5" y="17.5" width="82" height="1.5" fill="rgba(0,0,0,0.12)" rx="0.5"/>
-
-          {/* ── SUELO VERDE ── */}
-          <rect x="0"  y="72" width="110" height="9" fill="#4ade80" rx="3"/>
-          <rect x="5"  y="72" width="4.5" height="7" fill="#16a34a" rx="1.5"/>
-          <rect x="82" y="72" width="4.5" height="7" fill="#16a34a" rx="1.5"/>
-          {/* línea de área */}
-          <rect x="0" y="72" width="110" height="1.5" fill="#22c55e"/>
-        </svg>
-      </div>
-
-      {/* Estrellas de celebración */}
-      {[
-        { anim:'wc26-s1', emoji:'⭐' },
-        { anim:'wc26-s2', emoji:'✨' },
-        { anim:'wc26-s3', emoji:'🎊' },
-      ].map(({ anim, emoji }, i) => (
-        <div key={i} style={{
-          position:'absolute',
-          right: isMobile ? 44 : 76,
-          top: '45%',
-          fontSize: isMobile ? 14 : 20,
-          lineHeight: 1,
-          animation: `${anim} ${dur} ease-out infinite`,
-          pointerEvents: 'none',
-          zIndex: 3,
-          userSelect: 'none',
-        }}>{emoji}</div>
-      ))}
-
-      {/* GOL! */}
-      <div style={{
-        position:'absolute',
-        right: isMobile ? 80 : 136,
-        top: '50%',
-        transform: 'translateY(-50%)',
-        animation: `wc26-gol ${dur} ease-in-out infinite`,
-        pointerEvents: 'none',
-        zIndex: 2,
-        fontSize: isMobile ? 20 : 30,
-        fontWeight: 900,
-        color: '#f59e0b',
-        textShadow: '0 2px 16px rgba(245,158,11,0.95), 0 0 32px rgba(245,158,11,0.5)',
-        whiteSpace: 'nowrap',
-        letterSpacing: '0.06em',
-        userSelect: 'none',
-      }}>
-        ¡GOL! 🎉
-      </div>
-
-      {/* Balón */}
-      <div style={{
-        position: 'absolute',
-        left: '3%',
-        top: '55%',
-        fontSize: ballSize,
-        lineHeight: 1,
-        animation: `wc26-move ${dur} cubic-bezier(0.25,0.46,0.45,0.94) infinite, wc26-spin ${dur} linear infinite`,
-        pointerEvents: 'none',
-        zIndex: 1,
-        userSelect: 'none',
-      }}>
-        ⚽
+        {evento.emoji}
       </div>
     </>
   );
@@ -458,6 +289,7 @@ export default function Dashboard() {
   const [stats, setStats]     = useState(null);
   const [sala,  setSala]      = useState([]);
   const [loading, setLoading] = useState(true);
+  const [eventoFestivo, setEventoFestivo] = useState(null);
   const [calOpen, setCalOpen] = useState(false);
   const calRef                = useRef(null);
   const isMobile = useIsMobile();
@@ -480,6 +312,10 @@ export default function Dashboard() {
     })
     .catch(() => {})
     .finally(() => setLoading(false));
+
+    api.get("/eventos-festivos/activo", { params: { fecha: dayjs().format("YYYY-MM-DD") } })
+      .then(r => setEventoFestivo(r.data.data || null))
+      .catch(() => setEventoFestivo(null));
   }, []);
 
   const hoy       = dayjs().format("dddd D [de] MMMM YYYY");
@@ -627,7 +463,7 @@ export default function Dashboard() {
             overflow: "hidden",
           }}
         >
-          <WorldCupBannerAnimation isMobile={isMobile} />
+          <EventoFestivoBanner isMobile={isMobile} evento={eventoFestivo} />
 
           <div style={{ textAlign: "center", position: "relative", zIndex: 1 }}>
             {/* Emoji saludo animado: flota + saluda continuamente */}
@@ -687,6 +523,23 @@ export default function Dashboard() {
               <i className="bi bi-activity" style={{ color: "#10b981", fontSize: "0.8rem" }} />
               {fraseMedico}
             </motion.div>
+
+            {eventoFestivo?.mensaje && (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1 }}
+                style={{
+                  marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6,
+                  background: `${eventoFestivo.color || "#1e40af"}14`,
+                  border: `1px solid ${eventoFestivo.color || "#1e40af"}33`,
+                  color: eventoFestivo.color || "#1e40af",
+                  borderRadius: 20, padding: "4px 12px", fontSize: isMobile ? "0.7rem" : "0.76rem", fontWeight: 600,
+                }}
+              >
+                {eventoFestivo.emoji} {eventoFestivo.mensaje}
+              </motion.div>
+            )}
           </div>
         </motion.div>
 

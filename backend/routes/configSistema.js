@@ -15,6 +15,8 @@ const DEFAULTS = {
   color_nombre1:       "#ffffff",
   color_nombre2:       "#2D6BE8",
   inactividad_minutos: "20",
+  // Banners festivos del dashboard (calendario de fechas festivas)
+  eventos_festivos_activo: "1",
   // Landing page pública
   landing_color_primario:       "#0E1F3C",
   landing_activo:               "1",
@@ -106,6 +108,7 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
       "nombre_sistema", "subtitulo", "icono_bootstrap",
       "fondo_login_url", "copyright_texto", "color_primario",
       "color_nombre1", "color_nombre2", "inactividad_minutos",
+      "eventos_festivos_activo",
       // Landing page
       "landing_activo", "landing_color_primario", "landing_tagline", "landing_descripcion",
       "landing_whatsapp", "landing_email_contacto", "landing_nosotros_texto",
