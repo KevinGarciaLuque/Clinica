@@ -75,6 +75,13 @@ function getMenuSections(tipo, modulos) {
   const hasDynamic = modulos && modulos.length > 0;
   let mainItems = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
 
+  // Ítems fijos de administración (Usuarios, Horarios médicos, Servicios,
+  // Plantillas, Documentos Clínicos, Catálogos, Configuración): ahora también
+  // pasan por el sistema de permisos por clínica/usuario. Si no hay datos
+  // dinámicos (ej. aún cargando) se muestran todos, igual que antes.
+  const rutasHabilitadas = hasDynamic ? new Set(modulos.map(m => m.ruta)) : null;
+  const filtrarPorPermiso = (items) => rutasHabilitadas ? items.filter(i => rutasHabilitadas.has(i.to)) : items;
+
   // Clínica solo psicológica: ocultar Estudios e Imágenes
   const tienePsico       = mainItems.some(m => m.to === "/psicologia/consulta");
   const tieneOdonto      = mainItems.some(m => m.to === "/odontologia/consulta");
@@ -124,9 +131,9 @@ function getMenuSections(tipo, modulos) {
     mainItems = [...enPrioridad, ...resto, ...(cumple ? [cumple] : [])];
   }
 
-  if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: adminItems };
-  if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: adminItems };
-  if (tipo === "MEDICO")      return { super: [],          main: mainItems, admin: medicoItems };
+  if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: filtrarPorPermiso(adminItems) };
+  if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: filtrarPorPermiso(adminItems) };
+  if (tipo === "MEDICO")      return { super: [],          main: mainItems, admin: filtrarPorPermiso(medicoItems) };
   return                              { super: [],          main: mainItems, admin: [] };
 }
 
