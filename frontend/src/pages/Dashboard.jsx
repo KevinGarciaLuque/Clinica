@@ -128,6 +128,12 @@ function CalendarioPopup({ onClose }) {
 function EventoFestivoBanner({ isMobile, evento }) {
   if (!evento) return null;
   const color = evento.color || "#1e40af";
+  const largo = evento.nombre.length;
+  const fontSizeNombre = largo > 26 ? (isMobile ? 13 : 19)
+    : largo > 16 ? (isMobile ? 15 : 23)
+    : (isMobile ? 17 : 27);
+  // Evita que el navegador parta palabras justo después de un guion (ej. "Medic-KG")
+  const nombreSinCortes = evento.nombre.replace(/-/g, "‑");
 
   return (
     <>
@@ -145,8 +151,8 @@ function EventoFestivoBanner({ isMobile, evento }) {
       {/* Tarjeta del evento — banda izquierda, elegante */}
       <div style={{
         position:'absolute', left: isMobile ? 10 : 24, top:'50%', transform:'translateY(-50%)',
-        pointerEvents:'none', zIndex:0, textAlign:'left', lineHeight:1.15,
-        userSelect:'none', maxWidth: isMobile ? 150 : 280,
+        pointerEvents:'none', zIndex:0, textAlign:'left', lineHeight:1.2,
+        userSelect:'none', maxWidth: isMobile ? 190 : 380,
         background: `linear-gradient(135deg, ${color}12, ${color}05)`,
         border: `1px solid ${color}22`,
         borderRadius: 14,
@@ -162,12 +168,12 @@ function EventoFestivoBanner({ isMobile, evento }) {
           Evento especial
         </div>
         <div style={{
-          fontSize: isMobile ? 17 : 27, fontWeight:800, letterSpacing:'-0.01em',
+          fontSize: fontSizeNombre, fontWeight:800, letterSpacing:'-0.01em',
           background: `linear-gradient(135deg, ${color}, ${color}99)`,
           WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent',
-          backgroundClip: 'text',
+          backgroundClip: 'text', overflowWrap: 'normal', wordBreak: 'keep-all',
         }}>
-          {evento.nombre}
+          {nombreSinCortes}
         </div>
       </div>
 
