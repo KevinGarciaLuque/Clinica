@@ -20,6 +20,7 @@ export default function Consulta() {
   const [activeTab, setActiveTab] = useState("citas-hoy");
   const [citasHoy, setCitasHoy] = useState([]);
   const [salaEspera, setSalaEspera] = useState([]);
+  const [tieneRecepcionista, setTieneRecepcionista] = useState(true);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -46,8 +47,15 @@ export default function Consulta() {
     setLoading(true);
     api.get("/dashboard/sala-espera")
       .then(r => {
+        // Si la clínica tiene recepcionista, solo se muestran los pacientes que
+        // recepción ya admitió (EN_ESPERA/EN_ATENCION). Sin recepcionista, el
+        // médico ve directamente a todos los citados del día que aún no atendió.
+        const conRecepcionista = !!r.data.tiene_recepcionista;
+        setTieneRecepcionista(conRecepcionista);
         const activos = (r.data.data || [])
-          .filter(c => c.estado !== "COMPLETADA")
+          .filter(c => conRecepcionista
+            ? (c.estado === "EN_ESPERA" || c.estado === "EN_ATENCION")
+            : c.estado !== "COMPLETADA")
           .sort((a, b) => {
             // EN_ATENCION primero (el médico ya está con ese paciente)
             if (a.estado !== b.estado) return a.estado === "EN_ATENCION" ? -1 : 1;
@@ -148,7 +156,7 @@ export default function Consulta() {
             <CitasDelDia citas={citasHoy} onEstadoChange={cambiarEstado} navigate={navigate} />
           )}
           {!loading && activeTab === "sala-espera" && (
-            <SalaDeEspera citas={salaEspera} onEstadoChange={cambiarEstado} navigate={navigate} />
+            <SalaDeEspera citas={salaEspera} onEstadoChange={cambiarEstado} navigate={navigate} tieneRecepcionista={tieneRecepcionista} />
           )}
         </div>
       </div>
@@ -229,7 +237,7 @@ function CitasDelDia({ citas, onEstadoChange, navigate }) {
   );
 }
 
-function SalaDeEspera({ citas, onEstadoChange, navigate }) {
+function SalaDeEspera({ citas, onEstadoChange, navigate, tieneRecepcionista }) {
   const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
   return (
     <div>
@@ -259,7 +267,9 @@ function SalaDeEspera({ citas, onEstadoChange, navigate }) {
             display: "flex", alignItems: "center", gap: 7,
           }}>
             <i className="bi bi-info-circle"></i>
-            Todos los pacientes citados hoy que aún no han sido atendidos. Al darles consulta pasan a Consultas de hoy.
+            {tieneRecepcionista
+              ? "Solo pacientes admitidos por recepción (en espera o en atención). Los ya atendidos aparecen en Consultas de hoy."
+              : "Todos los pacientes citados hoy que aún no han sido atendidos. Al darles consulta pasan a Consultas de hoy."}
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>

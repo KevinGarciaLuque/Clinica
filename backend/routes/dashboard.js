@@ -91,7 +91,12 @@ router.get("/sala-espera", auth(), async (req, res) => {
       [clinicaId, hoy]
     );
 
-    res.json({ ok: true, data: rows });
+    const [[{ total: totalRecepcionistas }]] = await pool.query(
+      `SELECT COUNT(*) AS total FROM usuarios WHERE clinica_id=? AND tipo='RECEPCIONISTA' AND activo=1`,
+      [clinicaId]
+    );
+
+    res.json({ ok: true, data: rows, tiene_recepcionista: totalRecepcionistas > 0 });
   } catch (e) {
     console.error('❌ Error en sala-espera:', e.message);
     res.status(500).json({ ok: false, msg: e.message });
