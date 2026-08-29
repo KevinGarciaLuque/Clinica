@@ -119,7 +119,11 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   const endocrino = ["consulta", "historia_clinica", "estudios", "control_seguimiento_dm1", "educacion_diabetes", "recordatorios"];
   const generalExtras = ["consulta", "historia_clinica", "estudios", "inventario"];
 
-  const enabled = new Set(base);
+  // Ítems de administración: SIEMPRE habilitados por defecto en el preset.
+  // El SUPER_ADMIN puede desactivarlos luego desde el modal de permisos.
+  const adminModulos = ["admin_usuarios", "admin_horarios", "admin_servicios", "admin_plantillas", "documentos_clinicos", "catalogos", "admin_config"];
+
+  const enabled = new Set([...base, ...adminModulos]);
   if (esDerma)       derma.forEach((k) => enabled.add(k));
   else if (esPedia)  pedia.forEach((k) => enabled.add(k));
   else if (esPsico)  psico.forEach((k) => enabled.add(k));
@@ -194,6 +198,27 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIO
       return resultado;
     };
 
+    // Los ítems de administración (Usuarios, Configuración, etc.) deben estar
+    // SIEMPRE disponibles para ADMIN, y para MEDICO/PSICOLOGO salvo "Usuarios",
+    // sin depender de que el tipo de clínica los tenga enlazados (los tipos
+    // creados después de la migración 065 no los traen). El SUPER_ADMIN puede
+    // seguir desactivándolos por clínica/usuario mediante los overrides de abajo.
+    const agregarAdminSiRol = async (lista) => {
+      const rol = req.user.tipo;
+      if (rol !== "ADMIN" && rol !== "MEDICO" && rol !== "PSICOLOGO") return lista;
+      const claves = ["admin_usuarios","admin_horarios","admin_servicios","admin_plantillas","documentos_clinicos","catalogos","admin_config"];
+      const permitidas = rol === "ADMIN" ? claves : claves.filter(c => c !== "admin_usuarios");
+      const [adminRows] = await pool.query(
+        `SELECT clave, nombre, icono, ruta, orden FROM modulos_sistema
+         WHERE clave IN (${permitidas.map(() => "?").join(",")}) AND disponible=1`,
+        permitidas
+      );
+      const yaTiene = new Set(lista.map(m => m.clave));
+      const merged = [...lista, ...adminRows.filter(m => !yaTiene.has(m.clave))];
+      merged.sort((a, b) => (a.orden ?? 999) - (b.orden ?? 999));
+      return merged;
+    };
+
     // Si la clínica no tiene tipo asignado, devolver módulos base filtrados
     if (!rows.length) {
       const [base] = await pool.query(
@@ -202,10 +227,10 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIO
          ORDER BY orden`,
         ["dashboard","pacientes","citas","consulta","historia_clinica","chat_ia","estudios"]
       );
-      return res.json({ ok: true, data: await agregarCurvaSiPed(base) });
+      return res.json({ ok: true, data: await agregarAdminSiRol(await agregarCurvaSiPed(base)) });
     }
 
-    const baseRows = await agregarCurvaSiPed(rows);
+    const baseRows = await agregarAdminSiRol(await agregarCurvaSiPed(rows));
 
     // Aplicar override por clínica y por usuario
     const [overrides] = await pool.query(
