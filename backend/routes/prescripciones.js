@@ -601,14 +601,20 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const medicoDisplay = tMedico ? withDoctorPrefix(dedupeMedicoName(tMedico, medicoBase)) : "";
 
     // 5. Construir PDF
-    const doc = new PDFDoc({ size: "LETTER", margin: 0 });
+    //   media_carta   → hoja media carta (8.5 x 5.5 in = 612 x 396 pt)
+    //   carta_completa → hoja carta completa (612 x 792 pt), contenido expandido
+    // Márgenes iguales en los 4 lados.
+    const MARGIN = 30;
+    const PAGE_W = 612;
+    const PAGE_H = fill ? 792 : 396;
+    const doc = new PDFDoc({ size: [PAGE_W, PAGE_H], margin: 0 });
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="receta-${pr.id}.pdf"`);
     doc.pipe(res);
 
-    // Márgenes reducidos para aprovechar más la hoja.
-    const marginL = 30;
-    const pageW = doc.page.width - marginL * 2;
+    const marginL = MARGIN;
+    const pageW = PAGE_W - MARGIN * 2;
+    const pageH = PAGE_H;
     const GRAY = "#555555";
     const QR_SIZE = 60;
 
@@ -638,8 +644,8 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const headerGaps = (medicoDisplay ? 6 : 0) + (tCred ? 4 : 0);
     const headerH = Math.max(logoSize + 20, clinicHeight + doctorHeight + credHeight + headerGaps + 20);
 
-    // Dibuja fondo del encabezado
-    const topY = 10;
+    // Dibuja fondo del encabezado (margen superior = laterales)
+    const topY = MARGIN;
 
     doc.rect(marginL, topY, pageW, headerH).fill(tColor);
 
@@ -745,7 +751,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     doc.fillColor("#333").fontSize(fill ? 40 : 30).font("Times-Bold")
        .text("Rx", marginL + 10, rxY);
 
-    const recetaBodyY = rxY + (fill ? 46 : 36);
+    const recetaBodyY = rxY + (fill ? 46 : 30);
 
     /*
     // Contenido/instrucciones de la plantilla de receta
@@ -795,7 +801,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     doc.fillColor("#111").fontSize(fill ? 11.5 : 9.5).font("Helvetica")
        .text(recetaTexto || " ", marginL + 10, recetaBodyY, { width: pageW - 20, lineGap: fill ? 5 : 2 });
     const bodyH = doc.heightOfString(recetaTexto || " ", { width: pageW - 20, lineGap: fill ? 5 : 2 });
-    let rowY = recetaBodyY + Math.max(fill ? 160 : 120, bodyH) + 8;
+    let rowY = recetaBodyY + Math.max(fill ? 160 : 40, bodyH) + 8;
     /*
     items.forEach((item, i) => {
       const bg = i % 2 === 0 ? "#ffffff" : "#fcfcfc";
@@ -851,22 +857,26 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       rowY = hY + 8;
     }
 
-    // Mantener aire minimo sin separar la firma del bloque de contenido.
-    // En "carta completa" se empuja la firma cerca del pie de la hoja carta (792pt)
-    // para que el documento abarque toda la página.
-    const minContentY = fill ? 620 : recetaBodyY + 150;
-    if (rowY < minContentY) rowY = minContentY;
+    // La firma y el pie se anclan al fondo de la hoja para que el margen inferior
+    // sea igual al superior/laterales y no quede espacio muerto abajo.
+    const footerH = tFooter ? 20 : 0;
+    const bottomEdge = pageH - MARGIN;                 // límite inferior del contenido
+    const footerY = tFooter ? bottomEdge - footerH : bottomEdge;
+    const firmaImgH = firmaBuffer ? 45 : 0;
+    const firmaBlockH = firmaImgH + (medicoDisplay ? 24 : 14) + 4;
+    const firmaAnchorTop = (tFooter ? footerY : bottomEdge) - 10 - firmaBlockH;
 
     // ── Firma ───────────────────────────────────────────────────────
     let firmaBottom = rowY;
     if (tFirma) {
       const firmaX = marginL + pageW - 160;
       const firmaW = 160;
-      let firmaY = rowY + 14;
+      const firmaTop = Math.max(rowY + 12, firmaAnchorTop);
+      let firmaY = firmaTop;
       // Imagen de firma digital
       if (firmaBuffer) {
         try {
-          doc.image(firmaBuffer, firmaX + 30, firmaY - 10, { width: 100, height: 50, fit: [100, 50] });
+          doc.image(firmaBuffer, firmaX + 30, firmaY, { width: 100, height: 50, fit: [100, 50] });
           firmaY += 45;
         } catch { /* ignorar si imagen inválida */ }
       }
@@ -881,14 +891,13 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     }
 
     // ── Pie de página ───────────────────────────────────────────────
-    const footerY = Math.min(fill ? 752 : 720, firmaBottom + 18);
     if (tFooter) {
       doc.rect(marginL, footerY, pageW, 20).fill(tColor);
       doc.fillColor("#ffffff").fontSize(6.5).font("Helvetica-Bold")
          .text(tFooter, marginL + 5, footerY + 6, { width: pageW - 10, align: "center" });
     }
 
-    const cardBottom = tFooter ? footerY + 20 : Math.min(fill ? 772 : 740, firmaBottom + 12);
+    const cardBottom = tFooter ? footerY + footerH : Math.max(firmaBottom + 8, bottomEdge);
     doc.lineWidth(0.8).strokeColor("#dddddd").rect(marginL, topY, pageW, cardBottom - topY).stroke();
 
     doc.end();

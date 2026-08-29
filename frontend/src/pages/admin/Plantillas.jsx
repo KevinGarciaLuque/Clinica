@@ -1470,15 +1470,18 @@ export default function Plantillas() {
                       <option value="carta_completa">Carta completa</option>
                     </select>
                   )}
-                  <button onClick={imprimirVistaPrevia} style={{ marginLeft: tab === "receta" ? 0 : 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6 }}>
-                    <i className="bi bi-printer-fill" /> Imprimir
+                  <button
+                    onClick={(tab === "receta" && pacienteSel) ? generarDocumentoPdf : imprimirVistaPrevia}
+                    disabled={generandoPdf}
+                    style={{ marginLeft: tab === "receta" ? 0 : 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6, cursor: generandoPdf ? "default" : "pointer" }}>
+                    <i className="bi bi-printer-fill" /> {generandoPdf ? "Generando..." : "Imprimir"}
                   </button>
                   <button onClick={guardar} disabled={guardando} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6, cursor: guardando ? "default" : "pointer" }}>
                     <i className="bi bi-floppy-fill" /> {guardando ? "Guardando..." : "Guardar"}
                   </button>
-                  {pacienteSel && (
+                  {pacienteSel && tab !== "receta" && (
                     <button onClick={generarDocumentoPdf} disabled={generandoPdf} style={{ border: "none", background: tipoActivo?.color || "#1a2744", color: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: generandoPdf ? "default" : "pointer" }}>
-                      <i className="bi bi-file-earmark-pdf-fill" /> {generandoPdf ? "Generando..." : (tab === "receta" && formatoRecetaEfectivo === "carta_completa" ? "Generar carta completa" : "Generar documento")}
+                      <i className="bi bi-file-earmark-pdf-fill" /> {generandoPdf ? "Generando..." : "Generar documento"}
                     </button>
                   )}
                 </>
