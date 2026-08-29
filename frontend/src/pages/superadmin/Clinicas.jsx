@@ -59,6 +59,7 @@ export default function Clinicas() {
   
   // Modal de confirmación de eliminación
   const [modalEliminar, setModalEliminar] = useState(false);
+  const [modalDesbloqueo, setModalDesbloqueo] = useState(null);
   const [clinicaEliminar, setClinicaEliminar] = useState(null);
   const [textoConfirmacion, setTextoConfirmacion] = useState("");
 
@@ -191,15 +192,18 @@ export default function Clinicas() {
     }
   };
 
-  const toggleBloqueo = async (c) => {
-    const nuevo = c.bloqueada ? 0 : 1;
-    if (!nuevo && !window.confirm(`¿Quitar el candado de "${c.nombre}"? Quedará expuesta a edición y borrado.`)) return;
+  const aplicarBloqueo = async (c, nuevo) => {
     try {
       await api.put(`/clinicas/${c.id}/bloqueo`, { bloqueada: nuevo });
       setClinicas(prev => prev.map(x => x.id === c.id ? { ...x, bloqueada: nuevo } : x));
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     }
+  };
+
+  const toggleBloqueo = (c) => {
+    if (c.bloqueada) setModalDesbloqueo(c);   // pedir confirmación para quitar el candado
+    else             aplicarBloqueo(c, 1);
   };
 
   const eliminarClinica = async (c) => {
@@ -379,13 +383,13 @@ export default function Clinicas() {
   const filtradas = porBusqueda.filter((c) => perteneceATab(c, tab));
 
   const TABS = [
-    { key: "todas",     label: "Todas",     icon: "bi-grid-3x3-gap-fill" },
-    { key: "clientes",  label: "Clientes",  icon: "bi-patch-check-fill"  },
-    { key: "prueba",    label: "Prueba",    icon: "bi-clock-history"     },
-    { key: "semestral", label: "Semestral", icon: "bi-calendar2-check"   },
-    { key: "anual",     label: "Anual",     icon: "bi-award-fill"        },
-    { key: "vencidas",  label: "Vencidas",  icon: "bi-x-octagon-fill"    },
-    { key: "inactivas", label: "Inactivas", icon: "bi-pause-circle-fill" },
+    { key: "todas",     label: "Todas",     icon: "bi-grid-3x3-gap-fill", color: "#64748b" },
+    { key: "clientes",  label: "Clientes",  icon: "bi-patch-check-fill",  color: "#10b981" },
+    { key: "prueba",    label: "Prueba",    icon: "bi-clock-history",     color: "#f59e0b" },
+    { key: "semestral", label: "Semestral", icon: "bi-calendar2-check",   color: "#2196f3" },
+    { key: "anual",     label: "Anual",     icon: "bi-award-fill",        color: "#8b5cf6" },
+    { key: "vencidas",  label: "Vencidas",  icon: "bi-x-octagon-fill",    color: "#ef4444" },
+    { key: "inactivas", label: "Inactivas", icon: "bi-pause-circle-fill", color: "#94a3b8" },
   ].map(t => ({ ...t, count: porBusqueda.filter(c => perteneceATab(c, t.key)).length }));
 
   const abrirLicencia = (c) => {
@@ -643,28 +647,37 @@ export default function Clinicas() {
       </div>
 
       {/* ── Pestañas por plan ────────────────────────────────── */}
-      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+      <div style={{
+        display: "flex", gap: 6, marginBottom: 24, flexWrap: "wrap",
+        background: "rgba(255,255,255,.03)", border: `1px solid ${C.border}`,
+        borderRadius: 14, padding: 6,
+      }}>
         {TABS.map((t) => {
           const activa = tab === t.key;
           return (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
+              onMouseEnter={(e) => { if (!activa) e.currentTarget.style.background = "rgba(255,255,255,.05)"; }}
+              onMouseLeave={(e) => { if (!activa) e.currentTarget.style.background = "transparent"; }}
               style={{
-                display: "inline-flex", alignItems: "center", gap: 7,
-                background: activa ? "rgba(33,150,243,.15)" : "rgba(255,255,255,.03)",
-                border: `1px solid ${activa ? "rgba(33,150,243,.45)" : C.border}`,
-                color: activa ? C.accent : C.muted,
-                borderRadius: 10, padding: "7px 13px", fontSize: 13, fontWeight: 600,
-                cursor: "pointer", transition: "all .15s",
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: activa ? `linear-gradient(135deg, ${t.color}, ${t.color}cc)` : "transparent",
+                border: "1px solid transparent",
+                color: activa ? "#fff" : C.muted,
+                borderRadius: 10, padding: "8px 14px", fontSize: 13,
+                fontWeight: activa ? 700 : 600,
+                cursor: "pointer", transition: "all .18s",
+                boxShadow: activa ? `0 4px 14px ${t.color}55` : "none",
               }}
             >
-              <i className={`bi ${t.icon}`} />
+              <i className={`bi ${t.icon}`} style={{ fontSize: 14, opacity: activa ? 1 : .8 }} />
               {t.label}
               <span style={{
-                background: activa ? "rgba(33,150,243,.25)" : "rgba(255,255,255,.06)",
-                color: activa ? C.accent : C.muted,
-                borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700,
+                minWidth: 20, textAlign: "center",
+                background: activa ? "rgba(255,255,255,.25)" : "rgba(255,255,255,.06)",
+                color: activa ? "#fff" : C.muted,
+                borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 800,
               }}>
                 {t.count}
               </span>
@@ -1424,6 +1437,58 @@ export default function Clinicas() {
       )}
 
       {/* ── Modal de confirmación de eliminación ────────────── */}
+      {modalDesbloqueo && createPortal(
+        <div style={{
+          position: "fixed", inset: 0, zIndex: 9000,
+          background: "rgba(0,0,0,.75)", backdropFilter: "blur(6px)",
+          display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+        }}>
+          <div style={{
+            background: C.surface, border: "2px solid rgba(245,158,11,.4)",
+            borderRadius: 18, width: "100%", maxWidth: 460,
+            boxShadow: "0 24px 80px rgba(245,158,11,.25)",
+          }}>
+            <div style={{ padding: "22px 26px", borderBottom: `1px solid ${C.border}`, display: "flex", alignItems: "center", gap: 14 }}>
+              <div style={{
+                width: 46, height: 46, borderRadius: 12, background: "rgba(245,158,11,.15)",
+                border: "2px solid rgba(245,158,11,.3)", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-unlock-fill" style={{ color: C.warning, fontSize: 20 }} />
+              </div>
+              <div style={{ flex: 1 }}>
+                <h5 style={{ margin: 0, fontWeight: 700, color: C.warning, fontSize: 16 }}>Quitar candado de protección</h5>
+                <span style={{ fontSize: 12, color: C.muted }}>Solo Super Admin</span>
+              </div>
+            </div>
+            <div style={{ padding: "22px 26px", fontSize: 14, color: C.text, lineHeight: 1.6 }}>
+              La clínica <strong>{modalDesbloqueo.nombre}</strong> quedará expuesta a
+              <strong> edición, desactivación y borrado permanente</strong>. Vuelve a activar el candado en cuanto termines.
+            </div>
+            <div style={{ padding: "16px 26px", borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 12 }}>
+              <button
+                onClick={() => setModalDesbloqueo(null)}
+                style={{
+                  background: "transparent", border: `1px solid ${C.border}`, borderRadius: 9,
+                  padding: "10px 20px", color: C.muted, fontSize: 14, fontWeight: 600, cursor: "pointer",
+                }}
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => { aplicarBloqueo(modalDesbloqueo, 0); setModalDesbloqueo(null); }}
+                style={{
+                  background: C.warning, border: "none", borderRadius: 9,
+                  padding: "10px 20px", color: "#1a1206", fontSize: 14, fontWeight: 700, cursor: "pointer",
+                }}
+              >
+                <i className="bi bi-unlock-fill me-1" /> Quitar candado
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {modalEliminar && clinicaEliminar && createPortal(
         <div style={{
           position: "fixed", inset: 0, zIndex: 9000,
