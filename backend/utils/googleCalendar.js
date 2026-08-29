@@ -49,11 +49,20 @@ async function guardarTokens(medicoId, clinicaId, tokens, googleEmail) {
       [medicoId, clinicaId, googleEmail || null, accessEnc, refreshEnc, tokens.expiry_date || null]
     );
   } else {
-    // Google solo manda refresh_token la primera vez que se autoriza
-    await pool.query(
+    // Google no mandó refresh_token (suele pasar si la cuenta ya autorizó la app
+    // hace poco). Solo podemos actualizar el access_token si ya existe una fila.
+    const [r] = await pool.query(
       `UPDATE medico_google_tokens SET access_token=?, expiry_date=? WHERE medico_id=?`,
       [accessEnc, tokens.expiry_date || null, medicoId]
     );
+    if (!r.affectedRows) {
+      // No hay refresh_token y no había conexión previa → no se puede guardar algo
+      // útil. Avisar para que el usuario revoque el acceso y reconecte.
+      throw new Error(
+        "Google no devolvió un token de actualización. Quitá el acceso de Medic-KG en " +
+        "myaccount.google.com/permissions y volvé a conectar."
+      );
+    }
   }
 }
 

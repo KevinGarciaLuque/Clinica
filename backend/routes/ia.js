@@ -15,6 +15,7 @@ const router = require("express").Router();
 const pool   = require("../db");
 const OpenAI = require("openai");
 const auth   = require("../middlewares/auth");
+const gcal   = require("../utils/googleCalendar");
 
 // Inicialización lazy — solo falla si se usa sin API key, no al cargar el módulo
 let _openai = null;
@@ -220,6 +221,24 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
          VALUES (?,?,?,?,?,?,?,?)`,
         [clinicaId, paciente_id, medico_id, inicio, fin, tipo_consulta||"CONTROL", motivo||null, "IA"]
       );
+
+      // Sincronizar con Google Calendar del médico (si lo conectó) — no bloquea
+      try {
+        const [[pac]] = await pool.query("SELECT nombres, apellidos FROM pacientes WHERE id=?", [paciente_id]);
+        const [[tzRow]] = await pool.query(
+          "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='zona_horaria'", [clinicaId]
+        );
+        const googleEventId = await gcal.crearEvento(medico_id, {
+          paciente_nombre: pac ? `${pac.nombres} ${pac.apellidos}` : "Paciente",
+          motivo, inicio, fin,
+        }, tzRow?.valor || "America/Tegucigalpa");
+        if (googleEventId) {
+          await pool.query("UPDATE citas SET google_event_id=? WHERE id=?", [googleEventId, r.insertId]);
+        }
+      } catch (e) {
+        console.error("[ia/crear_cita] error sincronizando con Google Calendar:", e.message);
+      }
+
       return { ok: true, cita_id: r.insertId, mensaje: `Cita agendada con ID ${r.insertId}` };
     }
 

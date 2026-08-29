@@ -20,6 +20,15 @@ const { v4: uuidv4 } = require("uuid");
 const jwt     = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const { enviarEmail, templateVerificacion, templateBienvenida } = require("../utils/mailer");
+const gcal = require("../utils/googleCalendar");
+
+async function obtenerTZ(clinicaId) {
+  const [[tzRow]] = await pool.query(
+    "SELECT valor FROM clinica_config WHERE clinica_id=? AND clave='zona_horaria'",
+    [clinicaId]
+  );
+  return tzRow?.valor || "America/Tegucigalpa";
+}
 const upload  = require("../middlewares/upload");
 const cloudinary  = require("../utils/cloudinary");
 const streamifier = require("streamifier");
@@ -583,6 +592,10 @@ router.post("/cita", limiterModerate, async (req, res) => {
     if (!paciente_id || !medico_id || !inicio || !fin || !clinica_id)
       return res.status(400).json({ ok: false, msg: "paciente_id, medico_id, inicio, fin, clinica_id son obligatorios" });
 
+    // Guardar los valores originales (ISO) para Google Calendar antes de convertir.
+    const inicioIso = new Date(inicio).toISOString();
+    const finIso    = new Date(fin).toISOString();
+
     // MySQL DATETIME no acepta la Z de UTC ni milisegundos — convertir a 'YYYY-MM-DD HH:MM:SS'
     const toMysqlDt = (v) => new Date(v).toISOString().replace("T", " ").substring(0, 19);
     inicio = toMysqlDt(inicio);
@@ -643,6 +656,22 @@ router.post("/cita", limiterModerate, async (req, res) => {
       pacienteId: Number(paciente_id),
       citaId: r.insertId,
     });
+
+    // Sincronizar con el Google Calendar del médico (si lo conectó) — no bloquea la cita
+    try {
+      const tz = await obtenerTZ(clinica_id);
+      const googleEventId = await gcal.crearEvento(medico_id, {
+        paciente_nombre: nombrePac,
+        motivo,
+        inicio: inicioIso,
+        fin: finIso,
+      }, tz);
+      if (googleEventId) {
+        await pool.query("UPDATE citas SET google_event_id=? WHERE id=?", [googleEventId, r.insertId]);
+      }
+    } catch (e) {
+      console.error("[registro/cita] error sincronizando con Google Calendar:", e.message);
+    }
 
     res.json({ ok: true, id: r.insertId, msg: "Cita agendada exitosamente" });
   } catch (e) {
