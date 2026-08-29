@@ -47,6 +47,20 @@ async function ensureTituloMedicoColumn() {
     console.error("ensureTituloMedicoColumn:", e.message);
   }
 }
+let bloqueadaColReady = false;
+async function ensureBloqueadaColumn() {
+  if (bloqueadaColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM clinicas LIKE 'bloqueada'");
+    if (!cols.length) {
+      await pool.query("ALTER TABLE clinicas ADD COLUMN bloqueada TINYINT(1) NOT NULL DEFAULT 0");
+      await pool.query("UPDATE clinicas SET bloqueada = 1 WHERE plan_tipo IN ('semestral','anual')");
+    }
+    bloqueadaColReady = true;
+  } catch (e) {
+    console.error("ensureBloqueadaColumn:", e.message);
+  }
+}
 const DEFAULT_STORAGE_QUOTA_GB = 25;
 const DEFAULT_STORAGE_PRICE_PER_GB_LPS = 120;
 
@@ -499,6 +513,7 @@ router.put("/modulos/:id/configuracion", auth("SUPER_ADMIN"), async (req, res) =
 // ──────────────────────────────────────────────
 router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
+    await ensureBloqueadaColumn();
     if (req.user.super) {
       const [rows] = await pool.query(`
         SELECT c.id, c.nombre, c.slug, c.tipo_id, c.es_pediatrica, c.logo_url, c.email, c.telefono,
@@ -925,6 +940,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req,
     const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo, timezone, titulo_medico } = req.body;
 
     if (req.user.super) {
+      await ensureBloqueadaColumn();
       const [[cl]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [id]);
       if (cl && cl.bloqueada) {
         return res.status(409).json({ ok: false, msg: "Clínica protegida con candado. Desbloquéala para editarla." });
@@ -993,6 +1009,7 @@ router.put("/:id/config", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), asyn
 // DELETE /api/clinicas/:id  → solo SUPER_ADMIN (eliminar permanente o desactivar)
 router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    await ensureBloqueadaColumn();
     const { permanente } = req.query;
 
     const [[cl]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
@@ -1017,6 +1034,7 @@ router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
 // PUT /api/clinicas/:id/bloqueo  → candado de protección (solo SUPER_ADMIN)
 router.put("/:id/bloqueo", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    await ensureBloqueadaColumn();
     const bloqueada = req.body.bloqueada ? 1 : 0;
     await pool.query("UPDATE clinicas SET bloqueada=? WHERE id=?", [bloqueada, req.params.id]);
     res.json({ ok: true, bloqueada });
@@ -1076,6 +1094,7 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const { plan_tipo, inicio_manual, notas } = req.body;
 
+    await ensureBloqueadaColumn();
     const [[clBloq]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
     if (clBloq && clBloq.bloqueada) {
       return res.status(409).json({ ok: false, msg: "Clínica protegida con candado. Desbloquéala para gestionar su licencia." });
