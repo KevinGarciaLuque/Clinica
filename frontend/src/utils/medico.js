@@ -56,7 +56,7 @@ export function sufijoEsp(especialidad = "", sep = "–", titulo = tituloMedicoA
 export function nombreMedico(m, { conEspecialidad = false, sep = "–", titulo } = {}) {
   if (!m) return "";
   const t = titulo === undefined ? tituloMedicoActivo() : titulo;
-  const display = String(m.nombre_display ?? m.medico_nombre_display ?? "").trim();
+  const display = String(m.nombre_display ?? m.medico_nombre_display ?? m.med_nombre_display ?? "").trim();
   if (display) return display;
   const nom = (m.nombres ?? m.medico_nombres ?? m.med_nombres ?? "").trim();
   const ape = (m.apellidos ?? m.medico_apellidos ?? m.med_apellidos ?? "").trim();

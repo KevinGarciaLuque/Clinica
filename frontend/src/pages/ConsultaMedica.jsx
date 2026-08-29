@@ -2262,7 +2262,7 @@ function SubHistorialPaciente({ pacienteId }) {
               <div className="text-end">
                 <div className="small text-muted">{dayjs(rx.creado_en).format("DD/MM/YYYY")}</div>
                 <div style={{ fontSize: "0.75rem", color: "#888" }}>
-                  {prefijoDr()}{rx.med_apellidos}, {rx.med_nombres}
+                  {nombreMedico(rx)}
                 </div>
               </div>
             </div>

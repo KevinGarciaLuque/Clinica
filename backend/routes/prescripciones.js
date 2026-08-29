@@ -26,12 +26,24 @@ const hasPrescripcionesFirmaCol = async () => {
   return prescripcionesHasFirmaCol;
 };
 
+// Garantiza usuarios.nombre_display (migración 067)
+let nombreDisplayColReady = false;
+async function ensureNombreDisplayColumn() {
+  if (nombreDisplayColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!cols.length) await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    nombreDisplayColReady = true;
+  } catch (e) { console.error("ensureNombreDisplayColumn:", e.message); }
+}
+
 /**
  * GET /api/prescripciones?paciente_id=&historia_id=
  */
 router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
+    await ensureNombreDisplayColumn();
     const { paciente_id, historia_id, page = 1 } = req.query;
     const limit  = 20;
     const offset = (page - 1) * limit;
@@ -41,6 +53,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
              pr.enviado_recepcion_en, pr.recibido_recepcion_en,
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+             u.nombre_display AS med_nombre_display,
              (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
       FROM prescripciones pr
       JOIN pacientes p ON p.id = pr.paciente_id
@@ -111,9 +124,11 @@ router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","PSICOLOGO",
     const condCid = cid ? " AND pr.clinica_id = ?" : "";
     const paramsCid = cid ? [cid] : [];
 
+    await ensureNombreDisplayColumn();
     const [recetas] = await pool.query(
       `SELECT pr.id, pr.estado, pr.notas, pr.creado_en,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+              u.nombre_display AS med_nombre_display,
               hc.diagnostico_cie, hc.subjetivo,
               (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
        FROM prescripciones pr
@@ -206,6 +221,7 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
   try {
     const cid = clinicaOf(req);
 
+    await ensureNombreDisplayColumn();
     const condicion = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
     const paramsPr  = cid ? [req.params.id, cid] : [req.params.id];
 
@@ -213,7 +229,8 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
       `SELECT pr.*,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.dni,
-              u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+              u.nombre_display AS med_nombre_display, e.nombre AS especialidad
        FROM prescripciones pr
        JOIN pacientes p ON p.id = pr.paciente_id
        JOIN usuarios  u ON u.id = pr.medico_id
@@ -383,6 +400,7 @@ router.delete("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => 
 router.get("/:id/pdf", auth(), async (req, res) => {
   try {
     const cid = clinicaOf(req);
+    await ensureNombreDisplayColumn();
 
     // 1. Datos de la prescripción, paciente y médico
     const condPdf  = cid ? "pr.id = ? AND pr.clinica_id = ?" : "pr.id = ?";
@@ -394,6 +412,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
               p.fecha_nacimiento,           p.dni,
               u.nombres   AS med_nombres,   u.apellidos   AS med_apellidos,
+              u.nombre_display AS med_nombre_display,
               u.numero_colegiatura, ${firmaSelect}
               e.nombre    AS especialidad,
               c.nombre    AS clinica_nombre, c.direccion   AS clinica_direccion,
@@ -598,7 +617,11 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     };
 
     const medicoBase = `${pr.med_nombres} ${pr.med_apellidos}`.trim();
-    const medicoDisplay = tMedico ? withDoctorPrefix(dedupeMedicoName(tMedico, medicoBase)) : "";
+    // El "nombre para mostrar" que configuró el médico gana sobre la plantilla y se usa tal cual.
+    const medDisplayName = (pr.med_nombre_display || "").trim();
+    const medicoDisplay = medDisplayName
+      ? medDisplayName
+      : (tMedico ? withDoctorPrefix(dedupeMedicoName(tMedico, medicoBase)) : "");
 
     // 5. Construir PDF
     //   media_carta   → hoja media carta (8.5 x 5.5 in = 612 x 396 pt)

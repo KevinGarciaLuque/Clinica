@@ -248,10 +248,18 @@ async function construirSesion(user) {
     { expiresIn: process.env.JWT_EXPIRES || "8h" },
   );
 
-  // Obtener foto_url del usuario
-  const [fotoRows] = await pool.query(
-    "SELECT foto_url FROM usuarios WHERE id=? LIMIT 1", [user.id]
-  );
+  // Obtener foto_url y nombre_display del usuario
+  let extra = {};
+  try {
+    const [fotoRows] = await pool.query(
+      "SELECT foto_url, nombre_display FROM usuarios WHERE id=? LIMIT 1", [user.id]
+    );
+    extra = fotoRows[0] || {};
+  } catch (e) {
+    if (e.code !== "ER_BAD_FIELD_ERROR") throw e;
+    const [fotoRows] = await pool.query("SELECT foto_url FROM usuarios WHERE id=? LIMIT 1", [user.id]);
+    extra = fotoRows[0] || {};
+  }
 
   return {
     ok: true,
@@ -263,10 +271,11 @@ async function construirSesion(user) {
       clinica_nombre: clinicaNombre,
       nombres: user.nombres,
       apellidos: user.apellidos,
+      nombre_display: extra.nombre_display || null,
       email: user.email,
       tipo: user.tipo,
       super: esSuper,
-      foto_url: fotoRows[0]?.foto_url || null,
+      foto_url: extra.foto_url || null,
     },
   };
 }

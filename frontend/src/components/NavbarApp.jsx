@@ -1195,7 +1195,7 @@ export default function NavbarApp({ onMenuClick }) {
             </div>
             <div className="d-none d-md-block" style={{ lineHeight: 1.25, textAlign: "left" }}>
               <div style={{ color: "#f1f5f9", fontWeight: 600, fontSize: "0.8rem", whiteSpace: "nowrap" }}>
-                {user?.nombres} {user?.apellidos}
+                {user?.nombre_display || `${user?.nombres ?? ""} ${user?.apellidos ?? ""}`}
               </div>
               <div style={{ color: "rgba(255,255,255,.4)", fontSize: "0.58rem", textTransform: "uppercase", letterSpacing: "0.06em" }}>
                 {user?.tipo}
@@ -1243,7 +1243,7 @@ export default function NavbarApp({ onMenuClick }) {
                   </div>
                   <div>
                     <div style={{ color: "#f1f5f9", fontWeight: 700, fontSize: "0.9rem" }}>
-                      {user?.nombres} {user?.apellidos}
+                      {user?.nombre_display || `${user?.nombres ?? ""} ${user?.apellidos ?? ""}`}
                     </div>
                     <div style={{ color: "rgba(255,255,255,.45)", fontSize: "0.72rem", marginTop: 1 }}>
                       {user?.email}

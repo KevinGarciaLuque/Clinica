@@ -10,6 +10,16 @@ const http    = require("http");
 const fs      = require("fs");
 const path    = require("path");
 const sse     = require("../utils/sseManager");
+
+let _ndReady = false;
+async function ensureNombreDisplayColumn() {
+  if (_ndReady) return;
+  try {
+    const [c] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!c.length) await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    _ndReady = true;
+  } catch (e) { console.error("ensureNombreDisplayColumn:", e.message); }
+}
 const webPush = require("../utils/webPush");
 const { notificarRecepcionistas } = require("../utils/notificarRecepcion");
 
@@ -30,6 +40,7 @@ const hasEstudiosFirmaCol = async () => {
 router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
+    await ensureNombreDisplayColumn();
     const { paciente_id, historia_id, estado, page = 1 } = req.query;
     const limit  = 20;
     const offset = (page - 1) * limit;
@@ -37,7 +48,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     let sql = `
       SELECT s.*,
              p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
-             u.nombres AS medico_nombres, u.apellidos AS medico_apellidos
+             u.nombres AS medico_nombres, u.apellidos AS medico_apellidos, u.nombre_display AS medico_nombre_display
       FROM estudios_solicitudes s
       JOIN pacientes p ON p.id = s.paciente_id
       JOIN usuarios  u ON u.id = s.medico_id
@@ -333,11 +344,12 @@ router.get("/pdf", auth(), async (req, res) => {
 router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const cid = clinicaOf(req);
+    await ensureNombreDisplayColumn();
 
     const [[sol]] = await pool.query(
       `SELECT s.*,
               p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
-              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos
+              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos, u.nombre_display AS medico_nombre_display
        FROM estudios_solicitudes s
        JOIN pacientes p ON p.id = s.paciente_id
        JOIN usuarios  u ON u.id = s.medico_id

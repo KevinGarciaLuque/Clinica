@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/api";
-import { prefijoDr } from "../utils/medico";
+import { nombreMedico } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 
 // Hook para detectar tamaño de pantalla
@@ -802,7 +802,7 @@ export default function Dashboard() {
                                     fontSize: "14px",
                                     color: "#666"
                                   }}>
-                                    {prefijoDr()}{c.medico_apellidos}
+                                    {nombreMedico(c)}
                                   </td>
                                 )}
                                 <td style={{ 

@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
-import { prefijoDr } from "../utils/medico";
+import { nombreMedico } from "../utils/medico";
 
 const TIPOS_ESTUDIO = [
   { value: "LABORATORIO", label: "Laboratorio" },
@@ -152,7 +152,7 @@ export default function Estudios() {
                   {selectedEstudio.paciente_nombres} {selectedEstudio.paciente_apellidos}
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px 16px", color: "#6b7280", fontSize: "0.82rem" }}>
-                  <span>Médico: {prefijoDr()}{selectedEstudio.medico_apellidos}{selectedEstudio.medico_nombres ? `, ${selectedEstudio.medico_nombres}` : ""}</span>
+                  <span>Médico: {nombreMedico(selectedEstudio)}</span>
                   <span>Fecha: {dayjs(selectedEstudio.fecha_solicitud || selectedEstudio.creado_en).format("DD/MM/YYYY HH:mm")}</span>
                   <span>Estudio #<strong>{selectedEstudio.id}</strong></span>
                 </div>
@@ -390,7 +390,7 @@ export default function Estudios() {
                           }}>{estudio.estado}</span>
                         </td>
                         <td style={{ padding: "12px 16px", fontSize: 13, color: C.muted }}>
-                          {prefijoDr()}{estudio.medico_apellidos}
+                          {nombreMedico(estudio)}
                         </td>
                         <td style={{ padding: "12px 16px", textAlign: "right" }}>
                           <button

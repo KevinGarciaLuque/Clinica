@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
-import { prefijoDr, sufijoEsp, tituloMedicoActivo, nombreMedico } from "../utils/medico";
+import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 import AntecedentesClinico from "../components/AntecedentesClinico";
 import HistorialPsicologico from "../components/HistorialPsicologico";
 import { useAuth } from "../auth/AuthContext";
@@ -194,7 +194,7 @@ export default function HistoriaClinica() {
   <div class="header">
     <div class="header-left">
       <h1>Historia Clínica Electrónica</h1>
-      <p>${prefijoDr()}${det.med_nombres} ${det.med_apellidos}${sufijoEsp(det.especialidad, "—")}</p>
+      <p>${nombreMedico(det, { conEspecialidad: true, sep: "—" })}</p>
     </div>
     <div class="header-right">
       <p><strong>Fecha:</strong> ${dayjs(det.creado_en).format("DD/MM/YYYY HH:mm")}</p>
@@ -248,8 +248,8 @@ export default function HistoriaClinica() {
     <div class="firma-box">
       ${det.firma_digital_url ? `<img src="${det.firma_digital_url}" alt="Firma digital" />` : ""}
       <div class="linea"></div>
-      <p>${prefijoDr()}${det.med_nombres} ${det.med_apellidos}</p>
-      ${tituloMedicoActivo() && det.especialidad ? `<p>${det.especialidad}</p>` : ""}
+      <p>${nombreMedico(det)}</p>
+      ${!det.med_nombre_display && tituloMedicoActivo() && det.especialidad ? `<p>${det.especialidad}</p>` : ""}
     </div>
   </div>
 </body>
@@ -696,8 +696,8 @@ export default function HistoriaClinica() {
                           border: `1px solid ${h.estado === "FIRMADA" ? "#bbf7d0" : "#fde68a"}`,
                           borderRadius: 6, padding: "2px 8px", fontSize: "0.72rem", fontWeight: 700,
                         }}>{h.estado}</span>
-                        <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "#1e293b" }}>{prefijoDr()}{h.med_nombres} {h.med_apellidos}</span>
-                        {tituloMedicoActivo() && h.especialidad && <span style={{ fontSize: "0.8rem", color: "#9ca3af" }}>({h.especialidad})</span>}
+                        <span style={{ fontWeight: 600, fontSize: "0.85rem", color: "#1e293b" }}>{nombreMedico(h)}</span>
+                        {!h.med_nombre_display && tituloMedicoActivo() && h.especialidad && <span style={{ fontSize: "0.8rem", color: "#9ca3af" }}>({h.especialidad})</span>}
                       </div>
                       <span style={{ fontSize: "0.78rem", color: "#9ca3af" }}>{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</span>
                     </div>

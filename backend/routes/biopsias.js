@@ -14,11 +14,22 @@ const auth   = require("../middlewares/auth");
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
 
+let _ndReady = false;
+async function ensureNombreDisplayColumn() {
+  if (_ndReady) return;
+  try {
+    const [c] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!c.length) await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    _ndReady = true;
+  } catch (e) { console.error("ensureNombreDisplayColumn:", e.message); }
+}
+
 // ── GET / (lista) ─────────────────────────────────────────────────────────────
 router.get("/", auth(), async (req, res) => {
   try {
     const cid = clinicaOf(req);
     if (!cid) return res.json({ ok: true, data: [] });
+    await ensureNombreDisplayColumn();
 
     const { paciente_id, estado, page = 1 } = req.query;
     const limit  = 30;
@@ -62,6 +73,7 @@ router.get("/", auth(), async (req, res) => {
 router.get("/:id", auth(), async (req, res) => {
   try {
     const cid = clinicaOf(req);
+    await ensureNombreDisplayColumn();
     const [[row]] = await pool.query(
       `SELECT b.*,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,

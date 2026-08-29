@@ -18,6 +18,17 @@ const getHistoriasCols = async () => {
   return historiasColsCache;
 };
 
+// Garantiza usuarios.nombre_display (migración 067)
+let nombreDisplayColReady = false;
+async function ensureNombreDisplayColumn() {
+  if (nombreDisplayColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!cols.length) await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    nombreDisplayColReady = true;
+  } catch (e) { console.error("ensureNombreDisplayColumn:", e.message); }
+}
+
 // Devuelve el código CIE-10 solo si existe en la tabla `cie10` (para respetar la FK).
 // Si el código está vacío o no existe (ej. diagnóstico libre o de catálogo no seedeado), devuelve null.
 const cieValido = async (codigo) => {
@@ -40,6 +51,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     const cid = clinicaOf(req);
     if (!cid) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
     const cols = await getHistoriasCols();
+    await ensureNombreDisplayColumn();
 
     const { paciente_id, cita_id, page = 1 } = req.query;
     const limit  = 20;
@@ -55,7 +67,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
              h.subjetivo, h.objetivo, h.diagnostico_cie, h.plan, h.examen_fisico,
              h.diagnosticos_secundarios${selectExtras ? `, ${selectExtras}` : ""},
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
-             u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
+             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, e.nombre AS especialidad
       FROM historias_clinicas h
       JOIN pacientes p ON p.id = h.paciente_id
       JOIN usuarios  u ON u.id = h.medico_id
@@ -85,6 +97,7 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
     const cid = clinicaOf(req);
     const { id } = req.params;
     const cols = await getHistoriasCols();
+    await ensureNombreDisplayColumn();
 
     const selectExtras = [
       !cols.has("firma_digital_url") ? "NULL AS firma_digital_url" : null,
@@ -95,7 +108,7 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
       `SELECT h.*${selectExtras ? `, ${selectExtras}` : ""}, h.datos_derma,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.sexo, p.telefono AS pac_tel, p.email AS pac_email,
-              u.nombres AS med_nombres, u.apellidos AS med_apellidos, e.nombre AS especialidad
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, e.nombre AS especialidad
        FROM historias_clinicas h
        JOIN pacientes p ON p.id = h.paciente_id
        JOIN usuarios  u ON u.id = h.medico_id
@@ -444,13 +457,14 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","
 
     const cols = await getHistoriasCols();
     const hasDxDesc = cols.has("diagnostico_desc");
+    await ensureNombreDisplayColumn();
 
     // Todas las consultas firmadas previas (excluyendo la actual)
     let listSql = `
       SELECT h.id, h.creado_en, h.diagnostico_cie,
              ${hasDxDesc ? "h.diagnostico_desc," : "NULL AS diagnostico_desc,"}
              h.plan, h.subjetivo,
-             u.nombres AS med_nombres, u.apellidos AS med_apellidos,
+             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display,
              e.nombre AS especialidad,
              c.descripcion AS cie_desc
       FROM historias_clinicas h
@@ -487,7 +501,7 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","
     const consultas_previas = rows.map(r => ({
       id:               r.id,
       fecha:            r.creado_en,
-      medico:           `${r.med_nombres} ${r.med_apellidos}`,
+      medico:           (r.med_nombre_display || "").trim() || `${r.med_nombres} ${r.med_apellidos}`,
       especialidad:     r.especialidad || "",
       diagnostico_cie:  r.diagnostico_cie || "",
       diagnostico_desc: r.cie_desc || r.diagnostico_desc || "",

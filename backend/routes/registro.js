@@ -490,8 +490,14 @@ router.get("/doctores", async (req, res) => {
     if (!clinica_id)
       return res.status(400).json({ ok: false, msg: "clinica_id es requerido" });
 
+    const selNombreDisplay = await (async () => {
+      try {
+        const [c] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+        return c.length ? "u.nombre_display," : "NULL AS nombre_display,";
+      } catch { return "NULL AS nombre_display,"; }
+    })();
     const [rows] = await pool.query(
-      `SELECT u.id, u.nombres, u.apellidos,
+      `SELECT u.id, u.nombres, u.apellidos, ${selNombreDisplay}
               e.nombre AS especialidad
        FROM usuarios u
        LEFT JOIN especialidades e ON e.id = u.especialidad_id

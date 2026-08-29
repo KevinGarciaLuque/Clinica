@@ -643,7 +643,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
                   whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis",
                   padding: "0 8px",
                 }}>
-                  {user?.nombres} {user?.apellidos}
+                  {user?.nombre_display || `${user?.nombres ?? ""} ${user?.apellidos ?? ""}`}
                 </div>
                 <div style={{
                   color: C.textMuted, fontSize: "0.68rem", marginTop: 2,

@@ -7,7 +7,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
-import { prefijoDr } from "../../utils/medico";
+import { nombreMedico } from "../../utils/medico";
 
 // ─── constantes ───────────────────────────────────────────────────────────────
 const TIPOS_BIOPSIA = [
@@ -460,7 +460,7 @@ function PanelDetalle({ biopsia, onClose, onEdit, onResultado }) {
                 )}
                 <div className="col-12">
                   <p style={{ margin: 0, fontSize: "0.72rem", color: "#9ca3af" }}>Médico</p>
-                  <p style={{ margin: 0, fontSize: "0.85rem" }}>{prefijoDr()}{biopsia.med_apellidos}, {biopsia.med_nombres}</p>
+                  <p style={{ margin: 0, fontSize: "0.85rem" }}>{nombreMedico(biopsia)}</p>
                 </div>
               </div>
             </div>
@@ -752,7 +752,7 @@ export default function BiopsiaPatologia() {
                         onClick={() => abrirDetalle(b.id)}>
                         <td style={{ padding: "11px 14px" }}>
                           <div style={{ fontWeight: 600, fontSize: "0.88rem", color: "#111827" }}>{b.pac_nombres} {b.pac_apellidos}</div>
-                          <div style={{ fontSize: "0.73rem", color: "#9ca3af" }}>{prefijoDr()}{b.med_apellidos}</div>
+                          <div style={{ fontSize: "0.73rem", color: "#9ca3af" }}>{nombreMedico(b)}</div>
                         </td>
                         <td style={{ padding: "11px 14px" }}>
                           <span style={{ background: "#f5f3ff", color: "#7c3aed", border: "1px solid #ddd6fe", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>

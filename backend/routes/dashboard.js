@@ -9,10 +9,21 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 
+let _ndReady = false;
+async function ensureNombreDisplayColumn() {
+  if (_ndReady) return;
+  try {
+    const [c] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!c.length) await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    _ndReady = true;
+  } catch (e) { console.error("ensureNombreDisplayColumn:", e.message); }
+}
+
 // GET /api/dashboard/stats
 router.get("/stats", auth(), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
+    await ensureNombreDisplayColumn();
 
     // La fecha "de hoy" la decide el navegador del usuario (req.query.fecha), no el
     // servidor: Railway corre en UTC y calcular "hoy" ahí desfasa el día en horarios
@@ -91,7 +102,7 @@ router.get("/sala-espera", auth(), async (req, res) => {
               c.estado, c.tipo_consulta, c.motivo, c.canal,
               p.id AS paciente_id, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
               p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
-              u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
+              u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos, u.nombre_display AS medico_nombre_display,
               e.nombre AS especialidad
        FROM citas c
        JOIN pacientes p  ON p.id = c.paciente_id

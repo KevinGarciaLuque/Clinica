@@ -124,7 +124,7 @@ function AgendarCita({ clinicaId, pacienteId, sessionToken, onDone }) {
             <option value="">— Seleccionar médico —</option>
             {medicos.map(m => (
               <option key={m.id} value={m.id}>
-                {m.apellidos}, {m.nombres}{m.especialidad ? ` — ${m.especialidad}` : ""}
+                {(m.nombre_display || "").trim() || `${m.apellidos}, ${m.nombres}`}{!m.nombre_display && m.especialidad ? ` — ${m.especialidad}` : ""}
               </option>
             ))}
           </select>
