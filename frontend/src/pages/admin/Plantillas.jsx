@@ -574,6 +574,9 @@ export default function Plantillas() {
   const [pacienteSel, setPacienteSel] = useState(null);
   const [varsEditables, setVarsEditables] = useState({}); // { [tipo]: { campo: valor } }
   const [generandoPdf, setGenerandoPdf] = useState(false);
+  // Formato de impresión elegido en la barra de vista previa (override puntual del
+  // default guardado en Personalización). null = usar el default de la plantilla.
+  const [printFormato, setPrintFormato] = useState(null);
 
   useEffect(() => {
     if (!busquedaPaciente.trim() || pacienteSel) { setResultadosPaciente([]); return; }
@@ -763,19 +766,22 @@ export default function Plantillas() {
     } finally { setGuardando(false); }
   };
 
-  const construirHtmlCompleto = () => {
+  // Formato de receta efectivo: override de la barra > default guardado > media_carta
+  const formatoRecetaEfectivo = printFormato || personalizacion.formato_receta || "media_carta";
+
+  const construirHtmlCompleto = (paperOverride) => {
     // Regenera el HTML con el contenido mas reciente del editor (por si el
     // doctor no ha salido del campo todavia, ver getTipoDataLive arriba).
     const dataParaExport = { ...personalizacion, ...getTipoDataLive(), medico: medicoNombre, medico_firma_url: medicoFirmaUrl };
     const htmlFinal = buildHTML(dataParaExport, tab, varsPreview, !!pacienteSel, true);
-    const paper = getPaper(dataParaExport.papel_size, dataParaExport.papel_orientacion);
+    const paper = getPaper(paperOverride || dataParaExport.papel_size, dataParaExport.papel_orientacion);
     return `<!doctype html>
 <html>
 <head>
   <meta charset="utf-8" />
   <title>${tipoActivo?.label || "Plantilla"}</title>
   <style>
-    @page { size: ${paper.css}; margin: 10mm; }
+    @page { size: ${paper.css}; margin: 8mm; }
     * {
       -webkit-print-color-adjust: exact !important;
       print-color-adjust: exact !important;
@@ -797,7 +803,9 @@ export default function Plantillas() {
   const imprimirVistaPrevia = () => {
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
-    w.document.write(construirHtmlCompleto());
+    // Para la receta en "carta completa" se fuerza la hoja carta en la vista previa.
+    const override = (tab === "receta" && formatoRecetaEfectivo === "carta_completa") ? "LETTER" : null;
+    w.document.write(construirHtmlCompleto(override));
     w.document.close();
     w.focus();
     setTimeout(() => w.print(), 250);
@@ -817,14 +825,15 @@ export default function Plantillas() {
           notas,
           items: [],
         });
-        const res = await api.get(`/prescripciones/${data.id}/pdf`, { responseType: "blob" });
+        const res = await api.get(`/prescripciones/${data.id}/pdf?formato=${formatoRecetaEfectivo}`, { responseType: "blob" });
         const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
         window.open(url, "_blank");
         setMsg({ tipo: "success", texto: `Receta #${data.id} generada y guardada en el sistema` });
       } else {
+        const carta = printFormato === "carta_completa";
         const res = await api.post("/documentos/generar-pdf", {
-          html: construirHtmlCompleto(),
-          paper_size: dataActual.papel_size,
+          html: construirHtmlCompleto(carta ? "LETTER" : null),
+          paper_size: carta ? "LETTER" : dataActual.papel_size,
           orientacion: dataActual.papel_orientacion,
           nombre_archivo: `${tab}-${pacienteSel.nombres}-${pacienteSel.apellidos}`,
         }, { responseType: "blob" });
@@ -1450,7 +1459,18 @@ export default function Plantillas() {
               )}
               {tab !== "personalizacion" && !CONFIG_EXTRA_KEYS.has(tab) && (
                 <>
-                  <button onClick={imprimirVistaPrevia} style={{ marginLeft: 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6 }}>
+                  {tab === "receta" && (
+                    <select
+                      value={formatoRecetaEfectivo}
+                      onChange={e => setPrintFormato(e.target.value)}
+                      title="Tamaño de la receta al imprimir o generar"
+                      style={{ marginLeft: 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 8px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937" }}
+                    >
+                      <option value="media_carta">Media carta</option>
+                      <option value="carta_completa">Carta completa</option>
+                    </select>
+                  )}
+                  <button onClick={imprimirVistaPrevia} style={{ marginLeft: tab === "receta" ? 0 : 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6 }}>
                     <i className="bi bi-printer-fill" /> Imprimir
                   </button>
                   <button onClick={guardar} disabled={guardando} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6, cursor: guardando ? "default" : "pointer" }}>
@@ -1458,7 +1478,7 @@ export default function Plantillas() {
                   </button>
                   {pacienteSel && (
                     <button onClick={generarDocumentoPdf} disabled={generandoPdf} style={{ border: "none", background: tipoActivo?.color || "#1a2744", color: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, display: "flex", alignItems: "center", gap: 6, cursor: generandoPdf ? "default" : "pointer" }}>
-                      <i className="bi bi-file-earmark-pdf-fill" /> {generandoPdf ? "Generando..." : "Generar documento"}
+                      <i className="bi bi-file-earmark-pdf-fill" /> {generandoPdf ? "Generando..." : (tab === "receta" && formatoRecetaEfectivo === "carta_completa" ? "Generar carta completa" : "Generar documento")}
                     </button>
                   )}
                 </>

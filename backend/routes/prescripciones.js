@@ -606,8 +606,9 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     res.setHeader("Content-Disposition", `inline; filename="receta-${pr.id}.pdf"`);
     doc.pipe(res);
 
-    const pageW = doc.page.width - 100;
-    const marginL = 50;
+    // Márgenes reducidos para aprovechar más la hoja.
+    const marginL = 30;
+    const pageW = doc.page.width - marginL * 2;
     const GRAY = "#555555";
     const QR_SIZE = 60;
 
@@ -638,7 +639,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const headerH = Math.max(logoSize + 20, clinicHeight + doctorHeight + credHeight + headerGaps + 20);
 
     // Dibuja fondo del encabezado
-    const topY = 14;
+    const topY = 10;
 
     doc.rect(marginL, topY, pageW, headerH).fill(tColor);
 
@@ -783,7 +784,11 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     }).join("\n\n");
 
     const notasTexto = (pr.notas || "").trim();
-    const recetaTexto = [plantillaTexto, medsTexto, notasTexto ? `Notas:\n${notasTexto}` : ""]
+    // Evita duplicar el texto cuando las notas de la receta coinciden con lo que ya
+    // trae la plantilla (ocurre al "Generar documento" desde el editor de Plantillas,
+    // que manda el mismo contenido como notas).
+    const notasDistintas = notasTexto && !plantillaTexto.includes(notasTexto);
+    const recetaTexto = [plantillaTexto, medsTexto, notasDistintas ? `Notas:\n${notasTexto}` : ""]
       .filter(Boolean)
       .join("\n\n");
 
