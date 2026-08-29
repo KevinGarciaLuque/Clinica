@@ -502,7 +502,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA",
     if (req.user.super) {
       const [rows] = await pool.query(`
         SELECT c.id, c.nombre, c.slug, c.tipo_id, c.es_pediatrica, c.logo_url, c.email, c.telefono,
-               c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
+               c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.bloqueada, c.creado_en,
                c.plan_tipo, c.licencia_inicio, c.licencia_fin,
                t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
         FROM clinicas c
@@ -514,7 +514,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA",
     // No-super: solo puede ver la suya
     const [rows] = await pool.query(`
       SELECT c.id, c.nombre, c.slug, c.tipo_id, c.es_pediatrica, c.logo_url, c.email, c.telefono,
-             c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.creado_en,
+             c.direccion, c.ciudad, c.pais, c.ruc, c.activo, c.bloqueada, c.creado_en,
              c.plan_tipo, c.licencia_inicio, c.licencia_fin,
              t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
       FROM clinicas c
@@ -924,6 +924,13 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req,
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo, timezone, titulo_medico } = req.body;
 
+    if (req.user.super) {
+      const [[cl]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [id]);
+      if (cl && cl.bloqueada) {
+        return res.status(409).json({ ok: false, msg: "Clínica protegida con candado. Desbloquéala para editarla." });
+      }
+    }
+
     if (slug) {
       const [exist] = await pool.query("SELECT id FROM clinicas WHERE slug=? AND id!=?", [slug, id]);
       if (exist.length) return res.status(409).json({ ok: false, msg: "El slug ya existe" });
@@ -987,7 +994,12 @@ router.put("/:id/config", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), asyn
 router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const { permanente } = req.query;
-    
+
+    const [[cl]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
+    if (cl && cl.bloqueada) {
+      return res.status(409).json({ ok: false, msg: "Clínica protegida con candado. Desbloquéala antes de eliminar o desactivar." });
+    }
+
     if (permanente === "true") {
       // Eliminación permanente (CASCADE eliminará usuarios, pacientes, citas, etc.)
       await pool.query("DELETE FROM clinicas WHERE id=?", [req.params.id]);
@@ -997,6 +1009,17 @@ router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
     // Solo desactivar
     await pool.query("UPDATE clinicas SET activo=0 WHERE id=?", [req.params.id]);
     res.json({ ok: true, msg: "Clínica desactivada" });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// PUT /api/clinicas/:id/bloqueo  → candado de protección (solo SUPER_ADMIN)
+router.put("/:id/bloqueo", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const bloqueada = req.body.bloqueada ? 1 : 0;
+    await pool.query("UPDATE clinicas SET bloqueada=? WHERE id=?", [bloqueada, req.params.id]);
+    res.json({ ok: true, bloqueada });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -1052,6 +1075,11 @@ router.get("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const { plan_tipo, inicio_manual, notas } = req.body;
+
+    const [[clBloq]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
+    if (clBloq && clBloq.bloqueada) {
+      return res.status(409).json({ ok: false, msg: "Clínica protegida con candado. Desbloquéala para gestionar su licencia." });
+    }
 
     if (!["trial","semestral","anual"].includes(plan_tipo)) {
       return res.status(400).json({ ok: false, msg: "plan_tipo inválido. Use: trial, semestral, anual" });

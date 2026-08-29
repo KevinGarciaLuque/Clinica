@@ -50,6 +50,7 @@ export default function Clinicas() {
   const [form, setForm]           = useState({ ...EMPTY_C, ...EMPTY_A });
   const [editId, setEditId]       = useState(null);
   const [busqueda, setBusqueda]   = useState("");
+  const [tab, setTab]             = useState("todas");
   const [cargando, setCargando]   = useState(false);
   const [error, setError]         = useState("");
   const [showModal, setShowModal] = useState(false);
@@ -185,6 +186,17 @@ export default function Clinicas() {
       if (c.activo) await api.delete(`/clinicas/${c.id}`);
       else          await api.put(`/clinicas/${c.id}`, { activo: 1 });
       cargar();
+    } catch (e) {
+      setError(e.response?.data?.msg || e.message);
+    }
+  };
+
+  const toggleBloqueo = async (c) => {
+    const nuevo = c.bloqueada ? 0 : 1;
+    if (!nuevo && !window.confirm(`¿Quitar el candado de "${c.nombre}"? Quedará expuesta a edición y borrado.`)) return;
+    try {
+      await api.put(`/clinicas/${c.id}/bloqueo`, { bloqueada: nuevo });
+      setClinicas(prev => prev.map(x => x.id === c.id ? { ...x, bloqueada: nuevo } : x));
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     }
@@ -327,9 +339,20 @@ export default function Clinicas() {
     }
   };
 
-  const filtradas = clinicas.filter((c) =>
+  const porBusqueda = clinicas.filter((c) =>
     `${c.nombre} ${c.slug}`.toLowerCase().includes(busqueda.toLowerCase())
   );
+  const filtradas = porBusqueda.filter((c) => perteneceATab(c, tab));
+
+  const TABS = [
+    { key: "todas",     label: "Todas",     icon: "bi-grid-3x3-gap-fill" },
+    { key: "clientes",  label: "Clientes",  icon: "bi-patch-check-fill"  },
+    { key: "prueba",    label: "Prueba",    icon: "bi-clock-history"     },
+    { key: "semestral", label: "Semestral", icon: "bi-calendar2-check"   },
+    { key: "anual",     label: "Anual",     icon: "bi-award-fill"        },
+    { key: "vencidas",  label: "Vencidas",  icon: "bi-x-octagon-fill"    },
+    { key: "inactivas", label: "Inactivas", icon: "bi-pause-circle-fill" },
+  ].map(t => ({ ...t, count: porBusqueda.filter(c => perteneceATab(c, t.key)).length }));
 
   /* ── Helpers de licencia ── */
   const getLicenciaStatus = (c) => {
@@ -344,6 +367,26 @@ export default function Clinicas() {
   };
 
   const PLAN_LABEL = { trial: "Prueba", semestral: "Semestral", anual: "Anual" };
+
+  // Un "cliente" = plan de pago vigente (semestral o anual, no vencido) y activa.
+  const esCliente = (c) => {
+    if (!c.activo) return false;
+    if (!["semestral", "anual"].includes(c.plan_tipo)) return false;
+    return getLicenciaStatus(c).tipo !== "vencida";
+  };
+
+  // A qué pestaña pertenece cada clínica.
+  const perteneceATab = (c, t) => {
+    if (t === "todas") return true;
+    if (t === "inactivas") return !c.activo;
+    if (!c.activo) return false;
+    if (t === "clientes") return esCliente(c);
+    const venc = getLicenciaStatus(c).tipo === "vencida";
+    if (t === "vencidas") return venc;
+    if (venc) return false;
+    if (t === "prueba") return !c.plan_tipo || c.plan_tipo === "trial";
+    return c.plan_tipo === t; // "semestral" | "anual"
+  };
 
   const abrirLicencia = (c) => {
     setClinicaLicencia(c);
@@ -599,6 +642,37 @@ export default function Clinicas() {
         />
       </div>
 
+      {/* ── Pestañas por plan ────────────────────────────────── */}
+      <div style={{ display: "flex", gap: 8, marginBottom: 24, flexWrap: "wrap" }}>
+        {TABS.map((t) => {
+          const activa = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              style={{
+                display: "inline-flex", alignItems: "center", gap: 7,
+                background: activa ? "rgba(33,150,243,.15)" : "rgba(255,255,255,.03)",
+                border: `1px solid ${activa ? "rgba(33,150,243,.45)" : C.border}`,
+                color: activa ? C.accent : C.muted,
+                borderRadius: 10, padding: "7px 13px", fontSize: 13, fontWeight: 600,
+                cursor: "pointer", transition: "all .15s",
+              }}
+            >
+              <i className={`bi ${t.icon}`} />
+              {t.label}
+              <span style={{
+                background: activa ? "rgba(33,150,243,.25)" : "rgba(255,255,255,.06)",
+                color: activa ? C.accent : C.muted,
+                borderRadius: 999, padding: "1px 7px", fontSize: 11, fontWeight: 700,
+              }}>
+                {t.count}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       {/* ── Grid de clínicas ─────────────────────────────────── */}
       {cargando ? (
         <div style={{ textAlign: "center", padding: "60px 0" }}>
@@ -615,6 +689,9 @@ export default function Clinicas() {
           {filtradas.map((c) => {
             const initials = c.nombre.split(" ").slice(0, 2).map((w) => w[0]).join("").toUpperCase();
             const isHov = hovered === c.id;
+            const cliente = esCliente(c);
+            const locked = !!c.bloqueada;
+            const lockedBtn = (base) => locked ? { ...base, opacity: 0.4, cursor: "not-allowed", pointerEvents: "none" } : base;
             return (
               <div
                 key={c.id}
@@ -622,7 +699,7 @@ export default function Clinicas() {
                 onMouseLeave={() => setHovered(null)}
                 style={{
                   background: C.card,
-                  border: `1px solid ${isHov ? "rgba(33,150,243,.35)" : C.border}`,
+                  border: `1px solid ${locked ? "rgba(245,158,11,.5)" : cliente ? "rgba(16,185,129,.4)" : isHov ? "rgba(33,150,243,.35)" : C.border}`,
                   borderRadius: 16,
                   overflow: "hidden",
                   opacity: c.activo ? 1 : 0.55,
@@ -705,6 +782,15 @@ export default function Clinicas() {
                     </div>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 5, flexShrink: 0 }}>
+                    {cliente && (
+                      <span style={{
+                        padding: "3px 9px", borderRadius: 20, fontSize: 10, fontWeight: 700,
+                        background: "rgba(16,185,129,.18)", color: C.success,
+                        border: "1px solid rgba(16,185,129,.4)", whiteSpace: "nowrap", letterSpacing: ".03em",
+                      }}>
+                        <i className="bi bi-patch-check-fill me-1" />CLIENTE
+                      </span>
+                    )}
                     {/* Badge estado */}
                     <span style={{
                       padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600,
@@ -795,16 +881,16 @@ export default function Clinicas() {
                     <i className="bi bi-bar-chart-fill" />
                   </button>
                   <button
-                    onClick={() => abrirLicencia(c)}
-                    title="Gestionar licencia"
-                    style={{
+                    onClick={() => !locked && abrirLicencia(c)}
+                    title={locked ? "Clínica bloqueada" : "Gestionar licencia"}
+                    style={lockedBtn({
                       background: (() => { const ls = getLicenciaStatus(c); return ls.bg; })(),
                       border: (() => { const ls = getLicenciaStatus(c); return `1px solid ${ls.color}40`; })(),
                       borderRadius: 8, padding: "8px 10px",
                       color: (() => { const ls = getLicenciaStatus(c); return ls.color; })(),
                       fontSize: 13, cursor: "pointer", transition: "all .2s",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    }}
+                    })}
                     onMouseEnter={(e) => e.currentTarget.style.opacity = ".75"}
                     onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
                   >
@@ -825,22 +911,35 @@ export default function Clinicas() {
                     <i className="bi bi-envelope-arrow-up-fill" />
                   </button>
                   <button
-                    onClick={() => abrirEditar(c)}
+                    onClick={() => toggleBloqueo(c)}
+                    title={locked ? "Clínica protegida — clic para desbloquear (solo Super Admin)" : "Bloquear clínica para evitar cambios accidentales"}
                     style={{
+                      background: locked ? "rgba(245,158,11,.15)" : "rgba(148,163,184,.08)",
+                      border: `1px solid ${locked ? "rgba(245,158,11,.45)" : C.border}`,
+                      borderRadius: 8, padding: "8px 10px",
+                      color: locked ? C.warning : C.muted, fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <i className={`bi bi-${locked ? "lock-fill" : "unlock"}`} />
+                  </button>
+                  <button
+                    onClick={() => !locked && abrirEditar(c)}
+                    title={locked ? "Clínica bloqueada" : "Editar"}
+                    style={lockedBtn({
                       flex: 1, background: "rgba(33,150,243,.1)", border: "1px solid rgba(33,150,243,.25)",
                       borderRadius: 8, padding: "8px 0", color: C.accent,
                       fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .2s",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(33,150,243,.2)"}
-                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(33,150,243,.1)"}
+                    })}
                   >
                     <i className="bi bi-pencil-square" />
                     Editar
                   </button>
                   <button
-                    onClick={() => toggleActivo(c)}
-                    style={{
+                    onClick={() => !locked && toggleActivo(c)}
+                    title={locked ? "Clínica bloqueada" : ""}
+                    style={lockedBtn({
                       flex: 1,
                       background: c.activo ? "rgba(245,158,11,.08)" : "rgba(16,185,129,.08)",
                       border: `1px solid ${c.activo ? "rgba(245,158,11,.25)" : "rgba(16,185,129,.25)"}`,
@@ -848,32 +947,22 @@ export default function Clinicas() {
                       color: c.activo ? C.warning : C.success,
                       fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "background .2s",
                       display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    }}
-                    onMouseEnter={(e) => e.currentTarget.style.opacity = ".75"}
-                    onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
+                    })}
                   >
                     <i className={`bi bi-${c.activo ? "pause-circle" : "play-circle"}`} />
                     {c.activo ? "Desactivar" : "Activar"}
                   </button>
                   <button
-                    onClick={() => eliminarClinica(c)}
-                    title="Eliminar permanentemente"
-                    style={{
-                      background: "rgba(239,68,68,.08)", 
+                    onClick={() => !locked && eliminarClinica(c)}
+                    title={locked ? "Clínica bloqueada" : "Eliminar permanentemente"}
+                    style={lockedBtn({
+                      background: "rgba(239,68,68,.08)",
                       border: "1px solid rgba(239,68,68,.25)",
                       borderRadius: 8, padding: "8px 12px",
                       color: "#ef4444",
                       fontSize: 13, fontWeight: 600, cursor: "pointer", transition: "all .2s",
                       display: "flex", alignItems: "center", justifyContent: "center",
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.background = "rgba(239,68,68,.15)";
-                      e.currentTarget.style.transform = "scale(1.05)";
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.background = "rgba(239,68,68,.08)";
-                      e.currentTarget.style.transform = "scale(1)";
-                    }}
+                    })}
                   >
                     <i className="bi bi-trash-fill" />
                   </button>
