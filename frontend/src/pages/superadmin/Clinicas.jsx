@@ -339,21 +339,6 @@ export default function Clinicas() {
     }
   };
 
-  const porBusqueda = clinicas.filter((c) =>
-    `${c.nombre} ${c.slug}`.toLowerCase().includes(busqueda.toLowerCase())
-  );
-  const filtradas = porBusqueda.filter((c) => perteneceATab(c, tab));
-
-  const TABS = [
-    { key: "todas",     label: "Todas",     icon: "bi-grid-3x3-gap-fill" },
-    { key: "clientes",  label: "Clientes",  icon: "bi-patch-check-fill"  },
-    { key: "prueba",    label: "Prueba",    icon: "bi-clock-history"     },
-    { key: "semestral", label: "Semestral", icon: "bi-calendar2-check"   },
-    { key: "anual",     label: "Anual",     icon: "bi-award-fill"        },
-    { key: "vencidas",  label: "Vencidas",  icon: "bi-x-octagon-fill"    },
-    { key: "inactivas", label: "Inactivas", icon: "bi-pause-circle-fill" },
-  ].map(t => ({ ...t, count: porBusqueda.filter(c => perteneceATab(c, t.key)).length }));
-
   /* ── Helpers de licencia ── */
   const getLicenciaStatus = (c) => {
     if (!c.licencia_fin) return { label: "Sin licencia", color: C.muted, bg: "rgba(148,163,184,.08)", icon: "bi-slash-circle", tipo: "ninguna" };
@@ -387,6 +372,21 @@ export default function Clinicas() {
     if (t === "prueba") return !c.plan_tipo || c.plan_tipo === "trial";
     return c.plan_tipo === t; // "semestral" | "anual"
   };
+
+  const porBusqueda = clinicas.filter((c) =>
+    `${c.nombre} ${c.slug}`.toLowerCase().includes(busqueda.toLowerCase())
+  );
+  const filtradas = porBusqueda.filter((c) => perteneceATab(c, tab));
+
+  const TABS = [
+    { key: "todas",     label: "Todas",     icon: "bi-grid-3x3-gap-fill" },
+    { key: "clientes",  label: "Clientes",  icon: "bi-patch-check-fill"  },
+    { key: "prueba",    label: "Prueba",    icon: "bi-clock-history"     },
+    { key: "semestral", label: "Semestral", icon: "bi-calendar2-check"   },
+    { key: "anual",     label: "Anual",     icon: "bi-award-fill"        },
+    { key: "vencidas",  label: "Vencidas",  icon: "bi-x-octagon-fill"    },
+    { key: "inactivas", label: "Inactivas", icon: "bi-pause-circle-fill" },
+  ].map(t => ({ ...t, count: porBusqueda.filter(c => perteneceATab(c, t.key)).length }));
 
   const abrirLicencia = (c) => {
     setClinicaLicencia(c);
