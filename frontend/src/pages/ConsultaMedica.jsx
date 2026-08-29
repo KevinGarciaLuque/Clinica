@@ -8,7 +8,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { FaCheckCircle } from "react-icons/fa";
 import api from "../api/api";
-import { prefijoDr, sufijoEsp, tituloMedicoActivo } from "../utils/medico";
+import { prefijoDr, tituloMedicoActivo, nombreMedico } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -3338,7 +3338,7 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
             <select className="form-select form-select-sm" value={medicoId} onChange={e => { setMedicoId(e.target.value); setSlotSel(null); setHoraInicio(""); setHoraFin(""); }}>
               <option value="">— Seleccionar médico —</option>
               {medicos.map(m => (
-                <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad, "·")}</option>
+                <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true, sep: "·" })}</option>
               ))}
             </select>
           </div>
@@ -3560,7 +3560,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
+                      <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true })}</option>
                     ))}
                   </select>
                 </div>
@@ -3587,7 +3587,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
+                      <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true })}</option>
                     ))}
                   </select>
                 </div>

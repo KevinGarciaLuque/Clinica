@@ -348,13 +348,25 @@ router.post("/google-login", async (req, res) => {
 // ── GET /api/auth/me  → datos completos del usuario autenticado ──────────────
 router.get("/me", auth(), async (req, res) => {
   try {
-    const [rows] = await pool.query(
-      `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono,
-              numero_colegiatura, especialidad_id, foto_url, firma_url, two_factor_enabled,
-              (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
-       FROM usuarios u WHERE u.id=? LIMIT 1`,
-      [req.user.uid]
-    );
+    let rows;
+    try {
+      [rows] = await pool.query(
+        `SELECT id, clinica_id, nombres, apellidos, nombre_display, email, tipo, telefono,
+                numero_colegiatura, especialidad_id, foto_url, firma_url, two_factor_enabled,
+                (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
+         FROM usuarios u WHERE u.id=? LIMIT 1`,
+        [req.user.uid]
+      );
+    } catch (err) {
+      if (err.code !== "ER_BAD_FIELD_ERROR") throw err;
+      [rows] = await pool.query(
+        `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono,
+                numero_colegiatura, especialidad_id, foto_url, firma_url, two_factor_enabled,
+                (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
+         FROM usuarios u WHERE u.id=? LIMIT 1`,
+        [req.user.uid]
+      );
+    }
     if (!rows.length) return res.status(404).json({ ok: false, msg: "Usuario no encontrado" });
     res.json({ ok: true, data: rows[0] });
   } catch (e) {
@@ -365,7 +377,7 @@ router.get("/me", auth(), async (req, res) => {
 // ── PUT /api/auth/me  → actualizar propio perfil ──────────────────────────────
 router.put("/me", auth(), async (req, res) => {
   try {
-    const { nombres, apellidos, telefono, foto_url, firma_url, numero_colegiatura, password_actual, password_nuevo } = req.body;
+    const { nombres, apellidos, nombre_display, telefono, foto_url, firma_url, numero_colegiatura, password_actual, password_nuevo } = req.body;
 
     // Si quiere cambiar contraseña, verificar la actual
     let passwordHash;
@@ -387,6 +399,7 @@ router.put("/me", auth(), async (req, res) => {
     const values = [];
     if (nombres    !== undefined) { fields.push("nombres=?");   values.push(nombres || null); }
     if (apellidos  !== undefined) { fields.push("apellidos=?"); values.push(apellidos || null); }
+    if (nombre_display !== undefined) { fields.push("nombre_display=?"); values.push((nombre_display && nombre_display.trim()) || null); }
     if (telefono   !== undefined) { fields.push("telefono=?");  values.push(telefono || null); }
     if (foto_url           !== undefined) { fields.push("foto_url=?");           values.push(foto_url || null); }
     if (firma_url          !== undefined) { fields.push("firma_url=?");          values.push(firma_url || null); }
@@ -395,16 +408,36 @@ router.put("/me", auth(), async (req, res) => {
 
     if (fields.length) {
       values.push(req.user.uid);
-      await pool.query(`UPDATE usuarios SET ${fields.join(", ")} WHERE id=?`, values);
+      try {
+        await pool.query(`UPDATE usuarios SET ${fields.join(", ")} WHERE id=?`, values);
+      } catch (err) {
+        // La columna nombre_display puede no existir aún (migración 067) → reintentar sin ella
+        if (err.code !== "ER_BAD_FIELD_ERROR") throw err;
+        const idx = fields.indexOf("nombre_display=?");
+        if (idx === -1) throw err;
+        fields.splice(idx, 1); values.splice(idx, 1);
+        if (fields.length) await pool.query(`UPDATE usuarios SET ${fields.join(", ")} WHERE id=?`, values);
+      }
     }
 
     // Devolver usuario actualizado
-    const [rows] = await pool.query(
-      `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono, foto_url,
-              (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
-       FROM usuarios u WHERE u.id=? LIMIT 1`,
-      [req.user.uid]
-    );
+    let rows;
+    try {
+      [rows] = await pool.query(
+        `SELECT id, clinica_id, nombres, apellidos, nombre_display, email, tipo, telefono, foto_url,
+                (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
+         FROM usuarios u WHERE u.id=? LIMIT 1`,
+        [req.user.uid]
+      );
+    } catch (err) {
+      if (err.code !== "ER_BAD_FIELD_ERROR") throw err;
+      [rows] = await pool.query(
+        `SELECT id, clinica_id, nombres, apellidos, email, tipo, telefono, foto_url,
+                (SELECT nombre FROM clinicas WHERE id=u.clinica_id LIMIT 1) AS clinica_nombre
+         FROM usuarios u WHERE u.id=? LIMIT 1`,
+        [req.user.uid]
+      );
+    }
     res.json({ ok: true, data: rows[0] });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

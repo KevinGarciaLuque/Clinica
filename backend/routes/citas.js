@@ -11,6 +11,17 @@ async function obtenerTZ(clinicaId) {
   return tzRow?.valor || "America/Tegucigalpa";
 }
 
+// Garantiza usuarios.nombre_display (migración 067) — se auto-aplica en caliente.
+let nombreDisplayColReady = false;
+async function ensureNombreDisplayColumn() {
+  if (nombreDisplayColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!cols.length) await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    nombreDisplayColReady = true;
+  } catch (e) { console.error("ensureNombreDisplayColumn:", e.message); }
+}
+
 // ──────────────────────────────────────────────
 // GET /api/citas/slots?medico_id=X&fecha=YYYY-MM-DD
 // Slots libres de un médico en un día (usa horarios_medico)
@@ -101,6 +112,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
   try {
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
+    await ensureNombreDisplayColumn();
 
     const { desde, hasta, medico_id, paciente_id, estado } = req.query;
     let sql = `SELECT c.id,
@@ -115,6 +127,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
                       p.departamento AS paciente_departamento,
                       p.foto_perfil AS paciente_foto_perfil,
                       u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
+                      u.nombre_display AS medico_nombre_display,
                       e.nombre AS especialidad
                FROM citas c
                JOIN pacientes p ON p.id = c.paciente_id

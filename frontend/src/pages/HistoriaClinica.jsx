@@ -7,7 +7,7 @@ import { createPortal } from "react-dom";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
-import { prefijoDr, sufijoEsp, tituloMedicoActivo } from "../utils/medico";
+import { prefijoDr, sufijoEsp, tituloMedicoActivo, nombreMedico } from "../utils/medico";
 import AntecedentesClinico from "../components/AntecedentesClinico";
 import HistorialPsicologico from "../components/HistorialPsicologico";
 import { useAuth } from "../auth/AuthContext";
@@ -1072,7 +1072,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
+                      <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true })}</option>
                     ))}
                   </select>
                 </div>
@@ -1099,7 +1099,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
+                      <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true })}</option>
                     ))}
                   </select>
                 </div>

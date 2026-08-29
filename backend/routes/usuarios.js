@@ -16,6 +16,21 @@ function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
 }
 
+// Garantiza usuarios.nombre_display (migración 067). Se auto-aplica en caliente.
+let nombreDisplayColReady = false;
+async function ensureNombreDisplayColumn() {
+  if (nombreDisplayColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'nombre_display'");
+    if (!cols.length) {
+      await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
+    }
+    nombreDisplayColReady = true;
+  } catch (e) {
+    console.error("ensureNombreDisplayColumn:", e.message);
+  }
+}
+
 // ──────────────────────────────────────────────
 // GET /api/usuarios  → lista de usuarios de la clínica
 // ──────────────────────────────────────────────
@@ -28,7 +43,8 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","RECEPCIONISTA"), async (req, res) =>
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
 
     const { tipo } = req.query;
-    let sql = `SELECT u.id, u.nombres, u.apellidos, u.email, u.tipo, u.activo,
+    await ensureNombreDisplayColumn();
+    let sql = `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo, u.activo,
                       u.telefono, u.numero_colegiatura, u.firma_url,
                       e.nombre AS especialidad, e.id AS especialidad_id,
                       u.creado_en
@@ -60,6 +76,7 @@ router.get("/especialidades", auth(), async (req, res) => {
 // GET /api/usuarios/medicos  → solo médicos activos (para selects de citas/horarios)
 router.get("/medicos", auth(), async (req, res) => {
   try {
+    await ensureNombreDisplayColumn();
     const clinicaId = req.user.super
       ? (req.tenant?.clinica_id || req.query.clinica_id)
       : req.user.clinica_id;
@@ -68,7 +85,7 @@ router.get("/medicos", auth(), async (req, res) => {
     if (!clinicaId && req.user.super) {
       // SUPER_ADMIN sin clínica específica → traer todos los médicos de todas las clínicas
       [rows] = await pool.query(
-        `SELECT u.id, u.nombres, u.apellidos, u.clinica_id,
+        `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.clinica_id,
                 c.nombre AS clinica_nombre,
                 e.nombre AS especialidad
          FROM usuarios u
@@ -80,7 +97,7 @@ router.get("/medicos", auth(), async (req, res) => {
     } else {
       if (!clinicaId) return res.json({ ok: true, data: [] });
       [rows] = await pool.query(
-        `SELECT u.id, u.nombres, u.apellidos, u.clinica_id,
+        `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.clinica_id,
                 e.nombre AS especialidad
          FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
          WHERE u.clinica_id=? AND u.tipo='MEDICO' AND u.activo=1
@@ -97,8 +114,9 @@ router.get("/medicos", auth(), async (req, res) => {
 // GET /api/usuarios/:id
 router.get("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   try {
+    await ensureNombreDisplayColumn();
     const clinicaId = req.user.super ? null : req.user.clinica_id;
-    let sql = `SELECT u.id, u.clinica_id, u.nombres, u.apellidos, u.email, u.tipo,
+    let sql = `SELECT u.id, u.clinica_id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo,
                       u.activo, u.telefono, u.numero_colegiatura, u.firma_url,
                       e.nombre AS especialidad, e.id AS especialidad_id
                FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
@@ -123,7 +141,8 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
 
-    const { nombres, apellidos, email, password, tipo,
+    await ensureNombreDisplayColumn();
+    const { nombres, apellidos, nombre_display, email, password, tipo,
             especialidad_id, telefono, numero_colegiatura } = req.body;
 
     if (!nombres || !apellidos || !email || !password || !tipo) {
@@ -151,9 +170,9 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     const [r] = await pool.query(
       `INSERT INTO usuarios
-         (clinica_id, nombres, apellidos, email, password_hash, tipo, especialidad_id, telefono, numero_colegiatura)
-       VALUES (?,?,?,?,?,?,?,?,?)`,
-      [clinicaId, nombres, apellidos, email, hash, tipo,
+         (clinica_id, nombres, apellidos, nombre_display, email, password_hash, tipo, especialidad_id, telefono, numero_colegiatura)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      [clinicaId, nombres, apellidos, (nombre_display && nombre_display.trim()) || null, email, hash, tipo,
        especialidad_id||null, telefono||null, numero_colegiatura||null]
     );
 
@@ -182,7 +201,8 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
       return res.status(403).json({ ok: false, msg: "No se puede modificar un SUPER_ADMIN" });
     }
 
-    const { nombres, apellidos, email, password, tipo,
+    await ensureNombreDisplayColumn();
+    const { nombres, apellidos, nombre_display, email, password, tipo,
             especialidad_id, telefono, numero_colegiatura, firma_url, activo } = req.body;
 
     let passwordHash = undefined;
@@ -195,6 +215,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
     const values = [];
     if (nombres      !== undefined) { fields.push("nombres=?");            values.push(nombres || null); }
     if (apellidos    !== undefined) { fields.push("apellidos=?");          values.push(apellidos || null); }
+    if (nombre_display !== undefined) { fields.push("nombre_display=?");   values.push((nombre_display && nombre_display.trim()) || null); }
     if (email        !== undefined) { fields.push("email=?");              values.push(email || null); }
     if (passwordHash !== undefined) { fields.push("password_hash=?");      values.push(passwordHash); }
     if (tipo         !== undefined) { fields.push("tipo=?");               values.push(tipo || null); }

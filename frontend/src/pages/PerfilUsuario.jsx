@@ -10,7 +10,7 @@ export default function PerfilUsuario() {
   const [googleStatus, setGoogleStatus] = useState({ conectado: false, google_email: null });
   const [cargandoGoogle, setCargandoGoogle] = useState(false);
   const [form, setForm] = useState({
-    nombres: "", apellidos: "", telefono: "", foto_url: "",
+    nombres: "", apellidos: "", nombre_display: "", telefono: "", foto_url: "",
     numero_colegiatura: "",
   });
   const [pwForm, setPwForm]       = useState({ password_actual: "", password_nuevo: "", confirmar: "" });
@@ -43,12 +43,23 @@ export default function PerfilUsuario() {
       setForm({
         nombres:            user.nombres            || "",
         apellidos:          user.apellidos          || "",
+        nombre_display:     user.nombre_display     || "",
         telefono:           user.telefono           || "",
         foto_url:           user.foto_url           || "",
         numero_colegiatura: user.numero_colegiatura || "",
       });
       setPrevisualizacion(user.foto_url || "");
       setFirmaUrl(user.firma_url || "");
+      // Traer datos frescos del servidor (incluye nombre_display, que no viene en el token)
+      api.get("/auth/me").then(r => {
+        const d = r.data?.data;
+        if (d) setForm(f => ({
+          ...f,
+          nombre_display:     d.nombre_display     ?? f.nombre_display,
+          numero_colegiatura: d.numero_colegiatura ?? f.numero_colegiatura,
+          telefono:           d.telefono           ?? f.telefono,
+        }));
+      }).catch(() => {});
     }
   }, [user]);
 
@@ -115,6 +126,7 @@ export default function PerfilUsuario() {
       await api.put("/auth/me", {
         nombres:            form.nombres,
         apellidos:          form.apellidos,
+        nombre_display:     form.nombre_display || null,
         telefono:           form.telefono,
         foto_url:           form.foto_url,
         numero_colegiatura: form.numero_colegiatura || null,
@@ -122,6 +134,7 @@ export default function PerfilUsuario() {
       updateUser({
         nombres:            form.nombres,
         apellidos:          form.apellidos,
+        nombre_display:     form.nombre_display || null,
         telefono:           form.telefono,
         foto_url:           form.foto_url,
         numero_colegiatura: form.numero_colegiatura || null,
@@ -503,6 +516,17 @@ export default function PerfilUsuario() {
                       placeholder="Ej: CMH-12345"
                       onChange={e => setForm(f => ({ ...f, numero_colegiatura: e.target.value }))} />
                   </div>
+                  {["MEDICO", "PSICOLOGO"].includes(user?.tipo) && (
+                    <div style={{ gridColumn: isMobile ? undefined : "1 / -1" }}>
+                      <label style={labelSt}>Nombre para mostrar (opcional)</label>
+                      <input style={inputSt} value={form.nombre_display}
+                        placeholder={`Ej: ${form.nombres || "Sebastián"} ${form.apellidos || "Manzanares"}`}
+                        onChange={e => setForm(f => ({ ...f, nombre_display: e.target.value }))} />
+                      <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 4 }}>
+                        Así aparecés en citas, consultas y documentos. Si lo dejás vacío, se usa tu nombre y apellido.
+                      </div>
+                    </div>
+                  )}
                   <div style={{ gridColumn: isMobile ? undefined : "1 / -1" }}>
                     <button type="submit" disabled={guardando}
                       style={{ padding: "9px 22px", borderRadius: 8, border: "none", background: "linear-gradient(135deg,#1a2744,#243b72)", color: "#fff", fontWeight: 700, fontSize: "0.88rem", cursor: "pointer", display: "flex", alignItems: "center", gap: 7, opacity: guardando ? .7 : 1 }}>

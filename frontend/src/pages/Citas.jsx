@@ -10,7 +10,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import api from "../api/api";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
-import { prefijoDr, sufijoEsp, tituloMedicoActivo } from "../utils/medico";
+import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 
 dayjs.locale("es");
 const localizer = dayjsLocalizer(dayjs);
@@ -496,7 +496,7 @@ export default function Citas() {
   const reemplazarVarsRecordatorio = (texto = "") => {
     const c = selEvent?.resource || {};
     const paciente = `${c.paciente_nombres || ""} ${c.paciente_apellidos || ""}`.trim();
-    const medico = `${c.medico_nombres || ""} ${c.medico_apellidos || ""}`.trim();
+    const medico = nombreMedico(c) || `${c.medico_nombres || ""} ${c.medico_apellidos || ""}`.trim();
     return String(texto || "")
       .replaceAll("{paciente}", paciente)
       .replaceAll("{clinica}", "Clínica")
@@ -796,8 +796,8 @@ export default function Citas() {
                     {filtered.map(m => (
                       <li key={m.id} className={`list-group-item list-group-item-action py-1 ${filterMed === String(m.id) ? "active" : ""}`}
                         style={{ cursor: "pointer", fontSize: "0.82rem" }}
-                        onClick={() => { setFilterMed(String(m.id)); setFilterMedText(`${prefijoDr()}${m.nombres} ${m.apellidos}`); setShowMedList(false); }}>
-                        <strong>{prefijoDr()}{m.nombres} {m.apellidos}</strong>
+                        onClick={() => { setFilterMed(String(m.id)); setFilterMedText(nombreMedico(m)); setShowMedList(false); }}>
+                        <strong>{nombreMedico(m)}</strong>
                         {tituloMedicoActivo() && m.especialidad && <span className="text-muted ms-1">— {m.especialidad}</span>}
                       </li>
                     ))}
@@ -1060,7 +1060,7 @@ function FilaSala({ c, i, flujo, onEstadoChange }) {
         />
       </td>
       <td style={{ padding: "12px 14px" }}>
-        <div style={{ fontSize: "0.85rem", color: "#374151", fontWeight: 600 }}>{prefijoDr()}{c.medico_apellidos}</div>
+        <div style={{ fontSize: "0.85rem", color: "#374151", fontWeight: 600 }}>{nombreMedico(c)}</div>
         {tituloMedicoActivo() && <div style={{ fontSize: "0.74rem", color: "#9ca3af", marginTop: 2 }}>{c.especialidad}</div>}
       </td>
       <td style={{ padding: "12px 14px", fontSize: "0.83rem", color: "#374151", whiteSpace: "nowrap" }}>
@@ -1326,7 +1326,7 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
                   <option value="">— Selecciona —</option>
                   {medicos.map(m => (
                     <option key={m.id} value={m.id}>
-                      {prefijoDr()}{m.apellidos}{sufijoEsp(m.especialidad)}
+                      {nombreMedico(m, { conEspecialidad: true })}
                     </option>
                   ))}
                 </select>
@@ -1720,7 +1720,7 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
             </div>
             <div className="dcm-card full">
               <div className="dcm-card-label"><i className="bi bi-person-badge"></i> Médico</div>
-              <div className="dcm-card-val">{prefijoDr()}{c.medico_apellidos} {c.medico_nombres}</div>
+              <div className="dcm-card-val">{nombreMedico(c)}</div>
             </div>
             <div className="dcm-card full">
               <div className="dcm-card-label"><i className="bi bi-chat-text"></i> Motivo</div>
@@ -1959,7 +1959,7 @@ function ModalEditarCita({ event, medicos, tipoClinica, tiposCita = [], onClose,
                   onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
                   {medicos.map(m => (
                     <option key={m.id} value={String(m.id)}>
-                      {prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}
+                      {nombreMedico(m, { conEspecialidad: true })}
                     </option>
                   ))}
                 </select>

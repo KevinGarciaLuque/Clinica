@@ -2,10 +2,11 @@ import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
+import { tituloMedicoActivo } from "../../utils/medico";
 
 const TIPOS = ["ADMIN", "MEDICO", "PSICOLOGO", "ENFERMERA", "RECEPCIONISTA"];
 const EMPTY = {
-  nombres: "", apellidos: "", email: "", password: "",
+  nombres: "", apellidos: "", nombre_display: "", email: "", password: "",
   tipo: "RECEPCIONISTA", especialidad_id: "", telefono: "",
   numero_colegiatura: "", activo: 1,
 };
@@ -104,7 +105,8 @@ export default function Usuarios() {
   const abrirNuevo = () => { setForm(EMPTY); setEditId(null); setError(""); setShowModal(true); };
   const abrirEditar = (u) => {
     setForm({
-      nombres: u.nombres, apellidos: u.apellidos, email: u.email,
+      nombres: u.nombres, apellidos: u.apellidos, nombre_display: u.nombre_display || "",
+      email: u.email,
       password: "", tipo: u.tipo,
       especialidad_id: u.especialidad_id || "",
       telefono: u.telefono || "", numero_colegiatura: u.numero_colegiatura || "",
@@ -471,6 +473,22 @@ export default function Usuarios() {
                         icon="bi-patch-check"
                       />
                     </FieldGroup>
+                  )}
+                  {(form.tipo === "MEDICO" || form.tipo === "PSICOLOGO") && (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <FieldGroup label="Nombre para mostrar (opcional)">
+                        <StyledInput
+                          value={form.nombre_display}
+                          placeholder={`Ej. ${form.nombres || "Sebastián"} ${form.apellidos || "Manzanares"}`}
+                          onChange={(e) => setForm({ ...form, nombre_display: e.target.value })}
+                          icon="bi-card-text"
+                        />
+                      </FieldGroup>
+                      <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
+                        Cómo aparece este médico en citas, consultas y documentos. Si se deja vacío,
+                        se usa "{tituloMedicoActivo() ? "Dr. " : ""}{form.nombres || "Nombre"} {form.apellidos || "Apellido"}".
+                      </div>
+                    </div>
                   )}
                 </div>
 
