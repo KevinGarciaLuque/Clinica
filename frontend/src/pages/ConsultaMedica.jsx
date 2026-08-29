@@ -8,6 +8,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { FaCheckCircle } from "react-icons/fa";
 import api from "../api/api";
+import { prefijoDr, sufijoEsp, tituloMedicoActivo } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
@@ -1081,8 +1082,8 @@ function PacienteResumenCard({ resumen }) {
               <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
                 <i className="bi bi-person-badge" style={{ color: "#3b82f6" }}></i>
                 <span style={{ color: "#374151" }}>
-                  <strong>Médico:</strong> Dr. {actual.medico}
-                  {actual.especialidad && <span style={{ color: "#9ca3af" }}> · {actual.especialidad}</span>}
+                  <strong>Médico:</strong> {prefijoDr()}{actual.medico}
+                  {tituloMedicoActivo() && actual.especialidad && <span style={{ color: "#9ca3af" }}> · {actual.especialidad}</span>}
                 </span>
               </div>
             )}
@@ -2229,7 +2230,7 @@ function SubHistorialPaciente({ pacienteId }) {
               <div className="text-end">
                 <div className="small text-muted">{dayjs(rx.creado_en).format("DD/MM/YYYY")}</div>
                 <div style={{ fontSize: "0.75rem", color: "#888" }}>
-                  Dr. {rx.med_apellidos}, {rx.med_nombres}
+                  {prefijoDr()}{rx.med_apellidos}, {rx.med_nombres}
                 </div>
               </div>
             </div>
@@ -3305,7 +3306,7 @@ function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
             <select className="form-select form-select-sm" value={medicoId} onChange={e => { setMedicoId(e.target.value); setSlotSel(null); setHoraInicio(""); setHoraFin(""); }}>
               <option value="">— Seleccionar médico —</option>
               {medicos.map(m => (
-                <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos}{m.especialidad ? ` · ${m.especialidad}` : ""}</option>
+                <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad, "·")}</option>
               ))}
             </select>
           </div>
@@ -3527,7 +3528,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>
@@ -3554,7 +3555,7 @@ function ModalConsultaSinCita({ paciente, onClose, onCreated }) {
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>

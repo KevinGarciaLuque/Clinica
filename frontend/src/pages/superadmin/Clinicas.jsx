@@ -19,7 +19,7 @@ const C = {
 };
 
 const EMPTY_C = {
-  nombre: "", slug: "", tipo_id: "", es_pediatrica: false, email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
+  nombre: "", slug: "", tipo_id: "", es_pediatrica: false, titulo_medico: true, email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
 };
 const EMPTY_A = { admin_nombres: "", admin_apellidos: "", admin_email: "", admin_password: "" };
 
@@ -146,6 +146,7 @@ export default function Clinicas() {
     setForm({ nombre: c.nombre, slug: c.slug,
               tipo_id: c.tipo_id != null ? String(c.tipo_id) : "",
               es_pediatrica: !!c.es_pediatrica,
+              titulo_medico: c.titulo_medico == null ? true : !!c.titulo_medico,
               email: c.email||"", telefono: c.telefono||"",
               direccion: c.direccion||"", ciudad: c.ciudad||"",
               pais: c.pais||"PE", ruc: c.ruc||"",
@@ -157,7 +158,8 @@ export default function Clinicas() {
       const r = await api.get(`/clinicas/${c.id}`);
       const configArr = r.data?.data?.config || [];
       const min = configArr.find(x => x.clave === "inactividad_minutos")?.valor || "20";
-      setForm(f => ({ ...f, inactividad_minutos: min }));
+      const tm = r.data?.data?.titulo_medico;
+      setForm(f => ({ ...f, inactividad_minutos: min, titulo_medico: tm == null ? true : !!tm }));
     } catch (_) {}
   };
 
@@ -1093,6 +1095,55 @@ export default function Clinicas() {
                             background: "#fff", position: "absolute",
                             top: 3,
                             left: form.es_pediatrica ? 27 : 3,
+                            transition: "left .25s",
+                            boxShadow: "0 2px 6px rgba(0,0,0,.25)",
+                          }} />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* ── Switch mostrar título "Dr./Dra." + especialidad ── */}
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 16,
+                        background: form.titulo_medico ? "rgba(33,150,243,.06)" : "rgba(148,163,184,.08)",
+                        border: `1px solid ${form.titulo_medico ? C.border : "rgba(148,163,184,.3)"}`,
+                        borderRadius: 12, padding: "14px 20px",
+                        transition: "all .25s",
+                      }}>
+                        <div style={{
+                          width: 40, height: 40, borderRadius: 10, flexShrink: 0,
+                          background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                        }}>
+                          <i className="bi bi-person-badge-fill" style={{ fontSize: 18, color: "#fff" }} />
+                        </div>
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontWeight: 700, fontSize: 14, color: C.text }}>
+                            {form.titulo_medico ? 'Mostrar "Dr./Dra." y especialidad' : 'Solo nombre del médico'}
+                          </div>
+                          <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                            {form.titulo_medico
+                              ? 'En listados y documentos: "Dr. Juan Pérez – Cardiología"'
+                              : 'En listados y documentos: "Juan Pérez" (la especialidad se sigue guardando)'}
+                          </div>
+                        </div>
+                        <div
+                          onClick={() => setForm({ ...form, titulo_medico: !form.titulo_medico })}
+                          style={{
+                            width: 52, height: 28, borderRadius: 14, cursor: "pointer",
+                            background: form.titulo_medico
+                              ? `linear-gradient(135deg, ${C.accent}, ${C.accentD})`
+                              : "rgba(148,163,184,.3)",
+                            position: "relative", transition: "background .25s",
+                            flexShrink: 0,
+                          }}
+                        >
+                          <div style={{
+                            width: 22, height: 22, borderRadius: "50%",
+                            background: "#fff", position: "absolute",
+                            top: 3,
+                            left: form.titulo_medico ? 27 : 3,
                             transition: "left .25s",
                             boxShadow: "0 2px 6px rgba(0,0,0,.25)",
                           }} />

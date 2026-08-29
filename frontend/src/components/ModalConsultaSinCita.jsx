@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
+import { prefijoDr, sufijoEsp } from "../utils/medico";
 
 const TIPOS_CONSULTA_BASE = ["PRIMERA_VEZ", "CONTROL", "EMERGENCIA", "TELECONSULTA"];
 const TIPOS_CONSULTA_ESTETICA = [
@@ -186,7 +187,7 @@ export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psi
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>
@@ -213,7 +214,7 @@ export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psi
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{psicologia ? "" : "Dr. "}{m.nombres} {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}</option>
+                      <option key={m.id} value={m.id}>{psicologia ? "" : prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>

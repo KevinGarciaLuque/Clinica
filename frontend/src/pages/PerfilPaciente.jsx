@@ -11,6 +11,7 @@ import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../api/api";
+import { prefijoDr, sufijoEsp, tituloMedicoActivo } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 
@@ -407,7 +408,7 @@ export default function PerfilPaciente() {
   <div class="header">
     <div class="header-left">
       <h1>Historia Clínica Electrónica</h1>
-      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}${det.especialidad ? ` — ${det.especialidad}` : ""}</p>
+      <p>${prefijoDr()}${det.med_apellidos}, ${det.med_nombres}${sufijoEsp(det.especialidad, "—")}</p>
     </div>
     <div class="header-right">
       <p><strong>Fecha:</strong> ${dayjs(det.creado_en).format("DD/MM/YYYY HH:mm")}</p>
@@ -437,8 +438,8 @@ export default function PerfilPaciente() {
         ? `<span class="firma-digital-badge">✍ FIRMA DIGITAL</span>
            <img class="firma-img" src="${det.firma_digital_url}" alt="Firma digital" />`
         : `<div class="linea"></div>`}
-      <p>Dr. ${det.med_apellidos}, ${det.med_nombres}</p>
-      ${det.especialidad ? `<p>${det.especialidad}</p>` : ""}
+      <p>${prefijoDr()}${det.med_apellidos}, ${det.med_nombres}</p>
+      ${tituloMedicoActivo() && det.especialidad ? `<p>${det.especialidad}</p>` : ""}
       ${det.colegiatura_firmante ? `<p>Col. ${det.colegiatura_firmante}</p>` : ""}
     </div>
   </div>
@@ -510,7 +511,7 @@ export default function PerfilPaciente() {
   <div class="header">
     <div class="header-left">
       <h1>Consulta Odontológica</h1>
-      <p>Dr. ${s.dentista_nombre || ""}</p>
+      <p>${prefijoDr()}${s.dentista_nombre || ""}</p>
     </div>
     <div class="header-right">
       <p><strong>Fecha:</strong> ${dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</p>
@@ -531,7 +532,7 @@ export default function PerfilPaciente() {
   <div class="firma">
     <div class="firma-box">
       <div class="linea"></div>
-      <p>Dr. ${s.dentista_nombre || ""}</p>
+      <p>${prefijoDr()}${s.dentista_nombre || ""}</p>
     </div>
   </div>
 </body></html>`;
@@ -1815,8 +1816,8 @@ export default function PerfilPaciente() {
                                           ✍ FIRMA DIGITAL
                                         </span>
                                       )}
-                                      <strong className="small">Dr. {h.med_apellidos}, {h.med_nombres}</strong>
-                                      {h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
+                                      <strong className="small">{prefijoDr()}{h.med_apellidos}, {h.med_nombres}</strong>
+                                      {tituloMedicoActivo() && h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
                                     </div>
                                     <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
                                   </div>
@@ -2018,7 +2019,7 @@ export default function PerfilPaciente() {
                                 {s.estado}
                               </span>
                               <strong className="small">Sesión #{s.numero_sesion}</strong>
-                              {s.dentista_nombre && <span className="text-muted small ms-1">— Dr. {s.dentista_nombre}</span>}
+                              {s.dentista_nombre && <span className="text-muted small ms-1">— {prefijoDr()}{s.dentista_nombre}</span>}
                             </div>
                             <small className="text-muted">{dayjs(s.creado_en).format("DD/MM/YYYY HH:mm")}</small>
                           </div>
@@ -2953,7 +2954,7 @@ function _ModalConsultaSinCitaLegacy({ paciente, onClose, onCreated, psicologia 
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>
@@ -2981,7 +2982,7 @@ function _ModalConsultaSinCitaLegacy({ paciente, onClose, onCreated, psicologia 
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{psicologia ? "" : "Dr. "}{m.nombres} {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}</option>
+                      <option key={m.id} value={m.id}>{psicologia ? "" : prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>

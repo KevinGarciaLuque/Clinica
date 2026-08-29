@@ -4,6 +4,7 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
+import { prefijoDr, sufijoEsp } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
@@ -1172,7 +1173,7 @@ function _ModalConsultaSinCitaLegacy({ paciente, onClose, onCreated, psicologia 
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>Dr. {m.nombres} {m.apellidos} – {m.especialidad}</option>
+                      <option key={m.id} value={m.id}>{prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>
@@ -1200,7 +1201,7 @@ function _ModalConsultaSinCitaLegacy({ paciente, onClose, onCreated, psicologia 
                   <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
                     <option value="">— Selecciona —</option>
                     {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{psicologia ? "" : "Dr. "}{m.nombres} {m.apellidos}{m.especialidad ? ` – ${m.especialidad}` : ""}</option>
+                      <option key={m.id} value={m.id}>{psicologia ? "" : prefijoDr()}{m.nombres} {m.apellidos}{sufijoEsp(m.especialidad)}</option>
                     ))}
                   </select>
                 </div>

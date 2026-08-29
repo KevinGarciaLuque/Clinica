@@ -8,6 +8,7 @@ import {
   CartesianGrid, XAxis, YAxis, Tooltip, Legend,
 } from "recharts";
 import api from "../api/api";
+import { prefijoDr } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 
 function useIsMobile() {
@@ -966,7 +967,7 @@ export default function Facturacion() {
                       {porMedico.map(m => (
                         <div key={m.medico_id}>
                           <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 3 }}>
-                            <span style={{ fontWeight: 600, color: "#374151" }}>Dr. {m.nombres} {m.apellidos}</span>
+                            <span style={{ fontWeight: 600, color: "#374151" }}>{prefijoDr()}{m.nombres} {m.apellidos}</span>
                             <span style={{ fontWeight: 700, color: "#16a34a" }}>{fmtL(m.cobrado)}</span>
                           </div>
                           <div style={{ background: "#f1f5f9", borderRadius: 6, height: 6, overflow: "hidden" }}>

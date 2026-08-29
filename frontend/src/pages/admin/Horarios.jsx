@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
+import { tituloMedicoActivo } from "../../utils/medico";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SLOTS = [15, 20, 30, 45, 60];
@@ -241,7 +242,7 @@ export default function Horarios() {
             <option value="">— Elige un médico —</option>
             {medicos.map((m) => (
               <option key={m.id} value={m.id}>
-                Dr(a). {m.apellidos}, {m.nombres} — {m.especialidad || "Sin especialidad"}
+                {tituloMedicoActivo() ? "Dr(a). " : ""}{m.apellidos}, {m.nombres}{tituloMedicoActivo() ? ` — ${m.especialidad || "Sin especialidad"}` : ""}
               </option>
             ))}
           </select>
@@ -388,7 +389,7 @@ export default function Horarios() {
                   >
                     <option value="">— Elige —</option>
                     {medicos.map((m) => (
-                      <option key={m.id} value={m.id}>Dr(a). {m.apellidos}, {m.nombres}</option>
+                      <option key={m.id} value={m.id}>{tituloMedicoActivo() ? "Dr(a). " : ""}{m.apellidos}, {m.nombres}</option>
                     ))}
                   </select>
                 </div>

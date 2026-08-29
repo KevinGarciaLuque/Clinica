@@ -28,6 +28,13 @@ export function AuthProvider({ children }) {
     return raw ? JSON.parse(raw) : false;
   });
 
+  // Preferencia de la clínica: mostrar "Dr./Dra." + especialidad junto al nombre
+  // del médico. Default true (comportamiento histórico) hasta que el servidor diga lo contrario.
+  const [tituloMedico, setTituloMedico] = useState(() => {
+    const raw = localStorage.getItem("titulo_medico");
+    return raw ? JSON.parse(raw) : true;
+  });
+
   const isAuth = !!user;
 
   /** Carga (o recarga) los módulos del usuario autenticado */
@@ -56,12 +63,26 @@ export function AuthProvider({ children }) {
     }
   };
 
+  /** Carga las preferencias de presentación de la clínica */
+  const cargarPreferenciasClinica = async () => {
+    try {
+      const res = await api.get("/clinicas/preferencias");
+      const valor = res.data?.data?.titulo_medico !== 0;
+      localStorage.setItem("titulo_medico", JSON.stringify(valor));
+      setTituloMedico(valor);
+      return valor;
+    } catch {
+      return true;
+    }
+  };
+
   // Si hay token al montar (refresh de página), siempre recargar módulos del servidor
   // para que cambios en BD (nuevos módulos asignados) se reflejen sin necesidad de re-login
   useEffect(() => {
     if (user) {
       cargarModulos();
       cargarTieneRecepcionista();
+      cargarPreferenciasClinica();
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -89,6 +110,7 @@ export function AuthProvider({ children }) {
     // Cargar módulos inmediatamente tras login
     await cargarModulos();
     await cargarTieneRecepcionista();
+    await cargarPreferenciasClinica();
 
     return usuario;
   };
@@ -108,6 +130,7 @@ export function AuthProvider({ children }) {
 
     await cargarModulos();
     await cargarTieneRecepcionista();
+    await cargarPreferenciasClinica();
 
     return usuario;
   };
@@ -126,6 +149,7 @@ export function AuthProvider({ children }) {
 
     await cargarModulos();
     await cargarTieneRecepcionista();
+    await cargarPreferenciasClinica();
 
     return usuario;
   };
@@ -136,10 +160,12 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("modulos");
     localStorage.removeItem("licencia_info");
     localStorage.removeItem("tiene_recepcionista");
+    localStorage.removeItem("titulo_medico");
     setUser(null);
     setModulos([]);
     setLicenciaInfo(null);
     setTieneRecepcionista(false);
+    setTituloMedico(true);
   };
 
   /** Actualiza el usuario en estado y localStorage (tras editar perfil) */
@@ -152,7 +178,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, tieneRecepcionista, login, verificar2FA, loginConGoogle, logout, cargarModulos, cargarTieneRecepcionista, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, tieneRecepcionista, tituloMedico, login, verificar2FA, loginConGoogle, logout, cargarModulos, cargarTieneRecepcionista, cargarPreferenciasClinica, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

@@ -399,7 +399,7 @@ router.get("/info", async (req, res) => {
       return res.status(400).json({ ok: false, msg: "clinica_id es requerido" });
 
     const [[clinica]] = await pool.query(
-      "SELECT nombre, telefono, direccion FROM clinicas WHERE id=? LIMIT 1",
+      "SELECT nombre, telefono, direccion, titulo_medico FROM clinicas WHERE id=? LIMIT 1",
       [clinica_id]
     );
     if (!clinica)
@@ -420,6 +420,7 @@ router.get("/info", async (req, res) => {
       ok: true,
       nombre: clinica.nombre,
       telefono: clinica.telefono || null,
+      titulo_medico: clinica.titulo_medico == null ? 1 : Number(clinica.titulo_medico),
       medico: medico ? { nombres: medico.nombres, apellidos: medico.apellidos, especialidad: medico.especialidad } : null,
     });
   } catch (e) {

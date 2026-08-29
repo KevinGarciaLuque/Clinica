@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import api from "../api/api";
+import { tituloMedicoActivo } from "../utils/medico";
 
 const TABS = [
   { id: "citas",      label: "Citas de hoy",       icon: "bi-calendar2-check-fill" },
@@ -159,7 +160,7 @@ function FilaCita({ cita, envios, admitiendo, onAdmitir, aceptando, onAceptar })
               </span>
             </div>
             <div style={{ fontSize: "0.78rem", color: "#334155" }}>
-              Dr(a). {cita.medico_nombres} {cita.medico_apellidos}{cita.especialidad ? ` · ${cita.especialidad}` : ""}
+              {tituloMedicoActivo() ? "Dr(a). " : ""}{cita.medico_nombres} {cita.medico_apellidos}{tituloMedicoActivo() && cita.especialidad ? ` · ${cita.especialidad}` : ""}
             </div>
             <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 1 }}>
               {dayjs(cita.inicio).format("h:mm A")} · {cita.paciente_tel || "sin teléfono"}

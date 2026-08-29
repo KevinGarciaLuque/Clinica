@@ -217,7 +217,7 @@ function AgendarCita({ clinicaId, pacienteId, sessionToken, onDone }) {
 // ══════════════════════════════════════════════════════════════════════
 // Sub-componente: Pantalla de cita confirmada
 // ══════════════════════════════════════════════════════════════════════
-function CitaConfirmada({ citaConf, email, subsecuente, pacienteId, clinicaId, sessionToken }) {
+function CitaConfirmada({ citaConf, email, subsecuente, pacienteId, clinicaId, sessionToken, tituloMedico = true }) {
   const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
   const { slot, medico } = citaConf;
   const fechaStr = slot?.inicio
@@ -382,7 +382,7 @@ function CitaConfirmada({ citaConf, email, subsecuente, pacienteId, clinicaId, s
                         {ex.descripcion || "Sin descripción"}
                       </p>
                       <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: 4, marginBottom: 0 }}>
-                        Solicitado por: Dr(a). {ex.medico_apellidos}, {ex.medico_nombres}
+                        Solicitado por: {tituloMedico ? "Dr(a). " : ""}{ex.medico_apellidos}, {ex.medico_nombres}
                       </p>
                     </div>
                   ))}
@@ -680,9 +680,11 @@ export default function RegistroPaciente() {
                   <h3 className="fw-bold text-dark mb-1">{clinicaInfo.nombre}</h3>
                   {clinicaInfo.medico && (
                     <p className="text-muted mb-1" style={{ fontSize: "1rem" }}>
-                      {clinicaInfo.medico.especialidad
-                        ? `${clinicaInfo.medico.apellidos.split(' ')[0]}, ${clinicaInfo.medico.especialidad}`
-                        : `Dr(a). ${clinicaInfo.medico.nombres} ${clinicaInfo.medico.apellidos}`}
+                      {clinicaInfo.titulo_medico === 0
+                        ? `${clinicaInfo.medico.nombres} ${clinicaInfo.medico.apellidos}`
+                        : clinicaInfo.medico.especialidad
+                          ? `${clinicaInfo.medico.apellidos.split(' ')[0]}, ${clinicaInfo.medico.especialidad}`
+                          : `Dr(a). ${clinicaInfo.medico.nombres} ${clinicaInfo.medico.apellidos}`}
                     </p>
                   )}
                   <p className="text-muted" style={{ fontSize: "0.9rem" }}>¿Cómo podemos ayudarte hoy?</p>
@@ -976,7 +978,7 @@ export default function RegistroPaciente() {
 
               {/* Nuevo · Paso 5: Cita confirmada */}
               {paso === 5 && citaConf && (
-                <CitaConfirmada citaConf={citaConf} email={pacienteInfo?.email || form.email} />
+                <CitaConfirmada citaConf={citaConf} email={pacienteInfo?.email || form.email} tituloMedico={clinicaInfo?.titulo_medico !== 0} />
               )}
 
             </div>
@@ -1053,7 +1055,7 @@ export default function RegistroPaciente() {
 
               {/* Sub · Paso 2: Cita confirmada */}
               {paso === 2 && citaConf && (
-                <CitaConfirmada citaConf={citaConf} email={pacienteInfo?.email} subsecuente pacienteId={pacienteId} clinicaId={clinicaId} sessionToken={sessionToken} />
+                <CitaConfirmada citaConf={citaConf} email={pacienteInfo?.email} subsecuente pacienteId={pacienteId} clinicaId={clinicaId} sessionToken={sessionToken} tituloMedico={clinicaInfo?.titulo_medico !== 0} />
               )}
 
             </div>
