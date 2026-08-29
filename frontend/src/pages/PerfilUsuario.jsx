@@ -71,7 +71,10 @@ export default function PerfilUsuario() {
       showMsg("success", "Tu cuenta de Google fue conectada correctamente");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (resultado === "error") {
-      showMsg("danger", "No se pudo conectar tu cuenta de Google. Intenta de nuevo.");
+      const motivo = params.get("motivo");
+      showMsg("danger", motivo
+        ? `No se pudo conectar tu cuenta de Google: ${motivo}`
+        : "No se pudo conectar tu cuenta de Google. Intenta de nuevo.");
       window.history.replaceState({}, "", window.location.pathname);
     } else if (resultado === "noconfig") {
       showMsg("danger", "Google Calendar aún no está configurado en el servidor. Contacta al administrador del sistema.");

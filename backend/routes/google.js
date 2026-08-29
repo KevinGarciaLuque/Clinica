@@ -26,7 +26,7 @@ router.get("/connect", auth(...ROLES_CONECTABLES), (req, res) => {
   const state = jwt.sign(
     { medico_id: req.user.uid, clinica_id: req.user.clinica_id },
     process.env.JWT_SECRET,
-    { expiresIn: "10m" }
+    { expiresIn: "30m" }
   );
   res.redirect(gcal.getAuthUrl(state));
 });
@@ -43,16 +43,25 @@ router.get("/callback", async (req, res) => {
     const { tokens } = await client.getToken(code);
     client.setCredentials(tokens);
 
-    const { google } = require("googleapis");
-    const oauth2 = google.oauth2({ version: "v2", auth: client });
-    const { data: perfil } = await oauth2.userinfo.get();
+    let email = null;
+    try {
+      const { google } = require("googleapis");
+      const oauth2 = google.oauth2({ version: "v2", auth: client });
+      const { data: perfil } = await oauth2.userinfo.get();
+      email = perfil.email || null;
+    } catch (e2) {
+      // El correo es opcional para la sincronización; si falla (scope no
+      // concedido, etc.) se guarda igual y se usa el refresh token.
+      console.warn("[google/callback] no se pudo leer el email:", e2.message);
+    }
 
-    await gcal.guardarTokens(payload.medico_id, payload.clinica_id, tokens, perfil.email);
+    await gcal.guardarTokens(payload.medico_id, payload.clinica_id, tokens, email);
 
     res.redirect(`${frontendUrl}/perfil?google=ok`);
   } catch (e) {
-    console.error("[google/callback]", e.message);
-    res.redirect(`${frontendUrl}/perfil?google=error`);
+    const detalle = e?.response?.data?.error_description || e?.response?.data?.error || e.message;
+    console.error("[google/callback]", detalle, e?.stack || "");
+    res.redirect(`${frontendUrl}/perfil?google=error&motivo=${encodeURIComponent(String(detalle).slice(0, 200))}`);
   }
 });
 
