@@ -398,10 +398,20 @@ router.get("/info", async (req, res) => {
     if (!clinica_id)
       return res.status(400).json({ ok: false, msg: "clinica_id es requerido" });
 
-    const [[clinica]] = await pool.query(
-      "SELECT nombre, telefono, direccion, titulo_medico FROM clinicas WHERE id=? LIMIT 1",
-      [clinica_id]
-    );
+    // titulo_medico puede no existir aún (migración 066); si falta, se asume 1.
+    let clinica;
+    try {
+      [[clinica]] = await pool.query(
+        "SELECT nombre, telefono, direccion, titulo_medico FROM clinicas WHERE id=? LIMIT 1",
+        [clinica_id]
+      );
+    } catch (err) {
+      if (err.code !== "ER_BAD_FIELD_ERROR") throw err;
+      [[clinica]] = await pool.query(
+        "SELECT nombre, telefono, direccion FROM clinicas WHERE id=? LIMIT 1",
+        [clinica_id]
+      );
+    }
     if (!clinica)
       return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
 

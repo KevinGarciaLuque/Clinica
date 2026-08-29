@@ -27,6 +27,26 @@ const uploadFotoDoctor = multer({
 });
 
 let moduloPermisosSchemaReady = false;
+
+// Garantiza que exista clinicas.titulo_medico (migración 066). Se auto-aplica en
+// caliente la primera vez que se necesita, para no depender de correr la migración
+// manualmente en cada entorno. Mismo patrón que ensureModuloPermisosSchema.
+let tituloMedicoColReady = false;
+async function ensureTituloMedicoColumn() {
+  if (tituloMedicoColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM clinicas LIKE 'titulo_medico'");
+    if (!cols.length) {
+      await pool.query(
+        "ALTER TABLE clinicas ADD COLUMN titulo_medico TINYINT(1) NOT NULL DEFAULT 1"
+      );
+    }
+    tituloMedicoColReady = true;
+  } catch (e) {
+    // Si falla el ALTER (permisos, carrera), no marcamos ready para reintentar luego.
+    console.error("ensureTituloMedicoColumn:", e.message);
+  }
+}
 const DEFAULT_STORAGE_QUOTA_GB = 25;
 const DEFAULT_STORAGE_PRICE_PER_GB_LPS = 120;
 
@@ -231,6 +251,7 @@ router.get("/tiene-recepcionista", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOG
 //                0 = mostrar solo "Nombre Apellido".
 router.get("/preferencias", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
   try {
+    await ensureTituloMedicoColumn();
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.json({ ok: true, data: { titulo_medico: 1 } });
     const [[row]] = await pool.query(
@@ -779,6 +800,7 @@ router.put("/:id/storage-quota", auth("SUPER_ADMIN"), async (req, res) => {
 // GET /api/clinicas/:id
 router.get("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
+    await ensureTituloMedicoColumn();
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const [rows] = await pool.query(
       "SELECT id, nombre, slug, tipo_id, logo_url, email, telefono, direccion, ciudad, pais, ruc, datos_fiscales, activo, timezone, titulo_medico FROM clinicas WHERE id=?",
@@ -898,6 +920,7 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
 // PUT /api/clinicas/:id  → SUPER_ADMIN, ADMIN o MEDICO de esa clínica
 router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req, res) => {
   try {
+    await ensureTituloMedicoColumn();
     const id = req.user.super ? req.params.id : req.user.clinica_id;
     const { nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, logo_url, activo, timezone, titulo_medico } = req.body;
 
