@@ -73,6 +73,9 @@ export default function PerfilUsuario() {
     } else if (resultado === "error") {
       showMsg("danger", "No se pudo conectar tu cuenta de Google. Intenta de nuevo.");
       window.history.replaceState({}, "", window.location.pathname);
+    } else if (resultado === "noconfig") {
+      showMsg("danger", "Google Calendar aún no está configurado en el servidor. Contacta al administrador del sistema.");
+      window.history.replaceState({}, "", window.location.pathname);
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [puedeUsarGoogleCalendar]);
@@ -699,7 +702,16 @@ export default function PerfilUsuario() {
               </div>
             </div>
 
-            {googleStatus.conectado ? (
+            {googleStatus.configurado === false ? (
+              <div style={{
+                display: "flex", alignItems: "flex-start", gap: 10,
+                background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8,
+                padding: "12px 14px", fontSize: "0.82rem", color: "#92400e", lineHeight: 1.5,
+              }}>
+                <i className="bi bi-exclamation-triangle-fill" style={{ color: "#d97706", marginTop: 2 }} />
+                <span>La integración con Google Calendar todavía no está habilitada en el servidor. Contacta al administrador del sistema para activarla.</span>
+              </div>
+            ) : googleStatus.conectado ? (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12, flexWrap: "wrap" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                   <div style={{

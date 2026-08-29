@@ -11,8 +11,18 @@ const gcal = require("../utils/googleCalendar");
 
 const ROLES_CONECTABLES = ["MEDICO", "PSICOLOGO", "ADMIN", "SUPER_ADMIN"];
 
+/** ¿Están las credenciales de Google OAuth configuradas en el servidor? */
+const googleConfigurado = () =>
+  !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET && process.env.GOOGLE_REDIRECT_URI);
+
 // GET /api/google/connect → redirige a la pantalla de consentimiento de Google
 router.get("/connect", auth(...ROLES_CONECTABLES), (req, res) => {
+  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  // Sin credenciales OAuth, Google devuelve "Missing required parameter: client_id".
+  // Mejor avisar en la app que mandar al usuario a esa pantalla de error.
+  if (!googleConfigurado()) {
+    return res.redirect(`${frontendUrl}/perfil?google=noconfig`);
+  }
   const state = jwt.sign(
     { medico_id: req.user.uid, clinica_id: req.user.clinica_id },
     process.env.JWT_SECRET,
@@ -53,7 +63,7 @@ router.get("/status", auth(), async (req, res) => {
       "SELECT google_email FROM medico_google_tokens WHERE medico_id=? LIMIT 1",
       [req.user.uid]
     );
-    res.json({ ok: true, conectado: !!row, google_email: row?.google_email || null });
+    res.json({ ok: true, conectado: !!row, google_email: row?.google_email || null, configurado: googleConfigurado() });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

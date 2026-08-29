@@ -47,6 +47,7 @@ const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdm
 const LandingPageAdmin          = lazy(() => import("./pages/superadmin/LandingPageAdmin"));
 const LandingPage               = lazy(() => import("./pages/LandingPage"));
 const LinksPage                 = lazy(() => import("./pages/LinksPage"));
+const Privacidad                = lazy(() => import("./pages/Privacidad"));
 
 // Módulos de Cirugía Estética
 const GaleriaEstetica          = lazy(() => import("./pages/estetica/GaleriaEstetica"));
@@ -131,6 +132,7 @@ export default function App() {
       <Route path="/resena/:token"    element={<ResenaPublica />} />
       <Route path="/inicio"           element={<LandingPage />} />
       <Route path="/links"            element={<LinksPage />} />
+      <Route path="/privacidad"       element={<Privacidad />} />
       <Route path="/"                         element={<LandingPage />} />
 
       <Route
