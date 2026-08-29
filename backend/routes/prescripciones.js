@@ -447,6 +447,18 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     const tFirma      = tpl?.mostrar_firma !== false;
     const tFirmaLabel = tpl?.etiqueta_firma || "FIRMA";
 
+    // Formato de impresión de la receta:
+    //   media_carta   → layout compacto (contenido en la mitad superior de la hoja)
+    //   carta_completa → mismo contenido expandido para abarcar toda la hoja carta
+    // Prioridad: query param (override puntual) → plantilla guardada → media_carta
+    const formatoReq = String(req.query.formato || "").toLowerCase();
+    const formatoReceta = ["media_carta", "carta_completa"].includes(formatoReq)
+      ? formatoReq
+      : (["media_carta", "carta_completa"].includes(String(tpl?.formato_receta || "").toLowerCase())
+          ? String(tpl.formato_receta).toLowerCase()
+          : "media_carta");
+    const fill = formatoReceta === "carta_completa";
+
     // Horarios
     let tHorarios = [];
     try { tHorarios = JSON.parse(tpl?.horarios || "[]"); } catch { tHorarios = []; }
@@ -729,10 +741,10 @@ router.get("/:id/pdf", auth(), async (req, res) => {
        .moveTo(marginL + 10, separatorY).lineTo(marginL + pageW - 10, separatorY).stroke();
 
     const rxY = separatorY + 14;
-    doc.fillColor("#333").fontSize(30).font("Times-Bold")
+    doc.fillColor("#333").fontSize(fill ? 40 : 30).font("Times-Bold")
        .text("Rx", marginL + 10, rxY);
 
-    const recetaBodyY = rxY + 36;
+    const recetaBodyY = rxY + (fill ? 46 : 36);
 
     /*
     // Contenido/instrucciones de la plantilla de receta
@@ -775,10 +787,10 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       .filter(Boolean)
       .join("\n\n");
 
-    doc.fillColor("#111").fontSize(9.5).font("Helvetica")
-       .text(recetaTexto || " ", marginL + 10, recetaBodyY, { width: pageW - 20, lineGap: 2 });
-    const bodyH = doc.heightOfString(recetaTexto || " ", { width: pageW - 20, lineGap: 2 });
-    let rowY = recetaBodyY + Math.max(120, bodyH) + 8;
+    doc.fillColor("#111").fontSize(fill ? 11.5 : 9.5).font("Helvetica")
+       .text(recetaTexto || " ", marginL + 10, recetaBodyY, { width: pageW - 20, lineGap: fill ? 5 : 2 });
+    const bodyH = doc.heightOfString(recetaTexto || " ", { width: pageW - 20, lineGap: fill ? 5 : 2 });
+    let rowY = recetaBodyY + Math.max(fill ? 160 : 120, bodyH) + 8;
     /*
     items.forEach((item, i) => {
       const bg = i % 2 === 0 ? "#ffffff" : "#fcfcfc";
@@ -835,7 +847,9 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     }
 
     // Mantener aire minimo sin separar la firma del bloque de contenido.
-    const minContentY = recetaBodyY + 150;
+    // En "carta completa" se empuja la firma cerca del pie de la hoja carta (792pt)
+    // para que el documento abarque toda la página.
+    const minContentY = fill ? 620 : recetaBodyY + 150;
     if (rowY < minContentY) rowY = minContentY;
 
     // ── Firma ───────────────────────────────────────────────────────
@@ -862,14 +876,14 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     }
 
     // ── Pie de página ───────────────────────────────────────────────
-    const footerY = Math.min(720, firmaBottom + 18);
+    const footerY = Math.min(fill ? 752 : 720, firmaBottom + 18);
     if (tFooter) {
       doc.rect(marginL, footerY, pageW, 20).fill(tColor);
       doc.fillColor("#ffffff").fontSize(6.5).font("Helvetica-Bold")
          .text(tFooter, marginL + 5, footerY + 6, { width: pageW - 10, align: "center" });
     }
 
-    const cardBottom = tFooter ? footerY + 20 : Math.min(740, firmaBottom + 12);
+    const cardBottom = tFooter ? footerY + 20 : Math.min(fill ? 772 : 740, firmaBottom + 12);
     doc.lineWidth(0.8).strokeColor("#dddddd").rect(marginL, topY, pageW, cardBottom - topY).stroke();
 
     doc.end();

@@ -86,6 +86,7 @@ const defaultPersonalizacion = () => ({
   clinica: "", credenciales: "", footer: "",
   papel_size: "LETTER",
   papel_orientacion: "portrait",
+  formato_receta: "media_carta",
   mostrar_firma: true, etiqueta_firma: "FIRMA",
   clinica_font: "Arial, Helvetica, sans-serif",
   clinica_font_size: "1.25",
@@ -1294,6 +1295,18 @@ export default function Plantillas() {
                   <option value="portrait">Vertical</option>
                   <option value="landscape">Horizontal</option>
                 </select>
+              </div>
+            </div>
+
+            {/* Formato de la receta en PDF (Consulta Médica) */}
+            <div style={{ marginTop: 10 }}>
+              <label style={lStyle}><i className="bi bi-prescription2 me-2" style={{ color: tipoActivo?.color }} />Formato de receta impresa</label>
+              <select className="form-select" style={iStyle} value={personalizacion.formato_receta || "media_carta"} onChange={e => set("formato_receta", e.target.value)}>
+                <option value="media_carta">Media carta (compacta)</option>
+                <option value="carta_completa">Carta completa (llena la hoja)</option>
+              </select>
+              <div style={{ fontSize: "0.72rem", color: "#6b7280", marginTop: 4 }}>
+                Define cómo sale por defecto la receta en PDF desde Consulta Médica. El doctor puede cambiarlo puntualmente al imprimir.
               </div>
             </div>
 

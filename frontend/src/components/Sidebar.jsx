@@ -45,6 +45,14 @@ const medicoItems = [
   { to: "/admin/config",     label: "Configuración",      icon: "bi-gear-fill" },
 ];
 
+// Rutas que pertenecen a la sección "Administración". Desde la migración 065
+// también llegan en la lista dinámica de módulos (/clinicas/modulos), así que hay
+// que quitarlas de la sección "Clínica" para que no aparezcan duplicadas.
+const ADMIN_ROUTES = new Set([
+  "/admin/usuarios", "/admin/horarios", "/admin/servicios", "/admin/plantillas",
+  "/documentos-clinicos", "/catalogos", "/admin/config",
+]);
+
 const superItems = [
   { to: "/superadmin/clinicas",        label: "Clínicas",        icon: "bi-building-fill" },
   { to: "/superadmin/solicitudes-plan", label: "Solicitudes de Plan", icon: "bi-credit-card-fill" },
@@ -74,6 +82,10 @@ function modulosToItems(modulos) {
 function getMenuSections(tipo, modulos) {
   const hasDynamic = modulos && modulos.length > 0;
   let mainItems = hasDynamic ? modulosToItems(modulos) : BASE_FALLBACK;
+
+  // Los ítems de administración se renderizan solo en la sección "Administración"
+  // (filtrados por permisos más abajo); no deben duplicarse en "Clínica".
+  if (hasDynamic) mainItems = mainItems.filter(m => !ADMIN_ROUTES.has(m.to));
 
   // Ítems fijos de administración (Usuarios, Horarios médicos, Servicios,
   // Plantillas, Documentos Clínicos, Catálogos, Configuración): ahora también

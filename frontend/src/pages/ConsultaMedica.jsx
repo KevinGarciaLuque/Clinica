@@ -1756,6 +1756,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   const { tieneRecepcionista } = useAuth();
   const [list,      setList]      = useState([]);
   const [showForm,  setShowForm]  = useState(false);
+  const [rxMenu,    setRxMenu]    = useState(null); // id de receta con menú de tamaño abierto
   const [items,     setItems]     = useState([newRxItem()]);
   const [notas,     setNotas]     = useState("");
 
@@ -1802,9 +1803,11 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
       .catch(() => {});
   }, []);
 
-  const printRx = async (id) => {
+  const printRx = async (id, formato) => {
+    setRxMenu(null);
     try {
-      const res = await api.get(`/prescripciones/${id}/pdf`, { responseType: "blob" });
+      const qs = formato ? `?formato=${formato}` : "";
+      const res = await api.get(`/prescripciones/${id}/pdf${qs}`, { responseType: "blob" });
       const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
       window.open(url, "_blank");
     } catch (err) {
@@ -2173,15 +2176,44 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
                 </span>
               )
             )}
-            <button
-              onClick={() => printRx(p.id)}
-              style={{
-                background: "transparent", border: "1px solid #3b82f6",
-                borderRadius: 7, color: "#3b82f6", padding: "4px 12px",
-                fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
-              }}>
-              <i className="bi bi-printer me-1"></i>PDF
-            </button>
+            <div style={{ position: "relative", display: "flex" }}>
+              <button
+                onClick={() => printRx(p.id)}
+                title="Imprimir con el formato configurado"
+                style={{
+                  background: "transparent", border: "1px solid #3b82f6",
+                  borderRight: "none", borderRadius: "7px 0 0 7px", color: "#3b82f6",
+                  padding: "4px 10px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
+                }}>
+                <i className="bi bi-printer me-1"></i>PDF
+              </button>
+              <button
+                onClick={() => setRxMenu(rxMenu === p.id ? null : p.id)}
+                title="Elegir tamaño"
+                style={{
+                  background: rxMenu === p.id ? "#eff6ff" : "transparent",
+                  border: "1px solid #3b82f6", borderRadius: "0 7px 7px 0",
+                  color: "#3b82f6", padding: "4px 7px", fontSize: "0.7rem", cursor: "pointer",
+                }}>
+                <i className="bi bi-caret-down-fill"></i>
+              </button>
+              {rxMenu === p.id && (
+                <div style={{
+                  position: "absolute", top: "calc(100% + 4px)", right: 0, zIndex: 20,
+                  background: "#fff", border: "1px solid #e5e7eb", borderRadius: 8,
+                  boxShadow: "0 6px 18px rgba(0,0,0,.12)", overflow: "hidden", minWidth: 190,
+                }}>
+                  <button onClick={() => printRx(p.id, "media_carta")}
+                    style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 12px", fontSize: "0.78rem", cursor: "pointer", color: "#374151" }}>
+                    <i className="bi bi-file-earmark me-2"></i>Media carta (compacta)
+                  </button>
+                  <button onClick={() => printRx(p.id, "carta_completa")}
+                    style={{ display: "block", width: "100%", textAlign: "left", background: "none", border: "none", padding: "8px 12px", fontSize: "0.78rem", cursor: "pointer", color: "#374151", borderTop: "1px solid #f1f5f9" }}>
+                    <i className="bi bi-file-earmark-text me-2"></i>Carta completa
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       ))}
