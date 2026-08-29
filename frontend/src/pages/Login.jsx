@@ -380,6 +380,11 @@ export default function Login() {
           <p className="text-center mt-4 mb-0" style={{ color: "rgba(255,255,255,.35)", fontSize: ".75rem" }}>
             © {new Date().getFullYear()} {cfg.copyright_texto}
           </p>
+          <p className="text-center mt-1 mb-0">
+            <a href="/privacidad" style={{ color: "rgba(255,255,255,.35)", fontSize: ".72rem", textDecoration: "none" }}>
+              Política de Privacidad
+            </a>
+          </p>
         </div>
       </div>
     </>

@@ -1013,6 +1013,11 @@ export default function LandingPage() {
         <p style={{ color: "#334155", fontSize: 13, margin: 0 }}>
           {cfg.copyright_texto || `© ${new Date().getFullYear()} ${nombre} · Todos los derechos reservados`}
         </p>
+        <p style={{ margin: "8px 0 0" }}>
+          <a href="/privacidad" style={{ color: "#64748b", fontSize: 12, textDecoration: "none" }}>
+            Política de Privacidad
+          </a>
+        </p>
       </footer>
     </>
   );
