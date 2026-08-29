@@ -70,13 +70,18 @@ function SidebarIcon({ icon, style }) {
   return <span style={{ lineHeight: 1, flexShrink: 0, ...style }}>{icon}</span>;
 }
 
+// Módulos que son funciones DENTRO de la consulta (pestañas), no ítems de menú.
+const MODULOS_NO_MENU = new Set(["cardiologia_ecocardiograma"]);
+
 /** Convierte respuesta del API de módulos a items del sidebar */
 function modulosToItems(modulos) {
-  return modulos.map(m => ({
-    to:    m.ruta,
-    label: m.nombre,
-    icon:  m.icono,
-  }));
+  return modulos
+    .filter(m => !MODULOS_NO_MENU.has(m.clave))
+    .map(m => ({
+      to:    m.ruta,
+      label: m.nombre,
+      icon:  m.icono,
+    }));
 }
 
 function getMenuSections(tipo, modulos) {

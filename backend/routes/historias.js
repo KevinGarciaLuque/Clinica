@@ -178,7 +178,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
       subjetivo, objetivo, examen_fisico,
       diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan,
       estado = "BORRADOR",
-      datos_derma,
+      datos_derma, datos_cardio_eco,
     } = req.body;
 
     if (!paciente_id) return res.status(400).json({ ok: false, msg: "paciente_id requerido" });
@@ -187,6 +187,7 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     const insertCols = await getHistoriasCols();
     const hasDxDescCol = insertCols.has("diagnostico_desc");
+    const hasCardioEcoCol = insertCols.has("datos_cardio_eco");
 
     const insertFields = hasDxDescCol
       ? "(clinica_id, paciente_id, medico_id, cita_id, subjetivo, objetivo, examen_fisico, diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan, estado, datos_derma)"
@@ -194,11 +195,17 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     const insertVals = hasDxDescCol
       ? [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCod, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null]
       : [cid, paciente_id, req.user.id, cita_id || null, subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCod, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, estado, datos_derma ? JSON.stringify(datos_derma) : null];
-    const placeholders = insertVals.map(() => "?").join(",");
+    let insertFieldsF = insertFields;
+    let insertValsF = insertVals;
+    if (hasCardioEcoCol) {
+      insertFieldsF = insertFields.replace(/\)$/, ", datos_cardio_eco)");
+      insertValsF = [...insertVals, datos_cardio_eco ? JSON.stringify(datos_cardio_eco) : null];
+    }
+    const placeholders = insertValsF.map(() => "?").join(",");
 
     const [r] = await pool.query(
-      `INSERT INTO historias_clinicas ${insertFields} VALUES (${placeholders})`,
-      insertVals
+      `INSERT INTO historias_clinicas ${insertFieldsF} VALUES (${placeholders})`,
+      insertValsF
     );
 
     // Si hay cita_id, cambiar estado a EN_ATENCION
@@ -248,22 +255,27 @@ router.put("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
     const {
       subjetivo, objetivo, examen_fisico,
       diagnostico_cie, diagnostico_desc, diagnosticos_secundarios, plan,
-      datos_derma,
+      datos_derma, datos_cardio_eco,
     } = req.body;
 
     const updateCols = await getHistoriasCols();
     const hasDxDescUpd = updateCols.has("diagnostico_desc");
+    const hasCardioEcoUpd = updateCols.has("datos_cardio_eco");
 
     const cieCodUpd = await cieValido(diagnostico_cie);
 
-    const updateSql = hasDxDescUpd
-      ? `UPDATE historias_clinicas SET subjetivo=?, objetivo=?, examen_fisico=?, diagnostico_cie=?, diagnostico_desc=?, diagnosticos_secundarios=?, plan=?, datos_derma=? WHERE id=? AND clinica_id=?`
-      : `UPDATE historias_clinicas SET subjetivo=?, objetivo=?, examen_fisico=?, diagnostico_cie=?, diagnosticos_secundarios=?, plan=?, datos_derma=? WHERE id=? AND clinica_id=?`;
-    const updateVals = hasDxDescUpd
-      ? [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCodUpd, diagnostico_desc || null, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid]
-      : [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCodUpd, diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null, id, cid];
+    const setParts = ["subjetivo=?", "objetivo=?", "examen_fisico=?", "diagnostico_cie=?"];
+    const vals = [subjetivo || null, objetivo ? JSON.stringify(objetivo) : null, examen_fisico || null, cieCodUpd];
+    if (hasDxDescUpd) { setParts.push("diagnostico_desc=?"); vals.push(diagnostico_desc || null); }
+    setParts.push("diagnosticos_secundarios=?", "plan=?", "datos_derma=?");
+    vals.push(diagnosticos_secundarios ? JSON.stringify(diagnosticos_secundarios) : null, plan || null, datos_derma ? JSON.stringify(datos_derma) : null);
+    if (hasCardioEcoUpd) { setParts.push("datos_cardio_eco=?"); vals.push(datos_cardio_eco ? JSON.stringify(datos_cardio_eco) : null); }
+    vals.push(id, cid);
 
-    await pool.query(updateSql, updateVals);
+    await pool.query(
+      `UPDATE historias_clinicas SET ${setParts.join(", ")} WHERE id=? AND clinica_id=?`,
+      vals
+    );
 
     res.json({ ok: true });
   } catch (e) {
