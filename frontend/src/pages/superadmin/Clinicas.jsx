@@ -918,7 +918,6 @@ export default function Clinicas() {
           display: "flex", alignItems: "flex-start", justifyContent: "center",
           padding: "16px", overflowY: "auto",
         }}
-          onClick={e => { if (e.target === e.currentTarget) setShowModal(false); }}
         >
           <div style={{
             background: C.surface, border: `1px solid ${C.border}`,
