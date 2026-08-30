@@ -10,6 +10,7 @@ import { FaCheckCircle } from "react-icons/fa";
 import api from "../api/api";
 import { prefijoDr, tituloMedicoActivo, nombreMedico } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
+import { zscoreDetroit, ECO_ZMAP } from "../utils/zscoreEco";
 
 // ─── helpers ──────────────────────────────────────────────────────────────────
 const VITALS_FIELDS = [
@@ -3969,15 +3970,21 @@ const ECO_CONEXIONES = [
 ];
 const ECO_PARAM_ROWS = ["VI", "A. Aórtico", "Raíz Ao", "Unión ST", "A. Pulmonar", "TAP", "RDAP", "RIAP", "V mitral", "V tricúspide"];
 const ECO_PARAM_COLS = [
-  { key: "dd",     label: "DD (mm)" },
+  { key: "dd",     label: "DD" },
   { key: "dd_z",   label: "Z-score" },
-  { key: "ds",     label: "DS (mm)" },
+  { key: "ds",     label: "DS" },
   { key: "ds_z",   label: "Z-score" },
-  { key: "septum", label: "Septum d (mm)" },
+  { key: "septum", label: "Septum d" },
   { key: "septum_z", label: "Z-score" },
-  { key: "ppvi",   label: "PPVI d (mm)" },
+  { key: "ppvi",   label: "PPVI d" },
   { key: "ppvi_z", label: "Z-score" },
 ];
+// Convierte a mm el valor ingresado según la unidad elegida
+const ecoToMm = (v, unidad) => {
+  const n = parseFloat(v);
+  if (!n) return n;
+  return unidad === "cm" ? n * 10 : n;
+};
 const ECO_DOPPLER = [
   { key: "ea_tricuspide", label: "E/A Tricúspide" },
   { key: "ee_vd",         label: "E/E' VD" },
@@ -4055,6 +4062,27 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
   const set = (k, v) => setDatos(prev => ({ ...prev, [k]: v }));
   const [openSecs, setOpenSecs] = useState({ basal: true, segmentario: true, conexiones: true });
   const toggle = (id) => setOpenSecs(s => ({ ...s, [id]: !s[id] }));
+  const bsa = vitals?.sc;
+  const unidad = d.param_unidad || "mm";
+
+  // Autocalcular Z-scores (Detroit 2008) a partir de las medidas y la BSA
+  useEffect(() => {
+    if (firmada || !bsa) return;
+    setDatos(prev => {
+      let changed = false;
+      const next = { ...prev };
+      const u = prev.param_unidad || "mm";
+      for (const [mapKey, struct] of Object.entries(ECO_ZMAP)) {
+        const [row, col] = mapKey.split("|");
+        const mk = `p_${row}_${col}`.replace(/\s+/g, "_");
+        const zk = `${mk}_z`;
+        const res = zscoreDetroit(struct, ecoToMm(prev[mk], u), bsa);
+        const val = res ? res.texto : "";
+        if ((prev[zk] || "") !== val) { next[zk] = val; changed = true; }
+      }
+      return changed ? next : prev;
+    });
+  }, [datos, bsa, firmada]);
 
   const inp = { borderRadius: 6, fontSize: "0.82rem" };
   const zInp = { ...inp, textAlign: "center" };
@@ -4141,11 +4169,42 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
       </div>
 
       {/* Parámetros ecocardiográficos */}
-      <EcoSection id="parametros" title="Parámetros ecocardiográficos (mm / Valor Z)" icon="bi-rulers" open={openSecs.parametros} toggle={toggle}>
+      <EcoSection id="parametros" title={`Parámetros ecocardiográficos (${unidad} / Valor Z)`} icon="bi-rulers" open={openSecs.parametros} toggle={toggle}>
+        {/* Selector de unidad */}
+        <div className="d-flex align-items-center gap-2 mb-2">
+          <span style={{ fontSize: "0.78rem", fontWeight: 600, color: "#374151" }}>Unidad de medida:</span>
+          {["mm", "cm"].map(u => (
+            <button key={u} type="button" disabled={firmada}
+              onClick={() => {
+                if (u === unidad) return;
+                const factor = u === "cm" ? 0.1 : 10; // mm→cm o cm→mm
+                setDatos(prev => {
+                  const next = { ...prev, param_unidad: u };
+                  Object.keys(prev).forEach(key => {
+                    if (key.startsWith("p_") && !key.endsWith("_z") && prev[key] !== "" && prev[key] != null) {
+                      const n = parseFloat(prev[key]);
+                      if (!isNaN(n)) next[key] = String(Math.round(n * factor * 100) / 100);
+                    }
+                  });
+                  return next;
+                });
+              }}
+              style={{
+                border: `1px solid ${unidad === u ? "#be123c" : "#d1d5db"}`,
+                background: unidad === u ? "#be123c" : "#fff",
+                color: unidad === u ? "#fff" : "#374151",
+                borderRadius: 6, padding: "3px 14px", fontSize: "0.8rem", fontWeight: 700,
+                cursor: firmada ? "default" : "pointer",
+              }}>
+              {u}
+            </button>
+          ))}
+          <span style={{ fontSize: "0.72rem", color: "#9ca3af" }}>El Z-score se recalcula automáticamente.</span>
+        </div>
         <div style={{ overflowX: "auto" }}>
           <table className="table table-sm table-bordered align-middle" style={{ fontSize: "0.78rem", minWidth: 720 }}>
             <thead style={{ background: "#f8fafc" }}>
-              <tr><th></th>{ECO_PARAM_COLS.map(c => <th key={c.key} style={{ textAlign: "center", fontWeight: 600 }}>{c.label}</th>)}</tr>
+              <tr><th></th>{ECO_PARAM_COLS.map(c => <th key={c.key} style={{ textAlign: "center", fontWeight: 600 }}>{c.label}{c.key.endsWith("_z") ? "" : ` (${unidad})`}</th>)}</tr>
             </thead>
             <tbody>
               {ECO_PARAM_ROWS.map(r => (
@@ -4153,6 +4212,20 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
                   <td style={{ fontWeight: 600, whiteSpace: "nowrap" }}>{r}</td>
                   {ECO_PARAM_COLS.map(c => {
                     const k = `p_${r}_${c.key}`.replace(/\s+/g, "_");
+                    const isZ = c.key.endsWith("_z");
+                    const baseCol = isZ ? c.key.slice(0, -2) : null;
+                    const struct = isZ ? ECO_ZMAP[`${r}|${baseCol}`] : null;
+                    const auto = struct && bsa
+                      ? zscoreDetroit(struct, ecoToMm(d[`p_${r}_${baseCol}`.replace(/\s+/g, "_")], unidad), bsa)
+                      : null;
+                    if (isZ && struct) {
+                      return <td key={c.key} style={{ padding: 2, textAlign: "center", background: "#f1f5f9" }}
+                        title={auto ? `${auto.interp}${auto.confiable ? "" : " · BSA fuera de rango (>2.0)"}` : "Se calcula al ingresar la medida y la BSA"}>
+                        <span style={{ fontWeight: 700, fontSize: "0.8rem", color: auto ? auto.color : "#9ca3af" }}>
+                          {auto ? auto.texto : "—"}
+                        </span>
+                      </td>;
+                    }
                     return <td key={c.key} style={{ padding: 2 }}>
                       <input className="form-control form-control-sm border-0" style={zInp} disabled={firmada}
                         value={d[k] || ""} onChange={e => set(k, e.target.value)} />
@@ -4162,6 +4235,11 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
               ))}
             </tbody>
           </table>
+        </div>
+        <div style={{ fontSize: "0.72rem", color: "#6b7280", marginTop: 6 }}>
+          <i className="bi bi-info-circle me-1" />
+          Z-score automático: nomograma de <strong>Detroit (Pettersen 2008)</strong> según la superficie corporal (Mosteller) de Signos Vitales.
+          Verde |Z|&lt;1.6 · ámbar 1.6–2 · rojo ≥2. Válido para BSA ≤ 2.0 m².
         </div>
         <div className="row g-2 mt-1">
           {ECO_DOPPLER.map(dp => (
@@ -4301,9 +4379,9 @@ function PrintEco({ datos, vitals, paciente, user, onClose }) {
             </tbody></table>
 
             {/* Parámetros */}
-            <div style={secTitle}>Parámetros ecocardiográficos (mm / Valor Z)</div>
+            <div style={secTitle}>Parámetros ecocardiográficos ({d.param_unidad || "mm"} / Valor Z)</div>
             <table style={{ borderCollapse: "collapse", width: "100%" }}>
-              <thead><tr><th style={th}></th>{ECO_PARAM_COLS.map(c => <th key={c.key} style={th}>{c.label}</th>)}</tr></thead>
+              <thead><tr><th style={th}></th>{ECO_PARAM_COLS.map(c => <th key={c.key} style={th}>{c.label}{c.key.endsWith("_z") ? "" : ` (${d.param_unidad || "mm"})`}</th>)}</tr></thead>
               <tbody>
                 {ECO_PARAM_ROWS.map(r => (
                   <tr key={r}>
