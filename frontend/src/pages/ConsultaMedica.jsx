@@ -4020,7 +4020,7 @@ function EcoSection({ id, title, icon, open, toggle, children }) {
 function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint }) {
   const d = datos || {};
   const set = (k, v) => setDatos(prev => ({ ...prev, [k]: v }));
-  const [openSecs, setOpenSecs] = useState({ basal: true, segmentario: true });
+  const [openSecs, setOpenSecs] = useState({ basal: true, segmentario: true, conexiones: true });
   const toggle = (id) => setOpenSecs(s => ({ ...s, [id]: !s[id] }));
 
   const inp = { borderRadius: 6, fontSize: "0.82rem" };
@@ -4077,31 +4077,35 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
         <div style={{ fontSize: "0.72rem", color: "#9ca3af", marginTop: 6 }}>Peso, talla y superficie corporal se toman de Signos Vitales (SOAP).</div>
       </EcoSection>
 
-      {/* Análisis segmentario */}
-      <EcoSection id="segmentario" title="Análisis segmentario" icon="bi-diagram-3" open={openSecs.segmentario} toggle={toggle}>
-        {ECO_SEGMENTARIO.map(row => (
-          <div key={row.key} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>{row.label}</div>
-            <Radio name={row.key} opts={row.opts} />
-            {row.detalle && d[row.key] === "Anormal" && (
-              <input className="form-control form-control-sm mt-2" style={inp} placeholder="Describa la anomalía…" disabled={firmada}
-                value={d[row.detalle] || ""} onChange={e => set(row.detalle, e.target.value)} />
-            )}
-          </div>
-        ))}
-      </EcoSection>
-
-      {/* Conexiones */}
-      <EcoSection id="conexiones" title="Conexiones" icon="bi-share" open={openSecs.conexiones} toggle={toggle}>
-        {ECO_CONEXIONES.map(row => (
-          <div key={row.key} style={{ marginBottom: 12 }}>
-            <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>{row.label}</div>
-            <Radio name={row.key} opts={row.opts} />
-            <input className="form-control form-control-sm mt-2" style={inp} placeholder="Observaciones…" disabled={firmada}
-              value={d[`${row.key}_obs`] || ""} onChange={e => set(`${row.key}_obs`, e.target.value)} />
-          </div>
-        ))}
-      </EcoSection>
+      {/* Análisis segmentario (izq) + Conexiones (der) */}
+      <div className="row g-3">
+        <div className="col-lg-6">
+          <EcoSection id="segmentario" title="Análisis segmentario" icon="bi-diagram-3" open={openSecs.segmentario} toggle={toggle}>
+            {ECO_SEGMENTARIO.map(row => (
+              <div key={row.key} style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>{row.label}</div>
+                <Radio name={row.key} opts={row.opts} />
+                {row.detalle && d[row.key] === "Anormal" && (
+                  <input className="form-control form-control-sm mt-2" style={inp} placeholder="Describa la anomalía…" disabled={firmada}
+                    value={d[row.detalle] || ""} onChange={e => set(row.detalle, e.target.value)} />
+                )}
+              </div>
+            ))}
+          </EcoSection>
+        </div>
+        <div className="col-lg-6">
+          <EcoSection id="conexiones" title="Conexiones" icon="bi-share" open={openSecs.conexiones} toggle={toggle}>
+            {ECO_CONEXIONES.map(row => (
+              <div key={row.key} style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>{row.label}</div>
+                <Radio name={row.key} opts={row.opts} />
+                <input className="form-control form-control-sm mt-2" style={inp} placeholder="Observaciones…" disabled={firmada}
+                  value={d[`${row.key}_obs`] || ""} onChange={e => set(`${row.key}_obs`, e.target.value)} />
+              </div>
+            ))}
+          </EcoSection>
+        </div>
+      </div>
 
       {/* Parámetros ecocardiográficos */}
       <EcoSection id="parametros" title="Parámetros ecocardiográficos (mm / Valor Z)" icon="bi-rulers" open={openSecs.parametros} toggle={toggle}>
