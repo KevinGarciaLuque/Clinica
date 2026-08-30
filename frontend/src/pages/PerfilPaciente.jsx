@@ -1902,6 +1902,15 @@ export default function PerfilPaciente() {
                                     >
                                       <i className="bi bi-printer me-1" />Imprimir
                                     </button>
+                                    {Number(h.tiene_eco) === 1 && (
+                                      <button
+                                        className="btn btn-outline-danger btn-sm"
+                                        title="Imprimir hoja de ecocardiograma"
+                                        onClick={() => navigate(`/consulta-medica?historia_id=${h.id}&print_eco=1`)}
+                                      >
+                                        <i className="bi bi-heart-pulse me-1" />Imprimir eco
+                                      </button>
+                                    )}
                                   </div>
                                   {/* Detalle expandido */}
                                   {expanded && det && (

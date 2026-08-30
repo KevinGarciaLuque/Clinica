@@ -143,6 +143,16 @@ export default function Consulta() {
     setVitals(v => ({ ...v, imc: calcIMC(v.peso, v.talla), sc: calcSC(v.peso, v.talla) }));
   }, [vitals.peso, vitals.talla]);
 
+  // ── abrir impresión del eco directamente (?print_eco=1) ──────────────────────
+  const ecoPrintAbierto = useRef(false);
+  useEffect(() => {
+    if (params.get("print_eco") === "1" && !ecoPrintAbierto.current && Object.keys(datosEco).length) {
+      ecoPrintAbierto.current = true;
+      setTab("cardio_eco");
+      setShowEcoPrint(true);
+    }
+  }, [params, datosEco]);
+
   // ── resumen nuevo / subsecuente ──────────────────────────────────────────────
   useEffect(() => {
     const pid = paciente?.id || pacId;

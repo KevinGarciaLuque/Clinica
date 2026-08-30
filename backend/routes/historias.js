@@ -60,6 +60,9 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     const selectExtras = [
       !cols.has("firma_digital_url") ? "NULL AS firma_digital_url" : null,
       !cols.has("colegiatura_firmante") ? "NULL AS colegiatura_firmante" : null,
+      cols.has("datos_cardio_eco")
+        ? "(h.datos_cardio_eco IS NOT NULL) AS tiene_eco"
+        : "0 AS tiene_eco",
     ].filter(Boolean).join(", ");
 
     let sql = `
