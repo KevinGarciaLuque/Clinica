@@ -4244,7 +4244,7 @@ function PrintEco({ datos, vitals, paciente, user, onClose }) {
           #eco-print-doc, #eco-print-doc * { visibility: visible !important; }
           #eco-print-doc { position:fixed!important; top:0!important; left:0!important; width:100%!important; padding:12mm 14mm!important; box-shadow:none!important; background:#fff!important; }
           #eco-print-bar { display:none!important; }
-          @page { margin:0; size:A4; }
+          @page { margin:0; size:letter; }
         }
       `}</style>
       <div style={{ position: "fixed", inset: 0, zIndex: 4000, background: "#e8e8e8", overflowY: "auto" }}>
@@ -4258,7 +4258,7 @@ function PrintEco({ datos, vitals, paciente, user, onClose }) {
         </div>
 
         <div style={{ padding: "24px 16px", display: "flex", justifyContent: "center" }}>
-          <div id="eco-print-doc" style={{ background: "#fff", width: "100%", maxWidth: "210mm", minHeight: "297mm", padding: "16mm 16mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a1a", boxSizing: "border-box" }}>
+          <div id="eco-print-doc" style={{ background: "#fff", width: "100%", maxWidth: "216mm", minHeight: "279mm", padding: "14mm 16mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a1a", boxSizing: "border-box" }}>
             {/* Encabezado */}
             <div style={{ textAlign: "center", borderBottom: "2px solid #333", paddingBottom: 8, marginBottom: 10 }}>
               {logoUrl && <img src={logoUrl} alt="" style={{ maxHeight: 70, objectFit: "contain", marginBottom: 4 }} />}
