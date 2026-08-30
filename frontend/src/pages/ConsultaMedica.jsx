@@ -4002,6 +4002,29 @@ function edadTexto(fnac) {
   return a > 0 ? `${a} a ${mm} m` : `${mm} m`;
 }
 
+function AutoTextarea({ value, onChange, disabled, style, placeholder }) {
+  const ref = useRef(null);
+  const fit = () => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = "auto";
+    el.style.height = Math.max(el.scrollHeight, 34) + "px";
+  };
+  useEffect(fit, [value]);
+  return (
+    <textarea
+      ref={ref}
+      className="form-control form-control-sm"
+      rows={1}
+      placeholder={placeholder}
+      disabled={disabled}
+      value={value || ""}
+      onChange={e => { onChange(e); fit(); }}
+      style={{ overflow: "hidden", resize: "none", ...style }}
+    />
+  );
+}
+
 function EcoSection({ id, title, icon, open, toggle, children }) {
   return (
     <div style={{ border: "1px solid #e5e7eb", borderRadius: 10, marginBottom: 12, overflow: "hidden" }}>
@@ -4086,8 +4109,8 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
                 <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>{row.label}</div>
                 <Radio name={row.key} opts={row.opts} />
                 {row.detalle && d[row.key] === "Anormal" && (
-                  <input className="form-control form-control-sm mt-2" style={inp} placeholder="Describa la anomalía…" disabled={firmada}
-                    value={d[row.detalle] || ""} onChange={e => set(row.detalle, e.target.value)} />
+                  <div className="mt-2"><AutoTextarea style={inp} placeholder="Describa la anomalía…" disabled={firmada}
+                    value={d[row.detalle]} onChange={e => set(row.detalle, e.target.value)} /></div>
                 )}
               </div>
             ))}
@@ -4099,8 +4122,8 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
               <div key={row.key} style={{ marginBottom: 12 }}>
                 <div style={{ fontSize: "0.8rem", fontWeight: 600, color: "#374151", marginBottom: 4 }}>{row.label}</div>
                 <Radio name={row.key} opts={row.opts} />
-                <input className="form-control form-control-sm mt-2" style={inp} placeholder="Observaciones…" disabled={firmada}
-                  value={d[`${row.key}_obs`] || ""} onChange={e => set(`${row.key}_obs`, e.target.value)} />
+                <div className="mt-2"><AutoTextarea style={inp} placeholder="Observaciones…" disabled={firmada}
+                  value={d[`${row.key}_obs`]} onChange={e => set(`${row.key}_obs`, e.target.value)} /></div>
               </div>
             ))}
           </EcoSection>
@@ -4156,13 +4179,15 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
 
       {/* Detalles ECOTT */}
       <EcoSection id="ecott" title="Detalles ECOTT" icon="bi-card-list" open={openSecs.ecott} toggle={toggle}>
-        {ECO_ECOTT.map(f => (
-          <div key={f.key} className="mb-2">
-            <label className="form-label mb-1" style={{ fontSize: "0.76rem", fontWeight: 600, color: "#374151" }}>{f.label}</label>
-            <input className="form-control form-control-sm" style={inp} disabled={firmada}
-              value={d[f.key] || ""} onChange={e => set(f.key, e.target.value)} />
-          </div>
-        ))}
+        <div className="row g-3">
+          {ECO_ECOTT.map(f => (
+            <div key={f.key} className="col-md-6">
+              <label className="form-label mb-1" style={{ fontSize: "0.76rem", fontWeight: 600, color: "#374151" }}>{f.label}</label>
+              <AutoTextarea style={inp} disabled={firmada}
+                value={d[f.key]} onChange={e => set(f.key, e.target.value)} />
+            </div>
+          ))}
+        </div>
       </EcoSection>
 
       {/* Conclusiones */}
