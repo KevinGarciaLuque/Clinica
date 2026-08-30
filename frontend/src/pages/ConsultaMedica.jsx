@@ -4219,11 +4219,16 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
                       ? zscoreDetroit(struct, ecoToMm(d[`p_${r}_${baseCol}`.replace(/\s+/g, "_")], unidad), bsa)
                       : null;
                     if (isZ && struct) {
-                      return <td key={c.key} style={{ padding: 2, textAlign: "center", background: "#f1f5f9" }}
-                        title={auto ? `${auto.interp}${auto.confiable ? "" : " · BSA fuera de rango (>2.0)"}` : "Se calcula al ingresar la medida y la BSA"}>
-                        <span style={{ fontWeight: 700, fontSize: "0.8rem", color: auto ? auto.color : "#9ca3af" }}>
-                          {auto ? auto.texto : "—"}
-                        </span>
+                      return <td key={c.key} style={{ padding: "3px 4px", textAlign: "center", background: auto ? auto.bg : "#f1f5f9", minWidth: 96 }}
+                        title={auto ? `${auto.detalle}${auto.confiable ? "" : " · BSA fuera de rango (>2.0)"}` : "Se calcula al ingresar la medida y la BSA"}>
+                        {auto ? (
+                          <>
+                            <div style={{ fontWeight: 800, fontSize: "0.9rem", color: auto.color, lineHeight: 1.1 }}>{auto.texto}</div>
+                            <div style={{ fontSize: "0.62rem", fontWeight: 700, letterSpacing: ".02em", color: auto.color, textTransform: "uppercase" }}>{auto.interp}</div>
+                          </>
+                        ) : (
+                          <span style={{ color: "#9ca3af" }}>—</span>
+                        )}
                       </td>;
                     }
                     return <td key={c.key} style={{ padding: 2 }}>
@@ -4236,10 +4241,11 @@ function EcocardiogramaTab({ datos, setDatos, firmada, vitals, paciente, onPrint
             </tbody>
           </table>
         </div>
-        <div style={{ fontSize: "0.72rem", color: "#6b7280", marginTop: 6 }}>
-          <i className="bi bi-info-circle me-1" />
-          Z-score automático: nomograma de <strong>Detroit (Pettersen 2008)</strong> según la superficie corporal (Mosteller) de Signos Vitales.
-          Verde |Z|&lt;1.6 · ámbar 1.6–2 · rojo ≥2. Válido para BSA ≤ 2.0 m².
+        <div style={{ fontSize: "0.72rem", color: "#6b7280", marginTop: 8, display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
+          <span><i className="bi bi-info-circle me-1" />Z-score automático — nomograma de <strong>Detroit (Pettersen 2008)</strong>, según la S.C. (Mosteller) de Signos Vitales. BSA ≤ 2.0 m².</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "#dcfce7", border: "1px solid #86efac" }} /> Normal (|Z| &lt; 1.6)</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "#fef3c7", border: "1px solid #fcd34d" }} /> Límite (1.6–2)</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}><span style={{ width: 12, height: 12, borderRadius: 3, background: "#fee2e2", border: "1px solid #fca5a5" }} /> Dilatado / Hipoplásico (|Z| ≥ 2)</span>
         </div>
         <div className="row g-2 mt-1">
           {ECO_DOPPLER.map(dp => (
@@ -4321,6 +4327,7 @@ function PrintEco({ datos, vitals, paciente, user, onClose }) {
           body * { visibility: hidden !important; }
           #eco-print-doc, #eco-print-doc * { visibility: visible !important; }
           #eco-print-doc { position:fixed!important; top:0!important; left:0!important; width:100%!important; padding:12mm 14mm!important; box-shadow:none!important; background:#fff!important; }
+          #eco-print-doc * { -webkit-print-color-adjust:exact!important; print-color-adjust:exact!important; }
           #eco-print-bar { display:none!important; }
           @page { margin:0; size:letter; }
         }
@@ -4388,6 +4395,17 @@ function PrintEco({ datos, vitals, paciente, user, onClose }) {
                     <td style={{ ...cell, fontWeight: 700 }}>{r}</td>
                     {ECO_PARAM_COLS.map(c => {
                       const k = `p_${r}_${c.key}`.replace(/\s+/g, "_");
+                      const isZ = c.key.endsWith("_z");
+                      const baseCol = isZ ? c.key.slice(0, -2) : null;
+                      const struct = isZ ? ECO_ZMAP[`${r}|${baseCol}`] : null;
+                      const auto = struct
+                        ? zscoreDetroit(struct, ecoToMm(d[`p_${r}_${baseCol}`.replace(/\s+/g, "_")], d.param_unidad || "mm"), vitals?.sc)
+                        : null;
+                      if (isZ && auto) {
+                        return <td key={c.key} style={{ ...cell, textAlign: "center", background: auto.bg, color: auto.color, fontWeight: 700 }}>
+                          {auto.texto}<br /><span style={{ fontSize: 8.5 }}>{auto.interp}</span>
+                        </td>;
+                      }
                       return <td key={c.key} style={{ ...cell, textAlign: "center" }}>{d[k] || ""}</td>;
                     })}
                   </tr>

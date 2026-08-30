@@ -38,7 +38,7 @@ export const DETROIT_2008 = {
  * @param {string} estructura  clave de DETROIT_2008
  * @param {number|string} valorMm  medida en milímetros
  * @param {number|string} bsaM2  superficie corporal en m²
- * @returns {{ z:number, texto:string, interp:string, color:string, confiable:boolean } | null}
+ * @returns {{ z:number, texto:string, interp:string, detalle:string, color:string, bg:string, confiable:boolean } | null}
  */
 export function zscoreDetroit(estructura, valorMm, bsaM2) {
   const c = DETROIT_2008[estructura];
@@ -52,16 +52,20 @@ export function zscoreDetroit(estructura, valorMm, bsaM2) {
   const z = (Math.log(cm) - lnMean) / Math.sqrt(mse);
   const zr = Math.round(z * 100) / 100;
 
-  let interp = "Normal", color = "#16a34a";
-  if (z >= 2)       { interp = "Dilatado / aumentado"; color = "#dc2626"; }
-  else if (z <= -2) { interp = "Hipoplásico / disminuido"; color = "#dc2626"; }
-  else if (Math.abs(z) >= 1.6) { interp = "Límite"; color = "#f59e0b"; }
+  // Interpretación
+  let interp = "Normal", detalle = "Normal", color = "#15803d", bg = "#dcfce7";
+  if (z >= 2)        { interp = "Dilatado";     detalle = "Dilatado / aumentado";      color = "#b91c1c"; bg = "#fee2e2"; }
+  else if (z <= -2)  { interp = "Hipoplásico";  detalle = "Hipoplásico / disminuido";  color = "#b91c1c"; bg = "#fee2e2"; }
+  else if (z >= 1.6)  { interp = "Límite ↑";     detalle = "Límite alto";               color = "#b45309"; bg = "#fef3c7"; }
+  else if (z <= -1.6) { interp = "Límite ↓";     detalle = "Límite bajo";               color = "#b45309"; bg = "#fef3c7"; }
 
   return {
     z: zr,
     texto: (zr > 0 ? "+" : "") + zr.toFixed(2),
     interp,
+    detalle,
     color,
+    bg,
     confiable: bsa <= 2.0,
   };
 }
