@@ -544,6 +544,25 @@ export default function Citas() {
     return !!ausenciaDias[dayjs(date).format("YYYY-MM-DD")];
   }, [ausenciaDias]);
 
+  // Encabezado de celda del mes: muestra ícono + "Permiso" / "Incapacidad" bajo el número
+  const MonthDateHeader = useCallback(({ date, label }) => {
+    const aus = ausenciaDias[dayjs(date).format("YYYY-MM-DD")];
+    const t = aus ? (TIPOS_AUSENCIA[aus.tipo] || TIPOS_AUSENCIA.otro) : null;
+    return (
+      <div style={{ textAlign: "right" }}>
+        <span>{label}</span>
+        {t && (
+          <div style={{
+            display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 3,
+            fontSize: "0.66rem", fontWeight: 800, color: t.color, marginTop: 1, whiteSpace: "nowrap",
+          }}>
+            <i className={`bi ${t.icon}`} style={{ fontSize: "0.6rem" }} />{t.label}
+          </div>
+        )}
+      </div>
+    );
+  }, [ausenciaDias]);
+
   const onSelectSlot = (slot) => {
     if (bloqueadoPorAusencia(slot.start)) {
       const aus = ausenciaDias[dayjs(slot.start).format("YYYY-MM-DD")];
@@ -1025,6 +1044,7 @@ export default function Citas() {
                 },
                 week: { event: TimeGridEventContent },
                 day:  { event: TimeGridEventContent },
+                month: { dateHeader: MonthDateHeader },
               }}
             />
           </div>
