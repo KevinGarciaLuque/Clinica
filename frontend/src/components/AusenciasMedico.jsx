@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
@@ -245,8 +246,8 @@ export default function AusenciasMedico({ medicoId, medicoNombre }) {
       </div>
 
       {/* Modal */}
-      {showModal && (
-        <div style={{ position: "fixed", inset: 0, zIndex: 3000, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
+      {showModal && createPortal(
+        <div style={{ position: "fixed", inset: 0, zIndex: 100000, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}>
           <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto" }}>
             <div style={{ padding: "16px 20px", borderBottom: "1px solid #eef2f7", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <strong style={{ fontSize: "0.95rem" }}>{editId ? "Editar ausencia" : "Nueva ausencia"}</strong>
@@ -337,7 +338,8 @@ export default function AusenciasMedico({ medicoId, medicoNombre }) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );
