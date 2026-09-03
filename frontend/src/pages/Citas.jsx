@@ -10,6 +10,7 @@ import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import api from "../api/api";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
+import CompartirLink from "../components/CompartirLink";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 
 dayjs.locale("es");
@@ -724,17 +725,25 @@ export default function Citas() {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => { setSlotInfo(null); setShowNew(true); }}
-          style={{
-            background: "linear-gradient(135deg, #3b82f6, #2563eb)",
-            border: "none", borderRadius: 8, color: "#fff",
-            padding: "7px 18px", fontSize: "0.83rem", cursor: "pointer",
-            fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
-            boxShadow: "0 2px 8px rgba(59,130,246,.35)",
-          }}>
-          <i className="bi bi-plus-lg"></i> Nueva Cita
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+          <CompartirLink
+            texto="Link para agendar cita"
+            icon="bi-calendar-plus-fill"
+            url={`${window.location.origin}/registro?clinica_id=${user?.clinica_id || ""}&modo=cita`}
+            mensaje="Agenda tu cita en línea. Si ya eres paciente, solo necesitas tu DNI:"
+          />
+          <button
+            onClick={() => { setSlotInfo(null); setShowNew(true); }}
+            style={{
+              background: "linear-gradient(135deg, #3b82f6, #2563eb)",
+              border: "none", borderRadius: 8, color: "#fff",
+              padding: "7px 18px", fontSize: "0.83rem", cursor: "pointer",
+              fontWeight: 700, display: "flex", alignItems: "center", gap: 6,
+              boxShadow: "0 2px 8px rgba(59,130,246,.35)",
+            }}>
+            <i className="bi bi-plus-lg"></i> Nueva Cita
+          </button>
+        </div>
       </div>
 
       <div style={{ padding: "20px 24px" }}>

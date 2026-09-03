@@ -16,6 +16,7 @@ const pool   = require("../db");
 const OpenAI = require("openai");
 const auth   = require("../middlewares/auth");
 const gcal   = require("../utils/googleCalendar");
+const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
 
 // Inicialización lazy — solo falla si se usa sin API key, no al cargar el módulo
 let _openai = null;
@@ -172,6 +173,9 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
       );
       if (!horarios.length) return { disponible: false, mensaje: "El médico no trabaja ese día." };
 
+      const ausencias = await ausenciasEnFecha(args.medico_id, clinicaId, fechaReal);
+      if (ausenteTodoElDia(ausencias)) return { disponible: false, mensaje: "El médico está ausente ese día (vacaciones/permiso)." };
+
       const [ocupadas] = await pool.query(
         `SELECT inicio, fin FROM citas WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
@@ -190,7 +194,8 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
         while (cursor < fin) {
           const slotFin = new Date(cursor.getTime() + h.slot_minutos * 60000);
           const ocup = ocupadas.some(c => new Date(c.inicio) < slotFin && new Date(c.fin) > cursor);
-          if (!ocup) slots.push({ inicio: toLocalISO(cursor), fin: toLocalISO(slotFin) });
+          const bloq = turnoBloqueado(ausencias, cursor.toTimeString().slice(0,5), slotFin.toTimeString().slice(0,5));
+          if (!ocup && !bloq) slots.push({ inicio: toLocalISO(cursor), fin: toLocalISO(slotFin) });
           cursor = slotFin;
         }
       }

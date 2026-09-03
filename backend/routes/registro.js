@@ -21,6 +21,7 @@ const jwt     = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const { enviarEmail, templateVerificacion, templateBienvenida } = require("../utils/mailer");
 const gcal = require("../utils/googleCalendar");
+const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
 
 async function obtenerTZ(clinicaId) {
   const [[tzRow]] = await pool.query(
@@ -411,13 +412,13 @@ router.get("/info", async (req, res) => {
     let clinica;
     try {
       [[clinica]] = await pool.query(
-        "SELECT nombre, telefono, direccion, titulo_medico FROM clinicas WHERE id=? LIMIT 1",
+        "SELECT nombre, telefono, direccion, logo_url, titulo_medico FROM clinicas WHERE id=? LIMIT 1",
         [clinica_id]
       );
     } catch (err) {
       if (err.code !== "ER_BAD_FIELD_ERROR") throw err;
       [[clinica]] = await pool.query(
-        "SELECT nombre, telefono, direccion FROM clinicas WHERE id=? LIMIT 1",
+        "SELECT nombre, telefono, direccion, logo_url FROM clinicas WHERE id=? LIMIT 1",
         [clinica_id]
       );
     }
@@ -426,7 +427,7 @@ router.get("/info", async (req, res) => {
 
     // Médico principal: primer MEDICO activo (o ADMIN si no hay médico)
     const [[medico]] = await pool.query(
-      `SELECT nombres, apellidos, e.nombre AS especialidad
+      `SELECT nombres, apellidos, foto_url, e.nombre AS especialidad
        FROM usuarios u
        LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE u.clinica_id=? AND u.activo=1 AND u.tipo IN ('MEDICO','ADMIN','SUPER_ADMIN')
@@ -439,8 +440,9 @@ router.get("/info", async (req, res) => {
       ok: true,
       nombre: clinica.nombre,
       telefono: clinica.telefono || null,
+      logo_url: clinica.logo_url || null,
       titulo_medico: clinica.titulo_medico == null ? 1 : Number(clinica.titulo_medico),
-      medico: medico ? { nombres: medico.nombres, apellidos: medico.apellidos, especialidad: medico.especialidad } : null,
+      medico: medico ? { nombres: medico.nombres, apellidos: medico.apellidos, especialidad: medico.especialidad, foto_url: medico.foto_url || null } : null,
     });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -538,6 +540,10 @@ router.get("/slots", async (req, res) => {
     );
     if (!horarios.length) return res.json({ ok: true, data: [] });
 
+    // Ausencias del médico ese día (vacaciones / permiso / incapacidad…)
+    const ausencias = await ausenciasEnFecha(medico_id, clinica_id, fecha);
+    if (ausenteTodoElDia(ausencias)) return res.json({ ok: true, data: [] });
+
     const [ocupadas] = await pool.query(
       `SELECT inicio, fin FROM citas
        WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
@@ -569,14 +575,16 @@ router.get("/slots", async (req, res) => {
       const fin  = localTimeToUTC(fecha, h.hora_fin);
       while (cursor < fin) {
         const slotFin = new Date(cursor.getTime() + h.slot_minutos * 60000);
+        const hhmmIni = toTZTime(cursor);
+        const hhmmFin = toTZTime(slotFin);
         const ocup = ocupadas.some(
           c => new Date(c.inicio) < slotFin && new Date(c.fin) > cursor
         );
-        if (!ocup) {
+        if (!ocup && !turnoBloqueado(ausencias, hhmmIni, hhmmFin)) {
           slots.push({
             inicio: cursor.toISOString(),
             fin:    slotFin.toISOString(),
-            label:  toTZTime(cursor) + " - " + toTZTime(slotFin),
+            label:  hhmmIni + " - " + hhmmFin,
           });
         }
         cursor = slotFin;

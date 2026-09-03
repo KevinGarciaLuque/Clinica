@@ -144,6 +144,7 @@ app.use("/api/auth", require("./routes/auth"));
 app.use("/api/clinicas", require("./routes/clinicas"));
 app.use("/api/usuarios", require("./routes/usuarios"));
 app.use("/api/horarios", require("./routes/horarios"));
+app.use("/api/ausencias", require("./routes/ausencias"));
 app.use("/api/servicios", require("./routes/servicios"));
 app.use("/api/pacientes", require("./routes/pacientes"));
 app.use("/api/pacientes/:pacienteId/documentos", require("./routes/documentos"));

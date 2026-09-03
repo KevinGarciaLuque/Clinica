@@ -489,7 +489,13 @@ export default function RegistroPaciente() {
   }, [clinicaId]);
 
   // ── Navegación ────────────────────────────────────────
-  const [tipo, setTipo] = useState(null); // null | "nuevo" | "subsecuente"
+  // ?modo=nuevo  → salta directo al registro de paciente nuevo
+  // ?modo=cita   → salta directo a "ya tengo expediente" (verificar DNI + agendar)
+  const modoUrl = (params.get("modo") || "").toLowerCase();
+  const tipoInicial = modoUrl === "nuevo" ? "nuevo"
+    : (modoUrl === "cita" || modoUrl === "subsecuente") ? "subsecuente"
+    : null;
+  const [tipo, setTipo] = useState(tipoInicial); // null | "nuevo" | "subsecuente"
   const [paso, setPaso] = useState(0);
 
   // ── Estado general ────────────────────────────────────
@@ -653,8 +659,9 @@ export default function RegistroPaciente() {
     <div className="min-vh-100 d-flex flex-column" style={{ background: "#f1f5f9" }}>
 
       <nav className="navbar navbar-dark bg-dark px-4" style={{ height: 56 }}>
-        <span className="navbar-brand mb-0 fw-bold">
-          <i className="bi bi-hospital-fill text-primary me-2" />Medic-KG
+        <span className="navbar-brand mb-0 fw-bold d-flex align-items-center gap-2">
+          <img src="/logo.png" alt="Medic-KG" style={{ height: 30, width: "auto", objectFit: "contain" }} />
+          Medic-KG
         </span>
         {tipo && (
           <button
@@ -674,8 +681,13 @@ export default function RegistroPaciente() {
             <div className="text-center mb-5">
               {clinicaInfo ? (
                 <>
-                  <div className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-3" style={{ width: 72, height: 72 }}>
-                    <i className="bi bi-hospital-fill text-primary" style={{ fontSize: "2rem" }} />
+                  <div className="rounded-circle bg-primary bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-3 overflow-hidden border" style={{ width: 84, height: 84 }}>
+                    {clinicaInfo.medico?.foto_url
+                      ? <img src={clinicaInfo.medico.foto_url} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+                      : clinicaInfo.logo_url
+                        ? <img src={clinicaInfo.logo_url} alt="" style={{ width: "100%", height: "100%", objectFit: "contain", padding: 8 }} />
+                        : <i className="bi bi-hospital-fill text-primary" style={{ fontSize: "2rem" }} />
+                    }
                   </div>
                   <h3 className="fw-bold text-dark mb-1">{clinicaInfo.nombre}</h3>
                   {clinicaInfo.medico && (

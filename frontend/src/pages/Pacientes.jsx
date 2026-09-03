@@ -8,6 +8,7 @@ import { nombreMedico } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
+import CompartirLink from "../components/CompartirLink";
 
 dayjs.locale("es");
 
@@ -372,17 +373,12 @@ export default function Pacientes() {
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-          <button
-            onClick={() => window.open(`/registro?clinica_id=${user?.clinica_id || ""}`, "_blank")}
-            style={{
-              background: "rgba(255,255,255,.1)",
-              border: "1px solid rgba(255,255,255,.22)", borderRadius: 8, padding: "6px 14px",
-              color: "#e2e8f0", fontWeight: 500, fontSize: "0.8rem", cursor: "pointer",
-              display: "flex", alignItems: "center", gap: 6,
-            }}
-          >
-            <i className="bi bi-box-arrow-up-right" /> Link de registro
-          </button>
+          <CompartirLink
+            texto="Link de registro"
+            icon="bi-person-plus-fill"
+            url={`${window.location.origin}/registro?clinica_id=${user?.clinica_id || ""}&modo=nuevo`}
+            mensaje="Regístrate como paciente nuevo y crea tu ficha médica en línea:"
+          />
           <button
             onClick={() => {
               if (showForm) {

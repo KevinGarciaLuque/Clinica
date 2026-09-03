@@ -4,6 +4,7 @@ const rateLimit = require("express-rate-limit");
 const sse       = require("../utils/sseManager");
 const webPush   = require("../utils/webPush");
 const gcal      = require("../utils/googleCalendar");
+const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
 
 const publicLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -240,6 +241,9 @@ router.get("/clinica/:slug/slots", publicLimiter, async (req, res) => {
     );
     if (!horarios.length) return res.json({ ok: true, data: [] });
 
+    const ausencias = await ausenciasEnFecha(medicoIdInt, clinicaId, fecha);
+    if (ausenteTodoElDia(ausencias)) return res.json({ ok: true, data: [] });
+
     const [ocupadasDb] = await pool.query(
       `SELECT inicio, fin FROM citas
        WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
@@ -269,14 +273,16 @@ router.get("/clinica/:slug/slots", publicLimiter, async (req, res) => {
       const fin  = new Date(`${fecha}T${h.hora_fin}`);
       while (cursor < fin) {
         const slotFin = new Date(cursor.getTime() + h.slot_minutos * 60000);
+        const hhmmIni = cursor.toTimeString().slice(0, 5);
+        const hhmmFin = slotFin.toTimeString().slice(0, 5);
         const ocup = ocupadas.some(
           c => new Date(c.inicio) < slotFin && new Date(c.fin) > cursor
         );
-        if (!ocup) {
+        if (!ocup && !turnoBloqueado(ausencias, hhmmIni, hhmmFin)) {
           slots.push({
             inicio: toLocalISO(cursor),
             fin:    toLocalISO(slotFin),
-            label:  `${cursor.toTimeString().slice(0,5)} - ${slotFin.toTimeString().slice(0,5)}`,
+            label:  `${hhmmIni} - ${hhmmFin}`,
           });
         }
         cursor = slotFin;

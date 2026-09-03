@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
 import { tituloMedicoActivo, nombreMedico } from "../../utils/medico";
+import AusenciasMedico from "../../components/AusenciasMedico";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SLOTS = [15, 20, 30, 45, 60];
@@ -78,6 +79,7 @@ export default function Horarios() {
   const [cargando, setCargando]     = useState(false);
   const [error, setError]           = useState("");
   const [showModal, setShowModal]   = useState(false);
+  const [vista, setVista]           = useState("semanal"); // "semanal" | "ausencias"
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -193,18 +195,20 @@ export default function Horarios() {
             </div>
           </div>
         </div>
-        <button
-          onClick={() => abrirNuevo()}
-          disabled={!medicoSel}
-          style={{
-            background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.22)",
-            borderRadius: 8, color: "#e2e8f0", padding: "6px 14px",
-            fontSize: "0.8rem", cursor: medicoSel ? "pointer" : "not-allowed",
-            fontWeight: 500, display: "flex", alignItems: "center", gap: 6,
-            opacity: medicoSel ? 1 : 0.5,
-          }}>
-          <i className="bi bi-plus-lg"></i> Agregar bloque
-        </button>
+        {vista === "semanal" && (
+          <button
+            onClick={() => abrirNuevo()}
+            disabled={!medicoSel}
+            style={{
+              background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.22)",
+              borderRadius: 8, color: "#e2e8f0", padding: "6px 14px",
+              fontSize: "0.8rem", cursor: medicoSel ? "pointer" : "not-allowed",
+              fontWeight: 500, display: "flex", alignItems: "center", gap: 6,
+              opacity: medicoSel ? 1 : 0.5,
+            }}>
+            <i className="bi bi-plus-lg"></i> Agregar bloque
+          </button>
+        )}
       </div>
 
       <div style={{ padding: "20px 24px" }}>
@@ -248,8 +252,37 @@ export default function Horarios() {
           </select>
         </div>
 
-        {/* Contenido */}
-        {cargando ? (
+        {/* Pestañas */}
+        <div style={{ display: "flex", gap: 6, marginBottom: 18 }}>
+          {[
+            { k: "semanal",   label: "Horario semanal",     icon: "bi-calendar2-week" },
+            { k: "ausencias", label: "Ausencias y permisos", icon: "bi-calendar-x" },
+          ].map(t => {
+            const on = vista === t.k;
+            return (
+              <button key={t.k} onClick={() => setVista(t.k)}
+                style={{
+                  display: "inline-flex", alignItems: "center", gap: 7,
+                  background: on ? "#2563eb" : "#fff", color: on ? "#fff" : "#475569",
+                  border: `1px solid ${on ? "#2563eb" : "#e5e7eb"}`,
+                  borderRadius: 10, padding: "8px 16px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
+                }}>
+                <i className={`bi ${t.icon}`} />{t.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* ═══ AUSENCIAS ═══ */}
+        {vista === "ausencias" && (
+          <AusenciasMedico
+            medicoId={medicoSel}
+            medicoNombre={(() => { const m = medicos.find(x => String(x.id) === String(medicoSel)); return m ? nombreMedico(m) : ""; })()}
+          />
+        )}
+
+        {/* ═══ HORARIO SEMANAL ═══ */}
+        {vista === "semanal" && (cargando ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: "#9ca3af" }}>
             <div className="spinner-border text-primary" role="status" style={{ width: "1.5rem", height: "1.5rem" }}></div>
             <div style={{ marginTop: 10, fontSize: "0.85rem" }}>Cargando...</div>
@@ -350,7 +383,7 @@ export default function Horarios() {
               </div>
             ))}
           </div>
-        )}
+        ))}
       </div>
 
       {/* ═══ MODAL ═══ */}
