@@ -145,6 +145,33 @@ async function consultarFreeBusy(medicoId, timeMin, timeMax, tz) {
   return busy.map((b) => ({ inicio: b.start, fin: b.end }));
 }
 
+/**
+ * Lista los eventos del Google Calendar del médico en un rango.
+ * @returns {Array<{id,titulo,inicio,fin,allDay}>}
+ */
+async function listarEventos(medicoId, timeMin, timeMax) {
+  const conn = await getClientForMedico(medicoId);
+  if (!conn) return [];
+  const calendar = google.calendar({ version: "v3", auth: conn.client });
+  const { data } = await calendar.events.list({
+    calendarId: conn.calendarId,
+    timeMin,
+    timeMax,
+    singleEvents: true,
+    orderBy: "startTime",
+    maxResults: 250,
+  });
+  return (data.items || [])
+    .filter((e) => e.status !== "cancelled" && (e.start?.dateTime || e.start?.date))
+    .map((e) => ({
+      id: e.id,
+      titulo: e.summary || "(sin título)",
+      inicio: e.start.dateTime || e.start.date,
+      fin: e.end?.dateTime || e.end?.date || e.start.dateTime || e.start.date,
+      allDay: !e.start.dateTime,
+    }));
+}
+
 module.exports = {
   getOAuthClient,
   getAuthUrl,
@@ -154,4 +181,5 @@ module.exports = {
   actualizarEvento,
   borrarEvento,
   consultarFreeBusy,
+  listarEventos,
 };

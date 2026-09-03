@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { createPortal } from "react-dom";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
@@ -11,6 +11,7 @@ import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import api from "../api/api";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import CompartirLink from "../components/CompartirLink";
+import { TIPOS_AUSENCIA } from "../components/AusenciasMedico";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 
 dayjs.locale("es");
@@ -140,13 +141,47 @@ function buildEvents(citas) {
     }));
 }
 
+// Ausencias/permisos → eventos de todo el día (solo lectura)
+function buildAusencias(ausencias, medicos) {
+  const nombre = (id) => {
+    const m = medicos.find(x => String(x.id) === String(id));
+    return m ? `${m.nombres} ${m.apellidos}`.split(" ").slice(0, 2).join(" ") : "";
+  };
+  return (ausencias || []).map(a => {
+    const t = TIPOS_AUSENCIA[a.tipo] || TIPOS_AUSENCIA.otro;
+    const fin = dayjs(a.fecha_fin).add(1, "day").toDate(); // RBC: fin exclusivo en all-day
+    return {
+      id: `aus_${a.id}`,
+      title: `${t.label}${nombre(a.medico_id) ? " · " + nombre(a.medico_id) : ""}${Number(a.todo_el_dia) === 0 ? ` (${String(a.hora_inicio).slice(0,5)}–${String(a.hora_fin).slice(0,5)})` : ""}`,
+      start: dayjs(a.fecha_inicio).toDate(),
+      end: fin,
+      allDay: true,
+      resource: { __kind: "ausencia", tipo: a.tipo, motivo: a.motivo },
+    };
+  });
+}
+
+// Eventos externos de Google Calendar → bloques solo lectura
+function buildGoogle(eventos) {
+  return (eventos || []).map(e => ({
+    id: `g_${e.id}`,
+    title: `🗓 ${e.titulo}${e.medico_nombre ? " · " + e.medico_nombre.split(" ").slice(0, 2).join(" ") : ""}`,
+    start: new Date(e.inicio),
+    end: new Date(e.fin),
+    allDay: !!e.allDay,
+    resource: { __kind: "google" },
+  }));
+}
+
 // ─── Componente personalizado para la vista Agenda ───────────────────────────
 // Muestra el plan + estudios pendientes de la última consulta del paciente
 function AgendaEventoPendientes({ event }) {
   const [pendientes, setPendientes] = useState(null);
   const [cargando, setCargando] = useState(true);
+  const externo = event.resource?.__kind;
 
   useEffect(() => {
+    if (externo) { setCargando(false); return; }
     let activo = true;
     api.get(`/citas/${event.id}/pendientes`)
       .then(r => { if (activo) setPendientes(r.data.data); })
@@ -154,6 +189,16 @@ function AgendaEventoPendientes({ event }) {
       .finally(() => { if (activo) setCargando(false); });
     return () => { activo = false; };
   }, [event.id]);
+
+  if (externo) {
+    const t = externo === "ausencia" ? (TIPOS_AUSENCIA[event.resource.tipo] || TIPOS_AUSENCIA.otro) : null;
+    return (
+      <div style={{ lineHeight: 1.4, fontStyle: externo === "google" ? "italic" : "normal", color: t ? t.color : "#4b5563", fontWeight: 600 }}>
+        {event.title}
+        {event.resource?.motivo && <div style={{ fontSize: "0.75rem", fontWeight: 400 }}>{event.resource.motivo}</div>}
+      </div>
+    );
+  }
 
   const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff" };
   const hayPendientes = pendientes && (pendientes.plan || pendientes.estudios?.length > 0);
@@ -262,6 +307,27 @@ function dayPropGetter(date) {
 }
 
 function eventPropGetter(event) {
+  const kind = event.resource?.__kind;
+  if (kind === "ausencia") {
+    const t = TIPOS_AUSENCIA[event.resource.tipo] || TIPOS_AUSENCIA.otro;
+    return {
+      style: {
+        backgroundColor: t.bg, color: t.color,
+        border: `1px dashed ${t.color}`, borderRadius: "6px",
+        fontSize: "0.72rem", fontWeight: 700, opacity: 0.95, cursor: "default",
+      },
+    };
+  }
+  if (kind === "google") {
+    return {
+      style: {
+        backgroundColor: "#e5e7eb", color: "#4b5563",
+        border: "1px solid #cbd5e1", borderLeft: "3px solid #94a3b8",
+        borderRadius: "6px", fontSize: "0.74rem", fontWeight: 600,
+        fontStyle: "italic", cursor: "default",
+      },
+    };
+  }
   const col = ESTADO_COLOR[event.resource?.estado] || { bg: "#0d6efd", fg: "#fff", dot: "#0d6efd" };
   return {
     style: {
@@ -356,6 +422,8 @@ export default function Citas() {
       .catch(() => {});
   }, [user?.clinica_id]);
 
+  const [overlays, setOverlays] = useState([]);
+
   const loadCitas = useCallback(({ start, end } = {}) => {
     setLoading(true);
     const desde = dayjs(start || dayjs(date).startOf("month")).format("YYYY-MM-DD");
@@ -366,7 +434,19 @@ export default function Citas() {
       .then(r => setEvents(buildEvents(r.data.data || [])))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [date, filterMed]);
+
+    // Overlays: ausencias + eventos externos de Google (no bloquean la carga principal)
+    const ovParams = { desde, hasta };
+    if (filterMed) ovParams.medico_id = filterMed;
+    Promise.allSettled([
+      api.get("/ausencias", { params: ovParams }),
+      api.get("/citas/google-externos", { params: ovParams }),
+    ]).then(([aus, goog]) => {
+      const listaAus  = aus.status === "fulfilled" ? aus.value.data.data || [] : [];
+      const listaGoog = goog.status === "fulfilled" ? goog.value.data.data || [] : [];
+      setOverlays([...buildAusencias(listaAus, medicos), ...buildGoogle(listaGoog)]);
+    });
+  }, [date, filterMed, medicos]);
 
   useEffect(() => { loadCitas(); }, [loadCitas]);
 
@@ -390,6 +470,7 @@ export default function Citas() {
   }, [activeTab, loadSalaEspera]);
 
   const onEventDrop = ({ event, start, end }) => {
+    if (event.resource?.__kind) return; // ausencias / eventos externos no se mueven
     // Actualización optimista: mover el evento en el calendario de inmediato
     setEvents(prev => prev.map(e =>
       e.id === event.id
@@ -411,12 +492,25 @@ export default function Citas() {
 
   const onEventResize = ({ event, start, end }) => onEventDrop({ event, start, end });
 
+  // Citas + overlays (ausencias / eventos externos de Google) para el calendario
+  const allEvents = useMemo(() => [...events, ...overlays], [events, overlays]);
+
   const onSelectSlot = (slot) => {
     setSlotInfo({ inicio: slot.start, fin: slot.end });
     setShowNew(true);
   };
 
   const onSelectEvent = (event) => {
+    if (event.resource?.__kind) {
+      if (event.resource.__kind === "ausencia") {
+        showFeedback({
+          type: "info",
+          title: event.title,
+          message: event.resource.motivo || "Ausencia registrada en Horarios médicos → Ausencias y permisos.",
+        });
+      }
+      return; // eventos externos de Google: sin acción
+    }
     setSelEvent(event);
     setShowDet(true);
     setTimeout(() => headerRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 50);
@@ -838,7 +932,9 @@ export default function Citas() {
           }}>
             <DnDCalendar
               localizer={localizer}
-              events={events}
+              events={allEvents}
+              draggableAccessor={(e) => !e.resource?.__kind}
+              resizableAccessor={(e) => !e.resource?.__kind}
               view={view}
               onView={setView}
               date={date}

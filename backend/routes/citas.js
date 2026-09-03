@@ -113,6 +113,63 @@ router.get("/slots", auth(), async (req, res) => {
 });
 
 // ──────────────────────────────────────────────
+// GET /api/citas/google-externos?desde=&hasta=&medico_id=
+// Eventos del Google Calendar de los médicos que NO son citas de Medic-KG,
+// para mostrarlos en la agenda como bloques externos (solo lectura).
+// ──────────────────────────────────────────────
+router.get("/google-externos", auth("ADMIN", "MEDICO", "PSICOLOGO", "RECEPCIONISTA", "ENFERMERA", "SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+    if (!clinicaId) return res.json({ ok: true, data: [] });
+    const { desde, hasta, medico_id } = req.query;
+    if (!desde || !hasta) return res.status(400).json({ ok: false, msg: "desde y hasta obligatorios" });
+
+    let medicos;
+    if (medico_id) {
+      medicos = [{ id: Number(medico_id) }];
+    } else {
+      const [rows] = await pool.query(
+        "SELECT id FROM usuarios WHERE clinica_id=? AND tipo IN ('MEDICO','PSICOLOGO') AND activo=1",
+        [clinicaId]
+      );
+      medicos = rows;
+    }
+
+    // IDs de eventos que YA son citas nuestras → no duplicarlos
+    const [propias] = await pool.query(
+      `SELECT google_event_id FROM citas
+       WHERE clinica_id=? AND google_event_id IS NOT NULL
+         AND DATE(inicio) BETWEEN ? AND ?`,
+      [clinicaId, desde, hasta]
+    );
+    const setPropias = new Set(propias.map(p => p.google_event_id));
+
+    const [nombresRows] = await pool.query(
+      "SELECT id, nombres, apellidos FROM usuarios WHERE clinica_id=?",
+      [clinicaId]
+    );
+    const nombreDe = new Map(nombresRows.map(r => [r.id, `${r.nombres} ${r.apellidos}`.trim()]));
+
+    const out = [];
+    for (const m of medicos) {
+      let evs = [];
+      try {
+        evs = await gcal.listarEventos(m.id, `${desde}T00:00:00Z`, `${hasta}T23:59:59Z`);
+      } catch (e) {
+        console.error(`[google-externos] médico ${m.id}:`, e.message);
+      }
+      for (const e of evs) {
+        if (setPropias.has(e.id)) continue;
+        out.push({ ...e, medico_id: m.id, medico_nombre: nombreDe.get(m.id) || "" });
+      }
+    }
+    res.json({ ok: true, data: out });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ──────────────────────────────────────────────
 // GET /api/citas?desde=YYYY-MM-DD&hasta=YYYY-MM-DD&medico_id=
 // ──────────────────────────────────────────────
 router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
