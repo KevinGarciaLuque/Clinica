@@ -141,24 +141,53 @@ function buildEvents(citas) {
     }));
 }
 
-// Ausencias/permisos → eventos de todo el día (solo lectura)
-function buildAusencias(ausencias, medicos) {
+// Ausencias como bloques del calendario.
+// - Parciales (con horas): siempre como evento con horario.
+// - Día completo: como evento all-day SOLO si `incluirDiaCompleto` (vista "todos los médicos").
+//   Cuando hay un médico filtrado, las de día completo se pintan como fondo del día.
+function buildAusenciasBars(ausencias, medicos, incluirDiaCompleto) {
   const nombre = (id) => {
     const m = medicos.find(x => String(x.id) === String(id));
     return m ? `${m.nombres} ${m.apellidos}`.split(" ").slice(0, 2).join(" ") : "";
   };
-  return (ausencias || []).map(a => {
+  const out = [];
+  for (const a of (ausencias || [])) {
     const t = TIPOS_AUSENCIA[a.tipo] || TIPOS_AUSENCIA.otro;
-    const fin = dayjs(a.fecha_fin).add(1, "day").toDate(); // RBC: fin exclusivo en all-day
-    return {
-      id: `aus_${a.id}`,
-      title: `${t.label}${nombre(a.medico_id) ? " · " + nombre(a.medico_id) : ""}${Number(a.todo_el_dia) === 0 ? ` (${String(a.hora_inicio).slice(0,5)}–${String(a.hora_fin).slice(0,5)})` : ""}`,
-      start: dayjs(a.fecha_inicio).toDate(),
-      end: fin,
-      allDay: true,
-      resource: { __kind: "ausencia", tipo: a.tipo, motivo: a.motivo },
-    };
+    const quien = nombre(a.medico_id) ? " · " + nombre(a.medico_id) : "";
+    if (Number(a.todo_el_dia) === 0) {
+      out.push({
+        id: `aus_${a.id}`,
+        title: `${t.label}${quien} (${String(a.hora_inicio).slice(0,5)}–${String(a.hora_fin).slice(0,5)})`,
+        start: dayjs(`${dayjs(a.fecha_inicio).format("YYYY-MM-DD")}T${String(a.hora_inicio).slice(0,5)}`).toDate(),
+        end: dayjs(`${dayjs(a.fecha_fin).format("YYYY-MM-DD")}T${String(a.hora_fin).slice(0,5)}`).toDate(),
+        resource: { __kind: "ausencia", tipo: a.tipo, motivo: a.motivo },
+      });
+    } else if (incluirDiaCompleto) {
+      out.push({
+        id: `aus_${a.id}`,
+        title: `${t.label}${quien}`,
+        start: dayjs(a.fecha_inicio).toDate(),
+        end: dayjs(a.fecha_fin).endOf("day").toDate(),
+        allDay: true,
+        resource: { __kind: "ausencia", tipo: a.tipo, motivo: a.motivo },
+      });
+    }
+  }
+  return out;
+}
+
+// Mapa "YYYY-MM-DD" → { tipo, motivo } para las ausencias de día completo
+function mapAusenciasDiaCompleto(ausencias) {
+  const map = {};
+  (ausencias || []).filter(a => Number(a.todo_el_dia) === 1).forEach(a => {
+    let d = dayjs(a.fecha_inicio);
+    const fin = dayjs(a.fecha_fin);
+    while (d.isBefore(fin) || d.isSame(fin, "day")) {
+      map[d.format("YYYY-MM-DD")] = { tipo: a.tipo, motivo: a.motivo };
+      d = d.add(1, "day");
+    }
   });
+  return map;
 }
 
 // Eventos externos de Google Calendar → bloques solo lectura
@@ -423,6 +452,10 @@ export default function Citas() {
   }, [user?.clinica_id]);
 
   const [overlays, setOverlays] = useState([]);
+  const [ausenciaDias, setAusenciaDias] = useState({}); // "YYYY-MM-DD" -> {tipo,motivo}
+
+  // Un MEDICO/PSICOLOGO siempre está "filtrado" a su propia agenda aunque no elija en el buscador.
+  const medicoFoco = filterMed || ((user?.tipo === "MEDICO" || user?.tipo === "PSICOLOGO") ? String(user.id) : "");
 
   const loadCitas = useCallback(({ start, end } = {}) => {
     setLoading(true);
@@ -437,16 +470,17 @@ export default function Citas() {
 
     // Overlays: ausencias + eventos externos de Google (no bloquean la carga principal)
     const ovParams = { desde, hasta };
-    if (filterMed) ovParams.medico_id = filterMed;
+    if (medicoFoco) ovParams.medico_id = medicoFoco;
     Promise.allSettled([
       api.get("/ausencias", { params: ovParams }),
       api.get("/citas/google-externos", { params: ovParams }),
     ]).then(([aus, goog]) => {
       const listaAus  = aus.status === "fulfilled" ? aus.value.data.data || [] : [];
       const listaGoog = goog.status === "fulfilled" ? goog.value.data.data || [] : [];
-      setOverlays([...buildAusencias(listaAus, medicos), ...buildGoogle(listaGoog)]);
+      setOverlays([...buildAusenciasBars(listaAus, medicos, !medicoFoco), ...buildGoogle(listaGoog)]);
+      setAusenciaDias(medicoFoco ? mapAusenciasDiaCompleto(listaAus) : {});
     });
-  }, [date, filterMed, medicos]);
+  }, [date, filterMed, medicoFoco, medicos]);
 
   useEffect(() => { loadCitas(); }, [loadCitas]);
 
@@ -492,10 +526,35 @@ export default function Citas() {
 
   const onEventResize = ({ event, start, end }) => onEventDrop({ event, start, end });
 
-  // Citas + overlays (ausencias / eventos externos de Google) para el calendario
+  // Citas + overlays (ausencias parciales / eventos externos de Google)
   const allEvents = useMemo(() => [...events, ...overlays], [events, overlays]);
 
+  // Pinta el fondo del día cuando hay una ausencia de día completo (estilo calendario de Horarios)
+  const dayPropGetterMerged = useCallback((date) => {
+    const key = dayjs(date).format("YYYY-MM-DD");
+    const aus = ausenciaDias[key];
+    const base = dayPropGetter(date); // conserva el recuadro de "hoy"
+    if (!aus) return base;
+    const t = TIPOS_AUSENCIA[aus.tipo] || TIPOS_AUSENCIA.otro;
+    return { ...base, style: { ...(base.style || {}), backgroundColor: t.bg } };
+  }, [ausenciaDias]);
+
+  // Bloquea crear cita en un día de ausencia de día completo
+  const bloqueadoPorAusencia = useCallback((date) => {
+    return !!ausenciaDias[dayjs(date).format("YYYY-MM-DD")];
+  }, [ausenciaDias]);
+
   const onSelectSlot = (slot) => {
+    if (bloqueadoPorAusencia(slot.start)) {
+      const aus = ausenciaDias[dayjs(slot.start).format("YYYY-MM-DD")];
+      const t = TIPOS_AUSENCIA[aus.tipo] || TIPOS_AUSENCIA.otro;
+      showFeedback({
+        type: "warning",
+        title: `Día no disponible — ${t.label}`,
+        message: `El médico tiene ${t.label.toLowerCase()} ese día${aus.motivo ? ` (${aus.motivo})` : ""}. Quita la ausencia en Horarios médicos si necesitas agendar.`,
+      });
+      return;
+    }
     setSlotInfo({ inicio: slot.start, fin: slot.end });
     setShowNew(true);
   };
@@ -950,7 +1009,7 @@ export default function Citas() {
               onEventDrop={onEventDrop}
               onEventResize={onEventResize}
               eventPropGetter={eventPropGetter}
-              dayPropGetter={dayPropGetter}
+              dayPropGetter={dayPropGetterMerged}
               popup
               popupOffset={{ x: 30, y: 20 }}
               messages={MESSAGES}

@@ -250,7 +250,7 @@ router.post("/", async (req, res) => {
     await crearNotificacionesPortal({
       clinicaId: clinica_id,
       tipo: "PACIENTE_REGISTRO_PORTAL",
-      mensaje: "Se registró paciente desde link",
+      mensaje: `${nombres.trim()} ${apellidos.trim()} se registró como paciente nuevo desde el link`,
       pacienteId,
     });
 
