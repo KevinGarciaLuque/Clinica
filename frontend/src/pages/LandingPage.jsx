@@ -162,6 +162,10 @@ export default function LandingPage() {
           .hero-btns { flex-direction: column; }
           .planes-grid { grid-template-columns: 1fr !important; }
           .features-grid { grid-template-columns: 1fr 1fr !important; }
+          .mkt-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
+        }
+        @media (max-width: 900px) {
+          .mkt-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
         }
         @keyframes waPulse {
           0%   { box-shadow: 0 0 0 0 rgba(37,211,102,.6), 0 6px 24px rgba(37,211,102,.4); }
@@ -245,6 +249,9 @@ export default function LandingPage() {
             <button className="nav-link-lp" onClick={() => navigate("/agenda-tu-consulta")}>Agenda tu consulta médica</button>
             <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
             <button className="nav-link-lp" onClick={() => scrollTo("especialidades")}>Especialidades</button>
+            {cfg.marketing_activo !== "0" && (
+              <button className="nav-link-lp" onClick={() => navigate("/marketing-medico")}>Marketing Médico</button>
+            )}
             <button className="nav-link-lp" onClick={() => scrollTo("planes")}>Planes</button>
             <button className="nav-link-lp" onClick={() => scrollTo("resenas")}>Reseñas</button>
             <button className="nav-link-lp" onClick={() => scrollTo("nosotros")}>Nosotros</button>
@@ -285,6 +292,11 @@ export default function LandingPage() {
           <button className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => { setMenuOpen(false); navigate("/agenda-tu-consulta"); }}>
             Agenda tu consulta médica
           </button>
+          {cfg.marketing_activo !== "0" && (
+            <button className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => { setMenuOpen(false); navigate("/marketing-medico"); }}>
+              Marketing Médico
+            </button>
+          )}
           {["Características|caracteristicas","Especialidades|especialidades","Planes|planes","Reseñas|resenas","Nosotros|nosotros","Contacto|contacto"].map(item => {
             const [label, id] = item.split("|");
             return (
@@ -461,6 +473,44 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {/* ── MARKETING MÉDICO ── */}
+      {cfg.marketing_activo !== "0" && (
+        <section id="marketing" style={{ background: `linear-gradient(135deg, ${color} 0%, ${darken(color, 30)} 100%)`, padding: "88px 24px", color: "#fff", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -140, right: -100, width: 360, height: 360, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
+          <div style={{ maxWidth: 1000, margin: "0 auto", position: "relative", display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 48, alignItems: "center" }} className="mkt-grid">
+            <div>
+              <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "rgba(255,255,255,.7)" }}>
+                {cfg.marketing_home_badge || "Marketing Médico"}
+              </span>
+              <h2 style={{ fontSize: "clamp(1.7rem, 3.2vw, 2.5rem)", fontWeight: 800, marginTop: 10, marginBottom: 16, lineHeight: 1.2 }}>
+                {cfg.marketing_home_titulo || "Haz crecer tu consulta"}
+              </h2>
+              <p style={{ fontSize: 16, color: "rgba(255,255,255,.8)", lineHeight: 1.7, marginBottom: 28 }}>
+                {cfg.marketing_home_texto}
+              </p>
+              <button className="lp-btn-primary" style={{ background: "#fff", color }} onClick={() => navigate("/marketing-medico")}>
+                Conocer más <i className="bi bi-arrow-right ms-1" />
+              </button>
+            </div>
+            <div style={{ display: "grid", gap: 14 }}>
+              {[
+                { icon: "bi-images", t: "Contenido", d: "Publicaciones y piezas gráficas con identidad profesional." },
+                { icon: "bi-play-btn-fill", t: "Video", d: "Testimonios y reels que transmiten cercanía y confianza." },
+                { icon: "bi-graph-up-arrow", t: "Estrategia", d: "Planes de acompañamiento para atraer más pacientes." },
+              ].map((c, i) => (
+                <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, padding: "16px 18px" }}>
+                  <i className={`bi ${c.icon}`} style={{ fontSize: 22, color: "#fff", flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontWeight: 700, fontSize: 15 }}>{c.t}</div>
+                    <div style={{ fontSize: 13, color: "rgba(255,255,255,.72)", lineHeight: 1.55 }}>{c.d}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* ── PLANES ── */}
       <section id="planes" style={{ background: "#f8fafc", padding: "80px 24px" }}>

@@ -45,7 +45,9 @@ const SolicitudesPlan          = lazy(() => import("./pages/superadmin/Solicitud
 const ResenasMedicos           = lazy(() => import("./pages/superadmin/ResenasMedicos"));
 const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdminPersonalizacion"));
 const LandingPageAdmin          = lazy(() => import("./pages/superadmin/LandingPageAdmin"));
+const MarketingMedicoAdmin      = lazy(() => import("./pages/superadmin/MarketingMedicoAdmin"));
 const LandingPage               = lazy(() => import("./pages/LandingPage"));
+const MarketingMedico           = lazy(() => import("./pages/MarketingMedico"));
 const LinksPage                 = lazy(() => import("./pages/LinksPage"));
 const Privacidad                = lazy(() => import("./pages/Privacidad"));
 
@@ -131,6 +133,7 @@ export default function App() {
       <Route path="/solicitar-plan"   element={<SolicitarPlan />} />
       <Route path="/resena/:token"    element={<ResenaPublica />} />
       <Route path="/inicio"           element={<LandingPage />} />
+      <Route path="/marketing-medico" element={<MarketingMedico />} />
       <Route path="/links"            element={<LinksPage />} />
       <Route path="/privacidad"       element={<Privacidad />} />
       <Route path="/"                         element={<LandingPage />} />
@@ -251,6 +254,11 @@ export default function App() {
         <Route path="/superadmin/landing" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <LandingPageAdmin />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/marketing-medico" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <MarketingMedicoAdmin />
           </RolRoute>
         } />
 

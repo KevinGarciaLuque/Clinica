@@ -30,6 +30,14 @@ const DEFAULTS = {
   landing_tiktok:               "",
   landing_youtube:              "",
   landing_linkedin:             "",
+  // Sección "Marketing Médico" (/marketing-medico + bloque en el inicio)
+  marketing_activo:             "1",
+  marketing_home_badge:         "Marketing Médico",
+  marketing_home_titulo:        "Haz crecer tu consulta",
+  marketing_home_texto:         "Contenido, video y estrategia digital pensados para médicos y clínicas. Atrae más pacientes con una presencia profesional y coherente.",
+  marketing_hero_titulo:        "Marketing Médico",
+  marketing_hero_texto:         "Ayudamos a médicos y clínicas a comunicar mejor, ganar confianza y llenar la agenda. Mira ejemplos reales y elige el plan que se ajusta a ti.",
+  marketing_whatsapp:           "",
   // Página "Mi Link" (/links)
   links_nombre:                 "Medic-KG",
   links_bio:                    "Todos mis enlaces en un solo lugar 👇",
@@ -114,6 +122,8 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
       "landing_whatsapp", "landing_email_contacto", "landing_nosotros_texto",
       "landing_instagram", "landing_facebook", "landing_tiktok",
       "landing_youtube", "landing_linkedin",
+      "marketing_activo", "marketing_home_badge", "marketing_home_titulo", "marketing_home_texto",
+      "marketing_hero_titulo", "marketing_hero_texto", "marketing_whatsapp",
       "links_nombre", "links_bio",
       "landing_plan_trial_precio", "landing_plan_trial_duracion", "landing_plan_trial_features",
       "landing_plan_semestral_precio", "landing_plan_semestral_features",

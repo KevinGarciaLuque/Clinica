@@ -181,6 +181,7 @@ app.use("/api/vacunas",    require("./routes/vacunas"));
 app.use("/api/soporte",        require("./routes/soporte"));
 app.use("/api/cumpleanos",     require("./routes/cumpleanos"));
 app.use("/api/config-sistema", require("./routes/configSistema"));
+app.use("/api/marketing-medico", require("./routes/marketingMedico"));
 app.use("/api/eventos-festivos", require("./routes/eventosFestivos"));
 app.use("/api/psicologia",     require("./routes/psicologia"));
 app.use("/api/odontologia",    require("./routes/odontologia"));
