@@ -160,6 +160,8 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           </section>
           </div>
 
+          <div className="mcg-row2" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <section className="mcg-col-a" style={{ flex: "0 0 42%", minWidth: 0 }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>3. Interpretación clínica</div>
           {CAMPOS_INTERPRETACION.map(([k, l]) => (
             <div key={k} className="mcg-sec" style={{ marginBottom: 6 }}>
@@ -167,23 +169,26 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
               <p style={S.txtBlock}>{inter[k] || "—"}</p>
             </div>
           ))}
+          </section>
 
+          <section className="mcg-col-b" style={{ flex: 1, minWidth: 0 }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>4. Recomendaciones educativas</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", columnGap: 18, rowGap: 8 }}>
-            {CAMPOS_RECOMENDACIONES.map(([k, l]) => {
-              const lineas = aLineas(reco[k]);
-              return (
-                <div key={k} className="mcg-sec">
-                  <div style={{ fontSize: 10, fontWeight: 700, color: "#0f766e" }}>{l}</div>
-                  {lineas.length
-                    ? <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>{lineas.map((x, i) => <li key={i} style={{ fontSize: 10.5 }}>{x}</li>)}</ul>
-                    : <p style={S.txtBlock}>—</p>}
-                </div>
-              );
-            })}
+          {CAMPOS_RECOMENDACIONES.map(([k, l]) => {
+            const lineas = aLineas(reco[k]);
+            return (
+              <div key={k} className="mcg-sec" style={{ marginBottom: 6 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: "#0f766e" }}>{l}</div>
+                {lineas.length
+                  ? <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>{lineas.map((x, i) => <li key={i} style={{ fontSize: 10.5 }}>{x}</li>)}</ul>
+                  : <p style={S.txtBlock}>—</p>}
+              </div>
+            );
+          })}
+          </section>
           </div>
 
-          <section className="mcg-sec">
+          <div className="mcg-row2" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <section className="mcg-sec mcg-col-a" style={{ flex: "0 0 42%", minWidth: 0 }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>5. Plan de seguimiento</div>
           <div style={{ marginBottom: 4 }}>
             <div style={{ fontSize: 10, fontWeight: 700, color: "#0f766e" }}>Objetivos acordados</div>
@@ -196,24 +201,25 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           </div>
           </section>
 
-          <section className="mcg-sec">
+          <section className="mcg-sec mcg-col-b" style={{ flex: 1, minWidth: 0 }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>6. Datos del profesional</div>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 20, marginTop: 6 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 16, marginTop: 6, flexWrap: "wrap" }}>
             <div style={{ fontSize: 11, lineHeight: 1.7 }}>
               <div><strong>Nombre:</strong> {prof.nombre || informe.educador_nombre || "—"}</div>
               <div><strong>Profesión / Cargo:</strong> {prof.profesion_cargo || "—"}</div>
               <div><strong>N.º de colegiación:</strong> {prof.numero_colegiacion || "—"}</div>
             </div>
-            <div style={{ textAlign: "center", minWidth: 220 }}>
-              {user?.firma_url ? <img src={user.firma_url} alt="Firma" style={{ maxHeight: 64, maxWidth: 200, objectFit: "contain", display: "block", margin: "0 auto 4px" }} /> : <div style={{ height: 64 }} />}
-              <div style={{ borderTop: "1.5px solid #374151", paddingTop: 6, fontSize: 10, color: "#6b7280" }}>Firma y Sello · Fecha: {dayjs(informe.fecha).format("DD/MM/YYYY")}</div>
+            <div style={{ textAlign: "center", minWidth: 160, flex: 1 }}>
+              {user?.firma_url ? <img src={user.firma_url} alt="Firma" style={{ maxHeight: 56, maxWidth: 180, objectFit: "contain", display: "block", margin: "0 auto 4px" }} /> : <div style={{ height: 44 }} />}
+              <div style={{ borderTop: "1.5px solid #374151", paddingTop: 6, fontSize: 9.5, color: "#6b7280" }}>Firma y Sello · Fecha: {dayjs(informe.fecha).format("DD/MM/YYYY")}</div>
             </div>
           </div>
+          </section>
+          </div>
 
-          <div style={{ marginTop: 20, paddingTop: 10, borderTop: "1px solid #e5e7eb", textAlign: "center", fontSize: 9, color: "#9ca3af" }}>
+          <div style={{ marginTop: 14, paddingTop: 8, borderTop: "1px solid #e5e7eb", textAlign: "center", fontSize: 9, color: "#9ca3af" }}>
             Generado el {dayjs().format("DD/MM/YYYY [a las] HH:mm")}
           </div>
-          </section>
         </div>
       </div>
     </div>
