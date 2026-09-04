@@ -44,15 +44,19 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
   );
 
   const contenido = (
-    <div id="mcg-print-root">
+    <div id="mcg-print-root" style={{ position: "fixed", inset: 0, zIndex: 4000, display: "flex", flexDirection: "column", background: "#e8e8e8" }}>
       <style>{`
         @media print {
           @page { size: letter; margin: 0; }
           html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; }
           body > *:not(#mcg-print-root) { display: none !important; }
-          #mcg-print-root { position: static !important; background: #fff !important; }
+          #mcg-print-root {
+            position: static !important; display: block !important;
+            background: #fff !important; z-index: auto !important;
+          }
           #mcg-print-wrap {
             display: block !important; position: static !important;
+            flex: none !important;
             min-height: 0 !important; padding: 0 !important; margin: 0 !important;
             background: #fff !important; overflow: visible !important;
           }
@@ -60,16 +64,19 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
             position: static !important;
             width: 100% !important; max-width: none !important;
             min-height: 0 !important;
-            margin: 0 !important; padding: 12mm 14mm !important;
+            margin: 0 !important; padding: 8mm 12mm !important;
             box-shadow: none !important; background: #fff !important;
           }
           #print-actions-bar { display: none !important; }
           #mcg-print-doc table, #mcg-print-doc thead, #mcg-print-doc tr { break-inside: avoid; }
           .mcg-sec { break-inside: avoid; }
           .mcg-sec-title { break-after: avoid; }
+          .mcg-row2 { display: flex !important; gap: 12px; align-items: flex-start; }
+          .mcg-row2 > .mcg-col-a { flex: 0 0 42%; }
+          .mcg-row2 > .mcg-col-b { flex: 1; }
         }
       `}</style>
-      <div id="print-actions-bar" style={{ background: "#f0fdfa", borderBottom: "1px solid #99f6e4", padding: "12px 24px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <div id="print-actions-bar" style={{ background: "#f0fdfa", borderBottom: "1px solid #99f6e4", padding: "12px 24px", display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", flexShrink: 0 }}>
         <button onClick={() => window.print()} style={{ padding: "9px 22px", background: TEAL, color: "#fff", border: "none", borderRadius: 9, fontWeight: 700, cursor: "pointer", display: "flex", alignItems: "center", gap: 7, fontSize: 14 }}>
           <i className="bi bi-printer-fill" /> Imprimir / Guardar PDF
         </button>
@@ -78,8 +85,8 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
         </button>
         <span style={{ marginLeft: "auto", fontSize: 12, color: "#0f766e" }}>Vista previa — Informe MCG {dayjs(informe.fecha).format("DD/MM/YYYY")}</span>
       </div>
-      <div id="mcg-print-wrap" style={{ background: "#e8e8e8", minHeight: "calc(100vh - 60px)", padding: "24px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
-        <div id="mcg-print-doc" style={{ background: "white", width: "100%", maxWidth: "216mm", minHeight: "279mm", padding: "12mm 14mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
+      <div id="mcg-print-wrap" style={{ flex: 1, background: "#e8e8e8", padding: "20px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
+        <div id="mcg-print-doc" style={{ background: "white", width: "100%", maxWidth: "216mm", minHeight: "279mm", padding: "10mm 12mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
 
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${encabezadoColor}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
@@ -107,9 +114,10 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
             {D("Días analizados", enc.dias_analizados)}
           </div>
 
-          <section className="mcg-sec">
+          <div className="mcg-row2" style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+          <section className="mcg-sec mcg-col-a" style={{ flex: "0 0 42%" }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>1. Resumen del monitoreo</div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 8 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 8 }}>
             {RC("Días de uso del sensor", res.dias_uso_sensor, "días")}
             {RC("Datos disponibles", res.pct_datos_disponibles, "%")}
             {RC("Glucosa promedio", res.glucosa_promedio, "mg/dL")}
@@ -119,37 +127,38 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           </div>
           </section>
 
-          <section className="mcg-sec">
+          <section className="mcg-sec mcg-col-b" style={{ flex: 1, minWidth: 0 }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>2. Tiempo en rangos (TIR)</div>
-          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 10.5 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 9.5, tableLayout: "fixed" }}>
             <thead>
               <tr style={{ background: "#f0fdfa" }}>
-                <th style={{ textAlign: "left", padding: "6px 8px", border: "1px solid #d1d5db" }}>Rango de glucosa</th>
-                <th style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db", width: 90 }}>mg/dL</th>
-                <th style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db", width: 80 }}>Tiempo</th>
-                <th style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db", width: 80 }}>% del tiempo</th>
+                <th style={{ textAlign: "left", padding: "4px 6px", border: "1px solid #d1d5db" }}>Rango de glucosa</th>
+                <th style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db", width: 56 }}>mg/dL</th>
+                <th style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db", width: 46 }}>Tiempo</th>
+                <th style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db", width: 40 }}>%</th>
               </tr>
             </thead>
             <tbody>
               {RANGOS_MCG.map(r => (
                 <tr key={r.key}>
-                  <td style={{ padding: "6px 8px", border: "1px solid #d1d5db" }}>
-                    <span style={{ display: "inline-block", width: 9, height: 9, borderRadius: "50%", background: r.color, marginRight: 7 }} />
-                    {r.label} <span style={{ color: "#6b7280" }}>· {r.sub}</span>
+                  <td style={{ padding: "4px 6px", border: "1px solid #d1d5db" }}>
+                    <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: r.color, marginRight: 6 }} />
+                    {r.label}<br /><span style={{ color: "#6b7280", fontSize: 8.5, marginLeft: 14 }}>{r.sub}</span>
                   </td>
-                  <td style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db" }}>{r.rango}</td>
-                  <td style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db" }}>{tr[r.key]?.tiempo || "—"}</td>
-                  <td style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db", fontWeight: 700 }}>{tr[r.key]?.pct ? `${tr[r.key].pct} %` : "—"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db" }}>{r.rango}</td>
+                  <td style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db" }}>{tr[r.key]?.tiempo || "—"}</td>
+                  <td style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db", fontWeight: 700 }}>{tr[r.key]?.pct ? `${tr[r.key].pct}` : "—"}</td>
                 </tr>
               ))}
               <tr style={{ background: "#f0fdfa", fontWeight: 800 }}>
-                <td style={{ padding: "6px 8px", border: "1px solid #d1d5db" }} colSpan={3}>TOTAL</td>
-                <td style={{ textAlign: "center", padding: "6px 8px", border: "1px solid #d1d5db", color: total >= 98 && total <= 102 ? "#16a34a" : "#dc2626" }}>{total ? `${total} %` : "—"}</td>
+                <td style={{ padding: "4px 6px", border: "1px solid #d1d5db" }} colSpan={3}>TOTAL</td>
+                <td style={{ textAlign: "center", padding: "4px 4px", border: "1px solid #d1d5db", color: total >= 98 && total <= 102 ? "#16a34a" : "#dc2626" }}>{total ? `${total}` : "—"}</td>
               </tr>
             </tbody>
           </table>
-          <div style={{ fontSize: 8.5, color: "#6b7280", marginTop: 3, fontStyle: "italic" }}>* Rangos objetivo recomendados para la mayoría de adultos con diabetes.</div>
+          <div style={{ fontSize: 8, color: "#6b7280", marginTop: 3, fontStyle: "italic" }}>* Valores en % del tiempo. Rangos objetivo recomendados para adultos con diabetes.</div>
           </section>
+          </div>
 
           <div className="mcg-sec-title" style={S.sectionTitle}>3. Interpretación clínica</div>
           {CAMPOS_INTERPRETACION.map(([k, l]) => (
