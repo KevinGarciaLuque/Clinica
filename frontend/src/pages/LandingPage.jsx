@@ -8,6 +8,14 @@ function hexToRgb(hex) {
   return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : "59,130,246";
 }
 
+const mediaAbs = (u) => (!u ? "" : (u.startsWith("http") || u.startsWith("data:") ? u : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${u}`));
+
+function ytThumb(url) {
+  if (!url) return null;
+  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
+  return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : null;
+}
+
 const FEATURES = [
   { icon: "bi-calendar2-check-fill", label: "Agenda de Citas",      desc: "Calendario completo con vista diaria, semanal y mensual." },
   { icon: "bi-people-fill",          label: "Gestión de Pacientes",  desc: "Expedientes digitales con historial, documentos y más." },
@@ -47,6 +55,7 @@ export default function LandingPage() {
   const [cfg, setCfg] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [resenas, setResenas] = useState([]);
+  const [marketing, setMarketing] = useState({ posts: [], videos: [], planes: [] });
 
   useEffect(() => {
     fetch(`${API_URL}/api/config-sistema`)
@@ -56,6 +65,10 @@ export default function LandingPage() {
     fetch(`${API_URL}/api/resenas/publicas`)
       .then(r => r.json())
       .then(d => setResenas(d.data || []))
+      .catch(() => {});
+    fetch(`${API_URL}/api/marketing-medico`)
+      .then(r => r.json())
+      .then(d => setMarketing(d.data || { posts: [], videos: [], planes: [] }))
       .catch(() => {});
   }, []);
 
@@ -154,6 +167,8 @@ export default function LandingPage() {
         }
         .lp-btn-outline:hover { background: ${color}; color: #fff; }
         .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 36px rgba(0,0,0,.1) !important; }
+        .mkt-tile { transition: transform .25s ease; }
+        .mkt-tile:hover { transform: scale(1.03); }
         .plan-card { transition: transform .2s, box-shadow .2s; }
         .plan-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,.12) !important; }
         .nav-link-lp { background: none; border: none; color: rgba(255,255,255,.8); font-size: 14px; font-weight: 500; cursor: pointer; padding: 6px 12px; border-radius: 8px; transition: color .15s, background .15s; }
@@ -475,42 +490,114 @@ export default function LandingPage() {
       </section>
 
       {/* ── MARKETING MÉDICO ── */}
-      {cfg.marketing_activo !== "0" && (
-        <section id="marketing" style={{ background: `linear-gradient(135deg, ${color} 0%, ${darken(color, 30)} 100%)`, padding: "88px 24px", color: "#fff", position: "relative", overflow: "hidden" }}>
-          <div style={{ position: "absolute", top: -140, right: -100, width: 360, height: 360, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
-          <div style={{ maxWidth: 1000, margin: "0 auto", position: "relative", display: "grid", gridTemplateColumns: "1.1fr 1fr", gap: 48, alignItems: "center" }} className="mkt-grid">
+      {cfg.marketing_activo !== "0" && (() => {
+        const mPosts  = (marketing.posts  || []).filter(p => p.media_url);
+        const mVideos = (marketing.videos || []);
+        const featVideo = mVideos[0];
+        const featVideoImg = featVideo ? ytThumb(featVideo.media_url) : null;
+        const tiles = [];
+        if (featVideo) tiles.push({ key: `v${featVideo.id}`, video: true, img: featVideoImg, title: featVideo.titulo });
+        mPosts.forEach(p => tiles.push({ key: `p${p.id}`, img: mediaAbs(p.media_url), title: p.titulo }));
+        const visibles = tiles.slice(0, 5);
+        const extra = (mPosts.length + mVideos.length) - visibles.length;
+        const hayPreview = visibles.length > 0;
+        const go = () => navigate("/marketing-medico");
+
+        return (
+        <section id="marketing" style={{ background: `linear-gradient(135deg, ${color} 0%, ${darken(color, 32)} 100%)`, padding: "92px 24px", color: "#fff", position: "relative", overflow: "hidden" }}>
+          <div style={{ position: "absolute", top: -160, right: -120, width: 420, height: 420, borderRadius: "50%", background: "rgba(255,255,255,.045)" }} />
+          <div style={{ position: "absolute", bottom: -180, left: -140, width: 380, height: 380, borderRadius: "50%", background: "rgba(255,255,255,.03)" }} />
+          <div style={{ maxWidth: 1080, margin: "0 auto", position: "relative", display: "grid", gridTemplateColumns: "1fr 1.05fr", gap: 56, alignItems: "center" }} className="mkt-grid">
+
             <div>
-              <span style={{ fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1px", color: "rgba(255,255,255,.7)" }}>
-                {cfg.marketing_home_badge || "Marketing Médico"}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#fff", background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", padding: "6px 14px", borderRadius: 999 }}>
+                <i className="bi bi-megaphone-fill" />{cfg.marketing_home_badge || "Marketing Médico"}
               </span>
-              <h2 style={{ fontSize: "clamp(1.7rem, 3.2vw, 2.5rem)", fontWeight: 800, marginTop: 10, marginBottom: 16, lineHeight: 1.2 }}>
+              <h2 style={{ fontSize: "clamp(1.8rem, 3.4vw, 2.7rem)", fontWeight: 800, marginTop: 18, marginBottom: 16, lineHeight: 1.15 }}>
                 {cfg.marketing_home_titulo || "Haz crecer tu consulta"}
               </h2>
-              <p style={{ fontSize: 16, color: "rgba(255,255,255,.8)", lineHeight: 1.7, marginBottom: 28 }}>
+              <p style={{ fontSize: 16, color: "rgba(255,255,255,.82)", lineHeight: 1.75, marginBottom: 22 }}>
                 {cfg.marketing_home_texto}
               </p>
-              <button className="lp-btn-primary" style={{ background: "#fff", color }} onClick={() => navigate("/marketing-medico")}>
-                Conocer más <i className="bi bi-arrow-right ms-1" />
-              </button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 30 }}>
+                {["Redes sociales", "Reels y video", "Identidad visual", "Pauta digital"].map(t => (
+                  <span key={t} style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.9)", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", padding: "5px 12px", borderRadius: 8 }}>{t}</span>
+                ))}
+              </div>
+              <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
+                <button className="lp-btn-primary" style={{ background: "#fff", color }} onClick={go}>
+                  Conocer más <i className="bi bi-arrow-right ms-1" />
+                </button>
+                {marketing.planes?.length > 0 && (
+                  <button onClick={go} style={{ background: "none", border: "none", color: "#fff", fontWeight: 700, fontSize: 14, cursor: "pointer", textDecoration: "underline", textUnderlineOffset: 4 }}>
+                    Ver planes
+                  </button>
+                )}
+              </div>
             </div>
-            <div style={{ display: "grid", gap: 14 }}>
-              {[
-                { icon: "bi-images", t: "Contenido", d: "Publicaciones y piezas gráficas con identidad profesional." },
-                { icon: "bi-play-btn-fill", t: "Video", d: "Testimonios y reels que transmiten cercanía y confianza." },
-                { icon: "bi-graph-up-arrow", t: "Estrategia", d: "Planes de acompañamiento para atraer más pacientes." },
-              ].map((c, i) => (
-                <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, padding: "16px 18px" }}>
-                  <i className={`bi ${c.icon}`} style={{ fontSize: 22, color: "#fff", flexShrink: 0 }} />
-                  <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>{c.t}</div>
-                    <div style={{ fontSize: 13, color: "rgba(255,255,255,.72)", lineHeight: 1.55 }}>{c.d}</div>
-                  </div>
+
+            {hayPreview ? (
+              <div onClick={go} style={{ cursor: "pointer", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 14, boxShadow: "0 30px 60px rgba(0,0,0,.28)" }}>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  {visibles.map((t, i) => {
+                    const last = i === visibles.length - 1 && extra > 0;
+                    return (
+                      <div key={t.key} className="mkt-tile" style={{
+                        position: "relative", gridColumn: t.video ? "span 2" : "auto",
+                        aspectRatio: t.video ? "16/9" : "1/1", borderRadius: 12, overflow: "hidden",
+                        background: `linear-gradient(135deg, ${darken(color, 10)}, ${darken(color, 40)})`,
+                      }}>
+                        {t.img && <img src={t.img} alt={t.title || ""} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
+                        {t.video && (
+                          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.18)" }}>
+                            <div style={{ width: 54, height: 54, borderRadius: "50%", background: "rgba(255,255,255,.94)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(0,0,0,.35)" }}>
+                              <i className="bi bi-play-fill" style={{ fontSize: 26, color, marginLeft: 3 }} />
+                            </div>
+                          </div>
+                        )}
+                        {last && (
+                          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,.72)", color: "#fff" }}>
+                            <span style={{ fontSize: 22, fontWeight: 800 }}>+{extra}</span>
+                            <span style={{ fontSize: 12, fontWeight: 600, opacity: .85 }}>Ver todo</span>
+                          </div>
+                        )}
+                        {!last && t.title && !t.video && (
+                          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "16px 10px 8px", fontSize: 11, fontWeight: 600, color: "#fff", background: "linear-gradient(transparent, rgba(0,0,0,.6))", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {t.title}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 6px 4px" }}>
+                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.7)" }}>
+                    <i className="bi bi-collection-play me-2" />Ejemplos y videos reales
+                  </span>
+                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Ver galería <i className="bi bi-arrow-right" /></span>
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: "grid", gap: 14 }}>
+                {[
+                  { icon: "bi-images", t: "Contenido", d: "Publicaciones y piezas gráficas con identidad profesional." },
+                  { icon: "bi-play-btn-fill", t: "Video", d: "Testimonios y reels que transmiten cercanía y confianza." },
+                  { icon: "bi-graph-up-arrow", t: "Estrategia", d: "Planes de acompañamiento para atraer más pacientes." },
+                ].map((c, i) => (
+                  <div key={i} style={{ display: "flex", gap: 14, alignItems: "flex-start", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 14, padding: "16px 18px" }}>
+                    <i className={`bi ${c.icon}`} style={{ fontSize: 22, color: "#fff", flexShrink: 0 }} />
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15 }}>{c.t}</div>
+                      <div style={{ fontSize: 13, color: "rgba(255,255,255,.72)", lineHeight: 1.55 }}>{c.d}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </section>
-      )}
+        );
+      })()}
 
       {/* ── PLANES ── */}
       <section id="planes" style={{ background: "#f8fafc", padding: "80px 24px" }}>
