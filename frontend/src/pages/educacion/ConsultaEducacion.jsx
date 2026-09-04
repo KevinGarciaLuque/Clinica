@@ -10,6 +10,7 @@ import {
   SECCIONES_DEF, emptySesion, calcularIndiceGlobal, calcularAlertas,
 } from "./shared";
 import AlertasBanner from "./AlertasBanner";
+import PanelInformesMCG from "./InformeMCG";
 
 const NIVELES_1A5 = ["1", "2", "3", "4", "5"];
 
@@ -216,6 +217,7 @@ export default function ConsultaEducacion() {
   const [guardando, setGuardando] = useState(false);
   const [msg, setMsg] = useState(null);
   const [mostrarPrint, setMostrarPrint] = useState(false);
+  const [vista, setVista] = useState("sesiones"); // "sesiones" | "informes_mcg"
   const [logoUrl, setLogoUrl] = useState("");
   const [headerCfgSesion, setHeaderCfgSesion] = useState({ encabezado_color: true, color: TEAL });
 
@@ -397,25 +399,43 @@ export default function ConsultaEducacion() {
                 </button>
               </div>
 
+              <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
+                {[["sesiones", "Sesiones Educativas", "bi-mortarboard"], ["informes_mcg", "Informes MCG", "bi-file-earmark-medical"]].map(([v, txt, icon]) => (
+                  <button key={v} onClick={() => setVista(v)} style={{
+                    padding: "8px 16px", borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                    display: "flex", alignItems: "center", gap: 7,
+                    border: `1px solid ${vista === v ? TEAL : "#cbd5e1"}`,
+                    background: vista === v ? TEAL : "#fff",
+                    color: vista === v ? "#fff" : "#475569",
+                  }}>
+                    <i className={`bi ${icon}`} /> {txt}
+                  </button>
+                ))}
+              </div>
+
               {msg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, marginBottom: 14, fontSize: 13, fontWeight: 600, background: msg.tipo === "ok" ? "rgba(16,185,129,.1)" : "rgba(239,68,68,.1)", color: msg.tipo === "ok" ? "#059669" : "#dc2626" }}>
                   {msg.texto}
                 </div>
               )}
 
-              {!sesionActiva && (
-                <TabListaSesiones sesiones={sesiones} onNuevo={nuevaSesion} onVer={cargarSesion} onEliminar={eliminarSesion}
-                  onImprimir={(s) => { setSesionActiva(s); setFormSesion(deepMerge(emptySesion, s)); setMostrarPrint(true); }} />
-              )}
+              {vista === "informes_mcg" ? (
+                <PanelInformesMCG paciente={paciente} user={user} logoUrl={logoUrl} headerCfg={headerCfgSesion} />
+              ) : (<>
+                {!sesionActiva && (
+                  <TabListaSesiones sesiones={sesiones} onNuevo={nuevaSesion} onVer={cargarSesion} onEliminar={eliminarSesion}
+                    onImprimir={(s) => { setSesionActiva(s); setFormSesion(deepMerge(emptySesion, s)); setMostrarPrint(true); }} />
+                )}
 
-              {sesionActiva && (
-                <TabFormSesion
-                  sesionActiva={sesionActiva} formSesion={formSesion} set={set}
-                  seccionesAbiertas={seccionesAbiertas} toggleSeccion={toggleSeccion}
-                  fechaSesion={fechaSesion} setFechaSesion={setFechaSesion}
-                  guardando={guardando} onGuardar={guardarSesion} onCancelar={() => setSesionActiva(null)}
-                />
-              )}
+                {sesionActiva && (
+                  <TabFormSesion
+                    sesionActiva={sesionActiva} formSesion={formSesion} set={set}
+                    seccionesAbiertas={seccionesAbiertas} toggleSeccion={toggleSeccion}
+                    fechaSesion={fechaSesion} setFechaSesion={setFechaSesion}
+                    guardando={guardando} onGuardar={guardarSesion} onCancelar={() => setSesionActiva(null)}
+                  />
+                )}
+              </>)}
             </>
           )}
         </div>
