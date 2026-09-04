@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
+import { createPortal } from "react-dom";
 import dayjs from "dayjs";
 import api from "../../api/api";
 import { TEAL, TEAL_LIGHT, card, inputStyle, label, btn, deepMerge } from "./shared";
@@ -42,14 +43,14 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
     </div>
   );
 
-  return (
-    <>
+  const contenido = (
+    <div id="mcg-print-root">
       <style>{`
         @media print {
-          @page { size: letter; margin: 10mm 12mm; }
-          html, body { background: #fff !important; }
-          body * { visibility: hidden !important; }
-          #mcg-print-doc, #mcg-print-doc * { visibility: visible !important; }
+          @page { size: letter; margin: 0; }
+          html, body { background: #fff !important; margin: 0 !important; padding: 0 !important; height: auto !important; }
+          body > *:not(#mcg-print-root) { display: none !important; }
+          #mcg-print-root { position: static !important; background: #fff !important; }
           #mcg-print-wrap {
             display: block !important; position: static !important;
             min-height: 0 !important; padding: 0 !important; margin: 0 !important;
@@ -59,7 +60,7 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
             position: static !important;
             width: 100% !important; max-width: none !important;
             min-height: 0 !important;
-            margin: 0 !important; padding: 0 !important;
+            margin: 0 !important; padding: 12mm 14mm !important;
             box-shadow: none !important; background: #fff !important;
           }
           #print-actions-bar { display: none !important; }
@@ -206,8 +207,10 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           </section>
         </div>
       </div>
-    </>
+    </div>
   );
+
+  return createPortal(contenido, document.body);
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
