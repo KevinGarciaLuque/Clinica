@@ -28,12 +28,12 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
   const total = sumaPorcentajes(tr);
 
   const S = {
-    sectionTitle: { fontSize: 11, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".07em", borderBottom: "1.5px solid #99f6e4", paddingBottom: 4, margin: "16px 0 8px" },
-    dataGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: 18, rowGap: 10 },
-    dLabel: { fontSize: 9.5, fontWeight: 700, color: "#0f766e", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 2 },
-    dValue: { fontSize: 11.5, color: "#1f2937", fontWeight: 600 },
-    resumenCard: { border: "1px solid #99f6e4", borderRadius: 8, padding: "8px 10px", background: "#f0fdfa" },
-    txtBlock: { fontSize: 11, color: "#1f2937", whiteSpace: "pre-wrap", margin: "2px 0 0" },
+    sectionTitle: { fontSize: 10.5, fontWeight: 700, color: TEAL, textTransform: "uppercase", letterSpacing: ".06em", borderBottom: "1.5px solid #99f6e4", paddingBottom: 3, margin: "9px 0 5px" },
+    dataGrid: { display: "grid", gridTemplateColumns: "repeat(3, 1fr)", columnGap: 18, rowGap: 5 },
+    dLabel: { fontSize: 9, fontWeight: 700, color: "#0f766e", textTransform: "uppercase", letterSpacing: ".04em", marginBottom: 1 },
+    dValue: { fontSize: 11, color: "#1f2937", fontWeight: 600 },
+    resumenCard: { border: "1px solid #99f6e4", borderRadius: 7, padding: "5px 8px", background: "#f0fdfa" },
+    txtBlock: { fontSize: 10.5, color: "#1f2937", whiteSpace: "pre-wrap", margin: "1px 0 0" },
   };
   const D = (k, v) => <div><div style={S.dLabel}>{k}</div><div style={S.dValue}>{v || "—"}</div></div>;
   const RC = (k, v, u) => (
@@ -64,7 +64,7 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
             position: static !important;
             width: 100% !important; max-width: none !important;
             min-height: 0 !important;
-            margin: 0 !important; padding: 8mm 12mm !important;
+            margin: 0 !important; padding: 5mm 12mm !important;
             box-shadow: none !important; background: #fff !important;
           }
           #print-actions-bar { display: none !important; }
@@ -88,9 +88,9 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
       <div id="mcg-print-wrap" style={{ flex: 1, background: "#e8e8e8", padding: "20px 16px", overflowY: "auto", display: "flex", justifyContent: "center" }}>
         <div id="mcg-print-doc" style={{ background: "white", width: "100%", maxWidth: "216mm", minHeight: "279mm", padding: "10mm 12mm", boxShadow: "0 4px 32px rgba(0,0,0,.18)", fontFamily: "Arial, sans-serif", color: "#1a1a2e", boxSizing: "border-box", alignSelf: "flex-start" }}>
 
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${encabezadoColor}`, paddingBottom: 8, marginBottom: 12, flexWrap: "wrap", gap: 8 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `2.5px solid ${encabezadoColor}`, paddingBottom: 5, marginBottom: 7, flexWrap: "wrap", gap: 8 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-              {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 110, maxWidth: 240, objectFit: "contain", marginLeft: "-8mm" }} />}
+              {logoUrl && <img src={logoUrl} alt="Logo" style={{ height: 78, maxWidth: 200, objectFit: "contain", marginLeft: "-6mm" }} />}
               <div>
                 <div style={{ fontSize: 16, fontWeight: 800, color: encabezadoTextColor }}>{user?.clinica_nombre || "Clínica de Diabetes y Tecnología"}</div>
                 <div style={{ fontSize: 10, color: encabezadoOn ? "#0f766e" : "#6b7280", marginTop: 3 }}>Educación en Diabetes</div>
@@ -164,7 +164,7 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           <section className="mcg-col-a" style={{ flex: "0 0 42%", minWidth: 0 }}>
           <div className="mcg-sec-title" style={S.sectionTitle}>3. Interpretación clínica</div>
           {CAMPOS_INTERPRETACION.map(([k, l]) => (
-            <div key={k} className="mcg-sec" style={{ marginBottom: 6 }}>
+            <div key={k} className="mcg-sec" style={{ marginBottom: 3 }}>
               <div style={{ fontSize: 10, fontWeight: 700, color: "#0f766e" }}>{l}</div>
               <p style={S.txtBlock}>{inter[k] || "—"}</p>
             </div>
@@ -176,7 +176,7 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           {CAMPOS_RECOMENDACIONES.map(([k, l]) => {
             const lineas = aLineas(reco[k]);
             return (
-              <div key={k} className="mcg-sec" style={{ marginBottom: 6 }}>
+              <div key={k} className="mcg-sec" style={{ marginBottom: 3 }}>
                 <div style={{ fontSize: 10, fontWeight: 700, color: "#0f766e" }}>{l}</div>
                 {lineas.length
                   ? <ul style={{ margin: "2px 0 0", paddingLeft: 16 }}>{lineas.map((x, i) => <li key={i} style={{ fontSize: 10.5 }}>{x}</li>)}</ul>
@@ -217,7 +217,7 @@ function PrintInformeMCG({ informe, paciente, user, logoUrl, headerCfg, onClose 
           </section>
           </div>
 
-          <div style={{ marginTop: 14, paddingTop: 8, borderTop: "1px solid #e5e7eb", textAlign: "center", fontSize: 9, color: "#9ca3af" }}>
+          <div style={{ marginTop: 8, paddingTop: 5, borderTop: "1px solid #e5e7eb", textAlign: "center", fontSize: 8.5, color: "#9ca3af" }}>
             Generado el {dayjs().format("DD/MM/YYYY [a las] HH:mm")}
           </div>
         </div>
