@@ -132,7 +132,12 @@ export default function SolicitarPlan() {
   }
 
   return (
-    <div className="min-vh-100 d-flex align-items-center justify-content-center" style={{ background: "#f1f5f9", padding: "2rem" }}>
+    <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center" style={{ background: "#f1f5f9", padding: "2rem" }}>
+      <div style={{ maxWidth: 640, width: "100%", marginBottom: 12 }}>
+        <Link to="/" className="text-decoration-none text-muted small fw-semibold">
+          <i className="bi bi-arrow-left me-1" />Volver al inicio
+        </Link>
+      </div>
       <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5" style={{ maxWidth: 640, width: "100%" }}>
         <h4 className="fw-bold text-dark mb-1">Solicitar plan</h4>
         <p className="text-muted mb-3">Paso {paso} de {TOTAL_PASOS}</p>
