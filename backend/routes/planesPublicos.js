@@ -241,6 +241,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
       [clinicaId, usuarioId, req.user.id, montoFinal, moneda || "HNL", id]
     );
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const emailErrors = [];
 
     // 1) Confirmación
     try {
@@ -249,7 +250,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
         subject: "🎉 ¡Tu solicitud fue aceptada!",
         html: templateSolicitudAprobada({ nombres: `${solicitud.nombres} ${solicitud.apellidos}`, planNombre }),
       });
-    } catch (e) { console.error("[email solicitud aprobada]", e.message); }
+    } catch (e) { console.error("[email solicitud aprobada]", e.message); emailErrors.push(`confirmación: ${e.message}`); }
 
     // 2) Credenciales
     try {
@@ -264,7 +265,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
           clinicaNombre: solicitud.nombre_clinica,
         }),
       });
-    } catch (e) { console.error("[email credenciales]", e.message); }
+    } catch (e) { console.error("[email credenciales]", e.message); emailErrors.push(`credenciales: ${e.message}`); }
 
     // 3) Recibo en PDF
     try {
@@ -284,9 +285,15 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
         html: "<p>Adjuntamos el recibo de tu pago.</p>",
         attachments: [{ filename: `recibo-${id}.pdf`, content: pdfBuffer, contentType: "application/pdf" }],
       });
-    } catch (e) { console.error("[email recibo]", e.message); }
+    } catch (e) { console.error("[email recibo]", e.message); emailErrors.push(`recibo: ${e.message}`); }
 
-    res.json({ ok: true, clinica_id: clinicaId, usuario_id: usuarioId });
+    res.json({
+      ok: true,
+      clinica_id: clinicaId,
+      usuario_id: usuarioId,
+      emails_ok: emailErrors.length === 0,
+      email_errors: emailErrors,
+    });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

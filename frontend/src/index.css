@@ -28,7 +28,6 @@ a {
 
 .route-fade-enter {
   animation: routeFadeIn 170ms ease-out;
-  will-change: opacity, transform;
 }
 
 @keyframes routeFadeIn {

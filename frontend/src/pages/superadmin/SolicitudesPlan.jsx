@@ -70,9 +70,14 @@ export default function SolicitudesPlan() {
     setGuardando(true);
     setError("");
     try {
-      await api.post(`/planes-publicos/solicitudes/${modal.id}/aprobar`, form);
+      const { data } = await api.post(`/planes-publicos/solicitudes/${modal.id}/aprobar`, form);
       setModal(null);
       cargar();
+      if (data?.emails_ok === false) {
+        mostrarToast(false, "Clínica creada, pero falló el envío de correos. Usa \"Reenviar credenciales\".");
+      } else {
+        mostrarToast(true, "Clínica creada y credenciales enviadas por correo.");
+      }
     } catch (err) {
       setError(err?.response?.data?.msg || "Error al aprobar la solicitud");
     } finally {
