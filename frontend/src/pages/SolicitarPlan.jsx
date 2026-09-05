@@ -36,11 +36,14 @@ function formatearMonto(monto, moneda) {
 export default function SolicitarPlan() {
   const [params] = useSearchParams();
   const nivelInicial = NIVELES_PLAN[params.get("nivel")] ? params.get("nivel") : "avanzado";
+  const planInicial = duracionesDisponibles(nivelInicial).includes(params.get("plan"))
+    ? params.get("plan")
+    : "semestral";
 
   const [paso, setPaso] = useState(1);
   const [form, setForm] = useState({
     nombres: "", apellidos: "", email: "", telefono: "",
-    nombre_clinica: "", nivel_plan: nivelInicial, plan_solicitado: "semestral", mensaje: "",
+    nombre_clinica: "", nivel_plan: nivelInicial, plan_solicitado: planInicial, mensaje: "",
   });
   const [archivo, setArchivo]   = useState(null);
   const [preview, setPreview]   = useState(null);

@@ -55,12 +55,8 @@ export default function LandingPageAdmin() {
         landing_tiktok:               c.landing_tiktok                ?? "",
         landing_youtube:              c.landing_youtube               ?? "",
         landing_linkedin:             c.landing_linkedin              ?? "",
-        landing_plan_trial_precio:    c.landing_plan_trial_precio     ?? "",
-        landing_plan_trial_duracion:  c.landing_plan_trial_duracion   ?? "",
         landing_plan_trial_features:  c.landing_plan_trial_features   ?? "[]",
-        landing_plan_semestral_precio:    c.landing_plan_semestral_precio     ?? "",
         landing_plan_semestral_features:  c.landing_plan_semestral_features   ?? "[]",
-        landing_plan_anual_precio:    c.landing_plan_anual_precio     ?? "",
         landing_plan_anual_features:  c.landing_plan_anual_features   ?? "[]",
         // Directorio médico público (/agenda-tu-consulta)
         directorio_color_primario:    c.directorio_color_primario     ?? "#213665",
@@ -487,6 +483,13 @@ export default function LandingPageAdmin() {
       {/* ── TAB: PLANES ── */}
       {tab === "planes" && (
         <div style={{ display: "flex", flexDirection: "column", gap: 24 }}>
+          <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: 16 }}>
+            <p style={{ fontSize: 13, color: "#64748b", margin: 0 }}>
+              <i className="bi bi-info-circle me-1" />
+              El <strong>precio</strong> de cada plan se define en la pestaña <strong>Pagos</strong> (Semestral / Anual).
+              Aquí solo se editan las características que se muestran en cada tarjeta.
+            </p>
+          </div>
           {[
             { key: "trial",     label: "Plan Trial",     icon: "bi-clock-history",   color: "#f59e0b" },
             { key: "semestral", label: "Plan Semestral", icon: "bi-calendar2-check",  color: "#3b82f6" },
@@ -504,26 +507,6 @@ export default function LandingPageAdmin() {
                 <span style={{ fontWeight: 700, fontSize: 15, color: "#1e293b" }}>{plan.label}</span>
               </div>
               <div className="row g-3">
-                <div className="col-sm-6">
-                  <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Precio</label>
-                  <input
-                    className="form-control form-control-sm"
-                    value={form[`landing_plan_${plan.key}_precio`]}
-                    onChange={e => set(`landing_plan_${plan.key}_precio`, e.target.value)}
-                    placeholder={plan.key === "trial" ? "Gratis" : "Ej: $99/mes"}
-                  />
-                </div>
-                {plan.key === "trial" && (
-                  <div className="col-sm-6">
-                    <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Duración</label>
-                    <input
-                      className="form-control form-control-sm"
-                      value={form.landing_plan_trial_duracion}
-                      onChange={e => set("landing_plan_trial_duracion", e.target.value)}
-                      placeholder="Ej: 30 días"
-                    />
-                  </div>
-                )}
                 <div className="col-12">
                   <label className="form-label fw-semibold" style={{ fontSize: 13 }}>Características incluidas</label>
                   <FeaturesEditor clave={`landing_plan_${plan.key}_features`} />

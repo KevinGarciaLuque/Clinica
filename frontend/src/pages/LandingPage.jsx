@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { SIMBOLO_MONEDA } from "../utils/monedas";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+// Los ids de tarjeta de la landing (trial/semestral/anual) son solo slots visuales;
+// el precio real de cada uno vive en config_pagos bajo estos niveles.
+const NIVEL_POR_PLAN = { trial: "basico", semestral: "avanzado", anual: "empresarial" };
 
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -56,6 +61,8 @@ export default function LandingPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [resenas, setResenas] = useState([]);
   const [marketing, setMarketing] = useState({ posts: [], videos: [], planes: [] });
+  const [pagos, setPagos] = useState(null);
+  const [periodo, setPeriodo] = useState("anual"); // "semestral" | "anual"
 
   useEffect(() => {
     fetch(`${API_URL}/api/config-sistema`)
@@ -70,6 +77,10 @@ export default function LandingPage() {
       .then(r => r.json())
       .then(d => setMarketing(d.data || { posts: [], videos: [], planes: [] }))
       .catch(() => {});
+    fetch(`${API_URL}/api/config-sistema/pagos`)
+      .then(r => r.json())
+      .then(d => setPagos(d.data || {}))
+      .catch(() => setPagos({}));
   }, []);
 
   if (!cfg) return (
@@ -95,14 +106,38 @@ export default function LandingPage() {
         : `${API_URL}${cfg.logo_url}`)
     : "/logo.png";
 
+  const simbolo = SIMBOLO_MONEDA[pagos?.moneda] || pagos?.moneda || "L.";
+  const formatearPrecio = (n) => `${simbolo} ${Number(n).toLocaleString("es-HN", { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`;
+
+  const precioPlan = (planId) => {
+    const nivel = NIVEL_POR_PLAN[planId];
+    const semestral = pagos?.[`precio_${nivel}_semestral`];
+    const anual = pagos?.[`precio_${nivel}_anual`];
+    const total = periodo === "anual" ? anual : semestral;
+    if (total == null || total === "") {
+      return { precio: "Consultar", duracion: "", ahorroPct: null };
+    }
+    const meses = periodo === "anual" ? 12 : 6;
+    const porMes = Number(total) / meses;
+    let ahorroPct = null;
+    if (periodo === "anual" && semestral != null && semestral !== "") {
+      const porMesSemestral = Number(semestral) / 6;
+      if (porMesSemestral > 0) ahorroPct = Math.round((1 - porMes / porMesSemestral) * 100);
+    }
+    return {
+      precio: `${formatearPrecio(porMes)}/mes`,
+      duracion: `${formatearPrecio(total)} facturado ${periodo === "anual" ? "anualmente" : "cada 6 meses"}`,
+      ahorroPct: ahorroPct > 0 ? ahorroPct : null,
+    };
+  };
+
   const parsePlanes = () => [
     {
       id: "trial",
       label: "Básico",
       badge: null,
       subtitulo: "Ideal para médico independiente o consultorio pequeño",
-      precio: cfg.landing_plan_trial_precio || "Consultar",
-      duracion: cfg.landing_plan_trial_duracion || "Semestral / Anual",
+      ...precioPlan("trial"),
       features: tryParse(cfg.landing_plan_trial_features),
       icon: "bi-person-badge-fill",
       color: "#3b82f6",
@@ -113,8 +148,7 @@ export default function LandingPage() {
       label: "Avanzado",
       badge: "Popular",
       subtitulo: "Ideal para clínicas pequeñas con mayor flujo de pacientes",
-      precio: cfg.landing_plan_semestral_precio || "Consultar",
-      duracion: "Semestral / Anual",
+      ...precioPlan("semestral"),
       features: tryParse(cfg.landing_plan_semestral_features),
       icon: "bi-building-fill",
       color,
@@ -125,8 +159,7 @@ export default function LandingPage() {
       label: "Empresarial",
       badge: "Completo",
       subtitulo: "Ideal para clínicas, centros médicos y consultorios multi-área",
-      precio: cfg.landing_plan_anual_precio || "Consultar",
-      duracion: "Semestral / Anual",
+      ...precioPlan("anual"),
       features: tryParse(cfg.landing_plan_anual_features),
       icon: "bi-buildings-fill",
       color: "#10b981",
@@ -609,6 +642,30 @@ export default function LandingPage() {
             <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
               Planes para cada etapa
             </h2>
+            <div style={{ display: "inline-flex", alignItems: "center", gap: 4, background: "#e2e8f0", borderRadius: 999, padding: 4, marginTop: 28 }}>
+              {["semestral", "anual"].map(p => (
+                <button
+                  key={p}
+                  onClick={() => setPeriodo(p)}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 8,
+                    border: "none", borderRadius: 999, padding: "9px 20px",
+                    fontSize: 13.5, fontWeight: 700, cursor: "pointer",
+                    background: periodo === p ? "#fff" : "transparent",
+                    color: periodo === p ? "#0f172a" : "#64748b",
+                    boxShadow: periodo === p ? "0 2px 10px rgba(0,0,0,.08)" : "none",
+                    transition: "background .15s, color .15s",
+                  }}
+                >
+                  {p === "semestral" ? "Semestral" : "Anual"}
+                  {p === "anual" && (
+                    <span style={{ background: "#10b981", color: "#fff", fontSize: 10.5, fontWeight: 800, borderRadius: 999, padding: "2px 8px" }}>
+                      Ahorra hasta 17%
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
           </div>
           <div className="planes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
             {planes.map(plan => (
@@ -643,8 +700,15 @@ export default function LandingPage() {
                 <div style={{ fontSize: "clamp(15px, 1.6vw, 17px)", fontWeight: 800, color: plan.color, textTransform: "uppercase", letterSpacing: ".5px", marginBottom: 4 }}>
                   Plan {plan.label}
                 </div>
-                <div style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>
-                  {plan.precio}
+                <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+                  <div style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#0f172a", lineHeight: 1 }}>
+                    {plan.precio}
+                  </div>
+                  {plan.ahorroPct && (
+                    <span style={{ background: "#10b98118", color: "#10b981", fontSize: 11, fontWeight: 800, borderRadius: 999, padding: "3px 9px" }}>
+                      Ahorras {plan.ahorroPct}%
+                    </span>
+                  )}
                 </div>
                 <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8, marginTop: 4 }}>
                   {plan.duracion}
@@ -693,7 +757,7 @@ export default function LandingPage() {
                   </button>
                 )}
                 <a
-                  href={`/solicitar-plan?nivel=${{ trial: "basico", semestral: "avanzado", anual: "empresarial" }[plan.id] || "basico"}`}
+                  href={`/solicitar-plan?nivel=${NIVEL_POR_PLAN[plan.id] || "basico"}&plan=${periodo}`}
                   style={{
                     display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
                     textAlign: "center", textDecoration: "none",
@@ -707,6 +771,14 @@ export default function LandingPage() {
                 >
                   <i className="bi bi-credit-card-fill" />Comprar ahora
                 </a>
+                {plan.id === "trial" && (
+                  <a
+                    href="/solicitar-plan?nivel=basico&plan=trial"
+                    style={{ display: "block", textAlign: "center", textDecoration: "none", color: "#94a3b8", fontSize: 12.5, marginTop: 12 }}
+                  >
+                    o prueba gratis 14 días
+                  </a>
+                )}
               </div>
             ))}
           </div>
