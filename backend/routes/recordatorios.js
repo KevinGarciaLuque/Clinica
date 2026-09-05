@@ -300,7 +300,7 @@ router.post("/config/smtp/test", auth(), withRecordatoriosSchema(async (req, res
     await transporter.sendMail({
       from: `"${config.from_name}" <${config.from_email}>`,
       to: email_destino,
-      subject: "✅ Prueba de configuración SMTP",
+      subject: "Prueba de configuración SMTP",
       html: `
         <h2>¡Configuración exitosa!</h2>
         <p>Este es un correo de prueba desde tu sistema de clínica.</p>

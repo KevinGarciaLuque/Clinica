@@ -247,7 +247,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
     try {
       await enviarEmail({
         to: solicitud.email,
-        subject: "🎉 ¡Tu solicitud fue aceptada!",
+        subject: "Tu solicitud fue aprobada — Medic-KG",
         html: templateSolicitudAprobada({ nombres: `${solicitud.nombres} ${solicitud.apellidos}`, planNombre }),
       });
     } catch (e) { console.error("[email solicitud aprobada]", e.message); emailErrors.push(`confirmación: ${e.message}`); }
@@ -256,7 +256,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
     try {
       await enviarEmail({
         to: solicitud.email,
-        subject: "🔑 Tus credenciales de acceso",
+        subject: "Tus credenciales de acceso a Medic-KG",
         html: templateCredenciales({
           nombres: `${solicitud.nombres} ${solicitud.apellidos}`,
           email: solicitud.email,
@@ -323,7 +323,7 @@ router.post("/solicitudes/:id/reenviar-credenciales", auth("SUPER_ADMIN"), async
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     await enviarEmail({
       to: solicitud.email,
-      subject: "🔑 Tus credenciales de acceso",
+      subject: "Tus credenciales de acceso a Medic-KG",
       html: templateCredenciales({
         nombres: `${solicitud.nombres} ${solicitud.apellidos}`,
         email: solicitud.email,

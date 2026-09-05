@@ -303,7 +303,7 @@ router.post("/:id/reenviar-credenciales", auth("SUPER_ADMIN","ADMIN"), async (re
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     await enviarEmail({
       to: usuario.email,
-      subject: "🔑 Tus credenciales de acceso",
+      subject: "Tus credenciales de acceso a Medic-KG",
       html: templateCredenciales({
         nombres: `${usuario.nombres} ${usuario.apellidos}`,
         email: usuario.email,

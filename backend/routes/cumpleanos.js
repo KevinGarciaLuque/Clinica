@@ -151,7 +151,7 @@ router.post(
               await transporter.sendMail({
                 from:    `"${cfg.from_name}" <${cfg.from_email}>`,
                 to:      paciente.email,
-                subject: `🎂 ¡Feliz Cumpleaños ${paciente.nombres}!`,
+                subject: `¡Feliz cumpleaños, ${paciente.nombres}!`,
                 html: `
                   <div style="font-family:Arial,sans-serif;max-width:520px;margin:auto;
                                background:#fff;border-radius:12px;overflow:hidden;

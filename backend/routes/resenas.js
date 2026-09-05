@@ -70,7 +70,7 @@ router.post("/solicitar", auth("SUPER_ADMIN"), async (req, res) => {
       try {
         await enviarEmail({
           to: medico.email,
-          subject: "⭐ Nos encantaría conocer tu experiencia",
+          subject: "Nos encantaría conocer tu experiencia",
           html: templateSolicitudResena({
             nombreMedico,
             link: `${frontendUrl}/resena/${token}`,

@@ -49,16 +49,45 @@ async function buildTransporter() {
     secure: db ? db.secure : process.env.SMTP_SECURE === "true",
     auth: { user, pass },
   });
-  const from = db?.from || process.env.EMAIL_FROM || '"Medic-KG" <noreply@medickg.com>';
+  // El From debe estar alineado con la cuenta que autentica (SPF/DKIM), o Gmail
+  // lo manda a spam. Si el remitente configurado no trae una dirección <...@...>,
+  // lo tratamos como nombre visible y usamos la cuenta autenticada como dirección.
+  const fromRaw = db?.from || process.env.EMAIL_FROM || "Medic-KG";
+  const from = /<[^>]+@[^>]+>/.test(fromRaw) || /^[^<>\s]+@[^<>\s]+$/.test(fromRaw)
+    ? fromRaw
+    : `"${fromRaw.replace(/"/g, "")}" <${user}>`;
   return { transporter, from };
 }
 
 /**
+ * Convierte un HTML de correo en una versión de texto plano legible.
+ * Tener parte de texto mejora bastante la entregabilidad (menos spam).
+ */
+function htmlToText(html = "") {
+  return String(html)
+    .replace(/<\s*(style|script|head)[^>]*>[\s\S]*?<\s*\/\s*\1\s*>/gi, "")
+    .replace(/<\s*br\s*\/?\s*>/gi, "\n")
+    .replace(/<\s*\/\s*(p|div|h[1-6]|tr|li|table)\s*>/gi, "\n")
+    .replace(/<[^>]+>/g, "")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&quot;/gi, '"')
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+/**
  * Envía un email.
- * @param {object} opts  { to, subject, html, attachments }
+ * @param {object} opts  { to, subject, html, text, attachments }
  * @returns Promise<object>  info de nodemailer (o objeto simulado)
  */
-async function enviarEmail({ to, subject, html, attachments }) {
+async function enviarEmail({ to, subject, html, text, attachments }) {
+  const textFinal = text || (html ? htmlToText(html) : undefined);
   const built = await buildTransporter();
 
   if (!built) {
@@ -75,7 +104,7 @@ async function enviarEmail({ to, subject, html, attachments }) {
   }
 
   const { transporter, from } = built;
-  return transporter.sendMail({ from, to, subject, html, attachments });
+  return transporter.sendMail({ from, to, subject, html, text: textFinal, attachments });
 }
 
 // ────── Templates ──────────────────────────────────────
