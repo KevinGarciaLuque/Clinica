@@ -75,7 +75,7 @@ export default function Clinicas() {
   // Modal de gestión de licencia
   const [showLicenciaModal, setShowLicenciaModal]     = useState(false);
   const [clinicaLicencia, setClinicaLicencia]         = useState(null);
-  const [licenciaForm, setLicenciaForm]               = useState({ plan_tipo: "anual", inicio_manual: "", notas: "" });
+  const [licenciaForm, setLicenciaForm]               = useState({ plan_tipo: "anual", inicio_manual: "", fin_manual: "", notas: "" });
   const [licenciaGuardando, setLicenciaGuardando]     = useState(false);
 
   // Modal de detalles / uso de espacio
@@ -109,7 +109,7 @@ export default function Clinicas() {
     const c = clinicas.find(cl => cl.id === sol.clinica_id);
     if (c) {
       setClinicaLicencia(c);
-      setLicenciaForm({ plan_tipo: sol.plan_solicitado, inicio_manual: "", notas: `Solicitud #${sol.id} atendida` });
+      setLicenciaForm({ plan_tipo: sol.plan_solicitado, inicio_manual: "", fin_manual: "", notas: `Solicitud #${sol.id} atendida` });
       setShowLicenciaModal(true);
     }
   };
@@ -394,7 +394,7 @@ export default function Clinicas() {
 
   const abrirLicencia = (c) => {
     setClinicaLicencia(c);
-    setLicenciaForm({ plan_tipo: c.plan_tipo || "anual", inicio_manual: "", notas: "" });
+    setLicenciaForm({ plan_tipo: c.plan_tipo || "anual", inicio_manual: "", fin_manual: "", notas: "" });
     setShowLicenciaModal(true);
     setError("");
   };
@@ -2056,17 +2056,42 @@ export default function Clinicas() {
                 </div>
               </div>
 
-              {/* Fecha de inicio (opcional) */}
-              <Field label="Inicio del plan" hint="(vacío = hoy)">
-                <input
-                  type="date"
-                  style={inputSt}
-                  value={licenciaForm.inicio_manual}
-                  onChange={(e) => setLicenciaForm({ ...licenciaForm, inicio_manual: e.target.value })}
-                  onFocus={(e) => e.target.style.borderColor = C.accent}
-                  onBlur={(e)  => e.target.style.borderColor = C.border}
-                />
-              </Field>
+              {/* Fechas de inicio / fin */}
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <Field label="Inicio del plan" hint="(vacío = hoy)">
+                  <input
+                    type="date"
+                    style={inputSt}
+                    value={licenciaForm.inicio_manual}
+                    onChange={(e) => setLicenciaForm({ ...licenciaForm, inicio_manual: e.target.value })}
+                    onFocus={(e) => e.target.style.borderColor = C.accent}
+                    onBlur={(e)  => e.target.style.borderColor = C.border}
+                  />
+                </Field>
+                <Field label="Fin del plan" hint="(vacío = según plan)">
+                  <input
+                    type="date"
+                    style={inputSt}
+                    value={licenciaForm.fin_manual}
+                    min={licenciaForm.inicio_manual || undefined}
+                    onChange={(e) => setLicenciaForm({ ...licenciaForm, fin_manual: e.target.value })}
+                    onFocus={(e) => e.target.style.borderColor = C.accent}
+                    onBlur={(e)  => e.target.style.borderColor = C.border}
+                  />
+                </Field>
+              </div>
+              {licenciaForm.fin_manual && (() => {
+                const ini = licenciaForm.inicio_manual ? new Date(licenciaForm.inicio_manual) : new Date();
+                const f   = new Date(licenciaForm.fin_manual);
+                const d   = Math.ceil((f - ini) / 86400000);
+                return (
+                  <div style={{ fontSize: 12, color: d > 0 ? C.muted : "#ef4444", marginTop: -6 }}>
+                    {d > 0
+                      ? `Vigencia manual: ${d} día${d !== 1 ? "s" : ""} (hasta ${f.toLocaleDateString("es-PE", { day: "2-digit", month: "long", year: "numeric" })}).`
+                      : "La fecha de fin debe ser posterior al inicio."}
+                  </div>
+                );
+              })()}
 
               {/* Notas */}
               <Field label="Notas internas" hint="(opcional)">

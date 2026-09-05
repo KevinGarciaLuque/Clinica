@@ -1117,7 +1117,7 @@ router.get("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 // POST /api/clinicas/:id/licencia  → asignar o renovar licencia (SUPER_ADMIN)
 router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
   try {
-    const { plan_tipo, inicio_manual, notas } = req.body;
+    const { plan_tipo, inicio_manual, fin_manual, notas } = req.body;
 
     await ensureBloqueadaColumn();
     const [[clBloq]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
@@ -1131,10 +1131,22 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 
     // Calcular fechas
     const inicio = inicio_manual ? new Date(inicio_manual) : new Date();
-    const fin    = new Date(inicio);
-    if      (plan_tipo === "trial")     fin.setDate(fin.getDate() + 14);
-    else if (plan_tipo === "semestral") fin.setMonth(fin.getMonth() + 6);
-    else if (plan_tipo === "anual")     fin.setFullYear(fin.getFullYear() + 1);
+    let fin;
+    if (fin_manual) {
+      // Vigencia manual: el SUPER_ADMIN define la fecha de fin exacta.
+      fin = new Date(fin_manual);
+      if (isNaN(fin.getTime())) {
+        return res.status(400).json({ ok: false, msg: "Fecha de fin inválida" });
+      }
+      if (fin <= inicio) {
+        return res.status(400).json({ ok: false, msg: "La fecha de fin debe ser posterior a la de inicio" });
+      }
+    } else {
+      fin = new Date(inicio);
+      if      (plan_tipo === "trial")     fin.setDate(fin.getDate() + 14);
+      else if (plan_tipo === "semestral") fin.setMonth(fin.getMonth() + 6);
+      else if (plan_tipo === "anual")     fin.setFullYear(fin.getFullYear() + 1);
+    }
 
     // Actualizar clínica
     await pool.query(
@@ -1146,7 +1158,8 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
     await pool.query(
       `INSERT INTO licencias_historial (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas)
        VALUES (?,?,?,?,?,?)`,
-      [req.params.id, plan_tipo, inicio, fin, req.user.id, notas || null]
+      [req.params.id, plan_tipo, inicio, fin, req.user.id,
+       fin_manual ? `${notas ? notas + " · " : ""}Vigencia manual hasta ${fin.toISOString().slice(0, 10)}` : (notas || null)]
     );
 
     res.json({
