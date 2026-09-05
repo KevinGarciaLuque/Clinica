@@ -1,0 +1,18 @@
+# Railway / Nixpacks — instala Chromium del sistema para la generación de PDF
+# (@sparticuz/chromium ya no trae el binario a partir de v119).
+[phases.setup]
+aptPkgs = [
+  "chromium",
+  "fonts-liberation",
+  "libnss3",
+  "libatk-bridge2.0-0",
+  "libatk1.0-0",
+  "libcups2",
+  "libgbm1",
+  "libasound2",
+  "libpangocairo-1.0-0",
+  "libgtk-3-0",
+]
+
+[variables]
+PUPPETEER_EXECUTABLE_PATH = "/usr/bin/chromium"

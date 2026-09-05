@@ -12,6 +12,18 @@ const WINDOWS_BROWSER_PATHS = [
   "C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe",
 ];
 
+// Chromium instalado por el sistema (Railway/Docker). Se prioriza sobre
+// @sparticuz/chromium porque a partir de v119 ese paquete YA NO trae el
+// binario y `executablePath()` devuelve una ruta inexistente.
+const LINUX_BROWSER_PATHS = [
+  process.env.PUPPETEER_EXECUTABLE_PATH,
+  process.env.CHROME_BIN,
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+  "/usr/bin/google-chrome",
+  "/usr/bin/google-chrome-stable",
+].filter(Boolean);
+
 let browserPromise = null;
 async function getBrowser() {
   if (browserPromise) {
@@ -24,10 +36,14 @@ async function getBrowser() {
 
     const localBrowser = process.platform === "win32"
       ? WINDOWS_BROWSER_PATHS.find((p) => fs.existsSync(p))
-      : null;
+      : LINUX_BROWSER_PATHS.find((p) => { try { return fs.existsSync(p); } catch { return false; } });
 
     const launchOpts = localBrowser
-      ? { executablePath: localBrowser, headless: true }
+      ? {
+          executablePath: localBrowser,
+          headless: true,
+          args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
+        }
       : await (async () => {
           const chromium = require("@sparticuz/chromium").default;
           return {

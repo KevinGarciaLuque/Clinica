@@ -90,7 +90,7 @@ async function emitirContrato({
         monto_total=VALUES(monto_total), monto_mensual=VALUES(monto_mensual),
         moneda=VALUES(moneda), dia_facturacion=VALUES(dia_facturacion),
         cliente_nombre=VALUES(cliente_nombre), cliente_email=VALUES(cliente_email),
-        clausulas_extra=VALUES(clausulas_extra), pdf=VALUES(pdf)`,
+        clausulas_extra=VALUES(clausulas_extra), pdf=COALESCE(VALUES(pdf), pdf)`,
     [numero, clinicaId, licenciaHistorialId, planTipo, planLabel, ymd(fecha),
      ymd(vigenciaInicio), ymd(vigenciaFin), duracionMeses || null, montoTotal, montoMensual,
      moneda, diaFacturacion || null, clienteNombre || clinicaNombre, emailDestino,
@@ -221,6 +221,27 @@ async function reenviarRecibo(reciboId) {
   const to = r.email_destino || cl?.email;
   if (!to) throw new Error("La clínica no tiene correo configurado");
   const label = periodoLabel(r.periodo);
+
+  // Si el PDF no se generó en su momento (p. ej. Chromium no disponible),
+  // se intenta regenerar ahora antes de reenviar.
+  if (!r.pdf) {
+    try {
+      const [[ct]] = await pool.query(
+        "SELECT cliente_nombre, plan_label FROM contratos_licencia WHERE numero=? LIMIT 1",
+        [r.contrato_numero || ""]
+      );
+      const html = templateReciboMensual({
+        numero: r.numero, clinicaNombre: cl?.nombre || "Clínica",
+        clienteNombre: ct?.cliente_nombre || cl?.nombre || null,
+        contratoNumero: r.contrato_numero || null, planLabel: ct?.plan_label || null,
+        periodoLabel: label, periodoInicio: r.periodo_inicio, periodoFin: r.periodo_fin,
+        concepto: r.concepto, monto: r.monto, moneda: r.moneda, fechaEmision: r.fecha_emision,
+      });
+      r.pdf = await generarPdfDesdeHtml(html, { paper_size: "HALF_LETTER", orientacion: "portrait" });
+      if (r.pdf) await pool.query("UPDATE recibos_licencia SET pdf=? WHERE id=?", [r.pdf, reciboId]);
+    } catch (e) { console.error("[recibo pdf regenerar]", e.message); }
+  }
+
   await enviarEmail({
     to,
     subject: `Recibo ${r.numero} — cuota ${label} — Medic-KG`,
