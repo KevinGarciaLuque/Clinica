@@ -2028,11 +2028,12 @@ export default function Clinicas() {
             background: C.surface, border: `1px solid ${C.border}`,
             borderRadius: 18, width: "100%", maxWidth: 520,
             boxShadow: "0 24px 80px rgba(0,0,0,.5)",
+            display: "flex", flexDirection: "column", maxHeight: "92vh", overflow: "hidden",
           }}>
             {/* Header */}
             <div style={{
               padding: "22px 28px", borderBottom: `1px solid ${C.border}`,
-              display: "flex", alignItems: "center", gap: 14,
+              display: "flex", alignItems: "center", gap: 14, flexShrink: 0,
             }}>
               <div style={{
                 width: 40, height: 40, borderRadius: 10,
@@ -2063,7 +2064,7 @@ export default function Clinicas() {
             </div>
 
             {/* Body */}
-            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20 }}>
+            <div style={{ padding: "24px 28px", display: "flex", flexDirection: "column", gap: 20, overflowY: "auto", flex: 1, minHeight: 0 }}>
               {error && (
                 <div style={{
                   background: "rgba(239,68,68,.12)", border: "1px solid rgba(239,68,68,.3)",
@@ -2105,7 +2106,7 @@ export default function Clinicas() {
                 <label style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 10, display: "block" }}>
                   Seleccionar nuevo plan
                 </label>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 10 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 10 }}>
                   {[
                     { key: "trial",     label: "Prueba",    sub: "14 días",   icon: "bi-clock-history",   color: "#f59e0b" },
                     { key: "semestral", label: "Semestral", sub: "6 meses",   icon: "bi-calendar2-check", color: C.accent },
@@ -2144,7 +2145,7 @@ export default function Clinicas() {
               </div>
 
               {/* Vigencia a medida: inicio + (meses O fecha de fin exacta) */}
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
                 <Field label="Inicio del plan" hint="(vacío = hoy)">
                   <input
                     type="date"
@@ -2207,7 +2208,7 @@ export default function Clinicas() {
                   <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
                     Facturación mensual
                   </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
                     <Field label="Cuota mensual" hint="(sin impuesto)">
                       <input
                         type="number" min="0" step="0.01" placeholder="Ej: 700"
@@ -2276,7 +2277,7 @@ export default function Clinicas() {
             {/* Footer */}
             <div style={{
               padding: "18px 28px", borderTop: `1px solid ${C.border}`,
-              display: "flex", justifyContent: "flex-end", gap: 12,
+              display: "flex", justifyContent: "flex-end", gap: 12, flexShrink: 0,
             }}>
               <button
                 type="button"
