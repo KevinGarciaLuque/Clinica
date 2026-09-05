@@ -1117,7 +1117,7 @@ router.get("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 // POST /api/clinicas/:id/licencia  → asignar o renovar licencia (SUPER_ADMIN)
 router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
   try {
-    const { plan_tipo, inicio_manual, fin_manual, notas } = req.body;
+    const { plan_tipo, inicio_manual, fin_manual, meses_manual, notas } = req.body;
 
     await ensureBloqueadaColumn();
     const [[clBloq]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
@@ -1131,8 +1131,16 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 
     // Calcular fechas
     const inicio = inicio_manual ? new Date(inicio_manual) : new Date();
+    const mesesN = meses_manual != null && meses_manual !== "" ? parseInt(meses_manual, 10) : null;
     let fin;
-    if (fin_manual) {
+    if (mesesN != null) {
+      // Duración a medida: N meses a partir de la fecha de inicio.
+      if (!Number.isInteger(mesesN) || mesesN < 1 || mesesN > 120) {
+        return res.status(400).json({ ok: false, msg: "La duración en meses debe ser un entero entre 1 y 120" });
+      }
+      fin = new Date(inicio);
+      fin.setMonth(fin.getMonth() + mesesN);
+    } else if (fin_manual) {
       // Vigencia manual: el SUPER_ADMIN define la fecha de fin exacta.
       fin = new Date(fin_manual);
       if (isNaN(fin.getTime())) {
@@ -1159,7 +1167,9 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
       `INSERT INTO licencias_historial (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas)
        VALUES (?,?,?,?,?,?)`,
       [req.params.id, plan_tipo, inicio, fin, req.user.id,
-       fin_manual ? `${notas ? notas + " · " : ""}Vigencia manual hasta ${fin.toISOString().slice(0, 10)}` : (notas || null)]
+       (mesesN != null || fin_manual)
+         ? `${notas ? notas + " · " : ""}Vigencia manual: ${inicio.toISOString().slice(0, 10)} → ${fin.toISOString().slice(0, 10)}${mesesN != null ? ` (${mesesN} meses)` : ""}`
+         : (notas || null)]
     );
 
     res.json({
