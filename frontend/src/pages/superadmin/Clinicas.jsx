@@ -75,7 +75,8 @@ export default function Clinicas() {
   // Modal de gestión de licencia
   const [showLicenciaModal, setShowLicenciaModal]     = useState(false);
   const [clinicaLicencia, setClinicaLicencia]         = useState(null);
-  const [licenciaForm, setLicenciaForm]               = useState({ plan_tipo: "anual", inicio_manual: "", fin_manual: "", meses_manual: "", notas: "" });
+  const LIC_FORM_BASE = { plan_tipo: "anual", inicio_manual: "", fin_manual: "", meses_manual: "", monto: "", monto_mensual: "", moneda: "HNL", dia_facturacion: "", clausulas_contrato: "", notas: "" };
+  const [licenciaForm, setLicenciaForm]               = useState(LIC_FORM_BASE);
   const [licenciaGuardando, setLicenciaGuardando]     = useState(false);
 
   // Modal de detalles / uso de espacio
@@ -109,7 +110,7 @@ export default function Clinicas() {
     const c = clinicas.find(cl => cl.id === sol.clinica_id);
     if (c) {
       setClinicaLicencia(c);
-      setLicenciaForm({ plan_tipo: sol.plan_solicitado, inicio_manual: "", fin_manual: "", meses_manual: "", notas: `Solicitud #${sol.id} atendida` });
+      setLicenciaForm({ ...LIC_FORM_BASE, plan_tipo: sol.plan_solicitado, notas: `Solicitud #${sol.id} atendida` });
       setShowLicenciaModal(true);
     }
   };
@@ -394,7 +395,7 @@ export default function Clinicas() {
 
   const abrirLicencia = (c) => {
     setClinicaLicencia(c);
-    setLicenciaForm({ plan_tipo: c.plan_tipo || "anual", inicio_manual: "", fin_manual: "", meses_manual: "", notas: "" });
+    setLicenciaForm({ ...LIC_FORM_BASE, plan_tipo: c.plan_tipo || "anual", moneda: c.lic_moneda || "HNL" });
     setShowLicenciaModal(true);
     setError("");
   };
@@ -403,13 +404,85 @@ export default function Clinicas() {
     setLicenciaGuardando(true);
     setError("");
     try {
-      await api.post(`/clinicas/${clinicaLicencia.id}/licencia`, licenciaForm);
-      setShowLicenciaModal(false);
+      const { data } = await api.post(`/clinicas/${clinicaLicencia.id}/licencia`, licenciaForm);
+      if (data?.data?.contrato?.error) {
+        setError(`Licencia activada, pero el contrato no se pudo enviar: ${data.data.contrato.error}`);
+      } else {
+        setShowLicenciaModal(false);
+      }
       cargar();
     } catch (e) {
       setError(e.response?.data?.msg || e.message);
     } finally {
       setLicenciaGuardando(false);
+    }
+  };
+
+  /* ── Contrato + recibos mensuales ── */
+  const [showRecibosModal, setShowRecibosModal] = useState(false);
+  const [recibosClinica, setRecibosClinica]     = useState(null);
+  const [recibosData, setRecibosData]           = useState(null);
+  const [recibosCargando, setRecibosCargando]   = useState(false);
+  const [reciboMsg, setReciboMsg]               = useState("");
+  const [nuevoReciboPeriodo, setNuevoReciboPeriodo] = useState("");
+  const [nuevoReciboMonto, setNuevoReciboMonto]     = useState("");
+
+  const cargarRecibos = async (clinicaId) => {
+    setRecibosCargando(true);
+    try {
+      const { data } = await api.get(`/facturacion-licencias/clinica/${clinicaId}`);
+      setRecibosData(data.data);
+    } catch (e) {
+      setReciboMsg(e.response?.data?.msg || e.message);
+    } finally {
+      setRecibosCargando(false);
+    }
+  };
+
+  const abrirRecibos = (c) => {
+    setRecibosClinica(c);
+    setRecibosData(null);
+    setReciboMsg("");
+    setNuevoReciboPeriodo("");
+    setNuevoReciboMonto("");
+    setShowRecibosModal(true);
+    cargarRecibos(c.id);
+  };
+
+  const verPdf = async (tipo, id) => {
+    try {
+      const res = await api.get(`/facturacion-licencias/${tipo}/${id}/pdf`, { responseType: "blob" });
+      const url = URL.createObjectURL(new Blob([res.data], { type: "application/pdf" }));
+      window.open(url, "_blank");
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch {
+      setReciboMsg("No se pudo abrir el PDF");
+    }
+  };
+
+  const reenviarDoc = async (tipo, id) => {
+    setReciboMsg("");
+    try {
+      await api.post(`/facturacion-licencias/${tipo}/${id}/reenviar`);
+      setReciboMsg("Enviado correctamente.");
+      cargarRecibos(recibosClinica.id);
+    } catch (e) {
+      setReciboMsg(e.response?.data?.msg || "Error al reenviar");
+    }
+  };
+
+  const emitirReciboManual = async () => {
+    setReciboMsg("");
+    try {
+      await api.post(`/facturacion-licencias/clinica/${recibosClinica.id}/recibo`, {
+        periodo: nuevoReciboPeriodo || undefined,
+        monto: nuevoReciboMonto || undefined,
+      });
+      setReciboMsg("Recibo emitido y enviado.");
+      setNuevoReciboPeriodo(""); setNuevoReciboMonto("");
+      cargarRecibos(recibosClinica.id);
+    } catch (e) {
+      setReciboMsg(e.response?.data?.msg || "Error al emitir el recibo");
     }
   };
 
@@ -908,6 +981,20 @@ export default function Clinicas() {
                     onMouseLeave={(e) => e.currentTarget.style.opacity = "1"}
                   >
                     <i className="bi bi-key-fill" />
+                  </button>
+                  <button
+                    onClick={() => abrirRecibos(c)}
+                    title="Contrato y recibos mensuales"
+                    style={{
+                      background: "rgba(16,185,129,.08)", border: "1px solid rgba(16,185,129,.25)",
+                      borderRadius: 8, padding: "8px 10px",
+                      color: "#10b981", fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(16,185,129,.18)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(16,185,129,.08)"}
+                  >
+                    <i className="bi bi-receipt" />
                   </button>
                   <button
                     onClick={() => abrirReenviarCredenciales(c)}
@@ -2114,6 +2201,65 @@ export default function Clinicas() {
                 );
               })()}
 
+              {/* ── Facturación (contrato + recibos mensuales) ── */}
+              {licenciaForm.plan_tipo !== "trial" && (
+                <div style={{ borderTop: `1px dashed ${C.border}`, paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    Facturación mensual
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
+                    <Field label="Cuota mensual" hint="(sin impuesto)">
+                      <input
+                        type="number" min="0" step="0.01" placeholder="Ej: 700"
+                        style={inputSt}
+                        value={licenciaForm.monto_mensual}
+                        onChange={(e) => setLicenciaForm({ ...licenciaForm, monto_mensual: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="Moneda">
+                      <select
+                        style={inputSt}
+                        value={licenciaForm.moneda}
+                        onChange={(e) => setLicenciaForm({ ...licenciaForm, moneda: e.target.value })}
+                      >
+                        <option value="HNL">HNL — Lempira</option>
+                        <option value="USD">USD — Dólar</option>
+                        <option value="PEN">PEN — Sol</option>
+                        <option value="MXN">MXN — Peso</option>
+                      </select>
+                    </Field>
+                    <Field label="Día de cobro" hint="(1–28)">
+                      <input
+                        type="number" min="1" max="28" step="1" placeholder="día del inicio"
+                        style={inputSt}
+                        value={licenciaForm.dia_facturacion}
+                        onChange={(e) => setLicenciaForm({ ...licenciaForm, dia_facturacion: e.target.value })}
+                      />
+                    </Field>
+                  </div>
+                  <Field label="Monto total del período" hint="(opcional — si no pones cuota, se reparte entre los meses)">
+                    <input
+                      type="number" min="0" step="0.01" placeholder="Ej: 4200"
+                      style={inputSt}
+                      value={licenciaForm.monto}
+                      onChange={(e) => setLicenciaForm({ ...licenciaForm, monto: e.target.value })}
+                    />
+                  </Field>
+                  <Field label="Cláusulas adicionales del contrato" hint="(opcional — una por línea)">
+                    <textarea
+                      style={{ ...inputSt, resize: "vertical", minHeight: 56 }}
+                      placeholder="Ej: El cliente cubre la capacitación inicial de su personal."
+                      value={licenciaForm.clausulas_contrato}
+                      onChange={(e) => setLicenciaForm({ ...licenciaForm, clausulas_contrato: e.target.value })}
+                    />
+                  </Field>
+                  <div style={{ fontSize: 11.5, color: C.muted }}>
+                    Al activar se envía el <strong>contrato de servicio</strong> por correo. El primer
+                    <strong> recibo mensual</strong> se emite el mes siguiente, en el día de cobro indicado.
+                  </div>
+                </div>
+              )}
+
               {/* Notas */}
               <Field label="Notas internas" hint="(opcional)">
                 <textarea
@@ -2165,6 +2311,104 @@ export default function Clinicas() {
                 <i className={`bi bi-${licenciaGuardando ? "hourglass-split" : "check-lg"}`} />
                 {licenciaGuardando ? "Guardando..." : "Activar plan"}
               </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {/* ── Modal: Contrato + Recibos mensuales ───────────── */}
+      {showRecibosModal && recibosClinica && createPortal(
+        <div className="modal show d-block" style={{ background: "rgba(0,0,0,.62)", zIndex: 9000 }} onClick={() => setShowRecibosModal(false)}>
+          <div className="modal-dialog modal-lg modal-dialog-scrollable" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-content" style={{ background: C.card, color: C.text, border: `1px solid ${C.border}`, borderRadius: 14, overflow: "hidden" }}>
+              <div className="modal-header" style={{ borderBottom: `1px solid ${C.border}`, padding: "16px 22px" }}>
+                <h5 className="modal-title" style={{ fontWeight: 700 }}>
+                  <i className="bi bi-receipt me-2" style={{ color: "#10b981" }} />
+                  Contrato y recibos — {recibosClinica.nombre}
+                </h5>
+                <button className="btn-close btn-close-white" onClick={() => setShowRecibosModal(false)} />
+              </div>
+              <div className="modal-body" style={{ padding: "18px 22px", display: "flex", flexDirection: "column", gap: 18 }}>
+                {reciboMsg && (
+                  <div style={{ fontSize: 13, background: "rgba(33,150,243,.1)", border: `1px solid ${C.border}`, borderRadius: 8, padding: "8px 12px" }}>
+                    {reciboMsg}
+                  </div>
+                )}
+                {recibosCargando && <div style={{ color: C.muted, fontSize: 13 }}>Cargando…</div>}
+
+                {recibosData && (
+                  <>
+                    {/* Contratos */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>Contrato de servicio</div>
+                      {recibosData.contratos.length === 0 && <div style={{ color: C.muted, fontSize: 13 }}>Sin contrato emitido. Actívalo desde "Gestionar licencia".</div>}
+                      {recibosData.contratos.map((ct) => (
+                        <div key={ct.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", marginBottom: 8, fontSize: 13 }}>
+                          <div style={{ display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                            <div>
+                              <strong>{ct.numero}</strong> · {ct.plan_label || "—"}<br />
+                              <span style={{ color: C.muted }}>
+                                {new Date(ct.vigencia_inicio).toLocaleDateString("es-PE")} → {new Date(ct.vigencia_fin).toLocaleDateString("es-PE")}
+                                {" · "}Cuota {ct.moneda} {Number(ct.monto_mensual || 0).toFixed(2)}
+                                {ct.dia_facturacion ? ` · cobro día ${ct.dia_facturacion}` : ""}
+                              </span>
+                            </div>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              {ct.tiene_pdf ? <button className="btn btn-sm btn-outline-light" onClick={() => verPdf("contrato", ct.id)}>PDF</button> : null}
+                              <button className="btn btn-sm btn-outline-light" onClick={() => reenviarDoc("contrato", ct.id)}>Reenviar</button>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* Emitir recibo manual */}
+                    <div style={{ border: `1px dashed ${C.border}`, borderRadius: 10, padding: "12px 14px", display: "flex", gap: 10, alignItems: "flex-end", flexWrap: "wrap" }}>
+                      <div>
+                        <label style={{ fontSize: 11, color: C.muted, display: "block" }}>Período (YYYY-MM)</label>
+                        <input type="month" style={{ ...inputSt, padding: "6px 10px" }} value={nuevoReciboPeriodo} onChange={(e) => setNuevoReciboPeriodo(e.target.value)} />
+                      </div>
+                      <div>
+                        <label style={{ fontSize: 11, color: C.muted, display: "block" }}>Monto (opcional)</label>
+                        <input type="number" step="0.01" placeholder="cuota mensual" style={{ ...inputSt, padding: "6px 10px", width: 130 }} value={nuevoReciboMonto} onChange={(e) => setNuevoReciboMonto(e.target.value)} />
+                      </div>
+                      <button className="btn btn-sm btn-success" onClick={emitirReciboManual}>Emitir recibo</button>
+                    </div>
+
+                    {/* Recibos */}
+                    <div>
+                      <div style={{ fontSize: 12, fontWeight: 700, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 8 }}>
+                        Recibos mensuales ({recibosData.recibos.length})
+                      </div>
+                      {recibosData.recibos.length === 0 && <div style={{ color: C.muted, fontSize: 13 }}>Todavía no se ha emitido ningún recibo.</div>}
+                      {recibosData.recibos.map((r) => (
+                        <div key={r.id} style={{ border: `1px solid ${C.border}`, borderRadius: 10, padding: "10px 14px", marginBottom: 8, fontSize: 13, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                          <div>
+                            <strong>{r.numero}</strong> · {r.periodo}
+                            {"  "}
+                            <span style={{
+                              fontSize: 11, padding: "1px 7px", borderRadius: 20,
+                              background: r.estado === "enviado" ? "rgba(16,185,129,.15)" : r.estado === "error" ? "rgba(239,68,68,.15)" : "rgba(148,163,184,.15)",
+                              color: r.estado === "enviado" ? "#10b981" : r.estado === "error" ? "#ef4444" : C.muted,
+                            }}>{r.estado}</span>
+                            <br />
+                            <span style={{ color: C.muted }}>
+                              {r.moneda} {Number(r.monto).toFixed(2)} · emitido {new Date(r.fecha_emision).toLocaleDateString("es-PE")}
+                              {r.generado_por === "manual" ? " · manual" : ""}
+                              {r.error_msg ? ` · ${r.error_msg}` : ""}
+                            </span>
+                          </div>
+                          <div style={{ display: "flex", gap: 6 }}>
+                            {r.tiene_pdf ? <button className="btn btn-sm btn-outline-light" onClick={() => verPdf("recibo", r.id)}>PDF</button> : null}
+                            <button className="btn btn-sm btn-outline-light" onClick={() => reenviarDoc("recibo", r.id)}>Reenviar</button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>,

@@ -1117,7 +1117,10 @@ router.get("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
 // POST /api/clinicas/:id/licencia  → asignar o renovar licencia (SUPER_ADMIN)
 router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
   try {
-    const { plan_tipo, inicio_manual, fin_manual, meses_manual, notas } = req.body;
+    const {
+      plan_tipo, inicio_manual, fin_manual, meses_manual, notas,
+      monto, monto_mensual, moneda, dia_facturacion, clausulas_contrato, emitir_contrato,
+    } = req.body;
 
     await ensureBloqueadaColumn();
     const [[clBloq]] = await pool.query("SELECT bloqueada FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
@@ -1156,21 +1159,75 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
       else if (plan_tipo === "anual")     fin.setFullYear(fin.getFullYear() + 1);
     }
 
-    // Actualizar clínica
+    // ── Datos de facturación ──
+    const { mesesEntre, diaFacturacionDesde, emitirContrato } = require("../utils/facturacionLicencias");
+    const PLAN_LABELS = { trial: "Prueba", semestral: "Semestral", anual: "Anual" };
+
+    const duracionMeses = mesesN != null
+      ? mesesN
+      : (plan_tipo === "trial" ? 0 : mesesEntre(inicio, fin));
+
+    const montoTotal   = monto != null && monto !== "" ? Number(monto) : null;
+    let   montoMensual = monto_mensual != null && monto_mensual !== "" ? Number(monto_mensual) : null;
+    if (montoMensual == null && montoTotal != null && duracionMeses > 0) {
+      montoMensual = Math.round((montoTotal / duracionMeses) * 100) / 100;
+    }
+    const monedaFinal = moneda || "HNL";
+    const diaFact = plan_tipo === "trial" ? null
+      : (dia_facturacion ? Math.min(28, Math.max(1, parseInt(dia_facturacion, 10))) : diaFacturacionDesde(inicio));
+
+    // Actualizar clínica (incluye snapshot de facturación)
     await pool.query(
-      `UPDATE clinicas SET plan_tipo=?, licencia_inicio=?, licencia_fin=?, activo=1 WHERE id=?`,
-      [plan_tipo, inicio, fin, req.params.id]
+      `UPDATE clinicas
+          SET plan_tipo=?, licencia_inicio=?, licencia_fin=?, activo=1,
+              lic_monto_mensual=?, lic_moneda=?, lic_dia_facturacion=?
+        WHERE id=?`,
+      [plan_tipo, inicio, fin, montoMensual, monedaFinal, diaFact, req.params.id]
     );
 
     // Registrar en historial
-    await pool.query(
-      `INSERT INTO licencias_historial (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas)
-       VALUES (?,?,?,?,?,?)`,
+    const [rHist] = await pool.query(
+      `INSERT INTO licencias_historial
+         (clinica_id, plan_tipo, inicio, fin, superadmin_id, notas,
+          monto_total, monto_mensual, moneda, duracion_meses, dia_facturacion)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [req.params.id, plan_tipo, inicio, fin, req.user.id,
        (mesesN != null || fin_manual)
          ? `${notas ? notas + " · " : ""}Vigencia manual: ${inicio.toISOString().slice(0, 10)} → ${fin.toISOString().slice(0, 10)}${mesesN != null ? ` (${mesesN} meses)` : ""}`
-         : (notas || null)]
+         : (notas || null),
+       montoTotal, montoMensual, monedaFinal, duracionMeses || null, diaFact]
     );
+
+    // ── Emitir contrato de servicio (salvo trial o si se pide omitir) ──
+    let contrato = null;
+    if (plan_tipo !== "trial" && emitir_contrato !== false) {
+      try {
+        const [[cl]] = await pool.query("SELECT nombre, email FROM clinicas WHERE id=? LIMIT 1", [req.params.id]);
+        const [[usr]] = await pool.query(
+          "SELECT CONCAT(nombres,' ',apellidos) AS n, email FROM usuarios WHERE clinica_id=? ORDER BY id ASC LIMIT 1",
+          [req.params.id]
+        );
+        const r = await emitirContrato({
+          clinicaId: Number(req.params.id), licenciaHistorialId: rHist.insertId,
+          planTipo: plan_tipo,
+          planLabel: `${PLAN_LABELS[plan_tipo] || plan_tipo}${duracionMeses ? ` — ${duracionMeses} ${duracionMeses === 1 ? "mes" : "meses"}` : ""}`,
+          fecha: new Date(), vigenciaInicio: inicio, vigenciaFin: fin, duracionMeses,
+          montoTotal, montoMensual, moneda: monedaFinal, diaFacturacion: diaFact,
+          clienteNombre: usr?.n || cl?.nombre, clienteEmail: cl?.email || usr?.email,
+          clausulasExtra: clausulas_contrato || null, creadoPor: req.user.id, enviar: true,
+        });
+        contrato = r;
+        await pool.query(
+          "UPDATE clinicas SET lic_contrato_numero=? WHERE id=?", [r.numero, req.params.id]
+        );
+        await pool.query(
+          "UPDATE licencias_historial SET contrato_numero=? WHERE id=?", [r.numero, rHist.insertId]
+        );
+      } catch (e) {
+        console.error("[licencia contrato]", e.message);
+        contrato = { error: e.message };
+      }
+    }
 
     res.json({
       ok: true,
@@ -1179,6 +1236,10 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
         licencia_inicio: inicio,
         licencia_fin:    fin,
         dias_restantes:  Math.ceil((fin - new Date()) / 86400000),
+        monto_mensual:   montoMensual,
+        moneda:          monedaFinal,
+        dia_facturacion: diaFact,
+        contrato,
       },
     });
   } catch (e) {

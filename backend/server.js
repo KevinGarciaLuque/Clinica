@@ -168,6 +168,7 @@ app.use("/api/catalogos-condiciones-medicas", require("./routes/catalogosCondici
 app.use("/api/catalogos-procedimientos", require("./routes/catalogosProcedimientos"));
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/planes-publicos", require("./routes/planesPublicos"));
+app.use("/api/facturacion-licencias", require("./routes/facturacionLicencias"));
 app.use("/api/resenas", require("./routes/resenas"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));
@@ -893,5 +894,16 @@ cron.schedule("0 * * * *", async () => {
     await enviarRecordatorios();
   } catch (err) {
     console.error("❌ [CRON] Error en recordatorios:", err.message);
+  }
+});
+
+// ===== CRON: Facturación mensual de licencias (diario 06:10) =====
+const correrFacturacionMensual = require("./scripts/facturacion-mensual");
+cron.schedule("10 6 * * *", async () => {
+  console.log("💳 [CRON] Facturación mensual de licencias...");
+  try {
+    await correrFacturacionMensual();
+  } catch (err) {
+    console.error("❌ [CRON] Error en facturación mensual:", err.message);
   }
 });

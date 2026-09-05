@@ -240,8 +240,45 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
        WHERE id=?`,
       [clinicaId, usuarioId, req.user.id, montoFinal, moneda || "HNL", id]
     );
+    // ── Facturación: snapshot + contrato de servicio ──
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
     const emailErrors = [];
+
+    try {
+      const { emitirContrato, diaFacturacionDesde } = require("../utils/facturacionLicencias");
+      const MESES_PLAN = { trial: 0, semestral: 6, anual: 12 };
+      const duracionMeses = MESES_PLAN[solicitud.plan_solicitado] ?? 0;
+      const montoMensual = (montoFinal != null && duracionMeses > 0)
+        ? Math.round((montoFinal / duracionMeses) * 100) / 100
+        : null;
+      const monedaFinal = moneda || "HNL";
+
+      if (solicitud.plan_solicitado !== "trial") {
+        const diaFact = diaFacturacionDesde(inicio);
+        await pool.query(
+          `UPDATE clinicas SET lic_monto_mensual=?, lic_moneda=?, lic_dia_facturacion=? WHERE id=?`,
+          [montoMensual, monedaFinal, diaFact, clinicaId]
+        );
+        await pool.query(
+          `UPDATE licencias_historial SET monto_total=?, monto_mensual=?, moneda=?, duracion_meses=?, dia_facturacion=?
+             WHERE clinica_id=? ORDER BY id DESC LIMIT 1`,
+          [montoFinal, montoMensual, monedaFinal, duracionMeses, diaFact, clinicaId]
+        );
+        const rc = await emitirContrato({
+          clinicaId, planTipo: solicitud.plan_solicitado, planLabel: planNombre,
+          fecha: new Date(), vigenciaInicio: inicio, vigenciaFin: fin, duracionMeses,
+          montoTotal: montoFinal, montoMensual, moneda: monedaFinal, diaFacturacion: diaFact,
+          clienteNombre: `${solicitud.nombres} ${solicitud.apellidos}`, clienteEmail: solicitud.email,
+          creadoPor: req.user.id, enviar: true,
+        });
+        await pool.query(`UPDATE clinicas SET lic_contrato_numero=? WHERE id=?`, [rc.numero, clinicaId]);
+        await pool.query(
+          `UPDATE licencias_historial SET contrato_numero=? WHERE clinica_id=? ORDER BY id DESC LIMIT 1`,
+          [rc.numero, clinicaId]
+        );
+        if (rc.error) emailErrors.push(`contrato: ${rc.error}`);
+      }
+    } catch (e) { console.error("[aprobar contrato]", e.message); emailErrors.push(`contrato: ${e.message}`); }
 
     // 1) Confirmación
     try {

@@ -387,6 +387,254 @@ function templateFacturaRecibo({ nombres, clinicaNombre, planNombre, monto, mone
   </html>`;
 }
 
+// ────── Contrato de servicio + recibo mensual de licencia ──────
+
+const fmtFecha = (d) => new Date(d).toLocaleDateString("es-HN", { day: "2-digit", month: "long", year: "numeric" });
+const fmtMonto = (m, moneda) => m == null ? "—" : `${moneda || "HNL"} ${Number(m).toFixed(2)}`;
+
+/**
+ * Contrato de prestación de servicio (SaaS Medic-KG). Pensado para PDF A4.
+ * Se emite el día de la contratación. `clausulasExtra` es texto libre opcional
+ * del SUPER_ADMIN (una cláusula por línea).
+ */
+function templateContratoServicio({
+  numero, clinicaNombre, clienteNombre, clienteEmail, planLabel,
+  fecha, vigenciaInicio, vigenciaFin, duracionMeses,
+  montoTotal, montoMensual, moneda, diaFacturacion, clausulasExtra,
+}) {
+  const extra = String(clausulasExtra || "")
+    .split("\n").map((l) => l.trim()).filter(Boolean)
+    .map((l) => `<li>${l.replace(/</g, "&lt;")}</li>`).join("");
+
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    * { box-sizing:border-box; }
+    body { font-family:'Segoe UI',Arial,sans-serif; margin:0; padding:40px 44px; color:#1e293b; font-size:12.5px; line-height:1.55; }
+    .head { display:flex; justify-content:space-between; align-items:flex-start; border-bottom:2px solid #0d6efd; padding-bottom:14px; margin-bottom:22px; }
+    .brand { font-size:20px; font-weight:800; color:#0d6efd; }
+    .brand small { display:block; font-size:10px; font-weight:600; color:#64748b; letter-spacing:.08em; text-transform:uppercase; }
+    .doc-no { text-align:right; font-size:11px; color:#475569; }
+    .doc-no strong { display:block; font-size:15px; color:#0f172a; }
+    h1 { font-size:16px; text-align:center; margin:0 0 20px; letter-spacing:.02em; }
+    h2 { font-size:12.5px; color:#0d6efd; margin:20px 0 6px; text-transform:uppercase; letter-spacing:.04em; }
+    table.data { width:100%; border-collapse:collapse; margin:6px 0 4px; }
+    table.data td { padding:6px 8px; border:1px solid #e2e8f0; font-size:12px; vertical-align:top; }
+    table.data td.k { background:#f8fafc; color:#475569; width:32%; font-weight:600; }
+    ol { margin:6px 0 6px 18px; padding:0; }
+    ol li { margin:4px 0; }
+    .total-box { margin-top:10px; background:#f0f7ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; }
+    .total-box .row { display:flex; justify-content:space-between; font-size:12.5px; padding:3px 0; }
+    .total-box .row.big { font-size:15px; font-weight:800; color:#0d6efd; border-top:1px dashed #bfdbfe; margin-top:6px; padding-top:8px; }
+    .fine { margin-top:14px; font-size:10px; color:#64748b; line-height:1.5; }
+    .sign { margin-top:46px; display:flex; justify-content:space-between; gap:40px; }
+    .sign div { flex:1; text-align:center; border-top:1px solid #94a3b8; padding-top:6px; font-size:11px; color:#475569; }
+    .foot { margin-top:34px; text-align:center; font-size:9.5px; color:#94a3b8; }
+  </style></head>
+  <body>
+    <div class="head">
+      <div class="brand">Medic-KG<small>Sistema de Gestión Clínica</small></div>
+      <div class="doc-no">Contrato N°<strong>${numero}</strong>${fmtFecha(fecha)}</div>
+    </div>
+
+    <h1>CONTRATO DE PRESTACIÓN DE SERVICIO DE SOFTWARE</h1>
+
+    <p>Entre <strong>Medic-KG</strong> (en adelante, "el Proveedor") y
+       <strong>${clinicaNombre}</strong>, representada por
+       <strong>${clienteNombre}</strong> (correo <strong>${clienteEmail || "—"}</strong>)
+       (en adelante, "el Cliente"), se acuerda la contratación del servicio bajo los
+       términos siguientes.</p>
+
+    <h2>1. Objeto</h2>
+    <p>El Proveedor otorga al Cliente una licencia de uso, no exclusiva e intransferible,
+       de la plataforma Medic-KG en la modalidad <strong>${planLabel}</strong>, junto con
+       el alojamiento, las actualizaciones y el soporte técnico correspondientes durante
+       la vigencia del presente contrato.</p>
+
+    <h2>2. Vigencia</h2>
+    <table class="data">
+      <tr><td class="k">Inicio</td><td>${fmtFecha(vigenciaInicio)}</td></tr>
+      <tr><td class="k">Finalización</td><td>${fmtFecha(vigenciaFin)}</td></tr>
+      <tr><td class="k">Duración</td><td>${duracionMeses ? `${duracionMeses} ${duracionMeses === 1 ? "mes" : "meses"}` : "—"}</td></tr>
+    </table>
+
+    <h2>3. Precio y forma de pago</h2>
+    <div class="total-box">
+      <div class="row"><span>Cuota mensual acordada</span><span>${fmtMonto(montoMensual, moneda)}</span></div>
+      ${montoTotal != null ? `<div class="row"><span>Valor total del período</span><span>${fmtMonto(montoTotal, moneda)}</span></div>` : ""}
+      <div class="row"><span>Día de facturación</span><span>${diaFacturacion ? `${diaFacturacion} de cada mes` : "—"}</span></div>
+      <div class="row big"><span>Cuota mensual</span><span>${fmtMonto(montoMensual, moneda)}</span></div>
+    </div>
+    <p style="margin-top:8px">El Proveedor emitirá al Cliente un <strong>recibo mensual</strong> por el
+       monto de la cuota, a partir del mes siguiente a la firma de este contrato y en el
+       día de facturación indicado. Los valores expresados <strong>no incluyen impuestos</strong>;
+       cualquier tributo aplicable se calculará y facturará por separado conforme a la
+       legislación vigente.</p>
+
+    <h2>4. Condiciones del plan contratado</h2>
+    <ol>
+      <li>El plan contratado <strong>no admite cancelación anticipada</strong>; el Cliente se
+          obliga a cubrir la totalidad de las cuotas del período acordado
+          (${duracionMeses ? `${duracionMeses} ${duracionMeses === 1 ? "mes" : "meses"}` : "el período pactado"}),
+          aun cuando deje de utilizar el servicio antes de su vencimiento.</li>
+      <li>El precio de la cuota permanece fijo durante todo el período contratado.</li>
+      <li>La falta de pago de una cuota por más de <strong>10 días calendario</strong> faculta al
+          Proveedor a suspender el acceso al sistema hasta la regularización, sin que ello
+          libere al Cliente del pago de las cuotas pendientes.</li>
+      <li>Al vencimiento, el contrato podrá renovarse por acuerdo de ambas partes,
+          pudiendo actualizarse la cuota para el nuevo período.</li>
+      <li>El Cliente es responsable de la veracidad de los datos que registra y del uso que
+          hace el personal a su cargo dentro de la plataforma.</li>
+      <li>El Proveedor resguarda la información del Cliente con respaldos periódicos y no
+          divulga datos de pacientes a terceros, salvo requerimiento de autoridad competente.</li>
+      <li>El Cliente podrá exportar su información durante la vigencia y hasta
+          <strong>30 días</strong> después de finalizado el contrato; transcurrido ese plazo el
+          Proveedor podrá depurar los datos.</li>
+      <li>Ninguna de las partes será responsable por incumplimientos derivados de caso
+          fortuito o fuerza mayor.</li>
+      ${extra}
+    </ol>
+
+    <p class="fine">Este documento constituye la constancia de contratación del servicio y
+       reemplaza cualquier acuerdo verbal previo. La aceptación del servicio y/o el pago de la
+       primera cuota implican la conformidad plena del Cliente con estas condiciones.</p>
+
+    <div class="sign">
+      <div>Medic-KG — El Proveedor</div>
+      <div>${clienteNombre}<br/>${clinicaNombre} — El Cliente</div>
+    </div>
+
+    <div class="foot">Medic-KG · Sistema de Gestión Clínica · Documento generado el ${fmtFecha(new Date())}</div>
+  </body>
+  </html>`;
+}
+
+/** Cuerpo del correo que acompaña al contrato. */
+function templateContratoEmail({ clienteNombre, clinicaNombre, planLabel, numero }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es"><head><meta charset="UTF-8" /><style>
+    body { font-family:'Segoe UI',sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:16px; max-width:520px; margin:auto; overflow:hidden; box-shadow:0 4px 24px rgba(15,23,42,.06); }
+    .banner { background:linear-gradient(135deg,#0d6efd,#2563eb); padding:34px 32px 26px; text-align:center; color:#fff; }
+    .banner h2 { margin:0; font-size:21px; }
+    .body { padding:26px 32px 30px; color:#334155; font-size:14px; line-height:1.6; }
+    .box { background:#f8fafc; border:1px solid #e2e8f0; border-radius:10px; padding:14px 18px; margin:16px 0; font-size:13px; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:20px; padding-bottom:8px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="banner"><h2>Contratación de servicio confirmada</h2></div>
+      <div class="body">
+        <p>Hola <strong>${clienteNombre}</strong>, confirmamos la contratación del servicio
+           <strong>Medic-KG</strong> para <strong>${clinicaNombre}</strong>.</p>
+        <div class="box">
+          <div><strong>Contrato:</strong> ${numero}</div>
+          <div><strong>Plan:</strong> ${planLabel}</div>
+        </div>
+        <p>Adjunto encontrarás el <strong>contrato de servicio</strong> en PDF con las
+           condiciones del plan acordado. Consérvalo para tus registros.</p>
+        <p>A partir del próximo mes recibirás cada mes el <strong>recibo</strong> por la cuota
+           mensual acordada.</p>
+        <div class="footer">© ${new Date().getFullYear()} Medic-KG</div>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
+/**
+ * Recibo mensual de la licencia. Pensado para PDF (media carta).
+ * Incluye la nota de que el monto no lleva impuestos según el contrato.
+ */
+function templateReciboMensual({
+  numero, clinicaNombre, clienteNombre, contratoNumero, planLabel,
+  periodoLabel, periodoInicio, periodoFin, concepto,
+  monto, moneda, fechaEmision,
+}) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es">
+  <head><meta charset="UTF-8" /><style>
+    body { font-family:'Segoe UI',Arial,sans-serif; margin:0; padding:34px 36px; color:#1e293b; font-size:13px; }
+    .card { max-width:540px; margin:auto; border:1px solid #e2e8f0; border-radius:12px; overflow:hidden; }
+    .top { background:linear-gradient(135deg,#0d6efd,#2563eb); color:#fff; padding:22px 26px; }
+    .top .brand { font-size:17px; font-weight:800; }
+    .top .brand small { display:block; font-size:9px; letter-spacing:.1em; text-transform:uppercase; opacity:.85; }
+    .top .no { margin-top:8px; font-size:12px; opacity:.95; }
+    .body { padding:22px 26px 24px; }
+    h2 { font-size:14px; margin:0 0 12px; letter-spacing:.02em; }
+    table { width:100%; border-collapse:collapse; }
+    td { padding:7px 0; border-bottom:1px solid #eef2f7; font-size:12.5px; }
+    td.k { color:#64748b; width:42%; }
+    .total { margin-top:14px; background:#f0f7ff; border:1px solid #bfdbfe; border-radius:8px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; }
+    .total .lbl { font-size:12px; color:#475569; text-transform:uppercase; letter-spacing:.05em; }
+    .total .val { font-size:19px; font-weight:800; color:#0d6efd; }
+    .fine { margin-top:14px; font-size:9.5px; color:#94a3b8; line-height:1.5; }
+    .foot { margin-top:16px; text-align:center; font-size:9px; color:#cbd5e1; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="top">
+        <div class="brand">Medic-KG<small>Sistema de Gestión Clínica</small></div>
+        <div class="no">Recibo N° ${numero} · Emitido el ${fmtFecha(fechaEmision)}</div>
+      </div>
+      <div class="body">
+        <h2>Recibo de cuota mensual</h2>
+        <table>
+          <tr><td class="k">Cliente</td><td>${clienteNombre || "—"}</td></tr>
+          <tr><td class="k">Clínica</td><td>${clinicaNombre}</td></tr>
+          <tr><td class="k">Plan</td><td>${planLabel || "—"}</td></tr>
+          <tr><td class="k">Contrato</td><td>${contratoNumero || "—"}</td></tr>
+          <tr><td class="k">Período facturado</td><td>${periodoLabel}${periodoInicio ? ` (${fmtFecha(periodoInicio)} – ${fmtFecha(periodoFin)})` : ""}</td></tr>
+          <tr><td class="k">Concepto</td><td>${concepto || "Cuota mensual del servicio"}</td></tr>
+        </table>
+        <div class="total">
+          <span class="lbl">Monto de la cuota</span>
+          <span class="val">${fmtMonto(monto, moneda)}</span>
+        </div>
+        <p class="fine">El monto de este recibo <strong>no incluye impuestos</strong>, conforme a lo
+           acordado en el contrato del plan${contratoNumero ? ` N° ${contratoNumero}` : ""}.
+           Cualquier tributo aplicable se factura por separado según la legislación vigente.
+           Este documento es un comprobante del cobro de la cuota del período indicado.</p>
+        <div class="foot">© ${new Date().getFullYear()} Medic-KG · Documento generado automáticamente</div>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
+/** Cuerpo del correo que acompaña al recibo mensual. */
+function templateReciboEmail({ clienteNombre, clinicaNombre, periodoLabel, monto, moneda }) {
+  return `
+  <!DOCTYPE html>
+  <html lang="es"><head><meta charset="UTF-8" /><style>
+    body { font-family:'Segoe UI',sans-serif; background:#f1f5f9; margin:0; padding:24px; }
+    .card { background:#fff; border-radius:16px; max-width:520px; margin:auto; overflow:hidden; box-shadow:0 4px 24px rgba(15,23,42,.06); }
+    .banner { background:linear-gradient(135deg,#0d6efd,#2563eb); padding:32px; text-align:center; color:#fff; }
+    .banner h2 { margin:0; font-size:20px; }
+    .body { padding:24px 32px 28px; color:#334155; font-size:14px; line-height:1.6; }
+    .amount { font-size:22px; font-weight:800; color:#0d6efd; margin:6px 0 2px; }
+    .footer { color:#94a3b8; font-size:12px; text-align:center; margin-top:20px; padding-bottom:8px; }
+  </style></head>
+  <body>
+    <div class="card">
+      <div class="banner"><h2>Recibo del período ${periodoLabel}</h2></div>
+      <div class="body">
+        <p>Hola <strong>${clienteNombre || clinicaNombre}</strong>, adjuntamos el recibo
+           correspondiente a la cuota mensual del servicio Medic-KG para
+           <strong>${clinicaNombre}</strong>.</p>
+        <div class="amount">${fmtMonto(monto, moneda)}</div>
+        <p style="color:#64748b; font-size:12.5px;">El monto no incluye impuestos, según lo
+           acordado en el contrato del plan.</p>
+        <div class="footer">© ${new Date().getFullYear()} Medic-KG</div>
+      </div>
+    </div>
+  </body>
+  </html>`;
+}
+
 function templateSolicitudResena({ nombreMedico, link, clinicaNombre }) {
   return `
   <!DOCTYPE html>
@@ -440,6 +688,10 @@ module.exports = {
   templateCredenciales,
   templateSolicitudRechazada,
   templateFacturaRecibo,
+  templateContratoServicio,
+  templateContratoEmail,
+  templateReciboMensual,
+  templateReciboEmail,
   NOMBRE_PLAN,
   NIVEL_PLAN_LABEL,
   planCompletoLabel,
