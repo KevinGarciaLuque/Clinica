@@ -1,5 +1,5 @@
 -- ============================================================
---  072 — Facturación de licencias (contrato + recibos mensuales)
+--  073 — Facturación de licencias (contrato + recibos mensuales)
 --  El SUPER_ADMIN activa un plan con un monto mensual y un día
 --  de facturación. El día de la activación se emite el CONTRATO
 --  de servicio; cada mes (en el día de facturación) se emite un

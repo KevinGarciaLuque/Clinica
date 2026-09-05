@@ -1,6 +1,6 @@
 /**
- * run-072.js — Facturación de licencias (contrato + recibos mensuales)
- * Ejecutar: node migrations/run-072.js
+ * run-073.js — Facturación de licencias (contrato + recibos mensuales)
+ * Ejecutar: node migrations/run-073.js
  */
 const mysql = require("mysql2/promise");
 const fs = require("fs");
@@ -15,8 +15,8 @@ async function run() {
     host: process.env.DB_HOST, user: process.env.DB_USER, password: process.env.DB_PASSWORD,
     database: process.env.DB_NAME, port: Number(process.env.DB_PORT || 3306),
   });
-  console.log("\n🚀 Migración 072 — facturación de licencias...\n");
-  const sqlFile = fs.readFileSync(path.join(__dirname, "072_facturacion_licencias.sql"), "utf8");
+  console.log("\n🚀 Migración 073 — facturación de licencias...\n");
+  const sqlFile = fs.readFileSync(path.join(__dirname, "073_facturacion_licencias.sql"), "utf8");
   const statements = sqlFile.split("\n").filter(l => !l.trim().startsWith("--")).join("\n").split(";").map(s => s.trim()).filter(Boolean);
   for (const stmt of statements) {
     const preview = stmt.replace(/\s+/g, " ").slice(0, 90);
@@ -29,6 +29,6 @@ async function run() {
     }
   }
   await conn.end();
-  console.log("\n🎉 Migración 072 completada.\n");
+  console.log("\n🎉 Migración 073 completada.\n");
 }
 run().catch(err => { console.error("\n💥 Error fatal:", err.message); process.exit(1); });
