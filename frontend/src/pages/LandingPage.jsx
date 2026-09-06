@@ -726,58 +726,79 @@ export default function LandingPage() {
                     </li>
                   ))}
                 </ul>
-                {whatsapp ? (
-                  <a
-                    href={`https://wa.me/${whatsapp}?text=Hola, me interesa el plan ${plan.label} de ${nombre}`}
-                    target="_blank" rel="noopener noreferrer"
-                    style={{
-                      display: "block", textAlign: "center", textDecoration: "none",
-                      background: plan.highlight ? plan.color : "transparent",
-                      color: plan.highlight ? "#fff" : plan.color,
-                      border: `2px solid ${plan.color}`,
-                      borderRadius: 12, padding: "12px 0", fontWeight: 700, fontSize: 14,
-                      transition: "background .18s, color .18s",
-                    }}
-                    onMouseOver={e => { e.currentTarget.style.background = plan.color; e.currentTarget.style.color = "#fff"; }}
-                    onMouseOut={e  => { if (!plan.highlight) { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = plan.color; } }}
-                  >
-                    <i className="bi bi-whatsapp me-2" />Solicitar plan
-                  </a>
+                {plan.precio !== "Consultar" ? (
+                  <>
+                    {/* CTA primario: compra autoservicio */}
+                    <a
+                      href={`/solicitar-plan?nivel=${NIVEL_POR_PLAN[plan.id] || "basico"}&plan=${periodo}`}
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        textAlign: "center", textDecoration: "none",
+                        background: plan.color, color: "#fff",
+                        border: `2px solid ${plan.color}`,
+                        borderRadius: 12, padding: "13px 0", fontWeight: 700, fontSize: 14.5,
+                        boxShadow: `0 8px 22px -8px rgba(${hexToRgb(plan.color)},.6)`,
+                        transition: "transform .16s, box-shadow .16s, filter .16s",
+                      }}
+                      onMouseOver={e => { e.currentTarget.style.transform = "translateY(-1px)"; e.currentTarget.style.filter = "brightness(1.06)"; e.currentTarget.style.boxShadow = `0 12px 26px -8px rgba(${hexToRgb(plan.color)},.7)`; }}
+                      onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.filter = "none"; e.currentTarget.style.boxShadow = `0 8px 22px -8px rgba(${hexToRgb(plan.color)},.6)`; }}
+                    >
+                      <i className="bi bi-credit-card-fill" />Comprar ahora
+                    </a>
+
+                    {plan.id === "trial" && (
+                      <a
+                        href="/solicitar-plan?nivel=basico&plan=trial"
+                        style={{ display: "block", textAlign: "center", textDecoration: "none", color: plan.color, fontSize: 13, fontWeight: 600, marginTop: 10 }}
+                      >
+                        o empieza con la prueba gratis de 14 días
+                      </a>
+                    )}
+
+                    {/* Ayuda secundaria: WhatsApp */}
+                    {whatsapp && (
+                      <a
+                        href={`https://wa.me/${whatsapp}?text=Hola, tengo una duda sobre el plan ${plan.label} de ${nombre}`}
+                        target="_blank" rel="noopener noreferrer"
+                        style={{
+                          display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                          textDecoration: "none", color: "#64748b", fontSize: 12.5, fontWeight: 600,
+                          marginTop: plan.id === "trial" ? 8 : 14, transition: "color .15s",
+                        }}
+                        onMouseOver={e => { e.currentTarget.style.color = "#25D366"; }}
+                        onMouseOut={e  => { e.currentTarget.style.color = "#64748b"; }}
+                      >
+                        <i className="bi bi-whatsapp" />¿Tienes dudas? Escríbenos
+                      </a>
+                    )}
+                  </>
                 ) : (
-                  <button
-                    onClick={() => navigate("/login")}
-                    style={{
-                      width: "100%", background: plan.highlight ? plan.color : "transparent",
-                      color: plan.highlight ? "#fff" : plan.color,
-                      border: `2px solid ${plan.color}`,
-                      borderRadius: 12, padding: "12px 0", fontWeight: 700, fontSize: 14, cursor: "pointer",
-                    }}
-                  >
-                    Comenzar
-                  </button>
-                )}
-                <a
-                  href={`/solicitar-plan?nivel=${NIVEL_POR_PLAN[plan.id] || "basico"}&plan=${periodo}`}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                    textAlign: "center", textDecoration: "none",
-                    background: `${plan.color}12`, color: plan.color,
-                    border: `1.5px solid ${plan.color}40`,
-                    borderRadius: 12, padding: "11px 0", fontWeight: 700, fontSize: 13.5,
-                    marginTop: 10, transition: "background .18s, border-color .18s",
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.background = `${plan.color}22`; e.currentTarget.style.borderColor = plan.color; }}
-                  onMouseOut={e  => { e.currentTarget.style.background = `${plan.color}12`; e.currentTarget.style.borderColor = `${plan.color}40`; }}
-                >
-                  <i className="bi bi-credit-card-fill" />Comprar ahora
-                </a>
-                {plan.id === "trial" && (
-                  <a
-                    href="/solicitar-plan?nivel=basico&plan=trial"
-                    style={{ display: "block", textAlign: "center", textDecoration: "none", color: "#94a3b8", fontSize: 12.5, marginTop: 12 }}
-                  >
-                    o prueba gratis 14 días
-                  </a>
+                  /* Sin precio configurado → contacto directo */
+                  whatsapp ? (
+                    <a
+                      href={`https://wa.me/${whatsapp}?text=Hola, me interesa el plan ${plan.label} de ${nombre}`}
+                      target="_blank" rel="noopener noreferrer"
+                      style={{
+                        display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+                        textDecoration: "none", background: plan.color, color: "#fff",
+                        border: `2px solid ${plan.color}`, borderRadius: 12, padding: "13px 0",
+                        fontWeight: 700, fontSize: 14.5,
+                      }}
+                    >
+                      <i className="bi bi-whatsapp" />Consultar por WhatsApp
+                    </a>
+                  ) : (
+                    <button
+                      onClick={() => navigate("/login")}
+                      style={{
+                        width: "100%", background: plan.color, color: "#fff",
+                        border: `2px solid ${plan.color}`, borderRadius: 12, padding: "13px 0",
+                        fontWeight: 700, fontSize: 14.5, cursor: "pointer",
+                      }}
+                    >
+                      Comenzar
+                    </button>
+                  )
                 )}
               </div>
             ))}
