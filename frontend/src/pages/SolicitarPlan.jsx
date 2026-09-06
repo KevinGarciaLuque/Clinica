@@ -15,22 +15,35 @@ import { NIVELES_PLAN, DURACION_LABEL, duracionesDisponibles, precioClave } from
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 
-const TOTAL_PASOS = 3;
-
-function PasoIndicador({ paso }) {
-  return (
-    <div className="d-flex align-items-center gap-2 mb-4">
-      {[1, 2, 3].map((n) => (
-        <div key={n} style={{ flex: 1, height: 4, borderRadius: 2, background: n <= paso ? "#0d6efd" : "#e2e8f0" }} />
-      ))}
-    </div>
-  );
-}
+const PASOS = [
+  { n: 1, label: "Tus datos",     icon: "bi-person-vcard" },
+  { n: 2, label: "Transferencia", icon: "bi-bank" },
+  { n: 3, label: "Comprobante",   icon: "bi-cloud-arrow-up" },
+];
 
 function formatearMonto(monto, moneda) {
   if (monto == null) return null;
   const simbolo = SIMBOLO_MONEDA[moneda] || moneda;
   return `${simbolo} ${Number(monto).toFixed(2)}`;
+}
+
+function Stepper({ paso }) {
+  return (
+    <div className="sp-stepper">
+      {PASOS.map((p, i) => {
+        const estado = p.n < paso ? "done" : p.n === paso ? "active" : "todo";
+        return (
+          <div key={p.n} className="sp-step" data-estado={estado}>
+            {i > 0 && <span className="sp-step-line" data-estado={p.n <= paso ? "done" : "todo"} />}
+            <div className="sp-step-dot">
+              {estado === "done" ? <i className="bi bi-check-lg" /> : <i className={`bi ${p.icon}`} />}
+            </div>
+            <span className="sp-step-label">{p.label}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
 }
 
 export default function SolicitarPlan() {
@@ -74,7 +87,7 @@ export default function SolicitarPlan() {
     const file = e.target.files[0];
     if (!file) return;
     setArchivo(file);
-    setPreview(URL.createObjectURL(file));
+    setPreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
   };
 
   const irAPaso2 = (e) => {
@@ -112,142 +125,345 @@ export default function SolicitarPlan() {
   const montoPlan = esGratis
     ? null
     : (pagos ? formatearMonto(pagos[precioClave(form.nivel_plan, form.plan_solicitado)], pagos.moneda) : null);
+  const planLabel = `${NIVELES_PLAN[form.nivel_plan].label} · ${DURACION_LABEL[form.plan_solicitado]}`;
+
+  const styles = (
+    <style>{`
+      .sp-wrap { min-height: 100vh; display: flex; align-items: center; justify-content: center;
+        padding: 40px 20px; background:
+          radial-gradient(1100px 500px at 15% -10%, rgba(13,110,253,.10), transparent 60%),
+          radial-gradient(900px 500px at 110% 10%, rgba(14,31,60,.10), transparent 55%),
+          #f4f6fb;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+      .sp-shell { width: 100%; max-width: 940px; }
+      .sp-back { display: inline-flex; align-items: center; gap: 6px; color: #64748b;
+        text-decoration: none; font-size: 13.5px; font-weight: 600; margin-bottom: 14px;
+        transition: color .15s; }
+      .sp-back:hover { color: #0f172a; }
+      .sp-card { display: grid; grid-template-columns: 320px 1fr; background: #fff;
+        border-radius: 24px; overflow: hidden;
+        box-shadow: 0 1px 2px rgba(15,23,42,.04), 0 30px 60px -24px rgba(15,23,42,.22);
+        border: 1px solid #eef1f6; }
+      @media (max-width: 760px) { .sp-card { grid-template-columns: 1fr; } }
+
+      /* ── Panel izquierdo (resumen) ── */
+      .sp-aside { position: relative; padding: 34px 30px; color: #e2e8f0; overflow: hidden;
+        background: linear-gradient(160deg, #14294a 0%, #0e1f3c 55%, #0b1730 100%); }
+      .sp-aside::after { content: ""; position: absolute; width: 260px; height: 260px;
+        border-radius: 50%; right: -120px; top: -110px; background: rgba(255,255,255,.05); }
+      .sp-aside::before { content: ""; position: absolute; width: 200px; height: 200px;
+        border-radius: 50%; left: -90px; bottom: -100px; background: rgba(13,110,253,.14); }
+      .sp-brand { position: relative; font-weight: 800; font-size: 15px; letter-spacing: .3px;
+        display: flex; align-items: center; gap: 8px; }
+      .sp-brand i { color: #4c9bff; }
+      .sp-aside h1 { position: relative; font-size: 22px; font-weight: 800; color: #fff;
+        margin: 26px 0 6px; line-height: 1.25; }
+      .sp-aside .sp-sub { position: relative; font-size: 13px; color: rgba(226,232,240,.7);
+        line-height: 1.6; }
+      .sp-plan-box { position: relative; margin-top: 22px; padding: 16px 18px; border-radius: 16px;
+        background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+        backdrop-filter: blur(4px); }
+      .sp-plan-box .k { font-size: 11px; text-transform: uppercase; letter-spacing: 1px;
+        color: rgba(226,232,240,.55); }
+      .sp-plan-box .plan { font-size: 15px; font-weight: 700; color: #fff; margin-top: 3px; }
+      .sp-plan-box .price { font-size: 26px; font-weight: 900; color: #fff; margin-top: 12px;
+        line-height: 1; }
+      .sp-plan-box .price small { font-size: 13px; font-weight: 600; color: rgba(226,232,240,.6); }
+      .sp-perks { position: relative; margin: 24px 0 0; padding: 0; list-style: none;
+        display: flex; flex-direction: column; gap: 11px; }
+      .sp-perks li { display: flex; align-items: flex-start; gap: 9px; font-size: 12.7px;
+        color: rgba(226,232,240,.82); line-height: 1.45; }
+      .sp-perks i { color: #4c9bff; font-size: 14px; margin-top: 1px; flex-shrink: 0; }
+
+      /* ── Panel derecho (formulario) ── */
+      .sp-main { padding: 36px 38px 34px; }
+      @media (max-width: 760px) { .sp-main { padding: 28px 22px; } }
+      .sp-main h2 { font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 22px; }
+
+      .sp-stepper { display: flex; margin-bottom: 28px; }
+      .sp-step { position: relative; flex: 1; display: flex; flex-direction: column;
+        align-items: center; gap: 8px; }
+      .sp-step-line { position: absolute; height: 2px; top: 17px; right: 50%; width: 100%;
+        transform: translateX(-18px); z-index: 0; }
+      .sp-step-line[data-estado="done"] { background: #0d6efd; }
+      .sp-step-line[data-estado="todo"] { background: #e2e8f0; }
+      .sp-step-dot { position: relative; z-index: 1; width: 36px; height: 36px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center; font-size: 15px;
+        background: #fff; border: 2px solid #e2e8f0; color: #94a3b8;
+        transition: all .25s ease; }
+      .sp-step[data-estado="active"] .sp-step-dot { border-color: #0d6efd; color: #0d6efd;
+        box-shadow: 0 0 0 5px rgba(13,110,253,.12); }
+      .sp-step[data-estado="done"] .sp-step-dot { background: #0d6efd; border-color: #0d6efd;
+        color: #fff; }
+      .sp-step-label { font-size: 11.5px; font-weight: 600; color: #94a3b8; text-align: center; }
+      .sp-step[data-estado="active"] .sp-step-label,
+      .sp-step[data-estado="done"] .sp-step-label { color: #0f172a; }
+
+      .sp-label { display: block; font-size: 12px; font-weight: 700; color: #475569;
+        margin-bottom: 6px; letter-spacing: .1px; }
+      .sp-input, .sp-select, .sp-textarea { width: 100%; border: 1.5px solid #e3e8ef;
+        border-radius: 11px; padding: 11px 13px; font-size: 14px; color: #0f172a;
+        background: #fff; transition: border-color .15s, box-shadow .15s; outline: none;
+        font-family: inherit; }
+      .sp-input:focus, .sp-select:focus, .sp-textarea:focus { border-color: #0d6efd;
+        box-shadow: 0 0 0 4px rgba(13,110,253,.12); }
+      .sp-input::placeholder, .sp-textarea::placeholder { color: #cbd5e1; }
+      .sp-select { appearance: none; -webkit-appearance: none;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%2394a3b8' d='M6 8 0 2l1.4-1.4L6 5.2 10.6.6 12 2z'/%3E%3C/svg%3E");
+        background-repeat: no-repeat; background-position: right 14px center; padding-right: 34px; }
+      .sp-textarea { resize: vertical; min-height: 76px; }
+
+      .sp-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 16px; }
+      .sp-grid .sp-full { grid-column: 1 / -1; }
+      @media (max-width: 520px) { .sp-grid { grid-template-columns: 1fr; } }
+
+      .sp-total { display: flex; justify-content: space-between; align-items: center;
+        margin-top: 22px; padding: 14px 18px; border-radius: 14px;
+        background: linear-gradient(120deg, rgba(13,110,253,.09), rgba(13,110,253,.04));
+        border: 1px solid rgba(13,110,253,.16); }
+      .sp-total .k { font-size: 12.5px; font-weight: 700; color: #1d4ed8;
+        text-transform: uppercase; letter-spacing: .5px; }
+      .sp-total .v { font-size: 21px; font-weight: 900; color: #1d4ed8; }
+
+      .sp-bank { border: 1px solid #e3e8ef; border-radius: 16px; overflow: hidden; margin-top: 6px; }
+      .sp-bank-row { display: flex; justify-content: space-between; gap: 16px;
+        padding: 12px 16px; font-size: 13.5px; }
+      .sp-bank-row + .sp-bank-row { border-top: 1px solid #f1f5f9; }
+      .sp-bank-row .k { color: #94a3b8; }
+      .sp-bank-row .v { font-weight: 700; color: #0f172a; text-align: right; }
+      .sp-bank-row.total { background: #f8fafc; }
+      .sp-bank-row.total .v { color: #1d4ed8; }
+
+      .sp-drop { border: 2px dashed #cbd5e1; border-radius: 16px; padding: 30px 20px;
+        text-align: center; cursor: pointer; transition: border-color .15s, background .15s;
+        background: #f8fafc; }
+      .sp-drop:hover { border-color: #0d6efd; background: #f0f6ff; }
+      .sp-drop i { font-size: 30px; color: #0d6efd; }
+      .sp-drop .t { font-weight: 700; color: #0f172a; margin-top: 8px; font-size: 14px; }
+      .sp-drop .s { font-size: 12px; color: #94a3b8; margin-top: 2px; }
+      .sp-drop input { display: none; }
+      .sp-file-chip { display: flex; align-items: center; gap: 10px; margin-top: 12px;
+        padding: 10px 14px; border-radius: 12px; background: #ecfdf5; border: 1px solid #a7f3d0;
+        font-size: 13px; color: #065f46; font-weight: 600; }
+
+      .sp-actions { display: flex; gap: 10px; margin-top: 26px; }
+      .sp-btn { border: none; border-radius: 12px; padding: 12px 22px; font-size: 14px;
+        font-weight: 700; cursor: pointer; display: inline-flex; align-items: center;
+        justify-content: center; gap: 8px; transition: transform .15s, box-shadow .15s, background .15s;
+        font-family: inherit; }
+      .sp-btn-primary { flex: 1; background: linear-gradient(135deg, #0d6efd, #0b5ed7); color: #fff;
+        box-shadow: 0 8px 20px -6px rgba(13,110,253,.5); }
+      .sp-btn-primary:hover:not(:disabled) { transform: translateY(-1px);
+        box-shadow: 0 12px 26px -6px rgba(13,110,253,.55); }
+      .sp-btn-primary:disabled { opacity: .6; cursor: wait; }
+      .sp-btn-ghost { background: #fff; border: 1.5px solid #e3e8ef; color: #475569; }
+      .sp-btn-ghost:hover { border-color: #cbd5e1; color: #0f172a; }
+
+      .sp-alert { background: #fef2f2; border: 1px solid #fecaca; color: #b91c1c;
+        border-radius: 12px; padding: 10px 14px; font-size: 13px; margin-bottom: 18px;
+        display: flex; align-items: center; gap: 8px; }
+
+      .sp-note { font-size: 13px; color: #64748b; line-height: 1.6; margin-bottom: 18px; }
+      .sp-note strong { color: #0f172a; }
+    `}</style>
+  );
 
   if (enviado) {
     return (
-      <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center" style={{ background: "#f1f5f9", padding: "2rem" }}>
-        <div className="card border-0 shadow-sm rounded-4 p-5 text-center" style={{ maxWidth: 480, width: "100%" }}>
-          <div className="rounded-circle bg-success bg-opacity-10 d-flex align-items-center justify-content-center mx-auto mb-4" style={{ width: 80, height: 80 }}>
-            <i className="bi bi-check-circle-fill text-success" style={{ fontSize: "2.4rem" }} />
+      <div className="sp-wrap">
+        {styles}
+        <div className="sp-shell" style={{ maxWidth: 460 }}>
+          <div className="sp-card" style={{ gridTemplateColumns: "1fr", textAlign: "center" }}>
+            <div className="sp-main" style={{ padding: "44px 34px" }}>
+              <div style={{
+                width: 78, height: 78, borderRadius: "50%", margin: "0 auto 22px",
+                background: "#ecfdf5", display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+                <i className="bi bi-check-circle-fill" style={{ fontSize: 38, color: "#10b981" }} />
+              </div>
+              <h2 style={{ marginBottom: 10 }}>¡Recibimos tu comprobante!</h2>
+              <p className="sp-note" style={{ marginBottom: 24 }}>
+                Te enviamos un correo de confirmación. Validaremos tu transferencia y te avisaremos
+                apenas tu plan quede activo.
+              </p>
+              <Link to="/" className="sp-btn sp-btn-primary" style={{ textDecoration: "none", display: "inline-flex" }}>
+                Volver al inicio
+              </Link>
+            </div>
           </div>
-          <h4 className="fw-bold text-dark mb-2">¡Recibimos tu comprobante!</h4>
-          <p className="text-muted mb-4">
-            Te enviamos un correo de confirmación. Validaremos tu transferencia y te avisaremos
-            por correo apenas tu plan quede activo.
-          </p>
-          <Link to="/" className="btn btn-primary px-5">Volver al inicio</Link>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-vh-100 d-flex flex-column align-items-center justify-content-center" style={{ background: "#f1f5f9", padding: "2rem" }}>
-      <div style={{ maxWidth: 640, width: "100%", marginBottom: 12 }}>
-        <Link to="/" className="text-decoration-none text-muted small fw-semibold">
-          <i className="bi bi-arrow-left me-1" />Volver al inicio
+    <div className="sp-wrap">
+      {styles}
+      <div className="sp-shell">
+        <Link to="/" className="sp-back">
+          <i className="bi bi-arrow-left" />Volver al inicio
         </Link>
-      </div>
-      <div className="card border-0 shadow-sm rounded-4 p-4 p-md-5" style={{ maxWidth: 640, width: "100%" }}>
-        <h4 className="fw-bold text-dark mb-1">Solicitar plan</h4>
-        <p className="text-muted mb-3">Paso {paso} de {TOTAL_PASOS}</p>
-        <PasoIndicador paso={paso} />
 
-        {error && <div className="alert alert-danger py-2">{error}</div>}
-
-        {/* ── Paso 1: datos ── */}
-        {paso === 1 && (
-          <form onSubmit={irAPaso2}>
-            <div className="row g-3">
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">Nombres</label>
-                <input className="form-control" name="nombres" value={form.nombres} onChange={cambio} required />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">Apellidos</label>
-                <input className="form-control" name="apellidos" value={form.apellidos} onChange={cambio} required />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">Correo</label>
-                <input type="email" className="form-control" name="email" value={form.email} onChange={cambio} required />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">Teléfono</label>
-                <input className="form-control" name="telefono" value={form.telefono} onChange={cambio} />
-              </div>
-              <div className="col-12">
-                <label className="form-label small fw-semibold">Nombre de la clínica</label>
-                <input className="form-control" name="nombre_clinica" value={form.nombre_clinica} onChange={cambio} required />
-              </div>
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">Plan</label>
-                <select className="form-select" name="nivel_plan" value={form.nivel_plan} onChange={cambio}>
-                  {Object.entries(NIVELES_PLAN).map(([id, p]) => (
-                    <option key={id} value={id}>{p.label}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-md-6">
-                <label className="form-label small fw-semibold">Duración</label>
-                <select className="form-select" name="plan_solicitado" value={form.plan_solicitado} onChange={cambio}>
-                  {duraciones.map((d) => (
-                    <option key={d} value={d}>{DURACION_LABEL[d]}</option>
-                  ))}
-                </select>
-              </div>
-              <div className="col-12">
-                <label className="form-label small fw-semibold">Mensaje (opcional)</label>
-                <textarea className="form-control" name="mensaje" rows={2} value={form.mensaje} onChange={cambio} />
-              </div>
-            </div>
-
-            <div className="d-flex justify-content-between align-items-center bg-primary bg-opacity-10 rounded-3 px-3 py-2 mt-3">
-              <span className="small fw-semibold text-primary">Total a transferir</span>
-              <span className="fw-bold text-primary fs-5">{esGratis ? "Gratis" : (montoPlan || "—")}</span>
-            </div>
-
-            <button type="submit" className="btn btn-primary w-100 mt-4">
-              Continuar <i className="bi bi-arrow-right ms-1" />
-            </button>
-          </form>
-        )}
-
-        {/* ── Paso 2: datos bancarios ── */}
-        {paso === 2 && (
-          <div>
-            <p className="text-muted">
-              Transfiere {esGratis ? "" : montoPlan ? <strong>{montoPlan}</strong> : ""} correspondiente al plan{" "}
-              <strong>{NIVELES_PLAN[form.nivel_plan].label} — {DURACION_LABEL[form.plan_solicitado]}</strong> a la siguiente cuenta:
+        <div className="sp-card">
+          {/* ── Resumen ── */}
+          <aside className="sp-aside">
+            <div className="sp-brand"><i className="bi bi-heart-pulse-fill" />Medic-KG</div>
+            <h1>Solicita tu plan<br />en 3 pasos</h1>
+            <p className="sp-sub">
+              Completa tus datos, realiza la transferencia y súbenos el comprobante.
+              Activamos tu clínica apenas validamos el pago.
             </p>
-            <div className="bg-light rounded-3 p-3 mb-4">
-              <div className="row row-cols-2 g-2 small">
-                <div className="text-muted">Banco</div><div className="fw-semibold">{pagos?.banco || "—"}</div>
-                <div className="text-muted">Titular</div><div className="fw-semibold">{pagos?.titular || "—"}</div>
-                <div className="text-muted">Cuenta</div><div className="fw-semibold">{pagos?.numero_cuenta || "—"}</div>
-                {pagos?.numero_cci && (<><div className="text-muted">CCI</div><div className="fw-semibold">{pagos.numero_cci}</div></>)}
-                <div className="text-muted">Monto</div><div className="fw-bold text-primary">{esGratis ? "Gratis" : (montoPlan || "—")}</div>
+
+            <div className="sp-plan-box">
+              <div className="k">Plan seleccionado</div>
+              <div className="plan">{planLabel}</div>
+              <div className="price">
+                {esGratis ? "Gratis" : (montoPlan || "—")}
+                {!esGratis && <small> / período</small>}
               </div>
             </div>
-            <div className="d-flex gap-2">
-              <button type="button" className="btn btn-outline-secondary" onClick={() => setPaso(1)}>
-                <i className="bi bi-arrow-left me-1" />Atrás
-              </button>
-              <button type="button" className="btn btn-primary flex-fill" onClick={() => setPaso(3)}>
-                Ya transferí, continuar <i className="bi bi-arrow-right ms-1" />
-              </button>
-            </div>
-          </div>
-        )}
 
-        {/* ── Paso 3: subir comprobante ── */}
-        {paso === 3 && (
-          <form onSubmit={enviar}>
-            <label className="form-label small fw-semibold">Captura de la transferencia</label>
-            <input type="file" accept="image/*,application/pdf" className="form-control" onChange={seleccionarArchivo} required />
-            {preview && (
-              <img src={preview} alt="Vista previa" className="img-fluid rounded-3 mt-2" style={{ maxHeight: 240 }} />
+            <ul className="sp-perks">
+              <li><i className="bi bi-lightning-charge-fill" />Activación en menos de 24 horas hábiles</li>
+              <li><i className="bi bi-headset" />Acompañamiento en la puesta en marcha</li>
+              <li><i className="bi bi-shield-lock-fill" />Tus datos y los de tus pacientes protegidos</li>
+              <li><i className="bi bi-receipt" />Contrato y recibo mensual claros</li>
+            </ul>
+          </aside>
+
+          {/* ── Formulario ── */}
+          <div className="sp-main">
+            <h2>Solicitar plan</h2>
+            <Stepper paso={paso} />
+
+            {error && (
+              <div className="sp-alert">
+                <i className="bi bi-exclamation-triangle-fill" />{error}
+              </div>
             )}
 
-            <div className="d-flex gap-2 mt-4">
-              <button type="button" className="btn btn-outline-secondary" onClick={() => setPaso(2)} disabled={enviando}>
-                <i className="bi bi-arrow-left me-1" />Atrás
-              </button>
-              <button type="submit" className="btn btn-primary flex-fill" disabled={enviando}>
-                {enviando ? "Enviando..." : "Enviar solicitud"}
-              </button>
-            </div>
-          </form>
-        )}
+            {/* Paso 1 */}
+            {paso === 1 && (
+              <form onSubmit={irAPaso2}>
+                <div className="sp-grid">
+                  <div>
+                    <label className="sp-label">Nombres</label>
+                    <input className="sp-input" name="nombres" value={form.nombres} onChange={cambio} placeholder="Tu nombre" required />
+                  </div>
+                  <div>
+                    <label className="sp-label">Apellidos</label>
+                    <input className="sp-input" name="apellidos" value={form.apellidos} onChange={cambio} placeholder="Tus apellidos" required />
+                  </div>
+                  <div>
+                    <label className="sp-label">Correo</label>
+                    <input type="email" className="sp-input" name="email" value={form.email} onChange={cambio} placeholder="correo@ejemplo.com" required />
+                  </div>
+                  <div>
+                    <label className="sp-label">Teléfono</label>
+                    <input className="sp-input" name="telefono" value={form.telefono} onChange={cambio} placeholder="Opcional" />
+                  </div>
+                  <div className="sp-full">
+                    <label className="sp-label">Nombre de la clínica</label>
+                    <input className="sp-input" name="nombre_clinica" value={form.nombre_clinica} onChange={cambio} placeholder="Cómo se llama tu clínica o consultorio" required />
+                  </div>
+                  <div>
+                    <label className="sp-label">Plan</label>
+                    <select className="sp-select" name="nivel_plan" value={form.nivel_plan} onChange={cambio}>
+                      {Object.entries(NIVELES_PLAN).map(([id, p]) => (
+                        <option key={id} value={id}>{p.label}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="sp-label">Duración</label>
+                    <select className="sp-select" name="plan_solicitado" value={form.plan_solicitado} onChange={cambio}>
+                      {duraciones.map((d) => (
+                        <option key={d} value={d}>{DURACION_LABEL[d]}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="sp-full">
+                    <label className="sp-label">Mensaje <span style={{ color: "#94a3b8", fontWeight: 500 }}>(opcional)</span></label>
+                    <textarea className="sp-textarea" name="mensaje" rows={2} value={form.mensaje} onChange={cambio} placeholder="¿Algo que quieras contarnos?" />
+                  </div>
+                </div>
+
+                <div className="sp-total">
+                  <span className="k">Total a transferir</span>
+                  <span className="v">{esGratis ? "Gratis" : (montoPlan || "—")}</span>
+                </div>
+
+                <div className="sp-actions">
+                  <button type="submit" className="sp-btn sp-btn-primary">
+                    Continuar <i className="bi bi-arrow-right" />
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* Paso 2 */}
+            {paso === 2 && (
+              <div>
+                <p className="sp-note">
+                  Transfiere {esGratis ? "" : montoPlan ? <strong>{montoPlan}</strong> : ""} del plan{" "}
+                  <strong>{planLabel}</strong> a la siguiente cuenta:
+                </p>
+                <div className="sp-bank">
+                  <div className="sp-bank-row"><span className="k">Banco</span><span className="v">{pagos?.banco || "—"}</span></div>
+                  <div className="sp-bank-row"><span className="k">Titular</span><span className="v">{pagos?.titular || "—"}</span></div>
+                  <div className="sp-bank-row"><span className="k">Cuenta</span><span className="v">{pagos?.numero_cuenta || "—"}</span></div>
+                  {pagos?.numero_cci && (
+                    <div className="sp-bank-row"><span className="k">CCI</span><span className="v">{pagos.numero_cci}</span></div>
+                  )}
+                  <div className="sp-bank-row total"><span className="k">Monto</span><span className="v">{esGratis ? "Gratis" : (montoPlan || "—")}</span></div>
+                </div>
+
+                <div className="sp-actions">
+                  <button type="button" className="sp-btn sp-btn-ghost" onClick={() => setPaso(1)}>
+                    <i className="bi bi-arrow-left" />Atrás
+                  </button>
+                  <button type="button" className="sp-btn sp-btn-primary" onClick={() => setPaso(3)}>
+                    Ya transferí <i className="bi bi-arrow-right" />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Paso 3 */}
+            {paso === 3 && (
+              <form onSubmit={enviar}>
+                <p className="sp-note">
+                  Sube la captura o el PDF de la transferencia por <strong>{esGratis ? "—" : (montoPlan || "—")}</strong>.
+                </p>
+                <label className="sp-drop">
+                  <i className="bi bi-cloud-arrow-up-fill" />
+                  <div className="t">{archivo ? "Cambiar archivo" : "Selecciona tu comprobante"}</div>
+                  <div className="s">Imagen o PDF · máx. 5 MB</div>
+                  <input type="file" accept="image/*,application/pdf" onChange={seleccionarArchivo} required />
+                </label>
+
+                {archivo && (
+                  <div className="sp-file-chip">
+                    <i className="bi bi-file-earmark-check-fill" />
+                    {archivo.name}
+                  </div>
+                )}
+                {preview && (
+                  <img src={preview} alt="Vista previa" style={{ width: "100%", borderRadius: 14, marginTop: 12, maxHeight: 240, objectFit: "contain", border: "1px solid #e3e8ef" }} />
+                )}
+
+                <div className="sp-actions">
+                  <button type="button" className="sp-btn sp-btn-ghost" onClick={() => setPaso(2)} disabled={enviando}>
+                    <i className="bi bi-arrow-left" />Atrás
+                  </button>
+                  <button type="submit" className="sp-btn sp-btn-primary" disabled={enviando}>
+                    {enviando ? "Enviando…" : <>Enviar solicitud <i className="bi bi-send" /></>}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
