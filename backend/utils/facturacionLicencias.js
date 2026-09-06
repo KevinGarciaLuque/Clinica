@@ -74,27 +74,28 @@ async function emitirContrato({
     montoTotal, montoMensual, moneda, diaFacturacion, clausulasExtra,
   });
 
-  let pdf = null;
+  let pdf = null, pdfError = null;
   try { pdf = await generarPdfDesdeHtml(contratoHtml, { paper_size: "A4", orientacion: "portrait" }); }
-  catch (e) { console.error("[contrato pdf]", e.message); }
+  catch (e) { pdfError = String(e.message).slice(0, 400); console.error("[contrato pdf]", e.message); }
 
   await pool.query(
     `INSERT INTO contratos_licencia
        (numero, clinica_id, licencia_historial_id, plan_tipo, plan_label, fecha,
         vigencia_inicio, vigencia_fin, duracion_meses, monto_total, monto_mensual,
-        moneda, dia_facturacion, cliente_nombre, cliente_email, clausulas_extra, pdf, creado_por)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        moneda, dia_facturacion, cliente_nombre, cliente_email, clausulas_extra, pdf, pdf_error, creado_por)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
      ON DUPLICATE KEY UPDATE
         plan_label=VALUES(plan_label), vigencia_inicio=VALUES(vigencia_inicio),
         vigencia_fin=VALUES(vigencia_fin), duracion_meses=VALUES(duracion_meses),
         monto_total=VALUES(monto_total), monto_mensual=VALUES(monto_mensual),
         moneda=VALUES(moneda), dia_facturacion=VALUES(dia_facturacion),
         cliente_nombre=VALUES(cliente_nombre), cliente_email=VALUES(cliente_email),
-        clausulas_extra=VALUES(clausulas_extra), pdf=COALESCE(VALUES(pdf), pdf)`,
+        clausulas_extra=VALUES(clausulas_extra), pdf=COALESCE(VALUES(pdf), pdf),
+        pdf_error=VALUES(pdf_error)`,
     [numero, clinicaId, licenciaHistorialId, planTipo, planLabel, ymd(fecha),
      ymd(vigenciaInicio), ymd(vigenciaFin), duracionMeses || null, montoTotal, montoMensual,
      moneda, diaFacturacion || null, clienteNombre || clinicaNombre, emailDestino,
-     clausulasExtra, pdf, creadoPor]
+     clausulasExtra, pdf, pdfError, creadoPor]
   );
 
   let enviado = false, error = null;
@@ -178,19 +179,19 @@ async function emitirReciboMes({
     monto, moneda, fechaEmision: new Date(),
   });
 
-  let pdf = null;
+  let pdf = null, pdfError = null;
   try { pdf = await generarPdfDesdeHtml(html, { paper_size: "HALF_LETTER", orientacion: "portrait" }); }
-  catch (e) { console.error("[recibo pdf]", e.message); }
+  catch (e) { pdfError = String(e.message).slice(0, 400); console.error("[recibo pdf]", e.message); }
 
   await pool.query(
     `INSERT INTO recibos_licencia
        (numero, clinica_id, contrato_numero, licencia_historial_id, periodo,
         periodo_inicio, periodo_fin, concepto, monto, moneda, fecha_emision,
-        estado, email_destino, pdf, generado_por, creado_por)
-     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+        estado, email_destino, pdf, pdf_error, generado_por, creado_por)
+     VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
     [numero, c.id, c.lic_contrato_numero || null, null, periodo,
      ymd(periodoInicio), ymd(periodoFin), concepto, monto, moneda, ymd(new Date()),
-     "emitido", emailDestino, pdf, generadoPor, creadoPor]
+     "emitido", emailDestino, pdf, pdfError, generadoPor, creadoPor]
   );
 
   let enviado = false, error = null;
@@ -238,8 +239,11 @@ async function reenviarRecibo(reciboId) {
         concepto: r.concepto, monto: r.monto, moneda: r.moneda, fechaEmision: r.fecha_emision,
       });
       r.pdf = await generarPdfDesdeHtml(html, { paper_size: "HALF_LETTER", orientacion: "portrait" });
-      if (r.pdf) await pool.query("UPDATE recibos_licencia SET pdf=? WHERE id=?", [r.pdf, reciboId]);
-    } catch (e) { console.error("[recibo pdf regenerar]", e.message); }
+      if (r.pdf) await pool.query("UPDATE recibos_licencia SET pdf=?, pdf_error=NULL WHERE id=?", [r.pdf, reciboId]);
+    } catch (e) {
+      console.error("[recibo pdf regenerar]", e.message);
+      await pool.query("UPDATE recibos_licencia SET pdf_error=? WHERE id=?", [String(e.message).slice(0, 400), reciboId]);
+    }
   }
 
   await enviarEmail({

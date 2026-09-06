@@ -24,13 +24,13 @@ router.get("/clinica/:id", auth("SUPER_ADMIN"), async (req, res) => {
 
     const [recibos] = await pool.query(
       `SELECT id, numero, periodo, periodo_inicio, periodo_fin, concepto, monto, moneda,
-              fecha_emision, estado, email_destino, enviado_en, error_msg, generado_por,
+              fecha_emision, estado, email_destino, enviado_en, error_msg, pdf_error, generado_por,
               (pdf IS NOT NULL) AS tiene_pdf
          FROM recibos_licencia WHERE clinica_id=? ORDER BY periodo DESC`, [id]
     );
     const [contratos] = await pool.query(
       `SELECT id, numero, plan_label, fecha, vigencia_inicio, vigencia_fin, duracion_meses,
-              monto_total, monto_mensual, moneda, dia_facturacion, enviado_en,
+              monto_total, monto_mensual, moneda, dia_facturacion, enviado_en, pdf_error,
               (pdf IS NOT NULL) AS tiene_pdf
          FROM contratos_licencia WHERE clinica_id=? ORDER BY creado_en DESC`, [id]
     );
@@ -132,6 +132,28 @@ router.post("/correr-mensual", auth("SUPER_ADMIN"), async (req, res) => {
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
+});
+
+// ── Diagnóstico del motor de PDF (para depurar en producción) ──
+router.get("/diagnostico-pdf", auth("SUPER_ADMIN"), async (req, res) => {
+  const fs = require("fs");
+  const info = {
+    platform: process.platform,
+    PUPPETEER_EXECUTABLE_PATH: process.env.PUPPETEER_EXECUTABLE_PATH || null,
+    CHROME_BIN: process.env.CHROME_BIN || null,
+    rutas_encontradas: ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome", "/usr/bin/google-chrome-stable"]
+      .filter((p) => { try { return fs.existsSync(p); } catch { return false; } }),
+  };
+  try {
+    const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+    const buf = await generarPdfDesdeHtml("<h1>test</h1>", { paper_size: "A4", orientacion: "portrait" });
+    info.pdf_ok = true;
+    info.pdf_bytes = buf.length;
+  } catch (e) {
+    info.pdf_ok = false;
+    info.error = e.message;
+  }
+  res.json({ ok: true, data: info });
 });
 
 module.exports = router;

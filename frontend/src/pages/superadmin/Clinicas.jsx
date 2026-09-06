@@ -2360,6 +2360,11 @@ export default function Clinicas() {
                               <button className="btn btn-sm btn-outline-light" onClick={() => reenviarDoc("contrato", ct.id)}>Reenviar</button>
                             </div>
                           </div>
+                          {!ct.tiene_pdf && (
+                            <div style={{ marginTop: 6, fontSize: 11.5, color: "#ef4444" }}>
+                              PDF no generado{ct.pdf_error ? `: ${ct.pdf_error}` : " (Chromium no disponible en el servidor)"}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -2399,6 +2404,11 @@ export default function Clinicas() {
                               {r.generado_por === "manual" ? " · manual" : ""}
                               {r.error_msg ? ` · ${r.error_msg}` : ""}
                             </span>
+                            {!r.tiene_pdf && (
+                              <><br /><span style={{ fontSize: 11, color: "#ef4444" }}>
+                                PDF no generado{r.pdf_error ? `: ${r.pdf_error}` : ""}
+                              </span></>
+                            )}
                           </div>
                           <div style={{ display: "flex", gap: 6 }}>
                             {r.tiene_pdf ? <button className="btn btn-sm btn-outline-light" onClick={() => verPdf("recibo", r.id)}>PDF</button> : null}
