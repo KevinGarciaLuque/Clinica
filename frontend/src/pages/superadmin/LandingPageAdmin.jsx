@@ -61,6 +61,7 @@ export default function LandingPageAdmin() {
         // Directorio médico público (/agenda-tu-consulta)
         directorio_color_primario:    c.directorio_color_primario     ?? "#213665",
         directorio_color_tarjetas:    c.directorio_color_tarjetas     ?? "#213665",
+        directorio_color_franja:      c.directorio_color_franja       ?? "#eef2f7",
         directorio_badge_texto:       c.directorio_badge_texto        ?? "",
         directorio_titulo:            c.directorio_titulo             ?? "",
         directorio_subtitulo:         c.directorio_subtitulo          ?? "",
@@ -674,6 +675,35 @@ export default function LandingPageAdmin() {
                   flex: 1, minWidth: 90, height: 38, borderRadius: 10,
                   background: `linear-gradient(135deg, ${form.directorio_color_tarjetas} 0%, #000 100%)`,
                   boxShadow: "inset 0 1px 3px rgba(0,0,0,.2)",
+                }} />
+              </div>
+            </div>
+
+            <div className="col-sm-6">
+              <label className="form-label fw-bold">
+                <i className="bi bi-collection me-1" />Color de la franja de la tarjeta
+              </label>
+              <div className="form-text mb-2">
+                La banda de color detrás de la foto del médico, en las tarjetas del directorio. Igual para todas.
+              </div>
+              <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+                <input
+                  type="color"
+                  value={form.directorio_color_franja}
+                  onChange={e => set("directorio_color_franja", e.target.value)}
+                  style={{ width: 44, height: 38, border: "none", borderRadius: 8, cursor: "pointer", padding: 2 }}
+                />
+                <input
+                  className="form-control"
+                  style={{ fontFamily: "monospace", maxWidth: 130 }}
+                  value={form.directorio_color_franja}
+                  onChange={e => set("directorio_color_franja", e.target.value)}
+                  placeholder="#eef2f7"
+                />
+                <div style={{
+                  flex: 1, minWidth: 90, height: 38, borderRadius: 10,
+                  background: form.directorio_color_franja,
+                  border: "1px solid #e2e8f0",
                 }} />
               </div>
             </div>

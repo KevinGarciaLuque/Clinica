@@ -6,6 +6,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const DEFAULT_CFG = {
   directorio_color_primario: "#213665",
   directorio_color_tarjetas: "#213665",
+  directorio_color_franja:   "#eef2f7",
   directorio_badge_texto:    "Directorio médico",
   directorio_titulo:         "Agenda tu consulta médica",
   directorio_subtitulo:      "Los mejores médicos y especialistas los encuentras aquí. Compara perfiles y agenda tu cita en línea, sin llamadas ni esperas.",
@@ -31,7 +32,7 @@ function hexToRgb(hex) {
   return r ? `${parseInt(r[1], 16)},${parseInt(r[2], 16)},${parseInt(r[3], 16)}` : "33,54,101";
 }
 
-function DoctorCard({ medico, index, onSelect, fallbackColor }) {
+function DoctorCard({ medico, index, onSelect, fallbackColor, bandColor }) {
   const [fotoError, setFotoError] = useState(false);
   const color = (medico.color_primario || fallbackColor).trim();
   const colorRgb = hexToRgb(color);
@@ -51,7 +52,7 @@ function DoctorCard({ medico, index, onSelect, fallbackColor }) {
         textAlign: "center",
         cursor: "pointer",
         animation: `dmFadeUp .55s ${Math.min(index * 0.06, 0.6)}s ease both`,
-        transition: "transform .35s cubic-bezier(.25,.8,.25,1), box-shadow .35s ease, border-color .35s ease",
+        transition: "transform .25s ease, box-shadow .25s ease, border-color .25s ease",
         position: "relative",
         overflow: "hidden",
       }}
@@ -59,9 +60,8 @@ function DoctorCard({ medico, index, onSelect, fallbackColor }) {
     >
       <div
         style={{
-          position: "absolute", top: 0, left: 0, right: 0, height: 64,
-          background: `linear-gradient(160deg, ${color}, ${darken(color, 25)})`,
-          opacity: 0.08,
+          position: "absolute", top: 0, left: 0, right: 0, height: 72,
+          background: bandColor || "#eef2f7",
         }}
       />
 
@@ -136,6 +136,7 @@ export default function DirectorioMedicos() {
 
   const COLOR = (cfg.directorio_color_primario || DEFAULT_CFG.directorio_color_primario).trim();
   const CARD_COLOR = (cfg.directorio_color_tarjetas || DEFAULT_CFG.directorio_color_tarjetas).trim();
+  const BAND_COLOR = (cfg.directorio_color_franja || DEFAULT_CFG.directorio_color_franja).trim();
 
   useEffect(() => {
     fetch(`${API}/api/public/directorio`)
@@ -178,11 +179,11 @@ export default function DirectorioMedicos() {
           50%      { transform: translateY(-14px); }
         }
         .dm-card:hover {
-          transform: translateY(-5px) scale(1.015) !important;
-          box-shadow: 0 16px 36px rgba(15,23,42,.11) !important;
-          border-color: rgba(33,54,101,.18) !important;
+          transform: translateY(-3px) !important;
+          box-shadow: 0 10px 26px -8px rgba(15,23,42,.14) !important;
+          border-color: #e2e8f0 !important;
         }
-        .dm-card:hover .dm-card-btn { filter: brightness(1.08); }
+        .dm-card:hover .dm-card-btn { filter: brightness(1.04); }
         .dm-search:focus { outline: none; box-shadow: 0 0 0 4px rgba(33,54,101,.12); border-color: ${COLOR} !important; }
         .dm-back:hover { background: rgba(255,255,255,.16) !important; }
         @media (max-width: 640px) {
@@ -317,7 +318,7 @@ export default function DirectorioMedicos() {
               display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))", gap: 22,
             }}>
               {filtrados.map((m, i) => (
-                <DoctorCard key={m.slug} medico={m} index={i} fallbackColor={CARD_COLOR} onSelect={(slug) => navigate(`/p/${slug}`)} />
+                <DoctorCard key={m.slug} medico={m} index={i} fallbackColor={CARD_COLOR} bandColor={BAND_COLOR} onSelect={(slug) => navigate(`/p/${slug}`)} />
               ))}
             </div>
           )}

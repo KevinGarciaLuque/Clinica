@@ -172,10 +172,12 @@ router.delete("/:id", auth("SUPER_ADMIN"), async (req, res) => {
 router.get("/publicas", async (req, res) => {
   try {
     const [rows] = await pool.query(
-      `SELECT nombre_medico, especialidad, lugar, estrellas, opinion, respondida_en
-       FROM resenas_medicos
-       WHERE estado='respondida' AND activo=1
-       ORDER BY respondida_en DESC
+      `SELECT r.nombre_medico, r.especialidad, r.lugar, r.estrellas, r.opinion, r.respondida_en,
+              u.foto_url
+       FROM resenas_medicos r
+       LEFT JOIN usuarios u ON u.id = r.usuario_id
+       WHERE r.estado='respondida' AND r.activo=1
+       ORDER BY r.respondida_en DESC
        LIMIT 24`
     );
     res.json({ ok: true, data: rows });

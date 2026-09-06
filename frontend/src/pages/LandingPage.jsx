@@ -787,69 +787,121 @@ export default function LandingPage() {
 
       {/* ── RESEÑAS ── */}
       {resenas.length > 0 && (
-        <section id="resenas" style={{ background: "#fff", padding: "80px 24px" }}>
-          <div style={{ maxWidth: 1140, margin: "0 auto" }}>
-            <div style={{ textAlign: "center", marginBottom: 52 }}>
-              <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
-                Testimonios
-              </span>
-              <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
+        <section id="resenas" style={{ background: "linear-gradient(180deg, #ffffff 0%, #f8fafc 100%)", padding: "96px 24px" }}>
+          <div style={{ maxWidth: 1160, margin: "0 auto" }}>
+            <div style={{ textAlign: "center", marginBottom: 60 }}>
+              <div style={{
+                display: "inline-flex", alignItems: "center", gap: 8,
+                background: `rgba(${colorRgb},.07)`, border: `1px solid rgba(${colorRgb},.16)`,
+                borderRadius: 100, padding: "6px 18px", marginBottom: 18,
+              }}>
+                <i className="bi bi-patch-check-fill" style={{ color, fontSize: 14 }} />
+                <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1.5px" }}>
+                  Testimonios
+                </span>
+              </div>
+              <h2 style={{ fontSize: "clamp(1.7rem, 3vw, 2.5rem)", fontWeight: 900, color: "#0f172a", marginTop: 4, lineHeight: 1.2 }}>
                 Médicos que ya confían en nosotros
               </h2>
-              <p style={{ fontSize: 16, color: "#64748b", marginTop: 12, maxWidth: 560, margin: "12px auto 0" }}>
+              <p style={{ fontSize: 16.5, color: "#64748b", lineHeight: 1.7, maxWidth: 580, margin: "14px auto 0" }}>
                 Esto es lo que opinan los profesionales que ya usan el sistema en su día a día.
               </p>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 20 }}>
-              {resenas.map((r, i) => (
-                <div
-                  key={i}
-                  style={{
-                    background: "#fff",
-                    borderRadius: 20,
-                    padding: "28px 26px",
-                    border: "1px solid #e2e8f0",
-                    boxShadow: "0 4px 20px rgba(15,23,42,.05)",
-                    position: "relative",
-                    transition: "transform .25s, box-shadow .25s",
-                    animation: `fadeUp .5s ${i * 0.08}s ease both`,
-                    cursor: "default",
-                  }}
-                  onMouseOver={e => { e.currentTarget.style.transform = "translateY(-6px)"; e.currentTarget.style.boxShadow = `0 16px 36px rgba(${colorRgb},.18)`; }}
-                  onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = "0 4px 20px rgba(15,23,42,.05)"; }}
-                >
-                  <i className="bi bi-quote" style={{
-                    position: "absolute", top: 16, right: 20, fontSize: 34,
-                    color: `rgba(${colorRgb},.12)`,
-                  }} />
-                  <div style={{ marginBottom: 14 }}>
-                    {Array.from({ length: 5 }).map((_, s) => (
-                      <i key={s} className={`bi ${s < r.estrellas ? "bi-star-fill" : "bi-star"}`} style={{ color: "#f59e0b", fontSize: 15, marginRight: 2 }} />
-                    ))}
-                  </div>
-                  <p style={{ fontSize: 14.5, color: "#334155", lineHeight: 1.65, marginBottom: 22, minHeight: 72 }}>
-                    "{r.opinion}"
-                  </p>
-                  <div style={{ display: "flex", alignItems: "center", gap: 12, paddingTop: 16, borderTop: "1px solid #f1f5f9" }}>
-                    <div style={{
-                      width: 42, height: 42, borderRadius: "50%", flexShrink: 0,
-                      background: `linear-gradient(135deg, ${color}, ${color}99)`,
-                      display: "flex", alignItems: "center", justifyContent: "center",
-                      color: "#fff", fontWeight: 800, fontSize: 15,
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: 24 }}>
+              {resenas.map((r, i) => {
+                const inicial = r.nombre_medico?.trim()?.[0]?.toUpperCase() || "M";
+                return (
+                  <figure
+                    key={i}
+                    style={{
+                      margin: 0,
+                      background: "#fff",
+                      borderRadius: 24,
+                      padding: "34px 30px 28px",
+                      border: "1px solid #eef1f6",
+                      boxShadow: "0 1px 2px rgba(15,23,42,.04), 0 12px 32px -12px rgba(15,23,42,.12)",
+                      position: "relative",
+                      overflow: "hidden",
+                      display: "flex",
+                      flexDirection: "column",
+                      transition: "transform .28s cubic-bezier(.2,.7,.3,1), box-shadow .28s, border-color .28s",
+                      animation: `fadeUp .5s ${i * 0.08}s ease both`,
+                    }}
+                    onMouseOver={e => {
+                      e.currentTarget.style.transform = "translateY(-8px)";
+                      e.currentTarget.style.boxShadow = `0 1px 2px rgba(15,23,42,.04), 0 28px 50px -16px rgba(${colorRgb},.28)`;
+                      e.currentTarget.style.borderColor = `rgba(${colorRgb},.28)`;
+                    }}
+                    onMouseOut={e => {
+                      e.currentTarget.style.transform = "translateY(0)";
+                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(15,23,42,.04), 0 12px 32px -12px rgba(15,23,42,.12)";
+                      e.currentTarget.style.borderColor = "#eef1f6";
+                    }}
+                  >
+                    {/* Acento superior */}
+                    <span style={{ position: "absolute", top: 0, left: 0, right: 0, height: 3, background: `linear-gradient(90deg, ${color}, rgba(${colorRgb},.35))` }} />
+                    {/* Comilla marca de agua */}
+                    <i className="bi bi-quote" style={{
+                      position: "absolute", top: 6, right: 14, fontSize: 88, lineHeight: 1,
+                      color: `rgba(${colorRgb},.06)`, pointerEvents: "none",
+                    }} />
+
+                    <div style={{ display: "flex", gap: 3, marginBottom: 16, position: "relative" }}>
+                      {Array.from({ length: 5 }).map((_, s) => (
+                        <i key={s} className={`bi ${s < r.estrellas ? "bi-star-fill" : "bi-star"}`}
+                           style={{ color: s < r.estrellas ? "#f59e0b" : "#e2e8f0", fontSize: 15 }} />
+                      ))}
+                    </div>
+
+                    <blockquote style={{
+                      margin: 0, flex: 1,
+                      fontSize: 16, color: "#334155", lineHeight: 1.72, fontWeight: 450,
+                      letterSpacing: ".1px",
                     }}>
-                      {r.nombre_medico?.trim()?.[0]?.toUpperCase() || "M"}
-                    </div>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {r.nombre_medico}
+                      “{r.opinion}”
+                    </blockquote>
+
+                    <figcaption style={{
+                      display: "flex", alignItems: "center", gap: 14,
+                      marginTop: 26, paddingTop: 20, borderTop: "1px solid #f1f5f9",
+                    }}>
+                      <div style={{ position: "relative", width: 54, height: 54, flexShrink: 0 }}>
+                        <div style={{
+                          width: 54, height: 54, borderRadius: "50%",
+                          background: `linear-gradient(135deg, ${color}, ${color}aa)`,
+                          display: "flex", alignItems: "center", justifyContent: "center",
+                          color: "#fff", fontWeight: 800, fontSize: 19,
+                          boxShadow: `0 0 0 3px #fff, 0 4px 14px rgba(${colorRgb},.3)`,
+                        }}>
+                          {inicial}
+                        </div>
+                        {r.foto_url && (
+                          <img
+                            src={r.foto_url}
+                            alt={r.nombre_medico || "Médico"}
+                            loading="lazy"
+                            onError={e => { e.currentTarget.style.display = "none"; }}
+                            style={{
+                              position: "absolute", inset: 0, width: "100%", height: "100%",
+                              borderRadius: "50%", objectFit: "cover",
+                              boxShadow: `0 0 0 3px #fff, 0 4px 14px rgba(${colorRgb},.3)`,
+                            }}
+                          />
+                        )}
                       </div>
-                      <div style={{ fontSize: 12.5, color: "#94a3b8", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                        {[r.especialidad, r.lugar].filter(Boolean).join(" · ")}
+                      <div style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 800, fontSize: 14.5, color: "#0f172a", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {r.nombre_medico}
+                        </div>
+                        <div style={{ fontSize: 12.5, color: "#94a3b8", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                          {[r.especialidad, r.lugar].filter(Boolean).join(" · ")}
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                </div>
-              ))}
+                    </figcaption>
+                  </figure>
+                );
+              })}
             </div>
           </div>
         </section>

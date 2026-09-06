@@ -48,6 +48,7 @@ const DEFAULTS = {
   // Directorio médico público (/agenda-tu-consulta)
   directorio_color_primario:    "#213665",
   directorio_color_tarjetas:    "#213665",
+  directorio_color_franja:      "#eef2f7",
   directorio_badge_texto:       "Directorio médico",
   directorio_titulo:            "Agenda tu consulta médica",
   directorio_subtitulo:         "Los mejores médicos y especialistas los encuentras aquí. Compara perfiles y agenda tu cita en línea, sin llamadas ni esperas.",
@@ -125,7 +126,7 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
       "landing_plan_semestral_features",
       "landing_plan_anual_features",
       // Directorio médico público
-      "directorio_color_primario", "directorio_color_tarjetas", "directorio_badge_texto", "directorio_titulo", "directorio_subtitulo",
+      "directorio_color_primario", "directorio_color_tarjetas", "directorio_color_franja", "directorio_badge_texto", "directorio_titulo", "directorio_subtitulo",
       "directorio_badge1_texto", "directorio_badge2_texto", "directorio_badge3_texto",
       "directorio_cta_badge", "directorio_cta_titulo", "directorio_cta_texto", "directorio_cta_boton",
     ];
