@@ -169,7 +169,15 @@ export default function DirectorioMedicos() {
       <style>{`
         * { box-sizing: border-box; }
         body { margin: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+        /* Para las TARJETAS: entrada solo con opacidad. Si animara 'transform',
+           el fill-mode dejaría el transform aplicado para siempre y el :hover
+           no podría hacer la transición suave (se vería un salto brusco). */
         @keyframes dmFadeUp {
+          from { opacity: 0; }
+          to   { opacity: 1; }
+        }
+        /* Para elementos estáticos (hero, badges): entrada con desplazamiento. */
+        @keyframes dmRise {
           from { opacity: 0; transform: translateY(22px); }
           to   { opacity: 1; transform: translateY(0); }
         }
@@ -216,7 +224,7 @@ export default function DirectorioMedicos() {
             <i className="bi bi-arrow-left" /> Inicio
           </button>
 
-          <div style={{ maxWidth: 640, margin: "0 auto", position: "relative", animation: "dmFadeUp .6s ease both" }}>
+          <div style={{ maxWidth: 640, margin: "0 auto", position: "relative", animation: "dmRise .6s ease both" }}>
             <div style={{
               display: "inline-flex", alignItems: "center", gap: 7,
               background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.22)",
@@ -236,7 +244,7 @@ export default function DirectorioMedicos() {
             {/* Franja de confianza */}
             <div style={{
               display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px 28px",
-              marginTop: 28, animation: "dmFadeUp .6s .15s ease both",
+              marginTop: 28, animation: "dmRise .6s .15s ease both",
             }}>
               {[
                 { icon: "bi-patch-check-fill", label: cfg.directorio_badge1_texto },
@@ -263,7 +271,7 @@ export default function DirectorioMedicos() {
             background: "#fff", borderRadius: 18, padding: "10px 18px",
             boxShadow: "0 10px 40px rgba(15,23,42,.12)", marginBottom: 40,
             display: "flex", alignItems: "center", gap: 10,
-            animation: "dmFadeUp .5s .1s ease both",
+            animation: "dmRise .5s .1s ease both",
           }}>
             <i className="bi bi-search" style={{ color: "#94a3b8", fontSize: 16 }} />
             <input
@@ -332,7 +340,7 @@ export default function DirectorioMedicos() {
               textAlign: "center",
               position: "relative",
               overflow: "hidden",
-              animation: "dmFadeUp .5s .1s ease both",
+              animation: "dmRise .5s .1s ease both",
             }}
           >
             <div style={{ position: "absolute", top: -60, right: -60, width: 220, height: 220, borderRadius: "50%", background: "rgba(255,255,255,.05)" }} />
