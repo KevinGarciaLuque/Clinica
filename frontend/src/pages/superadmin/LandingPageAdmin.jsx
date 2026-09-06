@@ -1185,7 +1185,7 @@ function TabPagos() {
   const set = (k, v) => setForm(p => ({ ...p, [k]: v }));
 
   useEffect(() => {
-    api.get("/config-sistema/pagos")
+    api.get("/config-sistema/pagos-completo")
       .then(r => {
         const d = r.data.data;
         setForm(p => {

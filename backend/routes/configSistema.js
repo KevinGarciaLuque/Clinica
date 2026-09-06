@@ -155,8 +155,29 @@ const PRECIOS_CAMPOS = [
 ];
 
 // ── GET /api/config-sistema/pagos  (público, sin auth) ────────────────────
-// Se consulta desde /solicitar-plan para mostrar cuenta bancaria + precios
+// Solo precios + moneda. Los datos de la cuenta bancaria NO se exponen aquí:
+// se entregan en POST /api/planes-publicos/iniciar tras registrar la solicitud.
 router.get("/pagos", async (req, res) => {
+  try {
+    const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1");
+    const precios = {};
+    for (const campo of PRECIOS_CAMPOS) precios[campo] = row?.[campo] ?? null;
+    res.json({
+      ok: true,
+      data: {
+        moneda: row?.moneda || "HNL",
+        ...precios,
+      },
+    });
+  } catch (e) {
+    console.error("[config-sistema GET pagos]", e);
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /api/config-sistema/pagos-completo  (solo SUPER_ADMIN) ────────────
+// Incluye los datos de la cuenta bancaria, para el CMS.
+router.get("/pagos-completo", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1");
     const precios = {};
@@ -173,7 +194,6 @@ router.get("/pagos", async (req, res) => {
       },
     });
   } catch (e) {
-    console.error("[config-sistema GET pagos]", e);
     res.status(500).json({ ok: false, msg: e.message });
   }
 });

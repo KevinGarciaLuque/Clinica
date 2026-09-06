@@ -61,14 +61,26 @@ export default function SolicitarPlan() {
   const [archivo, setArchivo]   = useState(null);
   const [preview, setPreview]   = useState(null);
   const [enviando, setEnviando] = useState(false);
+  const [iniciando, setIniciando] = useState(false);
   const [error, setError]       = useState("");
   const [enviado, setEnviado]   = useState(false);
-  const [pagos, setPagos]       = useState(null); // config de cuenta bancaria + precios
+  const [pagos, setPagos]       = useState(null); // solo precios + moneda
+  const [token, setToken]       = useState(null); // token de la solicitud (paso 1)
+  const [banco, setBanco]       = useState(null); // datos bancarios (se piden en el paso 1)
 
   useEffect(() => {
     axios.get(`${BASE}/config-sistema/pagos`)
       .then((r) => setPagos(r.data.data))
       .catch(() => setPagos({}));
+  }, []);
+
+  // Esta página no debe indexarse (muestra datos bancarios tras el paso 1).
+  useEffect(() => {
+    const meta = document.createElement("meta");
+    meta.name = "robots";
+    meta.content = "noindex, nofollow";
+    document.head.appendChild(meta);
+    return () => { document.head.removeChild(meta); };
   }, []);
 
   const duraciones = useMemo(() => duracionesDisponibles(form.nivel_plan), [form.nivel_plan]);
@@ -90,14 +102,27 @@ export default function SolicitarPlan() {
     setPreview(file.type.startsWith("image/") ? URL.createObjectURL(file) : null);
   };
 
-  const irAPaso2 = (e) => {
+  const irAPaso2 = async (e) => {
     e.preventDefault();
     setError("");
     if (!form.nombres || !form.apellidos || !form.email || !form.nombre_clinica) {
       setError("Completa todos los campos obligatorios.");
       return;
     }
-    setPaso(2);
+    // Si ya se registró antes (volvió atrás y sigue), no se vuelve a crear.
+    if (token && banco) { setPaso(2); return; }
+
+    setIniciando(true);
+    try {
+      const { data } = await axios.post(`${BASE}/planes-publicos/iniciar`, form);
+      setToken(data.token);
+      setBanco(data.datos_bancarios);
+      setPaso(2);
+    } catch (err) {
+      setError(err?.response?.data?.msg || "No se pudo continuar. Intenta de nuevo.");
+    } finally {
+      setIniciando(false);
+    }
   };
 
   const enviar = async (e) => {
@@ -109,6 +134,7 @@ export default function SolicitarPlan() {
     try {
       const fd = new FormData();
       Object.entries(form).forEach(([k, v]) => fd.append(k, v));
+      if (token) fd.append("token", token);
       fd.append("comprobante", archivo);
       await axios.post(`${BASE}/planes-publicos/solicitar`, fd, {
         headers: { "Content-Type": "multipart/form-data" },
@@ -394,8 +420,8 @@ export default function SolicitarPlan() {
                 </div>
 
                 <div className="sp-actions">
-                  <button type="submit" className="sp-btn sp-btn-primary">
-                    Continuar <i className="bi bi-arrow-right" />
+                  <button type="submit" className="sp-btn sp-btn-primary" disabled={iniciando}>
+                    {iniciando ? "Un momento…" : <>Continuar <i className="bi bi-arrow-right" /></>}
                   </button>
                 </div>
               </form>
@@ -409,11 +435,11 @@ export default function SolicitarPlan() {
                   <strong>{planLabel}</strong> a la siguiente cuenta:
                 </p>
                 <div className="sp-bank">
-                  <div className="sp-bank-row"><span className="k">Banco</span><span className="v">{pagos?.banco || "—"}</span></div>
-                  <div className="sp-bank-row"><span className="k">Titular</span><span className="v">{pagos?.titular || "—"}</span></div>
-                  <div className="sp-bank-row"><span className="k">Cuenta</span><span className="v">{pagos?.numero_cuenta || "—"}</span></div>
-                  {pagos?.numero_cci && (
-                    <div className="sp-bank-row"><span className="k">CCI</span><span className="v">{pagos.numero_cci}</span></div>
+                  <div className="sp-bank-row"><span className="k">Banco</span><span className="v">{banco?.banco || "—"}</span></div>
+                  <div className="sp-bank-row"><span className="k">Titular</span><span className="v">{banco?.titular || "—"}</span></div>
+                  <div className="sp-bank-row"><span className="k">Cuenta</span><span className="v">{banco?.numero_cuenta || "—"}</span></div>
+                  {banco?.numero_cci && (
+                    <div className="sp-bank-row"><span className="k">CCI</span><span className="v">{banco.numero_cci}</span></div>
                   )}
                   <div className="sp-bank-row total"><span className="k">Monto</span><span className="v">{esGratis ? "Gratis" : (montoPlan || "—")}</span></div>
                 </div>

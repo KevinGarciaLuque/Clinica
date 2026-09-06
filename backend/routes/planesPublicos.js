@@ -73,11 +73,56 @@ function slugify(texto) {
 }
 
 // ══════════════════════════════════════════════════════════
+// POST /iniciar  — paso 1: registra la solicitud y entrega los datos bancarios
+// ══════════════════════════════════════════════════════════
+router.post("/iniciar", solicitarLimiter, async (req, res) => {
+  try {
+    const { nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje } = req.body;
+
+    if (!nombres || !apellidos || !email || !nombre_clinica || !plan_solicitado) {
+      return res.status(400).json({ ok: false, msg: "Faltan datos obligatorios" });
+    }
+    if (!PLANES_VALIDOS.includes(plan_solicitado)) {
+      return res.status(400).json({ ok: false, msg: "plan_solicitado inválido" });
+    }
+    const nivel = NIVELES_VALIDOS.includes(nivel_plan) ? nivel_plan : "basico";
+    if (nivel !== "basico" && plan_solicitado === "trial") {
+      return res.status(400).json({ ok: false, msg: "Los planes Avanzado y Empresarial no tienen prueba gratis, elige Semestral o Anual" });
+    }
+
+    const token = crypto.randomBytes(20).toString("hex");
+    await pool.query(
+      `INSERT INTO solicitudes_plan_publico
+         (nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje, estado, token, datos_confirmados_en)
+       VALUES (?,?,?,?,?,?,?,?, 'iniciada', ?, NOW())`,
+      [nombres, apellidos, email, telefono || null, nombre_clinica, nivel, plan_solicitado, mensaje || null, token]
+    );
+
+    const [[cuenta]] = await pool.query("SELECT banco, titular, numero_cuenta, numero_cci, moneda FROM config_pagos WHERE id=1 LIMIT 1");
+
+    res.json({
+      ok: true,
+      token,
+      datos_bancarios: {
+        banco:         cuenta?.banco || "",
+        titular:       cuenta?.titular || "",
+        numero_cuenta: cuenta?.numero_cuenta || "",
+        numero_cci:    cuenta?.numero_cci || "",
+        moneda:        cuenta?.moneda || "HNL",
+      },
+    });
+  } catch (e) {
+    console.error("[planes-publicos/iniciar]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo iniciar la solicitud. Intenta de nuevo." });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
 // POST /solicitar  — público, sin auth
 // ══════════════════════════════════════════════════════════
 router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobante"), async (req, res) => {
   try {
-    const { nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje } = req.body;
+    const { nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje, token } = req.body;
 
     if (!nombres || !apellidos || !email || !nombre_clinica || !plan_solicitado) {
       return res.status(400).json({ ok: false, msg: "Faltan datos obligatorios" });
@@ -101,14 +146,35 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
       streamifier.createReadStream(req.file.buffer).pipe(stream);
     });
 
-    const [r] = await pool.query(
-      `INSERT INTO solicitudes_plan_publico
-       (nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje, comprobante_url, comprobante_public_id)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
-      [nombres, apellidos, email, telefono || null, nombre_clinica, nivel, plan_solicitado,
-       mensaje || null, uploadResult.secure_url, uploadResult.public_id]
-    );
-    const solicitudId = r.insertId;
+    // Si viene un token del paso 1, se completa esa solicitud; si no, se crea una nueva.
+    let solicitudId = null;
+    if (token) {
+      const [[lead]] = await pool.query(
+        "SELECT id FROM solicitudes_plan_publico WHERE token=? AND estado='iniciada' LIMIT 1",
+        [token]
+      );
+      if (lead) {
+        await pool.query(
+          `UPDATE solicitudes_plan_publico
+             SET nombres=?, apellidos=?, email=?, telefono=?, nombre_clinica=?, nivel_plan=?, plan_solicitado=?,
+                 mensaje=?, comprobante_url=?, comprobante_public_id=?, estado='pendiente'
+           WHERE id=?`,
+          [nombres, apellidos, email, telefono || null, nombre_clinica, nivel, plan_solicitado,
+           mensaje || null, uploadResult.secure_url, uploadResult.public_id, lead.id]
+        );
+        solicitudId = lead.id;
+      }
+    }
+    if (!solicitudId) {
+      const [r] = await pool.query(
+        `INSERT INTO solicitudes_plan_publico
+         (nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje, comprobante_url, comprobante_public_id, estado)
+         VALUES (?,?,?,?,?,?,?,?,?,?, 'pendiente')`,
+        [nombres, apellidos, email, telefono || null, nombre_clinica, nivel, plan_solicitado,
+         mensaje || null, uploadResult.secure_url, uploadResult.public_id]
+      );
+      solicitudId = r.insertId;
+    }
     const planNombre = planCompletoLabel(nivel, plan_solicitado);
 
     // Notifica a todos los SUPER_ADMIN activos
