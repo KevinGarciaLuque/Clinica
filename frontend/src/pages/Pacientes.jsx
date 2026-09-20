@@ -100,6 +100,7 @@ export default function Pacientes() {
   const [q,      setQ]      = useState("");
   const [lista,  setLista]  = useState([]);
   const [msg,    setMsg]    = useState({ tipo: "", texto: "" });
+  const [sinClinica, setSinClinica] = useState(false);
   const [form,   setForm]   = useState(FORM_VACIO);
   const [showForm, setShowForm] = useState(searchParams.get("nuevo") === "true");
   const [editandoId, setEditandoId] = useState(null);
@@ -145,8 +146,20 @@ export default function Pacientes() {
 
   const cargar = async () => {
     setMsg({ tipo: "", texto: "" });
-    const res = await api.get("/pacientes", { params: { q } });
-    setLista(res.data.data || []);
+    try {
+      const res = await api.get("/pacientes", { params: { q } });
+      setLista(res.data.data || []);
+      setSinClinica(false);
+    } catch (err) {
+      if (err?.response?.status === 400) {
+        // SUPER_ADMIN sin clínica seleccionada: esta pantalla es de una
+        // clínica puntual, no tiene sentido listar pacientes de todas.
+        setSinClinica(true);
+        setLista([]);
+      } else {
+        setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "No se pudo cargar la lista de pacientes" });
+      }
+    }
   };
 
   useEffect(() => { cargar(); }, []);  // eslint-disable-line
@@ -347,6 +360,25 @@ export default function Pacientes() {
       cerrarWebcam();
     }, "image/jpeg", 0.92);
   };
+
+  if (sinClinica) {
+    return (
+      <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)", padding: "2rem" }}>
+        <div style={{
+          maxWidth: 520, margin: "10vh auto 0", background: "#fff", borderRadius: 16,
+          padding: "36px 32px", textAlign: "center", boxShadow: "0 8px 30px rgba(0,0,0,.08)",
+        }}>
+          <i className="bi bi-hospital" style={{ fontSize: 40, color: "#94a3b8" }} />
+          <h5 className="fw-bold mt-3 mb-2">Sin clínica seleccionada</h5>
+          <p className="text-muted mb-0">
+            Esta pantalla muestra el listado de pacientes de una clínica específica.
+            Como Super Admin no tienes una clínica asociada, así que aquí no hay nada que mostrar —
+            los datos clínicos de los pacientes pertenecen a cada clínica.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>

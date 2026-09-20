@@ -156,26 +156,21 @@ async function getResumenClinico(pacienteId) {
 router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
-    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
-    
-    // SUPER_ADMIN puede ver todos los pacientes
-    if (!isSuperAdmin && !clinicaId) {
-      return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
+
+    // Listar pacientes exige una clínica seleccionada, incluso para SUPER_ADMIN:
+    // sin este filtro se mezclarían pacientes de todas las clínicas en una sola
+    // lista (datos clínicos de terceros que el super admin no necesita ver).
+    if (!clinicaId) {
+      return res.status(400).json({ ok: false, msg: "Selecciona una clínica para ver sus pacientes" });
     }
 
     const q = (req.query.q || "").trim().slice(0, 100);
     let sql =
-      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes ";
-    const params = [];
-
-    // Filtrar por clínica si no es SUPER_ADMIN
-    if (!isSuperAdmin) {
-      sql += "WHERE clinica_id=? ";
-      params.push(clinicaId);
-    }
+      "SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes WHERE clinica_id=? ";
+    const params = [clinicaId];
 
     if (q) {
-      sql += (isSuperAdmin ? "WHERE " : "AND ") + "(nombres LIKE ? OR apellidos LIKE ? OR dni LIKE ? OR telefono LIKE ?) ";
+      sql += "AND (nombres LIKE ? OR apellidos LIKE ? OR dni LIKE ? OR telefono LIKE ?) ";
       params.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
 
@@ -192,19 +187,17 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
 router.get("/export/excel", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), requireModulo("exportar_pacientes"), async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
-    const isSuperAdmin = req.user?.tipo === "SUPER_ADMIN";
 
-    if (!isSuperAdmin && !clinicaId) {
-      return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
+    // Igual que en el listado: exportar exige clínica seleccionada, incluso
+    // para SUPER_ADMIN. Sin esto se podía descargar en un solo Excel el
+    // historial clínico resumido de pacientes de TODAS las clínicas.
+    if (!clinicaId) {
+      return res.status(400).json({ ok: false, msg: "Selecciona una clínica para exportar sus pacientes" });
     }
 
     let sql =
-      "SELECT id, nombres, apellidos, dni, fecha_nacimiento, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad, sexo, telefono, email, direccion, ciudad, departamento, pais, grupo_sanguineo, contacto_emergencia_nombre, contacto_emergencia_telefono, notas, activo, creado_en FROM pacientes ";
-    const params = [];
-    if (!isSuperAdmin) {
-      sql += "WHERE clinica_id=? ";
-      params.push(clinicaId);
-    }
+      "SELECT id, nombres, apellidos, dni, fecha_nacimiento, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad, sexo, telefono, email, direccion, ciudad, departamento, pais, grupo_sanguineo, contacto_emergencia_nombre, contacto_emergencia_telefono, notas, activo, creado_en FROM pacientes WHERE clinica_id=? ";
+    const params = [clinicaId];
     sql += "ORDER BY apellidos, nombres";
 
     const [pacientes] = await pool.query(sql, params);
@@ -214,7 +207,7 @@ router.get("/export/excel", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEP
     const workbook = buildPacientesWorkbook(pacientes);
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="pacientes_clinica_${clinicaId || "todas"}.xlsx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="pacientes_clinica_${clinicaId}.xlsx"`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (e) {
