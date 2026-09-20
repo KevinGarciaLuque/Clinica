@@ -10,10 +10,13 @@ const auth    = require("../middlewares/auth");
 ──────────────────────────────────────────────────────────────── */
 router.get("/clinicas", auth("SUPER_ADMIN"), async (req, res) => {
   try {
-    const primerDiaMes = new Date();
-    primerDiaMes.setDate(1);
-    primerDiaMes.setHours(0, 0, 0, 0);
-
+    // Antes esto hacía un LEFT JOIN directo de clinicas contra pacientes,
+    // usuarios, citas e historias_clinicas a la vez: por cada clínica se
+    // generaba un producto cartesiano (pacientes × citas × historias) antes
+    // de poder contar con DISTINCT, lo que se vuelve carísimo apenas hay
+    // datos reales (cientos de miles/millones de filas intermedias). Se
+    // precalcula cada conteo por separado (un solo GROUP BY por tabla) y
+    // se pega todo con LEFT JOIN — mismo resultado, sin el cruce.
     const [rows] = await pool.query(`
       SELECT
         c.id,
@@ -25,38 +28,41 @@ router.get("/clinicas", auth("SUPER_ADMIN"), async (req, res) => {
         c.licencia_fin,
         c.activo,
         c.creado_en,
-        ct.nombre                                              AS tipo_nombre,
-
-        /* ── Pacientes ── */
-        COUNT(DISTINCT p.id)                                   AS total_pacientes,
-        COUNT(DISTINCT CASE
-          WHEN p.creado_en >= DATE_FORMAT(NOW(),'%Y-%m-01')
-          THEN p.id END)                                       AS pacientes_este_mes,
-
-        /* ── Usuarios activos (excluye portal) ── */
-        COUNT(DISTINCT CASE
-          WHEN u.activo = 1 AND u.tipo != 'PACIENTE_PORTAL'
-          THEN u.id END)                                       AS total_usuarios,
-
-        /* ── Citas ── */
-        COUNT(DISTINCT ci.id)                                  AS total_citas,
-        COUNT(DISTINCT CASE
-          WHEN ci.creado_en >= DATE_FORMAT(NOW(),'%Y-%m-01')
-          THEN ci.id END)                                      AS citas_este_mes,
-
-        /* ── Historias clínicas (consultas) ── */
-        COUNT(DISTINCT hc.id)                                  AS total_consultas,
-
-        /* ── Días en plataforma ── */
-        DATEDIFF(NOW(), c.creado_en)                           AS dias_en_plataforma
-
+        ct.nombre                                AS tipo_nombre,
+        COALESCE(p.total_pacientes, 0)            AS total_pacientes,
+        COALESCE(p.pacientes_este_mes, 0)         AS pacientes_este_mes,
+        COALESCE(u.total_usuarios, 0)             AS total_usuarios,
+        COALESCE(ci.total_citas, 0)               AS total_citas,
+        COALESCE(ci.citas_este_mes, 0)            AS citas_este_mes,
+        COALESCE(hc.total_consultas, 0)           AS total_consultas,
+        DATEDIFF(NOW(), c.creado_en)              AS dias_en_plataforma
       FROM clinicas c
       LEFT JOIN tipos_clinica ct ON ct.id = c.tipo_id
-      LEFT JOIN pacientes     p  ON p.clinica_id  = c.id
-      LEFT JOIN usuarios      u  ON u.clinica_id  = c.id
-      LEFT JOIN citas         ci ON ci.clinica_id = c.id
-      LEFT JOIN historias_clinicas hc ON hc.clinica_id = c.id
-      GROUP BY c.id
+      LEFT JOIN (
+        SELECT clinica_id,
+               COUNT(*)                                                              AS total_pacientes,
+               SUM(CASE WHEN creado_en >= DATE_FORMAT(NOW(),'%Y-%m-01') THEN 1 ELSE 0 END) AS pacientes_este_mes
+        FROM pacientes
+        GROUP BY clinica_id
+      ) p ON p.clinica_id = c.id
+      LEFT JOIN (
+        SELECT clinica_id, COUNT(*) AS total_usuarios
+        FROM usuarios
+        WHERE activo = 1 AND tipo != 'PACIENTE_PORTAL'
+        GROUP BY clinica_id
+      ) u ON u.clinica_id = c.id
+      LEFT JOIN (
+        SELECT clinica_id,
+               COUNT(*)                                                              AS total_citas,
+               SUM(CASE WHEN creado_en >= DATE_FORMAT(NOW(),'%Y-%m-01') THEN 1 ELSE 0 END) AS citas_este_mes
+        FROM citas
+        GROUP BY clinica_id
+      ) ci ON ci.clinica_id = c.id
+      LEFT JOIN (
+        SELECT clinica_id, COUNT(*) AS total_consultas
+        FROM historias_clinicas
+        GROUP BY clinica_id
+      ) hc ON hc.clinica_id = c.id
       ORDER BY total_pacientes DESC
     `);
 
