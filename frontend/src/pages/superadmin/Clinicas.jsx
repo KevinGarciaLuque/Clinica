@@ -805,7 +805,7 @@ export default function Clinicas() {
                 <div style={{
                   background: `linear-gradient(135deg, #0f2a50 0%, #1a3a5c 100%)`,
                   padding: "18px 20px",
-                  display: "flex", alignItems: "center", gap: 14,
+                  display: "flex", alignItems: "flex-start", gap: 14,
                   borderBottom: `1px solid ${C.border}`,
                 }}>
                   <div style={{
@@ -818,8 +818,7 @@ export default function Clinicas() {
                     {initials}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontWeight: 700, fontSize: 15, color: C.text,
-                                  whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                    <div style={{ fontWeight: 700, fontSize: 15, color: C.text, lineHeight: 1.25 }} title={c.nombre}>
                       {c.nombre}
                     </div>
                     <div style={{ display: "flex", gap: 6, marginTop: 4, flexWrap: "wrap" }}>
