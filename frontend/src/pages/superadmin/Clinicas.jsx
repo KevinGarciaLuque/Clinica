@@ -945,8 +945,9 @@ export default function Clinicas() {
                 {/* Footer de tarjeta */}
                 <div style={{
                   padding: "12px 20px", borderTop: `1px solid ${C.border}`,
-                  display: "flex", gap: 10,
+                  display: "flex", flexDirection: "column", gap: 8,
                 }}>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   <button
                     onClick={() => abrirPermisosModulo(c)}
                     title="Permisos por módulos y doctores"
@@ -1044,6 +1045,8 @@ export default function Clinicas() {
                   >
                     <i className={`bi bi-${locked ? "lock-fill" : "unlock"}`} />
                   </button>
+                </div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
                   <button
                     onClick={() => !locked && abrirEditar(c)}
                     title={locked ? "Clínica bloqueada" : "Editar"}
@@ -1087,6 +1090,7 @@ export default function Clinicas() {
                   >
                     <i className="bi bi-trash-fill" />
                   </button>
+                </div>
                 </div>
               </div>
             );
