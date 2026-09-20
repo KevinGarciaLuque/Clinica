@@ -705,9 +705,24 @@ export default function ConsultaEndocrinologia() {
           </button>
 
           {!paciente ? (
-            <div style={{ textAlign: "center", padding: "80px 0", color: "#94a3b8" }}>
-              <i className="bi bi-droplet-half" style={{ fontSize: 48, opacity: .3, display: "block", marginBottom: 12 }} />
-              Selecciona un paciente para ver su Control de Seguimiento
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
+              <div style={{ textAlign: "center", maxWidth: 340 }}>
+                <div style={{
+                  width: 76, height: 76, borderRadius: "50%", margin: "0 auto 20px",
+                  background: `linear-gradient(135deg, ${ORANGE}18, #fff7ed)`,
+                  border: `1px solid ${ORANGE}30`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <i className="bi bi-droplet-half" style={{ fontSize: 30, color: ORANGE }} />
+                </div>
+                <div style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 6 }}>
+                  Control de Seguimiento
+                </div>
+                <div style={{ fontSize: 13.5, color: "#94a3b8", lineHeight: 1.6 }}>
+                  Selecciona un paciente en el panel de la izquierda para ver su historia,
+                  seguimientos y plan de tratamiento.
+                </div>
+              </div>
             </div>
           ) : (
             <>
@@ -778,18 +793,27 @@ export default function ConsultaEndocrinologia() {
 }
 
 // ── Panel de pacientes ──────────────────────────────────────────────────────
+function iniciales(nombres, apellidos) {
+  return `${(nombres || "").trim()[0] || ""}${(apellidos || "").trim()[0] || ""}`.toUpperCase() || "•";
+}
+
 function PanelPacientes({ pacientesFiltrados, paciente, busqueda, setBusqueda, seleccionarPaciente, onClose }) {
   return (
     <div style={{ background: "#0d1b2e", display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "14px 14px 12px", borderBottom: "1px solid rgba(255,255,255,.07)", background: "#112240", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{ width: 30, height: 30, borderRadius: 8, background: `linear-gradient(135deg, ${ORANGE}, #9a3412)`, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <i className="bi bi-droplet-half" style={{ color: "#fff", fontSize: 14 }} />
+      <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid rgba(255,255,255,.07)", background: "#112240", flexShrink: 0 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+            <div style={{
+              width: 34, height: 34, borderRadius: 9,
+              background: `linear-gradient(135deg, ${ORANGE}, #9a3412)`,
+              boxShadow: `0 3px 10px rgba(234,88,12,.35)`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+            }}>
+              <i className="bi bi-droplet-half" style={{ color: "#fff", fontSize: 15 }} />
             </div>
             <div>
-              <div style={{ fontWeight: 700, fontSize: "0.82rem", color: "#fff" }}>Pacientes</div>
-              <div style={{ fontSize: "0.65rem", color: "rgba(148,163,184,.6)" }}>Control de Seguimiento</div>
+              <div style={{ fontWeight: 700, fontSize: "0.86rem", color: "#fff", letterSpacing: ".1px" }}>Pacientes</div>
+              <div style={{ fontSize: "0.66rem", color: "rgba(148,163,184,.65)", marginTop: 1 }}>Control de Seguimiento</div>
             </div>
           </div>
           {onClose && (
@@ -799,17 +823,57 @@ function PanelPacientes({ pacientesFiltrados, paciente, busqueda, setBusqueda, s
           )}
         </div>
         <div style={{ position: "relative" }}>
-          <i className="bi bi-search" style={{ position: "absolute", left: 9, top: "50%", transform: "translateY(-50%)", color: "rgba(148,163,184,.5)", fontSize: 12 }} />
-          <input value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar paciente…"
-            style={{ width: "100%", boxSizing: "border-box", padding: "7px 10px 7px 28px", background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)", borderRadius: 8, color: "rgba(203,213,225,.9)", fontSize: "0.81rem", outline: "none" }} />
+          <i className="bi bi-search" style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "rgba(148,163,184,.45)", fontSize: 12.5 }} />
+          <input
+            value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar paciente…"
+            style={{
+              width: "100%", boxSizing: "border-box", padding: "9px 12px 9px 32px",
+              background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)",
+              borderRadius: 10, color: "rgba(226,232,240,.95)", fontSize: "0.82rem", outline: "none",
+              transition: "border-color .15s, background .15s",
+            }}
+            onFocus={e => { e.target.style.borderColor = `${ORANGE}80`; e.target.style.background = "rgba(255,255,255,.08)"; }}
+            onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,.1)"; e.target.style.background = "rgba(255,255,255,.05)"; }}
+          />
         </div>
       </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: 8 }}>
-        {pacientesFiltrados.map(p => {
+      <div style={{ flex: 1, overflowY: "auto", padding: "10px 8px" }}>
+        {pacientesFiltrados.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "40px 16px", color: "rgba(148,163,184,.5)", fontSize: 12.5 }}>
+            <i className="bi bi-search" style={{ fontSize: 22, display: "block", marginBottom: 8, opacity: .6 }} />
+            Sin resultados
+          </div>
+        ) : pacientesFiltrados.map(p => {
           const activo = paciente?.id === p.id;
           return (
-            <div key={p.id} onClick={() => seleccionarPaciente(p)} style={{ padding: "9px 10px", borderRadius: 9, cursor: "pointer", marginBottom: 3, background: activo ? "rgba(234,88,12,.18)" : "transparent" }}>
-              <div style={{ fontSize: "0.82rem", fontWeight: 600, color: activo ? "#fdba74" : "rgba(226,232,240,.9)" }}>{p.nombres} {p.apellidos}</div>
+            <div
+              key={p.id}
+              onClick={() => seleccionarPaciente(p)}
+              style={{
+                display: "flex", alignItems: "center", gap: 10,
+                padding: "9px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 3,
+                background: activo ? "rgba(234,88,12,.16)" : "transparent",
+                borderLeft: activo ? `3px solid ${ORANGE}` : "3px solid transparent",
+                transition: "background .15s, border-color .15s",
+              }}
+              onMouseEnter={e => { if (!activo) e.currentTarget.style.background = "rgba(255,255,255,.04)"; }}
+              onMouseLeave={e => { if (!activo) e.currentTarget.style.background = "transparent"; }}
+            >
+              <div style={{
+                width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
+                background: activo ? `linear-gradient(135deg, ${ORANGE}, #9a3412)` : "rgba(255,255,255,.08)",
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 11, fontWeight: 700, color: activo ? "#fff" : "rgba(203,213,225,.75)",
+              }}>
+                {iniciales(p.nombres, p.apellidos)}
+              </div>
+              <div style={{
+                fontSize: "0.82rem", fontWeight: activo ? 700 : 600,
+                color: activo ? "#fdba74" : "rgba(226,232,240,.88)",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+              }}>
+                {p.nombres} {p.apellidos}
+              </div>
             </div>
           );
         })}

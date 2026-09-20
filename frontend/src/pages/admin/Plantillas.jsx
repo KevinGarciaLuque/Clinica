@@ -768,6 +768,10 @@ export default function Plantillas() {
 
   // Formato de receta efectivo: override de la barra > default guardado > media_carta
   const formatoRecetaEfectivo = printFormato || personalizacion.formato_receta || "media_carta";
+  // Las constancias (Libre, Estándar, Con Motivo) también admiten elegir el
+  // tamaño al imprimir/generar, igual que la receta.
+  const esConstancia = ["constancia_libre", "constancia", "constancias"].includes(tab);
+  const formatoConstanciaEfectivo = printFormato || "media_carta";
 
   const construirHtmlCompleto = (paperOverride) => {
     // Regenera el HTML con el contenido mas reciente del editor (por si el
@@ -803,8 +807,11 @@ export default function Plantillas() {
   const imprimirVistaPrevia = () => {
     const w = window.open("", "_blank", "width=900,height=700");
     if (!w) return;
-    // Para la receta en "carta completa" se fuerza la hoja carta en la vista previa.
-    const override = (tab === "receta" && formatoRecetaEfectivo === "carta_completa") ? "LETTER" : null;
+    // Para la receta y las constancias en "carta completa" se fuerza la hoja carta en la vista previa.
+    const cartaCompleta = tab === "receta"
+      ? formatoRecetaEfectivo === "carta_completa"
+      : esConstancia && formatoConstanciaEfectivo === "carta_completa";
+    const override = cartaCompleta ? "LETTER" : null;
     w.document.write(construirHtmlCompleto(override));
     w.document.close();
     w.focus();
@@ -1470,10 +1477,21 @@ export default function Plantillas() {
                       <option value="carta_completa">Carta completa</option>
                     </select>
                   )}
+                  {esConstancia && (
+                    <select
+                      value={formatoConstanciaEfectivo}
+                      onChange={e => setPrintFormato(e.target.value)}
+                      title="Tamaño de la constancia al imprimir o generar"
+                      style={{ marginLeft: 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 8px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937" }}
+                    >
+                      <option value="media_carta">Media carta</option>
+                      <option value="carta_completa">Carta completa</option>
+                    </select>
+                  )}
                   <button
                     onClick={(tab === "receta" && pacienteSel) ? generarDocumentoPdf : imprimirVistaPrevia}
                     disabled={generandoPdf}
-                    style={{ marginLeft: tab === "receta" ? 0 : 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6, cursor: generandoPdf ? "default" : "pointer" }}>
+                    style={{ marginLeft: (tab === "receta" || esConstancia) ? 0 : 10, border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6, cursor: generandoPdf ? "default" : "pointer" }}>
                     <i className="bi bi-printer-fill" /> {generandoPdf ? "Generando..." : "Imprimir"}
                   </button>
                   <button onClick={guardar} disabled={guardando} style={{ border: "1px solid #d1d5db", background: "#fff", borderRadius: 7, padding: "4px 10px", fontSize: "0.78rem", fontWeight: 600, color: "#1f2937", display: "flex", alignItems: "center", gap: 6, cursor: guardando ? "default" : "pointer" }}>
