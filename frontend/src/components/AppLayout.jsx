@@ -1,14 +1,23 @@
 import { useState, useRef, useEffect } from "react";
-import { Outlet, useLocation } from "react-router-dom";
+import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
 import LicenciaVencidaModal from "./LicenciaVencidaModal";
+import useClinicaActiva from "../utils/useClinicaActiva";
+import { limpiarClinicaActiva } from "../utils/clinicaActiva";
 
 export default function AppLayout() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [collapsed,  setCollapsed]  = useState(false);
   const mainRef = useRef(null);
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const clinicaActiva = useClinicaActiva();
+
+  const salirClinicaActiva = () => {
+    limpiarClinicaActiva();
+    navigate("/superadmin/clinicas");
+  };
 
   useEffect(() => {
     if (mainRef.current) mainRef.current.scrollTop = 0;
@@ -43,6 +52,29 @@ export default function AppLayout() {
           animation: "navline-shine 5s ease-in-out infinite",
         }} />
       </div>
+
+      {/* ── Aviso: SUPER_ADMIN viendo una clínica puntual ── */}
+      {clinicaActiva && (
+        <div style={{
+          marginLeft: W, flexShrink: 0, transition: "margin-left 0.25s ease",
+          background: "#78350f", color: "#fde68a",
+          padding: "7px 20px", fontSize: 13, fontWeight: 600,
+          display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
+        }}>
+          <i className="bi bi-eye-fill" />
+          Viendo como: <strong>{clinicaActiva.nombre}</strong>
+          <button
+            onClick={salirClinicaActiva}
+            style={{
+              marginLeft: 8, background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.25)",
+              color: "#fde68a", borderRadius: 6, padding: "2px 10px", fontSize: 12, fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Salir
+          </button>
+        </div>
+      )}
 
       {/* ── Cuerpo debajo del navbar ── */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>

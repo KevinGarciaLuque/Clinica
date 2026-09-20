@@ -1,7 +1,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
+import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import ClinicaDetallesModal from "../../components/ClinicaDetallesModal";
+import { setClinicaActiva } from "../../utils/clinicaActiva";
 
 /* ── Paleta ────────────────────────────────────────────────── */
 const C = {
@@ -45,6 +47,11 @@ const inputSt = {
 };
 
 export default function Clinicas() {
+  const navigate = useNavigate();
+  const verPacientes = (c) => {
+    setClinicaActiva({ id: c.id, nombre: c.nombre });
+    navigate("/pacientes");
+  };
   const [clinicas, setClinicas]   = useState([]);
   const [tipos, setTipos]         = useState([]);
   const [form, setForm]           = useState({ ...EMPTY_C, ...EMPTY_A });
@@ -965,6 +972,20 @@ export default function Clinicas() {
                     onMouseLeave={(e) => e.currentTarget.style.background = "rgba(33,150,243,.08)"}
                   >
                     <i className="bi bi-bar-chart-fill" />
+                  </button>
+                  <button
+                    onClick={() => verPacientes(c)}
+                    title="Ver pacientes de esta clínica"
+                    style={{
+                      background: "rgba(139,92,246,.08)", border: "1px solid rgba(139,92,246,.25)",
+                      borderRadius: 8, padding: "8px 10px",
+                      color: "#8b5cf6", fontSize: 13, cursor: "pointer", transition: "all .2s",
+                      display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = "rgba(139,92,246,.18)"}
+                    onMouseLeave={(e) => e.currentTarget.style.background = "rgba(139,92,246,.08)"}
+                  >
+                    <i className="bi bi-people-fill" />
                   </button>
                   <button
                     onClick={() => !locked && abrirLicencia(c)}

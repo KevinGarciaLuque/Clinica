@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import api from "../api/api";
+import { limpiarClinicaActiva } from "../utils/clinicaActiva";
 
 const AuthContext = createContext(null);
 
@@ -161,6 +162,7 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("licencia_info");
     localStorage.removeItem("tiene_recepcionista");
     localStorage.removeItem("titulo_medico");
+    limpiarClinicaActiva();
     setUser(null);
     setModulos([]);
     setLicenciaInfo(null);

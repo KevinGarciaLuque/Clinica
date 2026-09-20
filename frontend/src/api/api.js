@@ -1,4 +1,5 @@
 import axios from "axios";
+import { getClinicaActiva } from "../utils/clinicaActiva";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -16,8 +17,11 @@ api.interceptors.request.use(
     const token = localStorage.getItem("token");
     const user = JSON.parse(localStorage.getItem("user") || "{}");
 
-    // SUPER_ADMIN puede no tener clinica_id propio; usar env var si está definida
-    const clinicaId = user?.clinica_id || import.meta.env.VITE_CLINICA_ID || null;
+    // SUPER_ADMIN no tiene clínica propia. Si eligió una "clínica activa"
+    // (ver Clínicas → Ver pacientes) se manda esa; si no, se omite el header
+    // y el backend exige explícitamente seleccionar una donde haga falta.
+    const clinicaActivaId = user?.tipo === "SUPER_ADMIN" ? getClinicaActiva()?.id : null;
+    const clinicaId = user?.clinica_id || clinicaActivaId || import.meta.env.VITE_CLINICA_ID || null;
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
