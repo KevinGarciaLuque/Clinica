@@ -168,7 +168,7 @@ async function crearYEnviarToken(pacienteId, clinicaId, email, nombres, apellido
 // ══════════════════════════════════════════════════════════
 // POST /api/registro  — Registro público
 // ══════════════════════════════════════════════════════════
-router.post("/", async (req, res) => {
+router.post("/", limiterStrict, async (req, res) => {
   const conn = await pool.getConnection();
   try {
     const {

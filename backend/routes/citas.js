@@ -206,7 +206,11 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     if (paciente_id){ sql += " AND c.paciente_id = ?"; params.push(paciente_id); }
     if (estado)     { sql += " AND c.estado = ?";      params.push(estado); }
 
-    sql += " ORDER BY c.inicio ASC LIMIT 500";
+    // El calendario siempre pide un rango de fechas acotado (día/mes) — ahí el
+    // límite solo es una red de seguridad y puede ser alto. Sin rango (llamada
+    // sin acotar) se mantiene un límite bajo para no traer la tabla completa.
+    const limite = (desde && hasta) ? 2000 : 500;
+    sql += ` ORDER BY c.inicio ASC LIMIT ${limite}`;
     const [rows] = await pool.query(sql, params);
     res.json({ ok: true, data: rows });
   } catch (e) {

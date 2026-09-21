@@ -15,8 +15,19 @@ const router = require("express").Router();
 const pool   = require("../db");
 const OpenAI = require("openai");
 const auth   = require("../middlewares/auth");
+const rateLimit = require("express-rate-limit");
 const gcal   = require("../utils/googleCalendar");
 const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
+
+// El chat es público (sin auth) y cada mensaje puede disparar varias llamadas
+// a OpenAI y hasta crear/cancelar citas reales — limitar por IP evita que un
+// bot queme el presupuesto de la clínica o sature la agenda con citas falsas.
+const limiterChat = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  max: 20,
+  standardHeaders: true, legacyHeaders: false,
+  message: { ok: false, msg: "Demasiados mensajes. Espera unos minutos e intenta de nuevo." },
+});
 
 // Inicialización lazy — solo falla si se usa sin API key, no al cargar el módulo
 let _openai = null;
@@ -317,7 +328,7 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
 // ─────────────────────────────────────────────
 // POST /api/ia/chat
 // ─────────────────────────────────────────────
-router.post("/chat", async (req, res) => {
+router.post("/chat", limiterChat, async (req, res) => {
   try {
     const clinicaId = req.tenant?.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });

@@ -101,6 +101,9 @@ export default function Pacientes() {
   const [lista,  setLista]  = useState([]);
   const [msg,    setMsg]    = useState({ tipo: "", texto: "" });
   const [sinClinica, setSinClinica] = useState(false);
+  const [page,   setPage]   = useState(1);
+  const [totalPac, setTotalPac] = useState(0);
+  const [pagesPac, setPagesPac] = useState(1);
   const [form,   setForm]   = useState(FORM_VACIO);
   const [showForm, setShowForm] = useState(searchParams.get("nuevo") === "true");
   const [editandoId, setEditandoId] = useState(null);
@@ -144,11 +147,14 @@ export default function Pacientes() {
     }
   }, [searchParams]);
 
-  const cargar = async () => {
+  const cargar = async (targetPage = page) => {
     setMsg({ tipo: "", texto: "" });
     try {
-      const res = await api.get("/pacientes", { params: { q } });
+      const res = await api.get("/pacientes", { params: { q, page: targetPage } });
       setLista(res.data.data || []);
+      setTotalPac(res.data.total ?? (res.data.data || []).length);
+      setPagesPac(res.data.pages ?? 1);
+      setPage(res.data.page ?? targetPage);
       setSinClinica(false);
     } catch (err) {
       if (err?.response?.status === 400) {
@@ -162,7 +168,9 @@ export default function Pacientes() {
     }
   };
 
-  useEffect(() => { cargar(); }, []);  // eslint-disable-line
+  const buscar = () => cargar(1);
+
+  useEffect(() => { cargar(1); }, []);  // eslint-disable-line
 
   useEffect(() => {
     if (!lista.length) return;
@@ -400,7 +408,7 @@ export default function Pacientes() {
           <div>
             <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>Pacientes</div>
             <div style={{ color: "rgba(255,255,255,.5)", fontSize: "0.73rem" }}>
-              Gestión de pacientes — {lista.length} registros
+              Gestión de pacientes — {totalPac || lista.length} registros
             </div>
           </div>
         </div>
@@ -728,10 +736,10 @@ export default function Pacientes() {
                 placeholder="Buscar paciente por nombre, DNI, teléfono o email..."
                 value={q}
                 onChange={e => setQ(e.target.value)}
-                onKeyDown={e => e.key === "Enter" && cargar()}
+                onKeyDown={e => e.key === "Enter" && buscar()}
               />
             </div>
-            <button onClick={cargar}
+            <button onClick={buscar}
               style={{
                 background: "#2563eb", border: "none", borderRadius: 8,
                 padding: "8px 20px", color: "#fff", cursor: "pointer",
@@ -927,6 +935,41 @@ export default function Pacientes() {
               </tbody>
             </table>
           </div>
+
+          {pagesPac > 1 && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              flexWrap: "wrap", gap: 10, marginTop: 16, paddingTop: 16, borderTop: "1px solid #f1f5f9",
+            }}>
+              <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+                {totalPac} paciente{totalPac !== 1 ? "s" : ""} — página {page} de {pagesPac}
+              </span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => cargar(page - 1)}
+                  disabled={page <= 1}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7, border: "1px solid #e5e7eb",
+                    background: page <= 1 ? "#f9fafb" : "#fff", color: page <= 1 ? "#cbd5e1" : "#374151",
+                    cursor: page <= 1 ? "default" : "pointer", fontSize: "0.82rem", fontWeight: 600,
+                  }}
+                >
+                  <i className="bi bi-chevron-left" /> Anterior
+                </button>
+                <button
+                  onClick={() => cargar(page + 1)}
+                  disabled={page >= pagesPac}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7, border: "1px solid #e5e7eb",
+                    background: page >= pagesPac ? "#f9fafb" : "#fff", color: page >= pagesPac ? "#cbd5e1" : "#374151",
+                    cursor: page >= pagesPac ? "default" : "pointer", fontSize: "0.82rem", fontWeight: 600,
+                  }}
+                >
+                  Siguiente <i className="bi bi-chevron-right" />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       </div>}

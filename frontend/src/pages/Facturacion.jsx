@@ -722,18 +722,36 @@ export default function Facturacion() {
   const [showConfigCai, setShowConfigCai] = useState(false);
   const [searchParams, setSearchParams] = useSearchParams();
   const [pdfBusyId, setPdfBusyId] = useState(null); // `${accion}-${facturaId}` mientras se genera el PDF
+  const [page, setPage] = useState(1);
+  const [totalFact, setTotalFact] = useState(0);
+  const [pagesFact, setPagesFact] = useState(1);
+  const [qBuscar, setQBuscar] = useState(""); // "buscar" debounced, para no pegarle al backend en cada tecla
+
+  // Debounce del buscador — espera a que el usuario deje de escribir.
+  useEffect(() => {
+    const t = setTimeout(() => setQBuscar(buscar.trim()), 400);
+    return () => clearTimeout(t);
+  }, [buscar]);
+
+  // Cualquier cambio de filtro/búsqueda vuelve a la página 1.
+  useEffect(() => { setPage(1); }, [filtroEstado, desde, hasta, qBuscar]);
 
   const cargar = useCallback(() => {
     setLoading(true);
-    const params = {};
+    const params = { page };
     if (filtroEstado) params.estado = filtroEstado;
     if (desde) params.desde = desde;
     if (hasta) params.hasta = hasta;
+    if (qBuscar) params.q = qBuscar;
     api.get("/facturacion", { params })
-      .then(r => setList(r.data.data || []))
+      .then(r => {
+        setList(r.data.data || []);
+        setTotalFact(r.data.total ?? (r.data.data || []).length);
+        setPagesFact(r.data.pages ?? 1);
+      })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [filtroEstado, desde, hasta]);
+  }, [filtroEstado, desde, hasta, qBuscar, page]);
 
   useEffect(() => { cargar(); }, [cargar]);
 
@@ -806,14 +824,6 @@ export default function Facturacion() {
       .finally(() => { setShowNueva(true); limpiarUrl(); });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const listFiltrada = buscar.trim()
-    ? list.filter(f => {
-        const t = buscar.trim().toLowerCase();
-        return (f.numero_completo || f.numero || "").toLowerCase().includes(t)
-          || `${f.paciente_nombres} ${f.paciente_apellidos}`.toLowerCase().includes(t);
-      })
-    : list;
 
   const serieChart = serie.map(s => ({
     fecha: dayjs(s.fecha).format("D/M"),
@@ -1027,10 +1037,10 @@ export default function Facturacion() {
         <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.06)", overflow: "hidden" }}>
           {loading ? (
             <div style={{ textAlign: "center", padding: 40 }}><div className="spinner-border spinner-border-sm" /></div>
-          ) : listFiltrada.length === 0 ? (
+          ) : list.length === 0 ? (
             <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
               <i className="bi bi-receipt" style={{ fontSize: "2rem", display: "block", marginBottom: 8, opacity: 0.3 }} />
-              {list.length === 0 ? "No hay facturas registradas todavía." : "Ningún resultado para tu búsqueda."}
+              {qBuscar ? "Ningún resultado para tu búsqueda." : "No hay facturas registradas todavía."}
             </div>
           ) : (
             <div style={{ overflowX: "auto" }}>
@@ -1044,7 +1054,7 @@ export default function Facturacion() {
                   </tr>
                 </thead>
                 <tbody>
-                  {listFiltrada.map(f => {
+                  {list.map(f => {
                     const col = ESTADO_COLOR[f.estado] || ESTADO_COLOR.PENDIENTE;
                     return (
                       <tr key={f.id} onClick={() => setDetalleId(f.id)} style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
@@ -1085,6 +1095,40 @@ export default function Facturacion() {
                   })}
                 </tbody>
               </table>
+            </div>
+          )}
+          {pagesFact > 1 && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              flexWrap: "wrap", gap: 10, padding: "14px 16px", borderTop: "1px solid #f1f5f9",
+            }}>
+              <span style={{ fontSize: "0.82rem", color: "#6b7280" }}>
+                {totalFact} factura{totalFact !== 1 ? "s" : ""} — página {page} de {pagesFact}
+              </span>
+              <div style={{ display: "flex", gap: 6 }}>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page <= 1}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7, border: "1px solid #e5e7eb",
+                    background: page <= 1 ? "#f9fafb" : "#fff", color: page <= 1 ? "#cbd5e1" : "#374151",
+                    cursor: page <= 1 ? "default" : "pointer", fontSize: "0.82rem", fontWeight: 600,
+                  }}
+                >
+                  <i className="bi bi-chevron-left" /> Anterior
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.min(pagesFact, p + 1))}
+                  disabled={page >= pagesFact}
+                  style={{
+                    padding: "6px 14px", borderRadius: 7, border: "1px solid #e5e7eb",
+                    background: page >= pagesFact ? "#f9fafb" : "#fff", color: page >= pagesFact ? "#cbd5e1" : "#374151",
+                    cursor: page >= pagesFact ? "default" : "pointer", fontSize: "0.82rem", fontWeight: 600,
+                  }}
+                >
+                  Siguiente <i className="bi bi-chevron-right" />
+                </button>
+              </div>
             </div>
           )}
         </div>

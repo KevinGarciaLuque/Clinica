@@ -103,31 +103,60 @@ async function recalcularTotales(conn, facturaId) {
 router.get("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
-    const { estado, desde, hasta, paciente_id } = req.query;
+    const { estado, desde, hasta, paciente_id, q } = req.query;
 
-    let sql = `
+    let whereSql = " WHERE f.clinica_id = ? ";
+    const whereParams = [clinicaId];
+
+    if (req.user.tipo === "MEDICO" && !(await medicoVeTodaFacturacion(clinicaId))) {
+      whereSql += " AND f.medico_id = ? ";
+      whereParams.push(req.user.id);
+    }
+    if (estado) { whereSql += " AND f.estado = ? "; whereParams.push(estado); }
+    if (desde)  { whereSql += " AND DATE(f.creado_en) >= ? "; whereParams.push(desde); }
+    if (hasta)  { whereSql += " AND DATE(f.creado_en) <= ? "; whereParams.push(hasta); }
+    if (paciente_id) { whereSql += " AND f.paciente_id = ? "; whereParams.push(paciente_id); }
+    if (q) {
+      const like = `%${String(q).trim().slice(0, 100)}%`;
+      whereSql += " AND (f.numero LIKE ? OR f.numero_completo LIKE ? OR p.nombres LIKE ? OR p.apellidos LIKE ?) ";
+      whereParams.push(like, like, like, like);
+    }
+
+    const selectSql = `
       SELECT f.*, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
              COALESCE((SELECT SUM(monto) FROM pagos WHERE factura_id=f.id), 0) AS total_pagado
       FROM facturas f
       JOIN pacientes p ON p.id = f.paciente_id
       LEFT JOIN usuarios u ON u.id = f.medico_id
-      WHERE f.clinica_id = ?
+      ${whereSql}
     `;
-    const params = [clinicaId];
 
-    if (req.user.tipo === "MEDICO" && !(await medicoVeTodaFacturacion(clinicaId))) {
-      sql += " AND f.medico_id = ? ";
-      params.push(req.user.id);
+    // Paginación real solo si el cliente manda ?page= (ej. la pantalla de
+    // Facturación). Sin ese parámetro se mantiene el comportamiento anterior
+    // (top 500) para no romper a quien solo pide las facturas de un paciente
+    // puntual (Estado de Cuenta del expediente, por ejemplo).
+    const pageParam = parseInt(req.query.page, 10);
+    const isPaginado = Number.isInteger(pageParam) && pageParam > 0;
+    const perPage = 30;
+
+    if (isPaginado) {
+      const [[{ total }]] = await pool.query(
+        `SELECT COUNT(*) AS total FROM facturas f JOIN pacientes p ON p.id = f.paciente_id ${whereSql}`,
+        whereParams
+      );
+      const pages = Math.max(1, Math.ceil(total / perPage));
+      const page = Math.min(pageParam, pages);
+      const offset = (page - 1) * perPage;
+
+      const [rows] = await pool.query(
+        `${selectSql} ORDER BY f.creado_en DESC LIMIT ? OFFSET ?`,
+        [...whereParams, perPage, offset]
+      );
+      return res.json({ ok: true, data: rows, total, page, pages, per_page: perPage });
     }
-    if (estado) { sql += " AND f.estado = ? "; params.push(estado); }
-    if (desde)  { sql += " AND DATE(f.creado_en) >= ? "; params.push(desde); }
-    if (hasta)  { sql += " AND DATE(f.creado_en) <= ? "; params.push(hasta); }
-    if (paciente_id) { sql += " AND f.paciente_id = ? "; params.push(paciente_id); }
 
-    sql += " ORDER BY f.creado_en DESC LIMIT 500";
-
-    const [rows] = await pool.query(sql, params);
+    const [rows] = await pool.query(`${selectSql} ORDER BY f.creado_en DESC LIMIT 500`, whereParams);
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

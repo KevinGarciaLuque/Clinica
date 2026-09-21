@@ -21,6 +21,16 @@ const limiterSensible = rateLimit({
   message: { ok: false, msg: "Demasiados intentos. Intenta de nuevo en unos minutos." },
 });
 
+// Límite para el login principal: más permisivo que limiterSensible porque
+// muchos usuarios reales (recepción, varios médicos) comparten la IP de la
+// clínica, pero igual frena fuerza bruta / credential-stuffing automatizado.
+const limiterLogin = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 30,
+  standardHeaders: true, legacyHeaders: false,
+  message: { ok: false, msg: "Demasiados intentos de inicio de sesión. Intenta de nuevo en unos minutos." },
+});
+
 // Genera un código numérico de 6 dígitos (con ceros a la izquierda)
 function generarCodigo6() {
   return String(crypto.randomInt(0, 1000000)).padStart(6, "0");
@@ -47,7 +57,7 @@ function registrarAcceso(pool, { usuario_id, clinica_id, nombres, apellidos, ema
 }
 
 // POST /api/auth/login
-router.post("/login", async (req, res) => {
+router.post("/login", limiterLogin, async (req, res) => {
   try {
     const { email, password, clinica_slug } = req.body;
 
