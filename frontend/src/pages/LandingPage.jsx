@@ -1,8 +1,92 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, MotionConfig, useMotionValue, useSpring, useInView, animate } from "framer-motion";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+// Revela el contenido al hacer scroll hasta él; respeta prefers-reduced-motion vía MotionConfig del padre.
+function Reveal({ children, delay = 0, y = 16, ...rest }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.45, delay, ease: "easeOut" }}
+      {...rest}
+    >
+      {children}
+    </motion.div>
+  );
+}
+
+// Anima el título palabra por palabra al cargar (mantén los textos cortos: uso pensado para un h1).
+function StaggerHeadline({ text, style }) {
+  const words = text.split(" ");
+  return (
+    <h1 style={{ ...style, overflow: "hidden" }}>
+      {words.map((w, i) => (
+        <motion.span
+          key={`${w}-${i}`}
+          style={{ display: "inline-block" }}
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, delay: 0.15 + i * 0.06, ease: "easeOut" }}
+        >
+          {w}{i < words.length - 1 ? " " : ""}
+        </motion.span>
+      ))}
+    </h1>
+  );
+}
+
+// Cuenta hacia arriba el número inicial de un texto (ej. "100%" -> anima 0→100 y conserva el "%").
+function StatValue({ value, style }) {
+  const ref = useRef(null);
+  const inView = useInView(ref, { once: true, amount: 0.6 });
+  const [display, setDisplay] = useState(value);
+
+  useEffect(() => {
+    const match = /^(\d+)(.*)$/.exec(value);
+    if (!inView || !match) return;
+    const target = Number(match[1]);
+    const controls = animate(0, target, {
+      duration: 1.1,
+      ease: "easeOut",
+      onUpdate: v => setDisplay(`${Math.round(v)}${match[2]}`),
+    });
+    return () => controls.stop();
+  }, [inView, value]);
+
+  return <div ref={ref} style={style}>{display}</div>;
+}
+
+// Botón que "sigue" ligeramente el cursor (efecto magnético). Úsalo en 1 elemento focal, no en varios.
+function MagneticButton({ children, className, style, strength = 0.3, ...rest }) {
+  const ref = useRef(null);
+  const x = useSpring(useMotionValue(0), { stiffness: 200, damping: 15, mass: 0.4 });
+  const y = useSpring(useMotionValue(0), { stiffness: 200, damping: 15, mass: 0.4 });
+
+  const handleMove = e => {
+    const r = ref.current.getBoundingClientRect();
+    x.set((e.clientX - r.left - r.width / 2) * strength);
+    y.set((e.clientY - r.top - r.height / 2) * strength);
+  };
+  const handleLeave = () => { x.set(0); y.set(0); };
+
+  return (
+    <motion.a
+      ref={ref}
+      className={className}
+      style={{ ...style, x, y }}
+      onMouseMove={handleMove}
+      onMouseLeave={handleLeave}
+      {...rest}
+    >
+      {children}
+    </motion.a>
+  );
+}
 
 // Los ids de tarjeta de la landing (trial/semestral/anual) son solo slots visuales;
 // el precio real de cada uno vive en config_pagos bajo estos niveles.
@@ -176,7 +260,7 @@ export default function LandingPage() {
   };
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
@@ -385,9 +469,10 @@ export default function LandingPage() {
             <i className="bi bi-stars" />
             Sistema de gestión clínica
           </div>
-          <h1 style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, color: "#fff", lineHeight: 1.15, marginBottom: 20, letterSpacing: "-.5px" }}>
-            {cfg.landing_tagline || nombre}
-          </h1>
+          <StaggerHeadline
+            text={cfg.landing_tagline || nombre}
+            style={{ fontSize: "clamp(2rem, 5vw, 3.5rem)", fontWeight: 900, color: "#fff", lineHeight: 1.15, marginBottom: 20, letterSpacing: "-.5px" }}
+          />
           {cfg.landing_descripcion && (
             <p style={{ fontSize: "clamp(1rem, 2vw, 1.2rem)", color: "rgba(255,255,255,.78)", lineHeight: 1.7, marginBottom: 36, maxWidth: 580, margin: "0 auto 36px" }}>
               {cfg.landing_descripcion}
@@ -419,20 +504,17 @@ export default function LandingPage() {
         </div>
 
         {/* Stats rápidos */}
-        <div style={{
-          marginTop: 64, display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center",
-          animation: "fadeUp .6s .2s ease both",
-        }}>
+        <div style={{ marginTop: 64, display: "flex", gap: 32, flexWrap: "wrap", justifyContent: "center" }}>
           {[
             { icon: "bi-building-check", val: "Multi-clínica", desc: "Soporte para varias sedes" },
             { icon: "bi-shield-check-fill", val: "Seguro", desc: "Datos cifrados y protegidos" },
             { icon: "bi-lightning-charge-fill", val: "Rápido", desc: "Acceso desde cualquier dispositivo" },
-          ].map(s => (
-            <div key={s.val} style={{ textAlign: "center", color: "rgba(255,255,255,.85)" }}>
+          ].map((s, i) => (
+            <Reveal key={s.val} delay={0.4 + i * 0.08} style={{ textAlign: "center", color: "rgba(255,255,255,.85)" }}>
               <i className={`bi ${s.icon}`} style={{ fontSize: 26, color: "rgba(255,255,255,.7)", display: "block", marginBottom: 6 }} />
               <div style={{ fontWeight: 800, fontSize: 15 }}>{s.val}</div>
               <div style={{ fontSize: 12, opacity: .7, marginTop: 2 }}>{s.desc}</div>
-            </div>
+            </Reveal>
           ))}
         </div>
       </section>
@@ -450,15 +532,15 @@ export default function LandingPage() {
           </div>
           <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
             {FEATURES.map((f, i) => (
-              <div
+              <Reveal
                 key={i}
+                delay={i * 0.05}
                 className="feature-card"
                 style={{
                   background: "#fff", borderRadius: 16, padding: "22px 20px",
                   border: "1px solid #e2e8f0",
                   boxShadow: "0 2px 12px rgba(0,0,0,.05)",
                   transition: "transform .2s, box-shadow .2s",
-                  animation: `fadeUp .5s ${i * 0.05}s ease both`,
                 }}
               >
                 <div style={{
@@ -470,7 +552,7 @@ export default function LandingPage() {
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", marginBottom: 6 }}>{f.label}</div>
                 <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.55 }}>{f.desc}</div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -492,8 +574,11 @@ export default function LandingPage() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
             {ESPECIALIDADES.map((esp, i) => (
-              <div
+              <Reveal
                 key={i}
+                delay={Math.min(i * 0.04, 0.4)}
+                y={12}
+                whileHover={{ y: -4, boxShadow: `0 12px 32px ${esp.color}22`, transition: { duration: 0.2 } }}
                 style={{
                   background: "#fff",
                   borderRadius: 18,
@@ -503,12 +588,8 @@ export default function LandingPage() {
                   display: "flex",
                   alignItems: "flex-start",
                   gap: 16,
-                  transition: "transform .2s, box-shadow .2s",
-                  animation: `fadeUp .5s ${i * 0.07}s ease both`,
                   cursor: "default",
                 }}
-                onMouseOver={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = `0 12px 32px ${esp.color}22`; }}
-                onMouseOut={e  => { e.currentTarget.style.transform = "translateY(0)";    e.currentTarget.style.boxShadow = `0 4px 20px ${esp.color}12`; }}
               >
                 <div style={{
                   width: 48, height: 48, borderRadius: 14, flexShrink: 0,
@@ -521,7 +602,7 @@ export default function LandingPage() {
                   <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>{esp.label}</div>
                   <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>{esp.desc}</div>
                 </div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -547,7 +628,7 @@ export default function LandingPage() {
           <div style={{ position: "absolute", bottom: -180, left: -140, width: 380, height: 380, borderRadius: "50%", background: "rgba(255,255,255,.03)" }} />
           <div style={{ maxWidth: 1080, margin: "0 auto", position: "relative", display: "grid", gridTemplateColumns: "1fr 1.05fr", gap: 56, alignItems: "center" }} className="mkt-grid">
 
-            <div>
+            <Reveal>
               <span style={{ display: "inline-flex", alignItems: "center", gap: 8, fontSize: 12, fontWeight: 700, textTransform: "uppercase", letterSpacing: "1.2px", color: "#fff", background: "rgba(255,255,255,.12)", border: "1px solid rgba(255,255,255,.2)", padding: "6px 14px", borderRadius: 999 }}>
                 <i className="bi bi-megaphone-fill" />{cfg.marketing_home_badge || "Marketing Médico"}
               </span>
@@ -572,15 +653,17 @@ export default function LandingPage() {
                   </button>
                 )}
               </div>
-            </div>
+            </Reveal>
 
             {hayPreview ? (
-              <div
+              <Reveal
+                delay={0.15}
                 onClick={go}
                 role="button"
                 tabIndex={0}
                 aria-label="Ver galería de Marketing Médico"
                 onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }}
+                whileHover={{ scale: 1.015, transition: { duration: 0.2 } }}
                 style={{ cursor: "pointer", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 14, boxShadow: "0 30px 60px rgba(0,0,0,.28)" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {visibles.map((t, i) => {
@@ -620,7 +703,7 @@ export default function LandingPage() {
                   </span>
                   <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Ver galería <i className="bi bi-arrow-right" /></span>
                 </div>
-              </div>
+              </Reveal>
             ) : (
               <div style={{ display: "grid", gap: 14 }}>
                 {[
@@ -679,9 +762,10 @@ export default function LandingPage() {
             </div>
           </div>
           <div className="planes-grid" style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 24 }}>
-            {planes.map(plan => (
-              <div
+            {planes.map((plan, i) => (
+              <Reveal
                 key={plan.id}
+                delay={i * 0.1}
                 className="plan-card"
                 style={{
                   borderRadius: 20, padding: "32px 28px",
@@ -811,7 +895,7 @@ export default function LandingPage() {
                     </button>
                   )
                 )}
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -844,8 +928,18 @@ export default function LandingPage() {
               {resenas.map((r, i) => {
                 const inicial = r.nombre_medico?.trim()?.[0]?.toUpperCase() || "M";
                 return (
-                  <figure
+                  <motion.figure
                     key={i}
+                    initial={{ opacity: 0, y: 16 }}
+                    whileInView={{ opacity: 1, y: 0 }}
+                    viewport={{ once: true, amount: 0.2 }}
+                    transition={{ duration: 0.45, delay: Math.min(i * 0.08, 0.4), ease: "easeOut" }}
+                    whileHover={{
+                      y: -8,
+                      boxShadow: `0 1px 2px rgba(15,23,42,.04), 0 28px 50px -16px rgba(${colorRgb},.28)`,
+                      borderColor: `rgba(${colorRgb},.28)`,
+                      transition: { duration: 0.28 },
+                    }}
                     style={{
                       margin: 0,
                       background: "#fff",
@@ -857,18 +951,6 @@ export default function LandingPage() {
                       overflow: "hidden",
                       display: "flex",
                       flexDirection: "column",
-                      transition: "transform .28s cubic-bezier(.2,.7,.3,1), box-shadow .28s, border-color .28s",
-                      animation: `fadeUp .5s ${i * 0.08}s ease both`,
-                    }}
-                    onMouseOver={e => {
-                      e.currentTarget.style.transform = "translateY(-8px)";
-                      e.currentTarget.style.boxShadow = `0 1px 2px rgba(15,23,42,.04), 0 28px 50px -16px rgba(${colorRgb},.28)`;
-                      e.currentTarget.style.borderColor = `rgba(${colorRgb},.28)`;
-                    }}
-                    onMouseOut={e => {
-                      e.currentTarget.style.transform = "translateY(0)";
-                      e.currentTarget.style.boxShadow = "0 1px 2px rgba(15,23,42,.04), 0 12px 32px -12px rgba(15,23,42,.12)";
-                      e.currentTarget.style.borderColor = "#eef1f6";
                     }}
                   >
                     {/* Acento superior */}
@@ -931,7 +1013,7 @@ export default function LandingPage() {
                         </div>
                       </div>
                     </figcaption>
-                  </figure>
+                  </motion.figure>
                 );
               })}
             </div>
@@ -979,15 +1061,15 @@ export default function LandingPage() {
               { val: "24/7",  label: "Acceso disponible",       icon: "bi-clock-fill" },
               { val: "Multi", label: "Clínica y sedes",         icon: "bi-building-fill" },
             ].map((s, i) => (
-              <div key={i} style={{
+              <Reveal key={i} delay={i * 0.08} style={{
                 padding: "32px 24px", textAlign: "center",
                 background: i % 2 === 0 ? "rgba(255,255,255,.03)" : "transparent",
                 borderRight: i < 3 ? "1px solid rgba(255,255,255,.06)" : "none",
               }}>
                 <i className={`bi ${s.icon}`} style={{ fontSize: 24, color, display: "block", marginBottom: 12 }} />
-                <div style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#fff", lineHeight: 1 }}>{s.val}</div>
+                <StatValue value={s.val} style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#fff", lineHeight: 1 }} />
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 8, lineHeight: 1.4 }}>{s.label}</div>
-              </div>
+              </Reveal>
             ))}
           </div>
 
@@ -1015,15 +1097,15 @@ export default function LandingPage() {
                 desc: "Acompañamiento en la configuración y soporte por WhatsApp para resolver cualquier duda.",
               },
             ].map((v, i) => (
-              <div key={i} style={{
-                background: "rgba(255,255,255,.04)",
-                border: "1px solid rgba(255,255,255,.08)",
-                borderRadius: 16, padding: "28px 24px",
-                transition: "background .2s, border-color .2s",
-                animation: `fadeUp .5s ${i * 0.08}s ease both`,
-              }}
-              onMouseOver={e => { e.currentTarget.style.background = "rgba(255,255,255,.08)"; e.currentTarget.style.borderColor = `${color}44`; }}
-              onMouseOut={e  => { e.currentTarget.style.background = "rgba(255,255,255,.04)"; e.currentTarget.style.borderColor = "rgba(255,255,255,.08)"; }}
+              <Reveal
+                key={i}
+                delay={i * 0.08}
+                whileHover={{ background: "rgba(255,255,255,.08)", borderColor: `${color}44`, transition: { duration: 0.2 } }}
+                style={{
+                  background: "rgba(255,255,255,.04)",
+                  border: "1px solid rgba(255,255,255,.08)",
+                  borderRadius: 16, padding: "28px 24px",
+                }}
               >
                 <div style={{
                   width: 46, height: 46, borderRadius: 12, marginBottom: 18,
@@ -1034,7 +1116,7 @@ export default function LandingPage() {
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 10 }}>{v.title}</div>
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,.55)", lineHeight: 1.7 }}>{v.desc}</div>
-              </div>
+              </Reveal>
             ))}
           </div>
         </div>
@@ -1285,16 +1367,17 @@ export default function LandingPage() {
 
       {/* ── BOTÓN FLOTANTE WHATSAPP ── */}
       {whatsapp && (
-        <a
+        <MagneticButton
           href={`https://wa.me/${whatsapp}?text=Hola, quiero información sobre ${nombre}`}
           target="_blank"
           rel="noopener noreferrer"
           className="wa-float-btn"
           title="Escríbenos por WhatsApp"
+          strength={0.25}
         >
           <i className="bi bi-whatsapp" />
           <span className="wa-float-label">¡Escríbenos!</span>
-        </a>
+        </MagneticButton>
       )}
 
       {/* ── FOOTER ── */}
@@ -1312,7 +1395,7 @@ export default function LandingPage() {
           </a>
         </p>
       </footer>
-    </>
+    </MotionConfig>
   );
 }
 

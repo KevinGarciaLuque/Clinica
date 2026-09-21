@@ -1,7 +1,22 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { motion, MotionConfig } from "framer-motion";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+function Reveal({ children, delay = 0, ...rest }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.45, delay, ease: "easeOut" }}
+      {...rest}
+    >
+      {children}
+    </motion.div>
+  );
+}
 
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex || "");
@@ -67,7 +82,7 @@ export default function MarketingMedico() {
   const hayContenido = posts.length || videos.length || planes.length;
 
   return (
-    <>
+    <MotionConfig reducedMotion="user">
       <style>{`
         * { box-sizing: border-box; margin: 0; padding: 0; }
         body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background: #fff; }
@@ -195,12 +210,17 @@ export default function MarketingMedico() {
                 const cardStyle = {
                   background: "#fff", borderRadius: 18, overflow: "hidden",
                   border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
-                  animation: `fadeUp .5s ${i * 0.06}s ease both`, textDecoration: "none",
-                  display: "block", color: "inherit",
+                  textDecoration: "none", display: "block", color: "inherit",
+                };
+                const cardMotionProps = {
+                  initial: { opacity: 0, y: 16 },
+                  whileInView: { opacity: 1, y: 0 },
+                  viewport: { once: true, amount: 0.2 },
+                  transition: { duration: 0.45, delay: Math.min(i * 0.06, 0.4), ease: "easeOut" },
                 };
                 return p.enlace_url
-                  ? <a key={p.id} className="mm-card mm-post" href={p.enlace_url} target="_blank" rel="noreferrer" style={cardStyle}>{inner}</a>
-                  : <div key={p.id} className="mm-card mm-post" style={cardStyle}>{inner}</div>;
+                  ? <motion.a key={p.id} className="mm-card mm-post" href={p.enlace_url} target="_blank" rel="noreferrer" style={cardStyle} {...cardMotionProps}>{inner}</motion.a>
+                  : <motion.div key={p.id} className="mm-card mm-post" style={cardStyle} {...cardMotionProps}>{inner}</motion.div>;
               })}
             </div>
           </div>
@@ -217,7 +237,7 @@ export default function MarketingMedico() {
               {videos.map((v, i) => {
                 const info = videoInfo(v.media_url);
                 return (
-                  <div key={v.id} className="mm-card mm-video" onClick={() => info && setVideoActivo(info.embed)}
+                  <Reveal key={v.id} delay={Math.min(i * 0.06, 0.4)} className="mm-card mm-video" onClick={() => info && setVideoActivo(info.embed)}
                     role="button"
                     tabIndex={0}
                     aria-label={`Reproducir video: ${v.titulo}`}
@@ -225,7 +245,6 @@ export default function MarketingMedico() {
                     style={{
                       borderRadius: 18, overflow: "hidden", cursor: "pointer",
                       border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
-                      animation: `fadeUp .5s ${i * 0.06}s ease both`,
                     }}>
                     <div style={{ position: "relative", aspectRatio: "16/9", background: `linear-gradient(135deg, ${color}, ${darken(color, 30)})` }}>
                       {info?.thumb && <img src={info.thumb} alt={v.titulo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
@@ -241,7 +260,7 @@ export default function MarketingMedico() {
                       <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{v.titulo}</div>
                       {v.descripcion && <div style={{ fontSize: 13, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{v.descripcion}</div>}
                     </div>
-                  </div>
+                  </Reveal>
                 );
               })}
             </div>
@@ -262,12 +281,11 @@ export default function MarketingMedico() {
             </div>
             <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 22, alignItems: "start" }}>
               {planes.map((pl, i) => (
-                <div key={pl.id} style={{
+                <Reveal key={pl.id} delay={i * 0.07} whileHover={{ y: -4, transition: { duration: 0.2 } }} style={{
                   background: pl.destacado ? `linear-gradient(180deg, ${color}, ${darken(color, 22)})` : "#1e293b",
                   border: pl.destacado ? "1px solid rgba(255,255,255,.25)" : "1px solid rgba(255,255,255,.08)",
                   borderRadius: 20, padding: "30px 26px", position: "relative",
                   boxShadow: pl.destacado ? "0 24px 54px rgba(0,0,0,.4)" : "0 10px 30px rgba(0,0,0,.25)",
-                  animation: `fadeUp .5s ${i * 0.07}s ease both`,
                 }}>
                   {pl.destacado && (
                     <span style={{ position: "absolute", top: -12, left: "50%", transform: "translateX(-50%)", background: "#fbbf24", color: "#0f172a", fontSize: 11, fontWeight: 800, padding: "4px 14px", borderRadius: 999, letterSpacing: ".5px" }}>
@@ -289,7 +307,7 @@ export default function MarketingMedico() {
                     style={{ width: "100%", justifyContent: "center", background: pl.destacado ? "#fff" : color, color: pl.destacado ? color : "#fff", boxShadow: "none" }}>
                     <i className="bi bi-whatsapp" /> Me interesa
                   </a>
-                </div>
+                </Reveal>
               ))}
             </div>
           </div>
@@ -342,7 +360,7 @@ export default function MarketingMedico() {
           </div>
         </div>
       )}
-    </>
+    </MotionConfig>
   );
 }
 
