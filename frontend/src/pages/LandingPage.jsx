@@ -215,6 +215,9 @@ export default function LandingPage() {
         @media (max-width: 900px) {
           .mkt-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
         }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+        }
         @keyframes waPulse {
           0%   { box-shadow: 0 0 0 0 rgba(37,211,102,.6), 0 6px 24px rgba(37,211,102,.4); }
           60%  { box-shadow: 0 0 0 16px rgba(37,211,102,0), 0 6px 24px rgba(37,211,102,.4); }
@@ -289,7 +292,7 @@ export default function LandingPage() {
         padding: "0 24px", height: 60,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img src={logoUrl} alt="logo" style={{ height: 54, objectFit: "contain" }} />
+          <img src={logoUrl} alt={nombre} style={{ height: 54, objectFit: "contain" }} />
           <span style={{ color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: "-.3px" }}>{nombre}</span>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -323,9 +326,11 @@ export default function LandingPage() {
           <button
             className="d-md-none"
             onClick={() => setMenuOpen(v => !v)}
-            style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", marginLeft: 8 }}
+            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuOpen}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", marginLeft: 8, padding: 11, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
-            <i className={`bi ${menuOpen ? "bi-x-lg" : "bi-list"}`} />
+            <i className={`bi ${menuOpen ? "bi-x-lg" : "bi-list"}`} aria-hidden="true" />
           </button>
         </div>
       </nav>
@@ -369,7 +374,7 @@ export default function LandingPage() {
 
         <div style={{ maxWidth: 720, animation: "fadeUp .6s ease both", position: "relative" }}>
           <div style={{ marginBottom: 24 }}>
-            <img src={logoUrl} alt="logo" style={{ height: 210, objectFit: "contain", filter: "drop-shadow(0 6px 24px rgba(0,0,0,.4))" }} />
+            <img src={logoUrl} alt={nombre} style={{ height: 210, objectFit: "contain", filter: "drop-shadow(0 6px 24px rgba(0,0,0,.4))" }} />
           </div>
           <div style={{
             display: "inline-flex", alignItems: "center", gap: 7,
@@ -570,7 +575,13 @@ export default function LandingPage() {
             </div>
 
             {hayPreview ? (
-              <div onClick={go} style={{ cursor: "pointer", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 14, boxShadow: "0 30px 60px rgba(0,0,0,.28)" }}>
+              <div
+                onClick={go}
+                role="button"
+                tabIndex={0}
+                aria-label="Ver galería de Marketing Médico"
+                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }}
+                style={{ cursor: "pointer", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 14, boxShadow: "0 30px 60px rgba(0,0,0,.28)" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
                   {visibles.map((t, i) => {
                     const last = i === visibles.length - 1 && extra > 0;
@@ -1289,14 +1300,14 @@ export default function LandingPage() {
       {/* ── FOOTER ── */}
       <footer style={{ background: "#0f172a", padding: "28px 24px", textAlign: "center" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 10, marginBottom: 10 }}>
-          <img src={logoUrl} alt="logo" style={{ height: 24, objectFit: "contain", opacity: .8 }} />
+          <img src={logoUrl} alt={nombre} style={{ height: 24, objectFit: "contain", opacity: .8 }} />
           <span style={{ color: "#475569", fontWeight: 700, fontSize: 15 }}>{nombre}</span>
         </div>
-        <p style={{ color: "#334155", fontSize: 13, margin: 0 }}>
+        <p style={{ color: "#94a3b8", fontSize: 13, margin: 0 }}>
           {cfg.copyright_texto || `© ${new Date().getFullYear()} ${nombre} · Todos los derechos reservados`}
         </p>
         <p style={{ margin: "8px 0 0" }}>
-          <a href="/privacidad" style={{ color: "#64748b", fontSize: 12, textDecoration: "none" }}>
+          <a href="/privacidad" style={{ color: "#cbd5e1", fontSize: 12, textDecoration: "underline" }}>
             Política de Privacidad
           </a>
         </p>

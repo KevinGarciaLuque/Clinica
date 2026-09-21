@@ -40,6 +40,13 @@ export default function MarketingMedico() {
     fetch(`${API_URL}/api/marketing-medico`).then(r => r.json()).then(d => setData(d.data || { posts: [], videos: [], planes: [] })).catch(() => {});
   }, []);
 
+  useEffect(() => {
+    if (!videoActivo) return;
+    const onKeyDown = e => { if (e.key === "Escape") setVideoActivo(null); };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [videoActivo]);
+
   if (!cfg) return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0f172a" }}>
       <div style={{ width: 40, height: 40, border: "4px solid rgba(255,255,255,.15)", borderTopColor: "#3b82f6", borderRadius: "50%", animation: "spin .7s linear infinite" }} />
@@ -80,6 +87,9 @@ export default function MarketingMedico() {
           .mm-grid { grid-template-columns: 1fr !important; }
           .mm-hero h1 { font-size: 2rem !important; }
         }
+        @media (prefers-reduced-motion: reduce) {
+          *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
+        }
       `}</style>
 
       {/* NAVBAR */}
@@ -91,7 +101,7 @@ export default function MarketingMedico() {
         padding: "0 24px", height: 60,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, cursor: "pointer" }} onClick={() => navigate("/")}>
-          <img src={logoUrl} alt="logo" style={{ height: 54, objectFit: "contain" }} />
+          <img src={logoUrl} alt={nombre} style={{ height: 54, objectFit: "contain" }} />
           <span style={{ color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: "-.3px" }}>{nombre}</span>
         </div>
         <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
@@ -106,8 +116,14 @@ export default function MarketingMedico() {
           }}>
             <i className="bi bi-box-arrow-in-right me-1" />Iniciar sesión
           </button>
-          <button className="d-md-none" onClick={() => setMenuOpen(v => !v)} style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", marginLeft: 8 }}>
-            <i className={`bi ${menuOpen ? "bi-x-lg" : "bi-list"}`} />
+          <button
+            className="d-md-none"
+            onClick={() => setMenuOpen(v => !v)}
+            aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
+            aria-expanded={menuOpen}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", marginLeft: 8, padding: 11, display: "flex", alignItems: "center", justifyContent: "center" }}
+          >
+            <i className={`bi ${menuOpen ? "bi-x-lg" : "bi-list"}`} aria-hidden="true" />
           </button>
         </div>
       </nav>
@@ -202,6 +218,10 @@ export default function MarketingMedico() {
                 const info = videoInfo(v.media_url);
                 return (
                   <div key={v.id} className="mm-card mm-video" onClick={() => info && setVideoActivo(info.embed)}
+                    role="button"
+                    tabIndex={0}
+                    aria-label={`Reproducir video: ${v.titulo}`}
+                    onKeyDown={e => { if ((e.key === "Enter" || e.key === " ") && info) { e.preventDefault(); setVideoActivo(info.embed); } }}
                     style={{
                       borderRadius: 18, overflow: "hidden", cursor: "pointer",
                       border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
@@ -288,22 +308,32 @@ export default function MarketingMedico() {
         </a>
       </section>
 
-      <footer style={{ background: "#0f172a", padding: "26px 24px", textAlign: "center", color: "rgba(255,255,255,.5)", fontSize: 13 }}>
+      <footer style={{ background: "#0f172a", padding: "26px 24px", textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
         {cfg.copyright_texto || `${nombre} · Todos los derechos reservados`}
       </footer>
 
       {/* MODAL DE VIDEO */}
       {videoActivo && (
-        <div onClick={() => setVideoActivo(null)} style={{
-          position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)",
-          display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-        }}>
+        <div
+          onClick={() => setVideoActivo(null)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Video"
+          style={{
+            position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)",
+            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+          }}>
           <div onClick={e => e.stopPropagation()} style={{ width: "min(900px, 100%)", position: "relative" }}>
-            <button onClick={() => setVideoActivo(null)} style={{
-              position: "absolute", top: -44, right: 0, background: "none", border: "none",
-              color: "#fff", fontSize: 26, cursor: "pointer",
-            }}>
-              <i className="bi bi-x-lg" />
+            <button
+              onClick={() => setVideoActivo(null)}
+              aria-label="Cerrar video"
+              autoFocus
+              style={{
+                position: "absolute", top: -52, right: -6, background: "none", border: "none",
+                color: "#fff", fontSize: 26, cursor: "pointer", padding: 11,
+                display: "flex", alignItems: "center", justifyContent: "center",
+              }}>
+              <i className="bi bi-x-lg" aria-hidden="true" />
             </button>
             <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 14, overflow: "hidden", background: "#000" }}>
               <iframe src={videoActivo} title="Video" allow="autoplay; encrypted-media; fullscreen" allowFullScreen
