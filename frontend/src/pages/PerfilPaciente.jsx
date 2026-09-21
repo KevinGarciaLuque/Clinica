@@ -88,6 +88,7 @@ export default function PerfilPaciente() {
   const [expandOdontoId, setExpandOdontoId] = useState(null);
   const [docsPorHistoria, setDocsPorHistoria] = useState({});
   const [documentos, setDocumentos] = useState([]);
+  const [facturasCuenta, setFacturasCuenta] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showLoadingSpinner, setShowLoadingSpinner] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -103,7 +104,7 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "cuenta", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
   const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
   
@@ -261,14 +262,21 @@ export default function PerfilPaciente() {
       setPaciente(dataPac);
       setForm(dataPac);
       // Cargar datos secundarios en paralelo para reducir espera inicial
-      const [histResult, alergiasResult, docsResult, docsPorHistResult, odontoResult, nefroResult] = await Promise.allSettled([
+      const [histResult, alergiasResult, docsResult, docsPorHistResult, odontoResult, nefroResult, facturasResult] = await Promise.allSettled([
         api.get(`/historias?paciente_id=${id}`),
         api.get(`/historias/paciente/${id}/alergias`),
         api.get(`/pacientes/${id}/documentos`),
         api.get(`/pacientes/${id}/documentos/por-historia`),
         api.get("/odontologia/sesiones", { params: { paciente_id: id, limit: 50 } }),
         api.get("/nefrologia/hoja-analitica", { params: { paciente_id: id } }),
+        api.get("/facturacion", { params: { paciente_id: id } }),
       ]);
+
+      if (facturasResult.status === "fulfilled") {
+        setFacturasCuenta(facturasResult.value.data.data || []);
+      } else {
+        setFacturasCuenta([]);
+      }
 
       if (nefroResult.status === "fulfilled") {
         setHojaNefroColumnas(nefroResult.value.data.data || []);
@@ -858,6 +866,12 @@ export default function PerfilPaciente() {
     );
   }
 
+  /* ── Estado de cuenta: saldo pendiente (facturas no anuladas, total - pagado) ── */
+  const facturasVigentes = facturasCuenta.filter(f => f.estado !== "ANULADA");
+  const saldoPendiente = facturasVigentes.reduce((acc, f) => acc + Math.max(0, Number(f.total) - Number(f.total_pagado || 0)), 0);
+  const totalFacturadoHist = facturasVigentes.reduce((acc, f) => acc + Number(f.total), 0);
+  const totalPagadoHist = facturasVigentes.reduce((acc, f) => acc + Number(f.total_pagado || 0), 0);
+
   /* ── Pestañas disponibles (dinámicas según módulos) ── */
   const totalEstetica = esteticaResumen.ficha + esteticaResumen.galeria + esteticaResumen.presupuestos + esteticaResumen.consentimientos + esteticaResumen.seguimiento + esteticaResumen.biopsias;
   const hayEstetica = [
@@ -893,6 +907,8 @@ export default function PerfilPaciente() {
       : []),
     { key: "examenes",    label: "Documentos",           short: "Docs.",    icon: "bi-files",
       badge: documentos.length > 0 ? documentos.length : null, badgeColor: "#0891b2" },
+    { key: "cuenta",      label: "Estado de Cuenta",     short: "Cuenta",   icon: "bi-wallet2",
+      badge: saldoPendiente > 0 ? "!" : null, badgeColor: "#dc2626", color: "#0d6efd" },
     ...(hayEstetica
       ? [{ key: "estetica", label: "Estética", short: "Estética", icon: "bi-star-fill",
           badge: esteticaResumen.loading ? null : totalEstetica > 0 ? totalEstetica : null, badgeColor: "#d97706" }]
@@ -2326,6 +2342,17 @@ export default function PerfilPaciente() {
         </div>
       )}
 
+      {tab === "cuenta" && (
+        <TabEstadoCuenta
+          paciente={paciente}
+          facturas={facturasCuenta}
+          saldoPendiente={saldoPendiente}
+          totalFacturado={totalFacturadoHist}
+          totalPagado={totalPagadoHist}
+          onCobrado={cargarTodo}
+        />
+      )}
+
       {tab === "estetica" && hayEstetica && (
         <div className="row g-4">
           <div className="col-12">
@@ -2835,6 +2862,204 @@ export default function PerfilPaciente() {
       )}
     </div>
     </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────
+// TAB: ESTADO DE CUENTA
+// Resumen de facturas del paciente (créditos = PENDIENTE sin pago completo)
+// con saldo consolidado y cobro rápido de cualquier factura pendiente.
+// ─────────────────────────────────────────────────────────────────────────
+const ESTADO_COLOR_CUENTA = {
+  PENDIENTE: { bg: "#fff7e0", fg: "#92400e", border: "#fde68a" },
+  PAGADA:    { bg: "#dcfce7", fg: "#166534", border: "#bbf7d0" },
+  ANULADA:   { bg: "#fee2e2", fg: "#991b1b", border: "#fecaca" },
+};
+
+function fmtLps(n) {
+  return `L ${Number(n || 0).toLocaleString("es-HN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function TabEstadoCuenta({ paciente, facturas, saldoPendiente, totalFacturado, totalPagado, onCobrado }) {
+  const [cobrando, setCobrando] = useState(null); // factura seleccionada para cobrar
+
+  const facturasOrdenadas = [...facturas].sort((a, b) => new Date(b.creado_en) - new Date(a.creado_en));
+
+  return (
+    <div>
+      {/* Resumen */}
+      <div className="row g-3 mb-4">
+        <div className="col-md-4">
+          <div className="card shadow-sm h-100 border-0" style={{ borderLeft: `4px solid ${saldoPendiente > 0 ? "#dc2626" : "#16a34a"}` }}>
+            <div className="card-body">
+              <div className="text-muted small fw-semibold text-uppercase" style={{ fontSize: "0.72rem", letterSpacing: ".04em" }}>
+                Saldo pendiente
+              </div>
+              <div style={{ fontSize: "1.5rem", fontWeight: 800, color: saldoPendiente > 0 ? "#dc2626" : "#16a34a" }}>
+                {fmtLps(saldoPendiente)}
+              </div>
+              <div className="small text-muted">
+                {saldoPendiente > 0 ? "El paciente tiene cargos a crédito" : "Sin deuda pendiente"}
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card shadow-sm h-100 border-0">
+            <div className="card-body">
+              <div className="text-muted small fw-semibold text-uppercase" style={{ fontSize: "0.72rem", letterSpacing: ".04em" }}>
+                Total facturado
+              </div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#1e293b" }}>{fmtLps(totalFacturado)}</div>
+              <div className="small text-muted">Histórico (no incluye anuladas)</div>
+            </div>
+          </div>
+        </div>
+        <div className="col-md-4">
+          <div className="card shadow-sm h-100 border-0">
+            <div className="card-body">
+              <div className="text-muted small fw-semibold text-uppercase" style={{ fontSize: "0.72rem", letterSpacing: ".04em" }}>
+                Total pagado
+              </div>
+              <div style={{ fontSize: "1.3rem", fontWeight: 700, color: "#1e293b" }}>{fmtLps(totalPagado)}</div>
+              <div className="small text-muted">Histórico</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Listado de facturas */}
+      <div className="card shadow-sm border-0">
+        <div className="card-header bg-white d-flex align-items-center justify-content-between">
+          <h6 className="mb-0"><i className="bi bi-receipt-cutoff me-2" />Movimientos</h6>
+          <span className="text-muted small">{facturasOrdenadas.length} registro(s)</span>
+        </div>
+        {facturasOrdenadas.length === 0 ? (
+          <div className="card-body text-center text-muted py-5">
+            <i className="bi bi-inboxes" style={{ fontSize: "2rem", opacity: .35, display: "block", marginBottom: 8 }} />
+            Este paciente no tiene facturas o recibos registrados todavía.
+          </div>
+        ) : (
+          <div className="table-responsive">
+            <table className="table table-hover align-middle mb-0">
+              <thead className="table-light">
+                <tr>
+                  <th>Número</th>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th className="text-end">Total</th>
+                  <th className="text-end">Pagado</th>
+                  <th className="text-end">Saldo</th>
+                  <th>Estado</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                {facturasOrdenadas.map(f => {
+                  const pagado = Number(f.total_pagado || 0);
+                  const saldo = Math.max(0, Number(f.total) - pagado);
+                  const col = ESTADO_COLOR_CUENTA[f.estado] || ESTADO_COLOR_CUENTA.PENDIENTE;
+                  return (
+                    <tr key={f.id}>
+                      <td className="fw-semibold">{f.numero_completo || f.numero}</td>
+                      <td>{dayjs(f.creado_en).format("DD/MM/YYYY")}</td>
+                      <td>{f.tipo_comprobante === "RECIBO" ? "Recibo" : f.tipo_comprobante === "FACTURA" ? "Factura" : "Boleta"}</td>
+                      <td className="text-end">{fmtLps(f.total)}</td>
+                      <td className="text-end">{fmtLps(pagado)}</td>
+                      <td className="text-end fw-semibold" style={{ color: saldo > 0 ? "#dc2626" : "#16a34a" }}>{fmtLps(saldo)}</td>
+                      <td>
+                        <span style={{ background: col.bg, color: col.fg, border: `1px solid ${col.border}`, borderRadius: 20, padding: "3px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
+                          {f.estado}
+                        </span>
+                      </td>
+                      <td className="text-end">
+                        {f.estado === "PENDIENTE" && (
+                          <button className="btn btn-sm btn-success" onClick={() => setCobrando(f)}>
+                            <i className="bi bi-cash-coin me-1" />Cobrar
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      {cobrando && (
+        <ModalCobrarFactura
+          factura={cobrando}
+          onClose={() => setCobrando(null)}
+          onCobrado={() => { setCobrando(null); onCobrado(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+function ModalCobrarFactura({ factura, onClose, onCobrado }) {
+  const saldo = Math.max(0, Number(factura.total) - Number(factura.total_pagado || 0));
+  const [monto, setMonto] = useState(String(saldo));
+  const [metodo, setMetodo] = useState("EFECTIVO");
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+
+  const cobrar = async () => {
+    const montoNum = Number(monto);
+    if (!Number.isFinite(montoNum) || montoNum <= 0) { setError("Ingresa un monto válido."); return; }
+    setGuardando(true); setError("");
+    try {
+      await api.post(`/facturacion/${factura.id}/pagos`, { metodo, monto: montoNum });
+      onCobrado();
+    } catch (e) {
+      setError(e.response?.data?.msg || "No se pudo registrar el pago.");
+    } finally {
+      setGuardando(false);
+    }
+  };
+
+  return createPortal(
+    <div style={{
+      position: "fixed", inset: 0, zIndex: 10002,
+      background: "rgba(15,23,42,.55)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16,
+    }}>
+      <div style={{ width: "100%", maxWidth: 400, background: "#fff", borderRadius: 14, boxShadow: "0 16px 48px rgba(0,0,0,.22)", overflow: "hidden" }}>
+        <div className="p-3 border-bottom d-flex align-items-center justify-content-between">
+          <h6 className="mb-0"><i className="bi bi-cash-coin me-2 text-success" />Cobrar {factura.numero_completo || factura.numero}</h6>
+          <button className="btn-close" onClick={onClose} />
+        </div>
+        <div className="p-3 d-flex flex-column gap-2">
+          <div className="d-flex justify-content-between small text-muted">
+            <span>Saldo pendiente</span>
+            <strong style={{ color: "#dc2626" }}>{fmtLps(saldo)}</strong>
+          </div>
+          <div>
+            <label className="form-label small fw-semibold">Monto a cobrar</label>
+            <input type="number" min="0" step="0.01" className="form-control" value={monto} onChange={e => setMonto(e.target.value)} />
+          </div>
+          <div>
+            <label className="form-label small fw-semibold">Método de pago</label>
+            <select className="form-select" value={metodo} onChange={e => setMetodo(e.target.value)}>
+              <option value="EFECTIVO">Efectivo</option>
+              <option value="TARJETA">Tarjeta</option>
+              <option value="TRANSFERENCIA">Transferencia</option>
+              <option value="SEGURO">Seguro</option>
+              <option value="OTRO">Otro</option>
+            </select>
+          </div>
+          {error && <div className="alert alert-danger py-2 mb-0 small">{error}</div>}
+        </div>
+        <div className="p-3 border-top d-flex gap-2 justify-content-end">
+          <button className="btn btn-outline-secondary" onClick={onClose} disabled={guardando}>Cancelar</button>
+          <button className="btn btn-success" onClick={cobrar} disabled={guardando}>
+            {guardando ? "Cobrando…" : "Registrar pago"}
+          </button>
+        </div>
+      </div>
+    </div>,
+    document.body
   );
 }
 

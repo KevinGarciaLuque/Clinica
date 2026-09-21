@@ -92,6 +92,7 @@ export default function ConfigClinica() {
           factura_correlativo_actual: cfgMap.factura_correlativo_actual || "",
           factura_fecha_limite_emision: cfgMap.factura_fecha_limite_emision || "",
           factura_isv_porcentaje:     cfgMap.factura_isv_porcentaje     || "15",
+          facturacion_medicos_ven_todo: cfgMap.facturacion_medicos_ven_todo || "0",
         });
 
         setStorage(resDetalles.data?.data?.almacenamiento || null);
@@ -950,6 +951,25 @@ export default function ConfigClinica() {
                   <input className="form-control" type="date"
                     value={formFactura.factura_fecha_limite_emision || ""}
                     onChange={(e) => setFormFactura({ ...formFactura, factura_fecha_limite_emision: e.target.value })} />
+                </div>
+              </div>
+
+              <hr className="my-4" />
+
+              <div className="form-check form-switch">
+                <input
+                  className="form-check-input" type="checkbox" role="switch" id="switchMedicosVenTodo"
+                  checked={formFactura.facturacion_medicos_ven_todo === "1"}
+                  onChange={(e) => setFormFactura({ ...formFactura, facturacion_medicos_ven_todo: e.target.checked ? "1" : "0" })}
+                />
+                <label className="form-check-label" htmlFor="switchMedicosVenTodo">
+                  Los médicos pueden ver la facturación de otros médicos
+                </label>
+                <div className="form-text">
+                  Apagado (por defecto): cada médico solo ve y cobra sus propias facturas/recibos, incluyendo
+                  en el Estado de Cuenta de sus pacientes. Encendido: todos los médicos ven la facturación
+                  completa de la clínica (solo lectura — registrar pagos o editar facturas ajenas sigue
+                  reservado a quien las creó, Administración o Recepción).
                 </div>
               </div>
 

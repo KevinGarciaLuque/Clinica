@@ -71,6 +71,15 @@ async function getClinicaConfig(clinicaId, claves) {
   return map;
 }
 
+// Por defecto cada MEDICO solo ve sus propias facturas/recibos. Si la clínica
+// activa "facturacion_medicos_ven_todo" (Configuración → Facturación), todos
+// los médicos ven la facturación completa de la clínica — solo para lectura;
+// registrar pagos, editar o anular facturas ajenas sigue restringido.
+async function medicoVeTodaFacturacion(clinicaId) {
+  const cfg = await getClinicaConfig(clinicaId, ["facturacion_medicos_ven_todo"]);
+  return cfg.facturacion_medicos_ven_todo === "1";
+}
+
 async function recalcularTotales(conn, facturaId) {
   const [[sub]] = await conn.query(
     "SELECT COALESCE(SUM(total),0) AS bruto FROM factura_items WHERE factura_id=?",
@@ -107,7 +116,7 @@ router.get("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (
     `;
     const params = [clinicaId];
 
-    if (req.user.tipo === "MEDICO") {
+    if (req.user.tipo === "MEDICO" && !(await medicoVeTodaFacturacion(clinicaId))) {
       sql += " AND f.medico_id = ? ";
       params.push(req.user.id);
     }
@@ -459,7 +468,7 @@ router.get("/:id", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), asyn
       [req.params.id, clinicaId]
     );
     if (!factura) return res.status(404).json({ ok: false, msg: "No encontrada" });
-    if (req.user.tipo === "MEDICO" && factura.medico_id !== req.user.id) {
+    if (req.user.tipo === "MEDICO" && factura.medico_id !== req.user.id && !(await medicoVeTodaFacturacion(clinicaId))) {
       return res.status(403).json({ ok: false, msg: "No tienes acceso a esta factura" });
     }
 
@@ -786,7 +795,7 @@ router.get("/:id/pdf", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
       [req.params.id, clinicaId]
     );
     if (!factura) return res.status(404).json({ ok: false, msg: "No encontrada" });
-    if (req.user.tipo === "MEDICO" && factura.medico_id !== req.user.id) {
+    if (req.user.tipo === "MEDICO" && factura.medico_id !== req.user.id && !(await medicoVeTodaFacturacion(clinicaId))) {
       return res.status(403).json({ ok: false, msg: "No tienes acceso a esta factura" });
     }
 
