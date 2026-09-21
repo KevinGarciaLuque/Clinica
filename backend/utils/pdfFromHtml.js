@@ -32,7 +32,7 @@ async function getBrowser() {
   }
 
   if (!browserPromise) {
-    const puppeteer = require("puppeteer-core");
+    const { default: puppeteer } = await import("puppeteer-core");
 
     const localBrowser = process.platform === "win32"
       ? WINDOWS_BROWSER_PATHS.find((p) => fs.existsSync(p))
@@ -45,7 +45,7 @@ async function getBrowser() {
           args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu"],
         }
       : await (async () => {
-          const chromium = require("@sparticuz/chromium").default;
+          const { default: chromium } = await import("@sparticuz/chromium");
           return {
             args: chromium.args,
             executablePath: await chromium.executablePath(),
