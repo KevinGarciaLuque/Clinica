@@ -43,6 +43,97 @@ function videoInfo(url) {
   return { embed: url, thumb: null };
 }
 
+// Tarjeta de post: detecta la proporción real de la imagen al cargar, en vez de forzar 4:3 y recortarla.
+function PostCard({ p, i, color }) {
+  const [ratio, setRatio] = useState("4 / 3");
+
+  const inner = (
+    <>
+      {p.media_url && (
+        <div style={{ aspectRatio: ratio, maxHeight: 420, overflow: "hidden", background: "#e2e8f0" }}>
+          <img
+            src={mediaUrl(p.media_url)}
+            alt={p.titulo}
+            loading="lazy"
+            onLoad={e => {
+              const { naturalWidth: w, naturalHeight: h } = e.target;
+              if (w && h) setRatio(`${w} / ${h}`);
+            }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        </div>
+      )}
+      <div style={{ padding: "18px 20px" }}>
+        <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 6 }}>{p.titulo}</div>
+        {p.descripcion && <div style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6 }}>{p.descripcion}</div>}
+        {p.enlace_url && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color }}>Ver caso <i className="bi bi-arrow-up-right" /></div>}
+      </div>
+    </>
+  );
+  const cardStyle = {
+    background: "#fff", borderRadius: 18, overflow: "hidden",
+    border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
+    textDecoration: "none", display: "block", color: "inherit",
+  };
+  const cardMotionProps = {
+    initial: { opacity: 0, y: 16 },
+    whileInView: { opacity: 1, y: 0 },
+    viewport: { once: true, amount: 0.2 },
+    transition: { duration: 0.45, delay: Math.min(i * 0.06, 0.4), ease: "easeOut" },
+  };
+  return p.enlace_url
+    ? <motion.a className="mm-card mm-post" href={p.enlace_url} target="_blank" rel="noreferrer" style={cardStyle} {...cardMotionProps}>{inner}</motion.a>
+    : <motion.div className="mm-card mm-post" style={cardStyle} {...cardMotionProps}>{inner}</motion.div>;
+}
+
+// Tarjeta de video: detecta si la miniatura es vertical (Shorts/Reels) leyendo sus dimensiones reales
+// al cargar, y ajusta la caja para mostrar el video completo en vez de recortarlo en 16:9.
+function VideoCard({ v, i, color, onOpen }) {
+  const info = videoInfo(v.media_url);
+  const [ratio, setRatio] = useState("16 / 9");
+
+  return (
+    <Reveal
+      delay={Math.min(i * 0.06, 0.4)}
+      className="mm-card mm-video"
+      onClick={() => info && onOpen(info.embed, ratio)}
+      role="button"
+      tabIndex={0}
+      aria-label={`Reproducir video: ${v.titulo}`}
+      onKeyDown={e => { if ((e.key === "Enter" || e.key === " ") && info) { e.preventDefault(); onOpen(info.embed, ratio); } }}
+      style={{
+        borderRadius: 18, overflow: "hidden", cursor: "pointer",
+        border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
+      }}>
+      <div style={{ position: "relative", aspectRatio: ratio, maxHeight: 420, background: `linear-gradient(135deg, ${color}, ${darken(color, 30)})` }}>
+        {info?.thumb && (
+          <img
+            src={info.thumb}
+            alt={v.titulo}
+            loading="lazy"
+            onLoad={e => {
+              const { naturalWidth: w, naturalHeight: h } = e.target;
+              if (w && h) setRatio(`${w} / ${h}`);
+            }}
+            style={{ width: "100%", height: "100%", objectFit: "cover" }}
+          />
+        )}
+        <div className="mm-play" style={{
+          position: "absolute", inset: 0, margin: "auto", width: 62, height: 62, borderRadius: "50%",
+          background: "rgba(255,255,255,.92)", display: "flex", alignItems: "center", justifyContent: "center",
+          transition: "transform .2s", boxShadow: "0 8px 24px rgba(0,0,0,.3)",
+        }}>
+          <i className="bi bi-play-fill" style={{ fontSize: 30, color, marginLeft: 3 }} />
+        </div>
+      </div>
+      <div style={{ padding: "16px 18px", background: "#fff" }}>
+        <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{v.titulo}</div>
+        {v.descripcion && <div style={{ fontSize: 13, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{v.descripcion}</div>}
+      </div>
+    </Reveal>
+  );
+}
+
 export default function MarketingMedico() {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState(null);
@@ -191,37 +282,10 @@ export default function MarketingMedico() {
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
             <Encabezado color={color} kicker="Portafolio" titulo="Ejemplos de contenido"
               texto="Publicaciones y piezas gráficas creadas para consultorios y clínicas reales." />
-            <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 22 }}>
-              {posts.map((p, i) => {
-                const inner = (
-                  <>
-                    {p.media_url && (
-                      <div style={{ aspectRatio: "4/3", overflow: "hidden", background: "#e2e8f0" }}>
-                        <img src={mediaUrl(p.media_url)} alt={p.titulo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
-                      </div>
-                    )}
-                    <div style={{ padding: "18px 20px" }}>
-                      <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 6 }}>{p.titulo}</div>
-                      {p.descripcion && <div style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6 }}>{p.descripcion}</div>}
-                      {p.enlace_url && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color }}>Ver caso <i className="bi bi-arrow-up-right" /></div>}
-                    </div>
-                  </>
-                );
-                const cardStyle = {
-                  background: "#fff", borderRadius: 18, overflow: "hidden",
-                  border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
-                  textDecoration: "none", display: "block", color: "inherit",
-                };
-                const cardMotionProps = {
-                  initial: { opacity: 0, y: 16 },
-                  whileInView: { opacity: 1, y: 0 },
-                  viewport: { once: true, amount: 0.2 },
-                  transition: { duration: 0.45, delay: Math.min(i * 0.06, 0.4), ease: "easeOut" },
-                };
-                return p.enlace_url
-                  ? <motion.a key={p.id} className="mm-card mm-post" href={p.enlace_url} target="_blank" rel="noreferrer" style={cardStyle} {...cardMotionProps}>{inner}</motion.a>
-                  : <motion.div key={p.id} className="mm-card mm-post" style={cardStyle} {...cardMotionProps}>{inner}</motion.div>;
-              })}
+            <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 22, alignItems: "start" }}>
+              {posts.map((p, i) => (
+                <PostCard key={p.id} p={p} i={i} color={color} />
+              ))}
             </div>
           </div>
         </section>
@@ -233,36 +297,16 @@ export default function MarketingMedico() {
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
             <Encabezado color={color} kicker="Video" titulo="Videos de doctores"
               texto="Testimonios y piezas audiovisuales que transmiten cercanía y profesionalismo." />
-            <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22 }}>
-              {videos.map((v, i) => {
-                const info = videoInfo(v.media_url);
-                return (
-                  <Reveal key={v.id} delay={Math.min(i * 0.06, 0.4)} className="mm-card mm-video" onClick={() => info && setVideoActivo(info.embed)}
-                    role="button"
-                    tabIndex={0}
-                    aria-label={`Reproducir video: ${v.titulo}`}
-                    onKeyDown={e => { if ((e.key === "Enter" || e.key === " ") && info) { e.preventDefault(); setVideoActivo(info.embed); } }}
-                    style={{
-                      borderRadius: 18, overflow: "hidden", cursor: "pointer",
-                      border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
-                    }}>
-                    <div style={{ position: "relative", aspectRatio: "16/9", background: `linear-gradient(135deg, ${color}, ${darken(color, 30)})` }}>
-                      {info?.thumb && <img src={info.thumb} alt={v.titulo} style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                      <div className="mm-play" style={{
-                        position: "absolute", inset: 0, margin: "auto", width: 62, height: 62, borderRadius: "50%",
-                        background: "rgba(255,255,255,.92)", display: "flex", alignItems: "center", justifyContent: "center",
-                        transition: "transform .2s", boxShadow: "0 8px 24px rgba(0,0,0,.3)",
-                      }}>
-                        <i className="bi bi-play-fill" style={{ fontSize: 30, color, marginLeft: 3 }} />
-                      </div>
-                    </div>
-                    <div style={{ padding: "16px 18px", background: "#fff" }}>
-                      <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{v.titulo}</div>
-                      {v.descripcion && <div style={{ fontSize: 13, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{v.descripcion}</div>}
-                    </div>
-                  </Reveal>
-                );
-              })}
+            <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22, alignItems: "start" }}>
+              {videos.map((v, i) => (
+                <VideoCard
+                  key={v.id}
+                  v={v}
+                  i={i}
+                  color={color}
+                  onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })}
+                />
+              ))}
             </div>
           </div>
         </section>
@@ -331,35 +375,39 @@ export default function MarketingMedico() {
       </footer>
 
       {/* MODAL DE VIDEO */}
-      {videoActivo && (
-        <div
-          onClick={() => setVideoActivo(null)}
-          role="dialog"
-          aria-modal="true"
-          aria-label="Video"
-          style={{
-            position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)",
-            display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
-          }}>
-          <div onClick={e => e.stopPropagation()} style={{ width: "min(900px, 100%)", position: "relative" }}>
-            <button
-              onClick={() => setVideoActivo(null)}
-              aria-label="Cerrar video"
-              autoFocus
-              style={{
-                position: "absolute", top: -52, right: -6, background: "none", border: "none",
-                color: "#fff", fontSize: 26, cursor: "pointer", padding: 11,
-                display: "flex", alignItems: "center", justifyContent: "center",
-              }}>
-              <i className="bi bi-x-lg" aria-hidden="true" />
-            </button>
-            <div style={{ position: "relative", paddingBottom: "56.25%", height: 0, borderRadius: 14, overflow: "hidden", background: "#000" }}>
-              <iframe src={videoActivo} title="Video" allow="autoplay; encrypted-media; fullscreen" allowFullScreen
-                style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
+      {videoActivo && (() => {
+        const [rw, rh] = videoActivo.ratio.split("/").map(Number);
+        const isPortrait = rw && rh && rw < rh;
+        return (
+          <div
+            onClick={() => setVideoActivo(null)}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Video"
+            style={{
+              position: "fixed", inset: 0, zIndex: 5000, background: "rgba(0,0,0,.85)",
+              display: "flex", alignItems: "center", justifyContent: "center", padding: 20,
+            }}>
+            <div onClick={e => e.stopPropagation()} style={{ width: isPortrait ? "min(420px, 90vw)" : "min(900px, 100%)", position: "relative" }}>
+              <button
+                onClick={() => setVideoActivo(null)}
+                aria-label="Cerrar video"
+                autoFocus
+                style={{
+                  position: "absolute", top: -52, right: -6, background: "none", border: "none",
+                  color: "#fff", fontSize: 26, cursor: "pointer", padding: 11,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                <i className="bi bi-x-lg" aria-hidden="true" />
+              </button>
+              <div style={{ position: "relative", aspectRatio: videoActivo.ratio, maxHeight: "85vh", borderRadius: 14, overflow: "hidden", background: "#000" }}>
+                <iframe src={videoActivo.embed} title="Video" allow="autoplay; encrypted-media; fullscreen" allowFullScreen
+                  style={{ position: "absolute", inset: 0, width: "100%", height: "100%", border: 0 }} />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </MotionConfig>
   );
 }
