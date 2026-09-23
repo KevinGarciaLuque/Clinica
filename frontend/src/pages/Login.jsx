@@ -13,6 +13,14 @@ function darken(hex, pct) {
   return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
 }
 
+// Partículas decorativas detrás del glass-card (mismo lenguaje visual que el hero
+// de la landing): posición %, rotación, escala y retraso de animación.
+const LOGIN_SHARDS = [
+  [12, 18, 18, 1.0, 0], [82, 12, -22, 0.8, -1.4], [90, 70, 60, 0.65, -3.1],
+  [8, 78, -35, 0.9, -0.6], [48, 8, 12, 0.6, -2.3], [60, 88, -18, 0.75, -4.2],
+  [30, 55, 45, 0.55, -1.8], [72, 42, -60, 0.7, -3.6],
+];
+
 export default function Login() {
   const { login, verificar2FA, loginConGoogle } = useAuth();
   const navigate  = useNavigate();
@@ -145,8 +153,55 @@ export default function Login() {
           content: '';
           position: fixed;
           inset: 0;
-          background: linear-gradient(135deg, ${color}b8 0%, ${colorDark}99 100%);
+          background:
+            radial-gradient(ellipse 70% 55% at 22% 35%, ${color}66 0%, transparent 62%),
+            linear-gradient(135deg, ${color}b8 0%, ${colorDark}c2 55%, #05070fcc 100%);
           z-index: 0;
+        }
+        /* Capa de ambiente sobre la foto: glow + partículas, mismo lenguaje visual que el hero */
+        .login-fx {
+          position: fixed;
+          inset: 0;
+          z-index: 0;
+          overflow: hidden;
+          pointer-events: none;
+        }
+        .login-fx__glow {
+          position: absolute;
+          border-radius: 50%;
+          filter: blur(70px);
+          animation: login-drift 16s ease-in-out infinite;
+        }
+        .login-fx__glow--a {
+          width: 46vw; height: 46vw; max-width: 480px; max-height: 480px;
+          top: -12%; left: -10%;
+          background: radial-gradient(circle, ${color}59 0%, transparent 70%);
+        }
+        .login-fx__glow--b {
+          width: 36vw; height: 36vw; max-width: 380px; max-height: 380px;
+          bottom: -14%; right: -8%;
+          background: radial-gradient(circle, #9fd0ff40 0%, transparent 70%);
+          animation-delay: -8s;
+        }
+        .login-fx__shard {
+          position: absolute;
+          width: 15px;
+          height: 24px;
+          clip-path: polygon(50% 0, 100% 38%, 64% 100%, 12% 72%);
+          background: linear-gradient(140deg, rgba(255,255,255,.6), rgba(159,208,255,.16) 55%, ${color}88);
+          opacity: .55;
+          animation: login-float 9s ease-in-out infinite;
+        }
+        @keyframes login-drift {
+          0%, 100% { transform: translate(0, 0) scale(1); }
+          50%      { transform: translate(3%, -4%) scale(1.08); }
+        }
+        @keyframes login-float {
+          0%, 100% { transform: translateY(0) rotate(var(--r, 0deg)); }
+          50%      { transform: translateY(-16px) rotate(calc(var(--r, 0deg) + 10deg)); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .login-fx__glow, .login-fx__shard { animation: none !important; }
         }
         .glass-card {
           position: relative;
@@ -232,6 +287,18 @@ export default function Login() {
       `}</style>
 
       <div className="login-bg">
+        <div className="login-fx" aria-hidden="true">
+          <span className="login-fx__glow login-fx__glow--a" />
+          <span className="login-fx__glow login-fx__glow--b" />
+          {LOGIN_SHARDS.map(([x, y, r, s, delay], i) => (
+            <span
+              key={i}
+              className="login-fx__shard"
+              style={{ top: `${y}%`, left: `${x}%`, "--r": `${r}deg`, scale: s, animationDelay: `${delay}s` }}
+            />
+          ))}
+        </div>
+
         <button
           type="button"
           className="btn-back-home"
