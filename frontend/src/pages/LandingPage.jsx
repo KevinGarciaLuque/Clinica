@@ -1,10 +1,12 @@
-import { useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, MotionConfig, useMotionValue, useSpring, useInView, animate } from "framer-motion";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
-import { MedicKGHero } from "../components/hero3d";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+// Hero 3D en su propio chunk: sólo lo descarga la variante /inicio-3d
+const MedicKGHero = lazy(() => import("../components/hero3d/MedicKGHero"));
 
 // Revela el contenido al hacer scroll hasta él; respeta prefers-reduced-motion vía MotionConfig del padre.
 function Reveal({ children, delay = 0, y = 16, ...rest }) {
@@ -448,6 +450,7 @@ export default function LandingPage({ hero3d = false }) {
 
       {/* ── HERO 3D (vista previa: /inicio-3d) ── */}
       {hero3d && (
+        <Suspense fallback={<section style={{ minHeight: "100vh", background: "#02060f" }} />}>
         <MedicKGHero
           eyebrow="Sistema de gestión clínica"
           titleLead="Medic-KG:"
@@ -468,6 +471,7 @@ export default function LandingPage({ hero3d = false }) {
             { icon: "bi-lightning-charge-fill", label: "Rápido", desc: "Acceso desde cualquier dispositivo" },
           ]}
         />
+        </Suspense>
       )}
 
       {/* ── HERO ── */}
