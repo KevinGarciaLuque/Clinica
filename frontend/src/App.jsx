@@ -133,6 +133,7 @@ export default function App() {
       <Route path="/solicitar-plan"   element={<SolicitarPlan />} />
       <Route path="/resena/:token"    element={<ResenaPublica />} />
       <Route path="/inicio"           element={<LandingPage />} />
+      <Route path="/inicio-3d"        element={<LandingPage hero3d />} />
       <Route path="/marketing-medico" element={<MarketingMedico />} />
       <Route path="/links"            element={<LinksPage />} />
       <Route path="/privacidad"       element={<Privacidad />} />

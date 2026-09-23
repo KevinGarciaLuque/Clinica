@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, MotionConfig, useMotionValue, useSpring, useInView, animate } from "framer-motion";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
+import { MedicKGHero } from "../components/hero3d";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -139,7 +140,7 @@ const ESPECIALIDADES = [
   { icon: "bi-plus-circle-fill",       label: "Y más especialidades",    desc: "El sistema se adapta a cualquier área médica según las necesidades de tu clínica.",  color: "#64748b" },
 ];
 
-export default function LandingPage() {
+export default function LandingPage({ hero3d = false }) {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -445,8 +446,32 @@ export default function LandingPage() {
         </div>
       )}
 
+      {/* ── HERO 3D (vista previa: /inicio-3d) ── */}
+      {hero3d && (
+        <MedicKGHero
+          eyebrow="Sistema de gestión clínica"
+          titleLead="Medic-KG:"
+          titleAccent="digitaliza tu clínica"
+          subtitle="Gestiona tus pacientes, citas y expedientes clínicos desde una sola plataforma"
+          actions={[
+            whatsapp
+              ? {
+                  label: "Solicitar demostración", icon: "bi-play-circle-fill", variant: "primary", external: true,
+                  href: `https://wa.me/${whatsapp}?text=Hola, quiero solicitar una demostración de ${nombre}`,
+                }
+              : { label: "Solicitar demostración", icon: "bi-play-circle-fill", variant: "primary", onClick: () => scrollTo("contacto") },
+            { label: "Conocer funcionalidades", icon: "bi-grid-1x2-fill", variant: "ghost", onClick: () => scrollTo("caracteristicas") },
+          ]}
+          features={[
+            { icon: "bi-building-check", label: "Multi-clínica", desc: "Soporte para varias sedes" },
+            { icon: "bi-shield-lock-fill", label: "Seguro", desc: "Datos cifrados y protegidos" },
+            { icon: "bi-lightning-charge-fill", label: "Rápido", desc: "Acceso desde cualquier dispositivo" },
+          ]}
+        />
+      )}
+
       {/* ── HERO ── */}
-      <section style={{
+      {!hero3d && <section style={{
         minHeight: "100vh", paddingTop: 60,
         background: `linear-gradient(145deg, ${color} 0%, ${darken(color, 35)} 55%, #0f172a 100%)`,
         display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
@@ -517,7 +542,7 @@ export default function LandingPage() {
             </Reveal>
           ))}
         </div>
-      </section>
+      </section>}
 
       {/* ── CARACTERÍSTICAS ── */}
       <section id="caracteristicas" style={{ background: "#f8fafc", padding: "80px 24px" }}>
