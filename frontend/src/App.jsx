@@ -137,7 +137,7 @@ export default function App() {
       <Route path="/marketing-medico" element={<MarketingMedico />} />
       <Route path="/links"            element={<LinksPage />} />
       <Route path="/privacidad"       element={<Privacidad />} />
-      <Route path="/"                         element={<LandingPage />} />
+      <Route path="/"                         element={<LandingPage hero3d />} />
 
       <Route
         element={
