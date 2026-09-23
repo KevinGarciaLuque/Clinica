@@ -28,7 +28,7 @@ function SceneContents({ stage, budget, logoSrc, onReady, registerInvalidate }) 
   const wave = useRef();
   const sparks = useRef();
 
-  const { reduced, finePointer } = stage.current;
+  const { reduced } = stage.current;
 
   // Estado mutable de animación (lo anima GSAP y lo lee el bucle de render)
   const animRef = useRef({
@@ -82,10 +82,11 @@ function SceneContents({ stage, budget, logoSrc, onReady, registerInvalidate }) 
     r.position.set(cx, cy, 0);
     r.scale.setScalar(s);
 
-    // 2) Objetivo de rotación: mouse (escritorio) o movimiento ambiental (táctil)
+    // 2) Objetivo de rotación: mouse/lápiz, o un toque reciente en el emblema (táctil),
+    // o movimiento ambiental cuando no hay ninguna interacción
     let tx = 0, ty = 0;
     if (!reduced) {
-      if (finePointer) {
+      if (stage.current.finePointer || stage.current.touchActive) {
         tx = stage.current.pointer.x;
         ty = stage.current.pointer.y;
       } else {

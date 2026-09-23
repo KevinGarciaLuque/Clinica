@@ -60,11 +60,15 @@ export default function MedicKGHero({
 
   const rootRef = useRef(null);
   const slotRef = useRef(null);
+  const touchTimer = useRef(0);
   const stage = useRef({
     layout: null,
     pointer: { x: 0, y: 0 },
     reduced: caps.reduced,
     finePointer: caps.finePointer,
+    // Se activa al tocar el emblema en pantallas táctiles: mientras esté en true,
+    // la escena usa stage.pointer (igual que con el mouse) en vez del movimiento ambiental.
+    touchActive: false,
     invalidate: null,
   });
 
@@ -125,6 +129,25 @@ export default function MedicKGHero({
     return () => { window.removeEventListener("pointermove", onMove); cancelAnimationFrame(raf); };
   }, [caps.reduced, caps.finePointer, use3D]);
 
+  // Tocar el emblema en pantallas táctiles: misma reacción que el mouse (giro + luz
+  // siguiendo el punto tocado), sostenida un momento y luego vuelve al movimiento ambiental.
+  const onSlotTouch = useCallback((e) => {
+    if (caps.reduced || e.pointerType !== "touch") return;
+    const x = (e.clientX / window.innerWidth) * 2 - 1;
+    const y = (e.clientY / window.innerHeight) * 2 - 1;
+    stage.current.pointer.x = x;
+    stage.current.pointer.y = y;
+    stage.current.touchActive = true;
+    if (!use3D && rootRef.current) {
+      rootRef.current.style.setProperty("--mkg-tilt-x", x.toFixed(3));
+      rootRef.current.style.setProperty("--mkg-tilt-y", y.toFixed(3));
+    }
+    clearTimeout(touchTimer.current);
+    touchTimer.current = setTimeout(() => { stage.current.touchActive = false; }, 2200);
+  }, [caps.reduced, use3D]);
+
+  useEffect(() => () => clearTimeout(touchTimer.current), []);
+
   // Entrada del texto con GSAP (se omite con prefers-reduced-motion)
   useLayoutEffect(() => {
     if (caps.reduced) return;
@@ -167,7 +190,7 @@ export default function MedicKGHero({
       )}
 
       <div className="mkg-hero__stage">
-        <div className="mkg-hero__slot" ref={slotRef}>
+        <div className="mkg-hero__slot" ref={slotRef} onPointerDown={onSlotTouch}>
           {!use3D && (
             <div className="mkg-hero__shards" aria-hidden="true">
               {CSS_SHARDS.map(([x, y, r, s], i) => (

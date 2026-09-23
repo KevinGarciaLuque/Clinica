@@ -64,6 +64,9 @@
   width: clamp(190px, min(38vh, 58vw), 400px);
   aspect-ratio: 1;
   perspective: 900px;
+  /* Permite detectar el toque sobre el emblema sin bloquear el scroll del resto del hero */
+  pointer-events: auto;
+  touch-action: manipulation;
 }
 .mkg-hero__fallback {
   position: absolute;
@@ -231,7 +234,7 @@
 /* ── Responsive ───────────────────────────────────────────────────────── */
 @media (max-width: 640px) {
   .mkg-hero { padding-left: 16px; padding-right: 16px; }
-  .mkg-hero__slot { width: clamp(170px, min(34vh, 66vw), 300px); }
+  .mkg-hero__slot { width: clamp(130px, min(26vh, 50vw), 220px); }
   .mkg-hero__actions { flex-direction: column; align-items: stretch; max-width: 340px; margin: 0 auto; }
   .mkg-hero__features { gap: 6px 16px; font-size: 12px; }
 }
