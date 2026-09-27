@@ -529,7 +529,12 @@ router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","
     const clinicaId = req.tenant?.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
 
-    const { dni, telefono, email, fecha_nacimiento, sexo, direccion, confirmar_duplicado } = req.body;
+    const { dni, telefono, email, fecha_nacimiento, sexo, direccion, confirmar_duplicado, sin_dni } = req.body;
+
+    // El DNI es obligatorio salvo que se marque expresamente "omitir DNI"
+    if (!String(dni ?? "").trim() && !sin_dni) {
+      return res.status(400).json({ ok: false, msg: "El DNI es obligatorio. Marca «Omitir DNI» si el paciente no lo tiene." });
+    }
 
     if (!req.body.nombres?.trim() || !req.body.apellidos?.trim()) {
       return res.status(400).json({ ok: false, msg: "nombres y apellidos son obligatorios" });

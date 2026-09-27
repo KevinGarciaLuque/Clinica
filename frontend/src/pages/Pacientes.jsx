@@ -76,6 +76,7 @@ const inputSt = {
 };
 
 const FORM_VACIO = {
+  sin_dni: false,
   nombres: "", apellidos: "", dni: "",
   fecha_nacimiento: "", sexo: "",
   telefono: "", email: "",
@@ -528,8 +529,26 @@ export default function Pacientes() {
                 <input style={inputSt} name="apellidos" value={form.apellidos} onChange={cambioForm} required />
               </div>
               <div>
-                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>DNI</label>
-                <input style={inputSt} name="dni" value={form.dni} onChange={cambioForm} />
+                <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>
+                  DNI {!editandoId && !form.sin_dni && <span style={{ color: "#dc2626" }}>*</span>}
+                </label>
+                <input
+                  style={{ ...inputSt, ...(form.sin_dni ? { background: "#f1f5f9", cursor: "not-allowed" } : {}) }}
+                  name="dni" value={form.dni} onChange={cambioForm}
+                  required={!editandoId && !form.sin_dni}
+                  disabled={!!form.sin_dni}
+                  placeholder={form.sin_dni ? "Sin DNI" : ""}
+                />
+                {!editandoId && (
+                  <label style={{ display: "flex", alignItems: "center", gap: 7, marginTop: 6, fontSize: 12.5, color: C.muted, cursor: "pointer" }}>
+                    <input
+                      type="checkbox"
+                      checked={!!form.sin_dni}
+                      onChange={(e) => setForm(f => ({ ...f, sin_dni: e.target.checked, dni: e.target.checked ? "" : f.dni }))}
+                    />
+                    Omitir DNI (no lo tiene o no lo desea registrar)
+                  </label>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: 12, color: C.muted, fontWeight: 600, textTransform: "uppercase", letterSpacing: ".05em", display: "block", marginBottom: 6 }}>Fecha de nacimiento</label>
