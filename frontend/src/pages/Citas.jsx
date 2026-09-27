@@ -11,6 +11,7 @@ import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
 import api from "../api/api";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import CompartirLink from "../components/CompartirLink";
+import GruposLlegadas from "../components/GruposLlegadas";
 import { TIPOS_AUSENCIA } from "../components/AusenciasMedico";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 
@@ -396,6 +397,8 @@ export default function Citas() {
   const [showDet,   setShowDet]     = useState(false);
   const [selEvent,  setSelEvent]    = useState(null);
   const [sala,      setSala]        = useState([]);
+  // Citas de hoy que aún requieren acción de recepción (por llegar + en sala de espera)
+  const pendientesSala = sala.filter(c => ["PENDIENTE", "CONFIRMADA", "EN_ESPERA"].includes(c.estado)).length;
   const [showConfirmDelete, setShowConfirmDelete] = useState(false);
   const [showEdit,         setShowEdit]          = useState(false);
   const [showReminder, setShowReminder] = useState(false);
@@ -498,9 +501,7 @@ export default function Citas() {
   }, []);
 
   useEffect(() => {
-    if (activeTab === "sala") {
-      loadSalaEspera();
-    }
+    loadSalaEspera();
   }, [activeTab, loadSalaEspera]);
 
   const onEventDrop = ({ event, start, end }) => {
@@ -938,6 +939,11 @@ export default function Citas() {
               display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
             }}>
               <i className={`bi ${t.icon}`}></i>{t.label}
+              {t.id === "sala" && pendientesSala > 0 && (
+                <span style={{ background: "#3b82f6", color: "#fff", borderRadius: 999, padding: "1px 8px", fontSize: "0.7rem", fontWeight: 800 }}>
+                  {pendientesSala}
+                </span>
+              )}
             </button>
           ))}
         </div>
@@ -1193,9 +1199,7 @@ const GRUPOS_SALA = [
 ];
 
 function SalaEspera({ sala, onEstadoChange }) {
-  const grupos = GRUPOS_SALA
-    .map(g => ({ ...g, citas: sala.filter(c => g.estados.includes(c.estado)) }))
-    .filter(g => g.citas.length > 0);
+  const grupos = GRUPOS_SALA.map(g => ({ ...g, citas: sala.filter(c => g.estados.includes(c.estado)) }));
 
   return (
     <div>
@@ -1210,45 +1214,39 @@ function SalaEspera({ sala, onEstadoChange }) {
         )}
       </div>
 
-      {sala.length === 0 && (
+      {sala.length === 0 ? (
         <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
           <i className="bi bi-person-check" style={{ fontSize: "2.8rem", opacity: .3 }}></i>
           <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay citas para hoy.</p>
         </div>
-      )}
-
-      {grupos.map((g, idx) => (
-        <div key={g.id} style={{ marginTop: idx === 0 ? 0 : 26 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
-            <i className={`bi ${g.icono}`} style={{ color: g.badge.fg }}></i>
-            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>{g.titulo}</span>
-            <span style={{ background: g.badge.bg, color: g.badge.fg, borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
-              {g.citas.length}
-            </span>
-          </div>
-          {g.ayuda && <div style={{ fontSize: "0.77rem", color: "#9ca3af", marginBottom: 10 }}>{g.ayuda}</div>}
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc" }}>
-                  {["#", "Paciente", "Medico", "Hora", "Estado", "Acciones"].map(h => (
-                    <th key={h} style={{
-                      padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
-                      color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
-                      borderBottom: "2px solid #e5e7eb", whiteSpace: "nowrap", textAlign: "left",
-                    }}>{h}</th>
+      ) : (
+        <GruposLlegadas
+          grupos={grupos}
+          nombreDe={(c) => `${c.paciente_nombres} ${c.paciente_apellidos}`}
+          renderTabla={(citas, g) => (
+            <div style={{ overflowX: "auto" }}>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ background: "#f8fafc" }}>
+                    {["#", "Paciente", "Medico", "Hora", "Estado", "Acciones"].map(h => (
+                      <th key={h} style={{
+                        padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                        color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                        borderBottom: "2px solid #e5e7eb", whiteSpace: "nowrap", textAlign: "left",
+                      }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {citas.map((c, i) => (
+                    <FilaSala key={c.id} c={c} i={i} acciones={g.acciones} onEstadoChange={onEstadoChange} />
                   ))}
-                </tr>
-              </thead>
-              <tbody>
-                {g.citas.map((c, i) => (
-                  <FilaSala key={c.id} c={c} i={i} acciones={g.acciones} onEstadoChange={onEstadoChange} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        />
+      )}
     </div>
   );
 }

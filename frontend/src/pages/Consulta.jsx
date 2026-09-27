@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
+import GruposLlegadas from "../components/GruposLlegadas";
 
 dayjs.locale("es");
 
@@ -272,93 +273,65 @@ function TablaCitas({ children }) {
 }
 
 function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, onConsulta, tieneRecepcionista }) {
-  const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
-  const FLUJO_POR_LLEGAR = ["EN_ESPERA", "EN_ATENCION"];
+  // Todas las citas activas de hoy, agrupadas por etapa (las completadas viven en "Consultas de hoy")
+  const todas = [...citas, ...porLlegar];
+  const grupos = [
+    {
+      id: "por_llegar", titulo: "Por llegar", icono: "bi-hourglass-split",
+      badge: { bg: "#fef9c3", fg: "#854d0e" },
+      ayuda: tieneRecepcionista
+        ? "Recepción aún no los marca como llegados. Puedes pasarlos a espera o iniciar la consulta directamente."
+        : "Tienen cita hoy y aún no han sido atendidos.",
+      estados: ["PENDIENTE", "CONFIRMADA"], flujo: ["EN_ESPERA", "EN_ATENCION"],
+    },
+    {
+      id: "en_espera", titulo: "En sala de espera", icono: "bi-person-lines-fill",
+      badge: { bg: "#ede9fe", fg: "#7c3aed" },
+      ayuda: "Ya llegaron y esperan a ser atendidos.",
+      estados: ["EN_ESPERA"], flujo: ["EN_ATENCION", "COMPLETADA"],
+    },
+    {
+      id: "en_atencion", titulo: "En atención", icono: "bi-clipboard2-pulse",
+      badge: { bg: "#dcfce7", fg: "#166534" },
+      ayuda: "Consulta en curso.",
+      estados: ["EN_ATENCION"], flujo: ["EN_ESPERA", "COMPLETADA"],
+    },
+  ].map(g => ({ ...g, citas: todas.filter(x => g.estados.includes(x.estado)) }));
+
+  const total = grupos.reduce((n, g) => n + g.citas.length, 0);
+
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>
           Sala de Espera - {dayjs().format("dddd D [de] MMMM")}
         </span>
-        {citas.length > 0 && (
+        {total > 0 && (
           <span style={{ background: "#ede9fe", color: "#7c3aed", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
-            {citas.length}
+            {total}
           </span>
         )}
       </div>
 
-      {citas.length === 0 && (
-        <div style={{ textAlign: "center", padding: porLlegar.length ? "24px 0" : "48px 0", color: "#9ca3af" }}>
+      {total === 0 ? (
+        <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
           <i className="bi bi-person-check" style={{ fontSize: "2.8rem", opacity: .3 }}></i>
-          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>
-            {porLlegar.length
-              ? "Ningún paciente ha sido admitido por recepción todavía."
-              : "No hay pacientes en sala de espera."}
-          </p>
+          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay pacientes en sala de espera.</p>
         </div>
-      )}
-
-      {citas.length > 0 && (
-        <>
-          <div style={{
-            background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8,
-            padding: "8px 14px", marginBottom: 16, fontSize: "0.79rem", color: "#0369a1",
-            display: "flex", alignItems: "center", gap: 7,
-          }}>
-            <i className="bi bi-info-circle"></i>
-            {tieneRecepcionista
-              ? "Solo pacientes admitidos por recepción (en espera o en atención). Los ya atendidos aparecen en Consultas de hoy."
-              : "Todos los pacientes citados hoy que aún no han sido atendidos. Al darles consulta pasan a Consultas de hoy."}
-          </div>
-          <div style={{ overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: "#f8fafc" }}>
-                  {["#", "Paciente", "DNI", "Telefono", "Email", "Estado", "Acciones"].map(h => (
-                    <th key={h} style={{
-                      padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
-                      color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
-                      borderBottom: "2px solid #e5e7eb", whiteSpace: "nowrap", textAlign: "left",
-                    }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {citas.map((cita, idx) => (
-                  <FilaCita key={cita.id} cita={cita} idx={idx}
-                    onEstadoChange={onEstadoChange} onConsulta={onConsulta}
-                    estadosDisponibles={FLUJO.filter(e => e !== cita.estado)} />
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </>
-      )}
-
-      {porLlegar.length > 0 && (
-        <div style={{ marginTop: citas.length > 0 ? 28 : 8 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
-            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>Por llegar (citados hoy)</span>
-            <span style={{ background: "#fef9c3", color: "#854d0e", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
-              {porLlegar.length}
-            </span>
-          </div>
-          <div style={{
-            background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8,
-            padding: "8px 14px", marginBottom: 12, fontSize: "0.79rem", color: "#92400e",
-            display: "flex", alignItems: "center", gap: 7,
-          }}>
-            <i className="bi bi-info-circle"></i>
-            Recepción aún no los marca como llegados. Puedes pasarlos a espera o iniciar la consulta directamente.
-          </div>
-          <TablaCitas>
-            {porLlegar.map((cita, idx) => (
-              <FilaCita key={cita.id} cita={cita} idx={idx}
-                onEstadoChange={onEstadoChange} onConsulta={onConsulta}
-                estadosDisponibles={FLUJO_POR_LLEGAR} />
-            ))}
-          </TablaCitas>
-        </div>
+      ) : (
+        <GruposLlegadas
+          grupos={grupos}
+          nombreDe={(x) => `${x.paciente_nombres} ${x.paciente_apellidos}`}
+          renderTabla={(lista, g) => (
+            <TablaCitas>
+              {lista.map((cita, idx) => (
+                <FilaCita key={cita.id} cita={cita} idx={idx}
+                  onEstadoChange={onEstadoChange} onConsulta={onConsulta}
+                  estadosDisponibles={g.flujo} />
+              ))}
+            </TablaCitas>
+          )}
+        />
       )}
     </div>
   );
