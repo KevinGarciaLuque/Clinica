@@ -43,14 +43,15 @@ function videoInfo(url) {
   return { embed: url, thumb: null };
 }
 
-// Tarjeta de post: detecta la proporción real de la imagen al cargar, en vez de forzar 4:3 y recortarla.
+// Tarjeta de post: parte de la proporción según el formato y la ajusta a la real de la imagen al cargar.
 function PostCard({ p, i, color }) {
-  const [ratio, setRatio] = useState("4 / 3");
+  const vertical = p.formato === "vertical";
+  const [ratio, setRatio] = useState(vertical ? "9 / 16" : "4 / 3");
 
   const inner = (
     <>
       {p.media_url && (
-        <div style={{ aspectRatio: ratio, maxHeight: 420, overflow: "hidden", background: "#e2e8f0" }}>
+        <div style={{ aspectRatio: ratio, maxHeight: vertical ? "none" : 420, overflow: "hidden", background: "#e2e8f0" }}>
           <img
             src={mediaUrl(p.media_url)}
             alt={p.titulo}
@@ -86,11 +87,13 @@ function PostCard({ p, i, color }) {
     : <motion.div className="mm-card mm-post" style={cardStyle} {...cardMotionProps}>{inner}</motion.div>;
 }
 
-// Tarjeta de video: detecta si la miniatura es vertical (Shorts/Reels) leyendo sus dimensiones reales
-// al cargar, y ajusta la caja para mostrar el video completo en vez de recortarlo en 16:9.
+// Tarjeta de video. La miniatura hqdefault de YouTube es 4:3 con barras negras incrustadas;
+// con object-fit: cover en una caja 16:9 (horizontal) o 9:16 (vertical) se recorta justo ese margen.
 function VideoCard({ v, i, color, onOpen }) {
   const info = videoInfo(v.media_url);
-  const [ratio, setRatio] = useState("16 / 9");
+  const vertical = v.formato === "vertical";
+  const ratio = vertical ? "9 / 16" : "16 / 9";
+  const playSize = vertical ? 50 : 62;
 
   return (
     <Reveal
@@ -105,25 +108,25 @@ function VideoCard({ v, i, color, onOpen }) {
         borderRadius: 18, overflow: "hidden", cursor: "pointer",
         border: "1px solid #e8eef5", boxShadow: "0 6px 22px rgba(15,23,42,.06)",
       }}>
-      <div style={{ position: "relative", aspectRatio: ratio, maxHeight: 420, background: `linear-gradient(135deg, ${color}, ${darken(color, 30)})` }}>
+      <div style={{ position: "relative", aspectRatio: ratio, background: `linear-gradient(135deg, ${color}, ${darken(color, 30)})` }}>
         {info?.thumb && (
-          <img
-            src={info.thumb}
-            alt={v.titulo}
-            loading="lazy"
-            onLoad={e => {
-              const { naturalWidth: w, naturalHeight: h } = e.target;
-              if (w && h) setRatio(`${w} / ${h}`);
-            }}
-            style={{ width: "100%", height: "100%", objectFit: "cover" }}
-          />
+          <img src={info.thumb} alt={v.titulo} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        )}
+        {vertical && (
+          <span style={{
+            position: "absolute", top: 10, left: 10, display: "inline-flex", alignItems: "center", gap: 5,
+            background: "rgba(2,6,15,.72)", color: "#fff", fontSize: 11, fontWeight: 800, letterSpacing: ".04em",
+            padding: "4px 9px", borderRadius: 999, backdropFilter: "blur(6px)",
+          }}>
+            <i className="bi bi-phone" aria-hidden="true" />SHORT
+          </span>
         )}
         <div className="mm-play" style={{
-          position: "absolute", inset: 0, margin: "auto", width: 62, height: 62, borderRadius: "50%",
+          position: "absolute", inset: 0, margin: "auto", width: playSize, height: playSize, borderRadius: "50%",
           background: "rgba(255,255,255,.92)", display: "flex", alignItems: "center", justifyContent: "center",
           transition: "transform .2s", boxShadow: "0 8px 24px rgba(0,0,0,.3)",
         }}>
-          <i className="bi bi-play-fill" style={{ fontSize: 30, color, marginLeft: 3 }} />
+          <i className="bi bi-play-fill" style={{ fontSize: vertical ? 26 : 30, color, marginLeft: 3 }} />
         </div>
       </div>
       <div style={{ padding: "16px 18px", background: "#fff" }}>
@@ -131,6 +134,62 @@ function VideoCard({ v, i, color, onOpen }) {
         {v.descripcion && <div style={{ fontSize: 13, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{v.descripcion}</div>}
       </div>
     </Reveal>
+  );
+}
+
+// Redes donde se crea el contenido: logos con el color de cada marca. Enlazan a las cuentas
+// de Medic-KG si están configuradas en Landing (landing_facebook, etc.).
+const REDES = [
+  { id: "facebook",  label: "Facebook",  icon: "bi-facebook",  bg: "#1877f2", glow: "24,119,242", cfg: "landing_facebook",  base: "https://facebook.com/" },
+  { id: "instagram", label: "Instagram", icon: "bi-instagram", bg: "linear-gradient(135deg,#f09433 0%,#e6683c 25%,#dc2743 50%,#cc2366 75%,#bc1888 100%)", glow: "220,39,67", cfg: "landing_instagram", base: "https://instagram.com/" },
+  { id: "tiktok",    label: "TikTok",    icon: "bi-tiktok",    bg: "#010101", glow: "37,244,238", cfg: "landing_tiktok",    base: "https://tiktok.com/@" },
+  { id: "youtube",   label: "YouTube",   icon: "bi-youtube",   bg: "#ff0000", glow: "255,0,0",   cfg: "landing_youtube",   base: "https://youtube.com/" },
+];
+
+function redHref(red, cfg) {
+  const v = (cfg?.[red.cfg] || "").trim();
+  if (!v) return null;
+  return v.startsWith("http") ? v : `${red.base}${v.replace(/^@/, "")}`;
+}
+
+function RedesStrip({ cfg }) {
+  return (
+    <section style={{ background: "#fff", padding: "64px 24px 20px" }}>
+      <div style={{ maxWidth: 900, margin: "0 auto" }}>
+        <Encabezado kicker="Redes sociales" titulo="Contenido para las redes donde están tus pacientes"
+          texto="Creamos y publicamos tu contenido en las plataformas que más usan tus pacientes." color="#2563eb" />
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: 22 }}>
+          {REDES.map((r, i) => {
+            const href = redHref(r, cfg);
+            const tile = (
+              <motion.div
+                initial={{ opacity: 0, y: 16 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true, amount: 0.3 }}
+                transition={{ duration: 0.45, delay: i * 0.08, ease: "easeOut" }}
+                whileHover={{ y: -6, scale: 1.05, transition: { duration: 0.2 } }}
+                style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10, width: 116 }}
+              >
+                <div style={{
+                  width: 84, height: 84, borderRadius: 24, background: r.bg,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                  boxShadow: `0 14px 32px -8px rgba(${r.glow},.55), inset 0 1px 0 rgba(255,255,255,.25)`,
+                }}>
+                  <i className={`bi ${r.icon}`} aria-hidden="true" style={{
+                    fontSize: 42, color: "#fff",
+                    textShadow: r.id === "tiktok" ? "-2px -2px 0 #25f4ee, 2px 2px 0 #fe2c55" : "none",
+                  }} />
+                </div>
+                <span style={{ fontWeight: 800, fontSize: 14.5, color: "#0f172a" }}>{r.label}</span>
+              </motion.div>
+            );
+            return href
+              ? <a key={r.id} href={href} target="_blank" rel="noreferrer" aria-label={`${r.label} de Medic-KG`} style={{ textDecoration: "none" }}>{tile}</a>
+              : <div key={r.id}>{tile}</div>;
+          })}
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -170,6 +229,11 @@ export default function MarketingMedico() {
     whatsapp ? `https://wa.me/${whatsapp}?text=${encodeURIComponent(texto)}` : "#";
 
   const { posts, videos, planes } = data;
+  const esVertical = (x) => x.formato === "vertical";
+  const postsH  = posts.filter(x => !esVertical(x));
+  const postsV  = posts.filter(esVertical);
+  const videosH = videos.filter(x => !esVertical(x));
+  const videosV = videos.filter(esVertical);
   const hayContenido = posts.length || videos.length || planes.length;
 
   return (
@@ -191,6 +255,7 @@ export default function MarketingMedico() {
         .mm-video:hover .mm-play { transform: scale(1.12); }
         @media (max-width: 720px) {
           .mm-grid { grid-template-columns: 1fr !important; }
+          .mm-grid-v { grid-template-columns: 1fr 1fr !important; gap: 12px !important; }
           .mm-hero h1 { font-size: 2rem !important; }
         }
         @media (prefers-reduced-motion: reduce) {
@@ -276,36 +341,57 @@ export default function MarketingMedico() {
         </section>
       )}
 
+      {/* REDES SOCIALES */}
+      <RedesStrip cfg={cfg} />
+
       {/* POSTS / EJEMPLOS */}
-      {posts.length > 0 && (
+      {postsH.length > 0 && (
         <section style={{ background: "#f8fafc", padding: "84px 24px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
             <Encabezado color={color} kicker="Portafolio" titulo="Ejemplos de contenido"
               texto="Publicaciones y piezas gráficas creadas para consultorios y clínicas reales." />
             <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))", gap: 22, alignItems: "start" }}>
-              {posts.map((p, i) => (
-                <PostCard key={p.id} p={p} i={i} color={color} />
-              ))}
+              {postsH.map((p, i) => <PostCard key={p.id} p={p} i={i} color={color} />)}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {postsV.length > 0 && (
+        <section style={{ background: postsH.length > 0 ? "#fff" : "#f8fafc", padding: "84px 24px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <Encabezado color={color} kicker="Formato vertical" titulo="Historias y piezas verticales"
+              texto="Contenido pensado para Stories, Reels y TikTok, donde más se consume hoy." />
+            <div className="mm-grid-v" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 20, alignItems: "start" }}>
+              {postsV.map((p, i) => <PostCard key={p.id} p={p} i={i} color={color} />)}
             </div>
           </div>
         </section>
       )}
 
       {/* VIDEOS */}
-      {videos.length > 0 && (
+      {videosH.length > 0 && (
         <section style={{ background: "#fff", padding: "84px 24px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
             <Encabezado color={color} kicker="Video" titulo="Videos de doctores"
               texto="Testimonios y piezas audiovisuales que transmiten cercanía y profesionalismo." />
             <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22, alignItems: "start" }}>
-              {videos.map((v, i) => (
-                <VideoCard
-                  key={v.id}
-                  v={v}
-                  i={i}
-                  color={color}
-                  onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })}
-                />
+              {videosH.map((v, i) => (
+                <VideoCard key={v.id} v={v} i={i} color={color} onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })} />
+              ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {videosV.length > 0 && (
+        <section style={{ background: videosH.length > 0 ? "#f8fafc" : "#fff", padding: "84px 24px" }}>
+          <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+            <Encabezado color={color} kicker="Shorts" titulo="Videos verticales"
+              texto="Formato corto y directo, ideal para Reels, TikTok y YouTube Shorts." />
+            <div className="mm-grid-v" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 20, alignItems: "start" }}>
+              {videosV.map((v, i) => (
+                <VideoCard key={v.id} v={v} i={i} color={color} onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })} />
               ))}
             </div>
           </div>

@@ -641,10 +641,10 @@ export default function LandingPage({ hero3d = false }) {
       {cfg.marketing_activo !== "0" && (() => {
         const mPosts  = (marketing.posts  || []).filter(p => p.media_url);
         const mVideos = (marketing.videos || []);
-        const featVideo = mVideos[0];
+        const featVideo = mVideos.find(v => v.formato !== "vertical") || mVideos[0];
         const featVideoImg = featVideo ? ytThumb(featVideo.media_url) : null;
         const tiles = [];
-        if (featVideo) tiles.push({ key: `v${featVideo.id}`, video: true, img: featVideoImg, title: featVideo.titulo });
+        if (featVideo) tiles.push({ key: `v${featVideo.id}`, video: true, vertical: featVideo.formato === "vertical", img: featVideoImg, title: featVideo.titulo });
         mPosts.forEach(p => tiles.push({ key: `p${p.id}`, img: mediaAbs(p.media_url), title: p.titulo }));
         const visibles = tiles.slice(0, 5);
         const extra = (mPosts.length + mVideos.length) - visibles.length;
@@ -699,8 +699,8 @@ export default function LandingPage({ hero3d = false }) {
                     const last = i === visibles.length - 1 && extra > 0;
                     return (
                       <div key={t.key} className="mkt-tile" style={{
-                        position: "relative", gridColumn: t.video ? "span 2" : "auto",
-                        aspectRatio: t.video ? "16/9" : "1/1", borderRadius: 12, overflow: "hidden",
+                        position: "relative", gridColumn: t.video && !t.vertical ? "span 2" : "auto",
+                        aspectRatio: t.video && !t.vertical ? "16/9" : "1/1", borderRadius: 12, overflow: "hidden",
                         background: `linear-gradient(135deg, ${darken(color, 10)}, ${darken(color, 40)})`,
                       }}>
                         {t.img && <img src={t.img} alt={t.title || ""} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}

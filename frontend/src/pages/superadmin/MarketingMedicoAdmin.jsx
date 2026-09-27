@@ -17,7 +17,7 @@ const TIPOS = [
 ];
 
 const emptyItem = (tipo) => ({
-  tipo, titulo: "", descripcion: "", media_url: "", enlace_url: "",
+  tipo, titulo: "", descripcion: "", media_url: "", enlace_url: "", formato: "horizontal",
   precio: "", features: "", destacado: false, orden: 0, activo: true,
 });
 
@@ -76,6 +76,7 @@ export default function MarketingMedicoAdmin() {
       fd.append("titulo", editando.titulo);
       fd.append("descripcion", editando.descripcion || "");
       fd.append("enlace_url", editando.enlace_url || "");
+      fd.append("formato", editando.formato === "vertical" ? "vertical" : "horizontal");
       fd.append("precio", editando.precio || "");
       fd.append("orden", String(editando.orden || 0));
       fd.append("destacado", editando.destacado ? "1" : "0");
@@ -188,6 +189,29 @@ export default function MarketingMedicoAdmin() {
               <div><label style={lbl}>Título</label><input style={inp} value={editando.titulo} onChange={e => setEditando({ ...editando, titulo: e.target.value })} /></div>
               <div><label style={lbl}>Descripción</label><textarea style={{ ...inp, minHeight: 64 }} value={editando.descripcion} onChange={e => setEditando({ ...editando, descripcion: e.target.value })} /></div>
 
+
+              {editando.tipo !== "plan" && (
+                <div>
+                  <label style={lbl}>Formato</label>
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {[
+                      { id: "horizontal", label: "Horizontal", icon: "bi-phone-landscape" },
+                      { id: "vertical",   label: "Vertical (Shorts / Reels)", icon: "bi-phone" },
+                    ].map(f => {
+                      const activo = (editando.formato || "horizontal") === f.id;
+                      return (
+                        <button key={f.id} type="button" onClick={() => setEditando({ ...editando, formato: f.id })}
+                          style={{ flex: 1, padding: "9px 10px", borderRadius: 8, fontSize: 13, fontWeight: 700, cursor: "pointer",
+                            border: activo ? "2px solid #2563eb" : "1px solid #cbd5e1",
+                            background: activo ? "rgba(37,99,235,.08)" : "#fff", color: activo ? "#1d4ed8" : "#475569" }}>
+                          <i className={`bi ${f.icon} me-2`} />{f.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               {editando.tipo === "post" && (<>
                 <div>
                   <label style={lbl}>Imagen</label>
@@ -198,7 +222,11 @@ export default function MarketingMedicoAdmin() {
               </>)}
 
               {editando.tipo === "video" && (
-                <div><label style={lbl}>URL de YouTube o Vimeo</label><input style={inp} value={editando.media_url} onChange={e => setEditando({ ...editando, media_url: e.target.value })} placeholder="https://www.youtube.com/watch?v=..." /></div>
+                <div><label style={lbl}>URL de YouTube o Vimeo</label><input style={inp} value={editando.media_url} onChange={e => {
+                  const media_url = e.target.value;
+                  // Los links de YouTube Shorts sugieren formato vertical automáticamente
+                  setEditando({ ...editando, media_url, ...(/youtube\.com\/shorts\//.test(media_url) ? { formato: "vertical" } : {}) });
+                }} placeholder="https://www.youtube.com/watch?v=..." /></div>
               )}
 
               {editando.tipo === "plan" && (<>

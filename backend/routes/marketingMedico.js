@@ -36,6 +36,7 @@ async function ensureSchema() {
       descripcion        TEXT,
       media_url          VARCHAR(600),
       media_public_id    VARCHAR(255),
+      formato            VARCHAR(12) NOT NULL DEFAULT 'horizontal',
       enlace_url         VARCHAR(600),
       precio             VARCHAR(80),
       features           JSON,
@@ -47,9 +48,22 @@ async function ensureSchema() {
       INDEX idx_mmi_tipo (tipo, activo, orden)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
   `);
+  // Tablas creadas antes de existir la columna `formato` (071): se agrega una sola vez.
+  const [[col]] = await pool.query(
+    `SELECT COUNT(*) AS n FROM information_schema.columns
+     WHERE table_schema = DATABASE() AND table_name = 'marketing_medico_items' AND column_name = 'formato'`
+  );
+  if (!col.n) {
+    await pool.query(
+      "ALTER TABLE marketing_medico_items ADD COLUMN formato VARCHAR(12) NOT NULL DEFAULT 'horizontal' AFTER media_public_id"
+    );
+  }
   schemaReady = true;
 }
 ensureSchema().catch(() => {});
+
+const normalizaFormato = (v, fallback = "horizontal") =>
+  v === "vertical" || v === "horizontal" ? v : fallback;
 
 const jsonOrNull = (v) => {
   if (v === undefined || v === null || v === "") return null;
@@ -139,11 +153,11 @@ router.post("/", auth("SUPER_ADMIN"), upload.single("imagen"), async (req, res) 
 
     const [r] = await pool.query(
       `INSERT INTO marketing_medico_items
-        (tipo, titulo, descripcion, media_url, media_public_id, enlace_url, precio, features, destacado, orden, activo)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
+        (tipo, titulo, descripcion, media_url, media_public_id, formato, enlace_url, precio, features, destacado, orden, activo)
+       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)`,
       [
         tipo, titulo, req.body.descripcion || null,
-        media_url, media_public_id, req.body.enlace_url || null,
+        media_url, media_public_id, normalizaFormato(req.body.formato), req.body.enlace_url || null,
         req.body.precio || null, jsonOrNull(req.body.features),
         req.body.destacado === "1" || req.body.destacado === "true" ? 1 : 0,
         Number(req.body.orden) || 0,
@@ -170,7 +184,7 @@ router.put("/:id", auth("SUPER_ADMIN"), upload.single("imagen"), async (req, res
 
     await pool.query(
       `UPDATE marketing_medico_items SET
-        tipo=?, titulo=?, descripcion=?, media_url=?, media_public_id=?, enlace_url=?,
+        tipo=?, titulo=?, descripcion=?, media_url=?, media_public_id=?, formato=?, enlace_url=?,
         precio=?, features=?, destacado=?, orden=?, activo=?
        WHERE id=?`,
       [
@@ -178,6 +192,7 @@ router.put("/:id", auth("SUPER_ADMIN"), upload.single("imagen"), async (req, res
         req.body.titulo ?? row.titulo,
         req.body.descripcion !== undefined ? (req.body.descripcion || null) : row.descripcion,
         media_url, media_public_id,
+        normalizaFormato(req.body.formato, row.formato || "horizontal"),
         req.body.enlace_url !== undefined ? (req.body.enlace_url || null) : row.enlace_url,
         req.body.precio !== undefined ? (req.body.precio || null) : row.precio,
         req.body.features !== undefined ? jsonOrNull(req.body.features) : row.features,
