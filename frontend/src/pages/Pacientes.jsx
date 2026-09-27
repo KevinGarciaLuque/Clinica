@@ -9,6 +9,7 @@ import { CAMPOS_NOMBRE, capitalizarNombre } from "../utils/nombres";
 import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
+import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import CompartirLink from "../components/CompartirLink";
 
 dayjs.locale("es");
@@ -97,6 +98,7 @@ export default function Pacientes() {
   const { user, modulos }  = useAuth();
   const tieneCrecimiento = modulos.some(m => m.clave === "curva_crecimiento");
   const navigate = useNavigate();
+  const funcionClinica = useFuncionClinica();
   const [searchParams] = useSearchParams();
   const [q,      setQ]      = useState("");
   const [lista,  setLista]  = useState([]);
@@ -296,7 +298,7 @@ export default function Pacientes() {
         if (soloPsicologia) {
           navigate(`/psicologia/consulta?paciente_id=${paciente.id}&sesion_id=nueva`);
         } else {
-          navigate(`/consulta-medica?paciente_id=${paciente.id}&cita_id=${citasHoy[0].id}`);
+          navigate(rutaConsulta(funcionClinica, paciente.id, citasHoy[0].id));
         }
       } else {
         setConsultaPaciente(paciente);
@@ -997,7 +999,7 @@ export default function Pacientes() {
             } else if (soloOdontologia) {
               navigate(`/odontologia/consulta?paciente_id=${consultaPaciente.id}${citaId ? `&cita_id=${citaId}` : ''}`);
             } else {
-              navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+              navigate(rutaConsulta(funcionClinica, consultaPaciente.id, citaId));
             }
             setConsultaPaciente(null);
           }}

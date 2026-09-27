@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from "react";
-import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import api from "../../api/api";
@@ -203,10 +202,7 @@ export default function ConsultaEducacion() {
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
-  const [pacientes, setPacientes] = useState([]);
   const [paciente, setPaciente] = useState(null);
-  const [busqueda, setBusqueda] = useState("");
-  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   const [sesiones, setSesiones] = useState([]);
   const [sesionActiva, setSesionActiva] = useState(null);
@@ -220,10 +216,6 @@ export default function ConsultaEducacion() {
   const [vista, setVista] = useState("sesiones"); // "sesiones" | "informes_mcg"
   const [logoUrl, setLogoUrl] = useState("");
   const [headerCfgSesion, setHeaderCfgSesion] = useState({ encabezado_color: true, color: TEAL });
-
-  useEffect(() => {
-    api.get("/pacientes", { params: { limit: 200 } }).then(r => setPacientes(r.data.data || [])).catch(() => {});
-  }, []);
 
   useEffect(() => {
     // El logo y el color del encabezado se configuran en Plantillas de Documentos
@@ -247,12 +239,15 @@ export default function ConsultaEducacion() {
 
   useEffect(() => {
     const pid = params.get("paciente_id");
-    if (pid && pacientes.length) {
-      const p = pacientes.find(x => String(x.id) === String(pid));
-      if (p) seleccionarPaciente(p, params.get("sesion_id"));
-    }
+    if (!pid) return;
+    api.get(`/pacientes/${pid}`)
+      .then(r => {
+        const p = r.data?.data || r.data;
+        if (p?.id) seleccionarPaciente(p, params.get("sesion_id"));
+      })
+      .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params, pacientes]);
+  }, [params]);
 
   useEffect(() => {
     if (params.get("print") === "1" && sesionActiva && sesionActiva !== "nueva") {
@@ -266,7 +261,6 @@ export default function ConsultaEducacion() {
     setPaciente(p);
     setSesionActiva(null);
     setMsg(null);
-    setSidebarOpen(false);
 
     api.get(`/pacientes/${p.id}`).then(r => setPaciente(r.data.data || p)).catch(() => {});
 
@@ -337,8 +331,6 @@ export default function ConsultaEducacion() {
     });
   };
 
-  const pacientesFiltrados = pacientes.filter(p => `${p.nombres} ${p.apellidos}`.toLowerCase().includes(busqueda.toLowerCase()));
-
   if (mostrarPrint && sesionActiva && sesionActiva !== "nueva") {
     return <PrintSesion sesion={sesionActiva} paciente={paciente} user={user} logoUrl={logoUrl} headerCfg={headerCfgSesion} onClose={() => setMostrarPrint(false)} />;
   }
@@ -347,41 +339,19 @@ export default function ConsultaEducacion() {
     <>
       <style>{`
         .edu-root { display: flex; height: 100%; position: relative; }
-        .edu-desktop-panel { display: flex; flex-direction: column; width: 260px; min-width: 260px; flex-shrink: 0; border-right: 1px solid rgba(255,255,255,.07); }
         .edu-main { flex: 1; padding: 16px 20px; overflow-y: auto; min-width: 0; background: #f1f5f9; }
-        .edu-sidebar-toggle { display: none; }
         .edu-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
         .edu-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
         .edu-check-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 8px; }
         @media (max-width: 767px) {
           .edu-root { display: block; }
-          .edu-desktop-panel { display: none; }
-          .edu-sidebar-toggle { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px; background: #112240; color: rgba(203,213,225,.9); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; font-size: 0.83rem; font-weight: 500; cursor: pointer; margin-bottom: 14px; }
           .edu-main { padding: 12px 14px; }
           .edu-grid-2, .edu-grid-3 { grid-template-columns: 1fr; }
         }
       `}</style>
 
-      {createPortal(
-        <>
-          {sidebarOpen && <div onClick={() => setSidebarOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.5)", zIndex: 1055 }} />}
-          <div style={{ position: "fixed", top: 62, left: 0, height: "calc(100% - 62px)", width: 260, zIndex: 1060, transform: sidebarOpen ? "translateX(0)" : "translateX(-100%)", transition: "transform .28s cubic-bezier(.4,0,.2,1)" }}>
-            <PanelPacientes pacientesFiltrados={pacientesFiltrados} paciente={paciente} busqueda={busqueda} setBusqueda={setBusqueda} seleccionarPaciente={seleccionarPaciente} onClose={() => setSidebarOpen(false)} />
-          </div>
-        </>,
-        document.body
-      )}
-
       <div className="edu-root">
-        <div className="edu-desktop-panel">
-          <PanelPacientes pacientesFiltrados={pacientesFiltrados} paciente={paciente} busqueda={busqueda} setBusqueda={setBusqueda} seleccionarPaciente={seleccionarPaciente} onClose={null} />
-        </div>
-
         <div className="edu-main">
-          <button className="edu-sidebar-toggle" onClick={() => setSidebarOpen(true)}>
-            <i className="bi bi-list" /> {paciente ? `${paciente.nombres} ${paciente.apellidos}` : "Seleccionar paciente"}
-          </button>
-
           {!paciente ? (
             <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
               <div style={{ textAlign: "center", maxWidth: 340 }}>
@@ -397,8 +367,16 @@ export default function ConsultaEducacion() {
                   Educación en Diabetes
                 </div>
                 <div style={{ fontSize: 13.5, color: "#94a3b8", lineHeight: 1.6 }}>
-                  Selecciona un paciente en el panel de la izquierda para ver sus sesiones
-                  educativas e informes MCG.
+                  Abre a un paciente desde <strong>Consulta</strong> (citas de hoy) o búscalo en
+                  el módulo de <strong>Pacientes</strong> para ver sus sesiones educativas e informes MCG.
+                </div>
+                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
+                  <button onClick={() => navigate("/consulta")} style={btn(TEAL)}>
+                    <i className="bi bi-clipboard2-pulse" /> Ir a Consulta
+                  </button>
+                  <button onClick={() => navigate("/pacientes")} style={btn(TEAL, true)}>
+                    <i className="bi bi-people" /> Ir a Pacientes
+                  </button>
                 </div>
               </div>
             </div>
@@ -409,9 +387,14 @@ export default function ConsultaEducacion() {
                   <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{paciente.nombres} {paciente.apellidos}</div>
                   <div style={{ fontSize: 12, color: "#64748b" }}>Educación en Diabetes</div>
                 </div>
-                <button onClick={() => navigate(`/pacientes/${paciente.id}/perfil`)} style={btn(TEAL, true)}>
+                <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                  <button onClick={() => navigate("/consulta")} style={btn(TEAL, true)}>
+                    <i className="bi bi-arrow-left" /> Volver a Consulta
+                  </button>
+                  <button onClick={() => navigate(`/pacientes/${paciente.id}/perfil`)} style={btn(TEAL, true)}>
                   <i className="bi bi-person-vcard" /> Ver Expediente
                 </button>
+                </div>
               </div>
 
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
@@ -456,96 +439,6 @@ export default function ConsultaEducacion() {
         </div>
       </div>
     </>
-  );
-}
-
-// ── Panel de pacientes ──────────────────────────────────────────────────────
-function iniciales(nombres, apellidos) {
-  return `${(nombres || "").trim()[0] || ""}${(apellidos || "").trim()[0] || ""}`.toUpperCase() || "•";
-}
-
-function PanelPacientes({ pacientesFiltrados, paciente, busqueda, setBusqueda, seleccionarPaciente, onClose }) {
-  return (
-    <div style={{ background: "#0d1b2e", display: "flex", flexDirection: "column", height: "100%" }}>
-      <div style={{ padding: "16px 16px 14px", borderBottom: "1px solid rgba(255,255,255,.07)", background: "#112240", flexShrink: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <div style={{
-              width: 34, height: 34, borderRadius: 9,
-              background: `linear-gradient(135deg, ${TEAL}, #0f766e)`,
-              boxShadow: `0 3px 10px rgba(13,148,136,.35)`,
-              display: "flex", alignItems: "center", justifyContent: "center",
-            }}>
-              <i className="bi bi-mortarboard-fill" style={{ color: "#fff", fontSize: 15 }} />
-            </div>
-            <div>
-              <div style={{ fontWeight: 700, fontSize: "0.86rem", color: "#fff", letterSpacing: ".1px" }}>Pacientes</div>
-              <div style={{ fontSize: "0.66rem", color: "rgba(148,163,184,.65)", marginTop: 1 }}>Educación en Diabetes</div>
-            </div>
-          </div>
-          {onClose && (
-            <button onClick={onClose} style={{ background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.08)", borderRadius: 7, cursor: "pointer", color: "rgba(148,163,184,.7)", fontSize: 13, width: 28, height: 28, display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <i className="bi bi-x-lg" />
-            </button>
-          )}
-        </div>
-        <div style={{ position: "relative" }}>
-          <i className="bi bi-search" style={{ position: "absolute", left: 11, top: "50%", transform: "translateY(-50%)", color: "rgba(148,163,184,.45)", fontSize: 12.5 }} />
-          <input
-            value={busqueda} onChange={e => setBusqueda(e.target.value)} placeholder="Buscar paciente…"
-            style={{
-              width: "100%", boxSizing: "border-box", padding: "9px 12px 9px 32px",
-              background: "rgba(255,255,255,.05)", border: "1px solid rgba(255,255,255,.1)",
-              borderRadius: 10, color: "rgba(226,232,240,.95)", fontSize: "0.82rem", outline: "none",
-              transition: "border-color .15s, background .15s",
-            }}
-            onFocus={e => { e.target.style.borderColor = `${TEAL}80`; e.target.style.background = "rgba(255,255,255,.08)"; }}
-            onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,.1)"; e.target.style.background = "rgba(255,255,255,.05)"; }}
-          />
-        </div>
-      </div>
-      <div style={{ flex: 1, overflowY: "auto", padding: "10px 8px" }}>
-        {pacientesFiltrados.length === 0 ? (
-          <div style={{ textAlign: "center", padding: "40px 16px", color: "rgba(148,163,184,.5)", fontSize: 12.5 }}>
-            <i className="bi bi-search" style={{ fontSize: 22, display: "block", marginBottom: 8, opacity: .6 }} />
-            Sin resultados
-          </div>
-        ) : pacientesFiltrados.map(p => {
-          const activo = paciente?.id === p.id;
-          return (
-            <div
-              key={p.id}
-              onClick={() => seleccionarPaciente(p)}
-              style={{
-                display: "flex", alignItems: "center", gap: 10,
-                padding: "9px 10px", borderRadius: 10, cursor: "pointer", marginBottom: 3,
-                background: activo ? "rgba(13,148,136,.16)" : "transparent",
-                borderLeft: activo ? `3px solid ${TEAL}` : "3px solid transparent",
-                transition: "background .15s, border-color .15s",
-              }}
-              onMouseEnter={e => { if (!activo) e.currentTarget.style.background = "rgba(255,255,255,.04)"; }}
-              onMouseLeave={e => { if (!activo) e.currentTarget.style.background = "transparent"; }}
-            >
-              <div style={{
-                width: 30, height: 30, borderRadius: "50%", flexShrink: 0,
-                background: activo ? `linear-gradient(135deg, ${TEAL}, #0f766e)` : "rgba(255,255,255,.08)",
-                display: "flex", alignItems: "center", justifyContent: "center",
-                fontSize: 11, fontWeight: 700, color: activo ? "#fff" : "rgba(203,213,225,.75)",
-              }}>
-                {iniciales(p.nombres, p.apellidos)}
-              </div>
-              <div style={{
-                fontSize: "0.82rem", fontWeight: activo ? 700 : 600,
-                color: activo ? "#5eead4" : "rgba(226,232,240,.88)",
-                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-              }}>
-                {p.nombres} {p.apellidos}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-    </div>
   );
 }
 

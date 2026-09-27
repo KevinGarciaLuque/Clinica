@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
+import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 
 dayjs.locale("es");
 
@@ -22,7 +23,7 @@ export default function Consulta() {
   const [salaEspera, setSalaEspera] = useState([]);
   const [porLlegar, setPorLlegar] = useState([]);
   const [tieneRecepcionista, setTieneRecepcionista] = useState(true);
-  const [funcion, setFuncion] = useState(null); // EDUCADOR_DIABETES | CONTROL_SEGUIMIENTO | null
+  const funcion = useFuncionClinica();
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -78,23 +79,12 @@ export default function Consulta() {
   }, []);
 
   useEffect(() => {
-    api.get("/usuarios/mi-funcion")
-      .then(r => setFuncion(r.data?.data?.funcion_clinica || null))
-      .catch(() => setFuncion(null));
-  }, []);
-
-  useEffect(() => {
     if (activeTab === "citas-hoy") loadCitasHoy();
     else if (activeTab === "sala-espera") loadSalaEspera();
   }, [activeTab, loadCitasHoy, loadSalaEspera]);
 
   // A qué pantalla lleva "Consulta": cada función de endocrinología trabaja en su propio módulo
-  const irAConsulta = (cita) => {
-    const q = `paciente_id=${cita.paciente_id}&cita_id=${cita.id}`;
-    if (funcion === "EDUCADOR_DIABETES") return navigate(`/educacion/consulta?${q}`);
-    if (funcion === "CONTROL_SEGUIMIENTO") return navigate(`/endocrinologia/seguimiento?${q}`);
-    return navigate(`/consulta-medica?${q}`);
-  };
+  const irAConsulta = (cita) => navigate(rutaConsulta(funcion, cita.paciente_id, cita.id));
 
   const cambiarEstado = (citaId, nuevoEstado) => {
     api.patch(`/citas/${citaId}/estado`, { estado: nuevoEstado })

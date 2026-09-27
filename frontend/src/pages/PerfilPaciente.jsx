@@ -25,6 +25,7 @@ import HistoriaEndocrinologiaTab from "../components/HistoriaEndocrinologiaTab";
 import SeguimientosEndocrinologia from "../components/SeguimientosEndocrinologia";
 import EducacionDiabetesTab from "../components/EducacionDiabetesTab";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
+import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/constantes_odontologia";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
@@ -80,6 +81,7 @@ function Dato({ col, label, value }) {
 export default function PerfilPaciente() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const funcionClinica = useFuncionClinica();
   const [searchParams] = useSearchParams();
   const fileRef = useRef();
   const fotoInputRef = useRef();
@@ -732,7 +734,7 @@ export default function PerfilPaciente() {
         if (soloPsicologia) {
           navigate(`/psicologia/consulta?paciente_id=${pacienteTarget.id}&sesion_id=nueva`);
         } else {
-          navigate(`/consulta-medica?paciente_id=${pacienteTarget.id}&cita_id=${citasHoy[0].id}`);
+          navigate(rutaConsulta(funcionClinica, pacienteTarget.id, citasHoy[0].id));
         }
       } else {
         setConsultaPaciente(pacienteTarget);
@@ -2752,7 +2754,7 @@ export default function PerfilPaciente() {
             } else if (soloOdontologia) {
               navigate(`/odontologia/consulta?paciente_id=${consultaPaciente.id}${citaId ? `&cita_id=${citaId}` : ''}`);
             } else {
-              navigate(`/consulta-medica?paciente_id=${consultaPaciente.id}&cita_id=${citaId}`);
+              navigate(rutaConsulta(funcionClinica, consultaPaciente.id, citaId));
             }
             setConsultaPaciente(null);
           }}
