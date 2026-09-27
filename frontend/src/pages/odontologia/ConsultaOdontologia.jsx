@@ -18,13 +18,22 @@ const COLOR_D = '#e65100';
 const BG_LIGHT = '#fff7ed';
 const BORDER = '#fed7aa';
 
+// ─── Superficies neutras (el naranja queda solo como acento) ─────────────────
+const INK = '#0f172a';
+const MUTED = '#64748b';
+const LINE = '#e2e8f0';
+const CARD = {
+  background: '#fff', border: `1px solid ${LINE}`, borderRadius: 14,
+  boxShadow: '0 1px 2px rgba(15,23,42,.04), 0 6px 18px -10px rgba(15,23,42,.12)',
+};
+
 // ─── Tabs ─────────────────────────────────────────────────────────────────────
 const TABS = [
-  { id: 'odontograma', label: '🦷 Odontograma' },
-  { id: 'sesion',      label: '📋 Consulta' },
-  { id: 'plan',        label: '📝 Plan de Tratamiento' },
-  { id: 'historia',    label: '📚 Historia' },
-  { id: 'cuenta',      label: '💳 Estudios y Cuenta' },
+  { id: 'odontograma', label: 'Odontograma',          icon: 'bi-grid-3x3-gap-fill' },
+  { id: 'sesion',      label: 'Consulta',             icon: 'bi-clipboard2-pulse' },
+  { id: 'plan',        label: 'Plan de Tratamiento',  icon: 'bi-list-check' },
+  { id: 'historia',    label: 'Historia',             icon: 'bi-journal-medical' },
+  { id: 'cuenta',      label: 'Estudios y Cuenta',    icon: 'bi-wallet2' },
 ];
 
 // ─── Buscador CIE-10 ──────────────────────────────────────────────────────────
@@ -549,39 +558,54 @@ export default function ConsultaOdontologia() {
           color: msg.type === 'ok' ? '#166534' : '#991b1b',
           boxShadow: '0 4px 12px #0003',
         }}>
-          {msg.type === 'ok' ? '✓ ' : '⚠ '}{msg.text}
+          <i className={`bi ${msg.type === 'ok' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-2`} />{msg.text}
         </div>
       )}
 
       {/* ── Header ── */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
-        <div>
-          <h2 style={{ margin: 0, fontSize: 22, color: COLOR_D, display: 'flex', alignItems: 'center', gap: 10 }}>
-            🦷 Consulta Odontológica
-          </h2>
-          {paciente && (
-            <div style={{ marginTop: 4, color: '#475569', fontSize: 14 }}>
-              <strong>{paciente.nombre} {paciente.apellido}</strong>
-              {paciente.fecha_nacimiento && (
-                <span style={{ marginLeft: 10, color: '#94a3b8' }}>
-                  {dayjs().diff(dayjs(paciente.fecha_nacimiento), 'year')} años
-                </span>
-              )}
+      <div style={{ ...CARD, padding: '16px 20px', marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 14 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, minWidth: 0 }}>
+          <div style={{
+            width: 48, height: 48, borderRadius: 14, flexShrink: 0,
+            background: `linear-gradient(135deg, ${COLOR}, ${COLOR_D})`, color: '#fff',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontWeight: 800, fontSize: 17, letterSpacing: '.02em',
+          }}>
+            {paciente ? `${(paciente.nombre || '')[0] || ''}${(paciente.apellido || '')[0] || ''}`.toUpperCase() : <i className="bi bi-person" />}
+          </div>
+          <div style={{ minWidth: 0 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, letterSpacing: '.08em', textTransform: 'uppercase', color: COLOR_D }}>
+              Consulta odontológica
             </div>
-          )}
+            {paciente && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 20, fontWeight: 800, color: INK }}>{paciente.nombre} {paciente.apellido}</span>
+                {paciente.fecha_nacimiento && (
+                  <span style={{ fontSize: 12, fontWeight: 600, color: MUTED, background: '#f1f5f9', borderRadius: 999, padding: '2px 10px' }}>
+                    {dayjs().diff(dayjs(paciente.fecha_nacimiento), 'year')} años
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Resumen rápido */}
         {resumen && (
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
             {[
-              { label: 'Sesiones', val: resumen.total_sesiones, color: COLOR },
-              { label: 'Firmadas', val: resumen.sesiones_firmadas, color: '#16a34a' },
-              { label: 'Pendientes plan', val: resumen.plan_pendientes, color: '#ef4444' },
-            ].map(s => (
-              <div key={s.label} style={{ textAlign: 'center', padding: '8px 14px', borderRadius: 10, background: `${s.color}11`, border: `1px solid ${s.color}33` }}>
-                <div style={{ fontSize: 20, fontWeight: 700, color: s.color }}>{s.val}</div>
-                <div style={{ fontSize: 10, color: '#94a3b8' }}>{s.label}</div>
+              { label: 'Sesiones', val: resumen.total_sesiones, color: COLOR, icon: 'bi-journal-text' },
+              { label: 'Firmadas', val: resumen.sesiones_firmadas, color: '#16a34a', icon: 'bi-patch-check' },
+              { label: 'Pendientes plan', val: resumen.plan_pendientes, color: '#ef4444', icon: 'bi-hourglass-split' },
+            ].map(st => (
+              <div key={st.label} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', borderRadius: 12, background: '#f8fafc', border: `1px solid ${LINE}` }}>
+                <div style={{ width: 32, height: 32, borderRadius: 9, background: `${st.color}18`, color: st.color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15 }}>
+                  <i className={`bi ${st.icon}`} aria-hidden="true" />
+                </div>
+                <div>
+                  <div style={{ fontSize: 19, fontWeight: 800, color: INK, lineHeight: 1 }}>{st.val}</div>
+                  <div style={{ fontSize: 10.5, color: MUTED, marginTop: 2 }}>{st.label}</div>
+                </div>
               </div>
             ))}
           </div>
@@ -595,38 +619,43 @@ export default function ConsultaOdontologia() {
       {!loading && (
         <>
           {/* ── Tabs ── */}
-          <div style={{ display: 'flex', borderBottom: `2px solid ${BORDER}`, marginBottom: 20, gap: 2, flexWrap: 'wrap' }}>
-            {TABS.map(t => (
-              <button
-                key={t.id}
-                onClick={() => setTab(t.id)}
-                style={{
-                  padding: '9px 18px', border: 'none', cursor: 'pointer', fontSize: 13,
-                  fontWeight: tab === t.id ? 700 : 400,
-                  borderBottom: tab === t.id ? `3px solid ${COLOR}` : '3px solid transparent',
-                  background: tab === t.id ? BG_LIGHT : 'transparent',
-                  color: tab === t.id ? COLOR_D : '#475569',
-                  borderRadius: '8px 8px 0 0',
-                  marginBottom: -2,
-                  transition: 'all 0.15s',
-                }}
-              >
-                {t.label}
-              </button>
-            ))}
+          <div role="tablist" style={{ ...CARD, display: 'flex', gap: 4, padding: 5, marginBottom: 18, flexWrap: 'wrap', borderRadius: 12 }}>
+            {TABS.map(t => {
+              const activa = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  role="tab"
+                  aria-selected={activa}
+                  onClick={() => setTab(t.id)}
+                  style={{
+                    display: 'inline-flex', alignItems: 'center', gap: 8,
+                    padding: '9px 16px', border: 'none', cursor: 'pointer', fontSize: 13,
+                    fontWeight: activa ? 700 : 500, borderRadius: 9,
+                    background: activa ? BG_LIGHT : 'transparent',
+                    color: activa ? COLOR_D : MUTED,
+                    boxShadow: activa ? `inset 0 0 0 1px ${BORDER}` : 'none',
+                    transition: 'all .15s',
+                  }}
+                >
+                  <i className={`bi ${t.icon}`} aria-hidden="true" style={{ fontSize: 14 }} />
+                  {t.label}
+                </button>
+              );
+            })}
           </div>
 
           {/* ══════════════════════════════════════════
               TAB: ODONTOGRAMA
           ══════════════════════════════════════════ */}
           {tab === 'odontograma' && (
-            <div>
+            <div style={{ ...CARD, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
                   <h3 style={{ margin: 0, color: COLOR_D, fontSize: 16 }}>Odontograma del paciente</h3>
                   {/* Toggle 2D / 3D */}
                   <div style={{ display: 'flex', borderRadius: 8, overflow: 'hidden', border: `1px solid ${BORDER}` }}>
-                    {[['2d','🗺 2D Clásico'],['3d','🧊 3D Interactivo']].map(([mode, label]) => (
+                    {[['2d','2D Clásico'],['3d','3D Interactivo']].map(([mode, label]) => (
                       <button key={mode}
                         onClick={() => setOdoView(mode)}
                         style={{
@@ -647,7 +676,7 @@ export default function ConsultaOdontologia() {
                     color: odoGuardado ? '#166534' : '#fff',
                     fontWeight: 700, cursor: 'pointer', fontSize: 13,
                   }}>
-                  {saving ? 'Guardando...' : odoGuardado ? '✓ Guardado' : 'Guardar Odontograma'}
+                  {saving ? 'Guardando...' : odoGuardado ? 'Guardado' : 'Guardar Odontograma'}
                 </button>
               </div>
 
@@ -673,11 +702,11 @@ export default function ConsultaOdontologia() {
             <div style={{ display: 'grid', gridTemplateColumns: '260px 1fr', gap: 20, alignItems: 'start' }}>
 
               {/* Lista de sesiones previas */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                  <strong style={{ fontSize: 13, color: '#334155' }}>Sesiones</strong>
-                  <button onClick={nuevaSesion} style={{ padding: '4px 12px', borderRadius: 6, background: COLOR, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
-                    + Nueva
+              <div style={{ ...CARD, padding: 14 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                  <strong style={{ fontSize: 14, color: INK }}>Sesiones</strong>
+                  <button onClick={nuevaSesion} style={{ padding: '5px 12px', borderRadius: 8, background: COLOR, color: '#fff', border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                    <i className="bi bi-plus-lg me-1" />Nueva
                   </button>
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 500, overflowY: 'auto' }}>
@@ -685,8 +714,8 @@ export default function ConsultaOdontologia() {
                     <div key={s.id}
                       onClick={() => cargarSesion(s)}
                       style={{
-                        padding: '10px 12px', borderRadius: 8, cursor: 'pointer',
-                        border: sesionActual?.id === s.id ? `2px solid ${COLOR}` : '1px solid #e2e8f0',
+                        padding: '10px 12px', borderRadius: 10, cursor: 'pointer',
+                        border: sesionActual?.id === s.id ? `1.5px solid ${COLOR}` : `1px solid ${LINE}`,
                         background: sesionActual?.id === s.id ? BG_LIGHT : '#fff',
                         transition: 'all 0.15s',
                       }}
@@ -716,9 +745,9 @@ export default function ConsultaOdontologia() {
               </div>
 
               {/* Formulario de sesión */}
-              <div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-                  <h3 style={{ margin: 0, fontSize: 16, color: COLOR_D }}>
+              <div style={{ ...CARD, padding: 20 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingBottom: 14, borderBottom: `1px solid ${LINE}`, flexWrap: 'wrap', gap: 8 }}>
+                  <h3 style={{ margin: 0, fontSize: 17, fontWeight: 800, color: INK }}>
                     {sesionActual ? `Sesión #${sesionActual.numero_sesion}` : 'Nueva sesión'}
                     {readOnly && <span style={{ marginLeft: 10, fontSize: 12, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>FIRMADA</span>}
                   </h3>
@@ -726,7 +755,7 @@ export default function ConsultaOdontologia() {
                     {sesionActual && !readOnly && (
                       <button onClick={firmarSesion} disabled={saving}
                         style={{ padding: '7px 16px', borderRadius: 8, background: '#16a34a', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                        ✎ Firmar sesión
+                        <i className="bi bi-pen me-1" /> Firmar sesión
                       </button>
                     )}
                     {!readOnly && (
@@ -803,7 +832,7 @@ export default function ConsultaOdontologia() {
                       {!readOnly && (
                         <button onClick={prellenarHallazgosDesdeOdontograma}
                           style={{ padding: '3px 10px', borderRadius: 6, border: `1px solid ${BORDER}`, background: '#fff', color: COLOR_D, cursor: 'pointer', fontSize: 11, fontWeight: 700 }}>
-                          🦷 Prellenar desde odontograma
+                          <i className="bi bi-magic me-1" /> Prellenar desde odontograma
                         </button>
                       )}
                     </div>
@@ -929,7 +958,7 @@ export default function ConsultaOdontologia() {
               TAB: PLAN DE TRATAMIENTO
           ══════════════════════════════════════════ */}
           {tab === 'plan' && (
-            <div>
+            <div style={{ ...CARD, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
                 <div>
                   <h3 style={{ margin: 0, fontSize: 18, color: COLOR_D }}>Plan de Tratamiento Integral</h3>
@@ -939,7 +968,7 @@ export default function ConsultaOdontologia() {
                 </div>
                 <button onClick={guardarPlan} disabled={saving}
                   style={{ padding: '7px 18px', borderRadius: 8, background: planGuardado ? '#dcfce7' : COLOR, color: planGuardado ? '#166534' : '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                  {saving ? 'Guardando...' : planGuardado ? '✓ Guardado' : 'Guardar plan'}
+                  {saving ? 'Guardando...' : planGuardado ? 'Guardado' : 'Guardar plan'}
                 </button>
               </div>
 
@@ -1066,12 +1095,12 @@ export default function ConsultaOdontologia() {
               TAB: HISTORIA ODONTOLÓGICA
           ══════════════════════════════════════════ */}
           {tab === 'historia' && (
-            <div>
+            <div style={{ ...CARD, padding: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
                 <h3 style={{ margin: 0, fontSize: 16, color: COLOR_D }}>Historia odontológica</h3>
                 <button onClick={guardarHistoria} disabled={saving}
                   style={{ padding: '7px 18px', borderRadius: 8, background: historiaGuardada ? '#dcfce7' : COLOR, color: historiaGuardada ? '#166534' : '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
-                  {saving ? 'Guardando...' : historiaGuardada ? '✓ Guardado' : 'Guardar historia'}
+                  {saving ? 'Guardando...' : historiaGuardada ? 'Guardado' : 'Guardar historia'}
                 </button>
               </div>
 
@@ -1316,7 +1345,7 @@ export default function ConsultaOdontologia() {
               (integración con módulos existentes /estudios y /facturacion)
           ══════════════════════════════════════════ */}
           {tab === 'cuenta' && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 28 }}>
+            <div style={{ ...CARD, padding: 20, display: 'flex', flexDirection: 'column', gap: 28 }}>
 
               {/* Estudios complementarios */}
               <div>
@@ -1442,13 +1471,13 @@ export default function ConsultaOdontologia() {
 
 // ─── Estilos reutilizables ────────────────────────────────────────────────────
 const lbl = {
-  display: 'block', fontSize: 12, fontWeight: 600,
-  color: '#64748b', marginBottom: 4,
+  display: 'block', fontSize: 12, fontWeight: 700,
+  color: '#475569', marginBottom: 5, letterSpacing: '.01em',
 };
 
 const inputStyle = {
-  width: '100%', padding: '7px 10px', borderRadius: 6,
-  border: '1px solid #e2e8f0', fontSize: 13,
+  width: '100%', padding: '8px 11px', borderRadius: 8,
+  border: '1px solid #cbd5e1', fontSize: 13, color: INK,
   background: '#fff', boxSizing: 'border-box',
 };
 
@@ -1464,10 +1493,10 @@ const condTd = {
 
 function textareaStyle(readOnly) {
   return {
-    width: '100%', padding: '7px 10px', borderRadius: 6,
-    border: `1px solid ${readOnly ? '#e2e8f0' : '#fed7aa'}`,
-    fontSize: 13, resize: 'vertical',
-    background: readOnly ? '#f8fafc' : '#fffbf5',
+    width: '100%', padding: '8px 11px', borderRadius: 8,
+    border: `1px solid ${readOnly ? LINE : '#cbd5e1'}`,
+    fontSize: 13, resize: 'vertical', color: INK,
+    background: readOnly ? '#f8fafc' : '#fff',
     boxSizing: 'border-box',
   };
 }
