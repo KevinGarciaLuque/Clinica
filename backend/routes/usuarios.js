@@ -31,6 +31,67 @@ async function ensureNombreDisplayColumn() {
   }
 }
 
+// Función clínica (solo clínicas de endocrinología): a qué pantalla lo lleva "Consulta".
+// NULL = médico normal. Migración 078; también se auto-aplica en caliente.
+const FUNCIONES_CLINICA = ["EDUCADOR_DIABETES", "CONTROL_SEGUIMIENTO"];
+let funcionColReady = false;
+async function ensureFuncionColumn() {
+  if (funcionColReady) return;
+  try {
+    const [cols] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'funcion_clinica'");
+    if (!cols.length) {
+      await pool.query("ALTER TABLE usuarios ADD COLUMN funcion_clinica VARCHAR(30) NULL");
+    }
+    funcionColReady = true;
+  } catch (e) {
+    console.error("ensureFuncionColumn:", e.message);
+  }
+}
+
+async function esClinicaEndocrinologia(clinicaId) {
+  const [[r]] = await pool.query(
+    `SELECT tc.clave FROM clinicas c JOIN tipos_clinica tc ON tc.id = c.tipo_id WHERE c.id = ? LIMIT 1`,
+    [clinicaId]
+  );
+  return r?.clave === "endocrinologia";
+}
+
+// Deja visible para el usuario solo el módulo que corresponde a su función
+// (Educación en Diabetes o Control de Seguimiento). Sin función: vuelve al valor de la clínica.
+async function sincronizarModulosFuncion(usuarioId, funcion) {
+  try {
+    const [mods] = await pool.query(
+      "SELECT id, clave FROM modulos_sistema WHERE clave IN ('educacion_diabetes','control_seguimiento_dm1')"
+    );
+    const edu = mods.find(m => m.clave === "educacion_diabetes")?.id;
+    const seg = mods.find(m => m.clave === "control_seguimiento_dm1")?.id;
+    if (!edu || !seg) return;
+    if (!funcion) {
+      await pool.query("DELETE FROM usuario_modulos WHERE usuario_id=? AND modulo_id IN (?,?)", [usuarioId, edu, seg]);
+      return;
+    }
+    const eduOn = funcion === "EDUCADOR_DIABETES" ? 1 : 0;
+    await pool.query(
+      `INSERT INTO usuario_modulos (usuario_id, modulo_id, habilitado) VALUES (?,?,?),(?,?,?)
+       ON DUPLICATE KEY UPDATE habilitado = VALUES(habilitado)`,
+      [usuarioId, edu, eduOn, usuarioId, seg, eduOn ? 0 : 1]
+    );
+  } catch (e) {
+    console.error("sincronizarModulosFuncion:", e.message);
+  }
+}
+
+// GET /api/usuarios/mi-funcion  → función clínica del usuario autenticado
+router.get("/mi-funcion", auth(), async (req, res) => {
+  try {
+    await ensureFuncionColumn();
+    const [[u]] = await pool.query("SELECT funcion_clinica FROM usuarios WHERE id=? LIMIT 1", [req.user.id ?? req.user.uid]);
+    res.json({ ok: true, data: { funcion_clinica: u?.funcion_clinica || null } });
+  } catch (e) {
+    res.json({ ok: true, data: { funcion_clinica: null } });
+  }
+});
+
 // ──────────────────────────────────────────────
 // GET /api/usuarios  → lista de usuarios de la clínica
 // ──────────────────────────────────────────────
@@ -44,7 +105,8 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","RECEPCIONISTA"), async (req, res) =>
 
     const { tipo } = req.query;
     await ensureNombreDisplayColumn();
-    let sql = `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo, u.activo,
+    await ensureFuncionColumn();
+    let sql = `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo, u.activo, u.funcion_clinica,
                       u.telefono, u.numero_colegiatura, u.firma_url,
                       e.nombre AS especialidad, e.id AS especialidad_id,
                       u.creado_en
@@ -115,9 +177,10 @@ router.get("/medicos", auth(), async (req, res) => {
 router.get("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
   try {
     await ensureNombreDisplayColumn();
+    await ensureFuncionColumn();
     const clinicaId = req.user.super ? null : req.user.clinica_id;
     let sql = `SELECT u.id, u.clinica_id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo,
-                      u.activo, u.telefono, u.numero_colegiatura, u.firma_url,
+                      u.activo, u.funcion_clinica, u.telefono, u.numero_colegiatura, u.firma_url,
                       e.nombre AS especialidad, e.id AS especialidad_id
                FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
                WHERE u.id=?`;
@@ -143,7 +206,7 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     await ensureNombreDisplayColumn();
     const { nombres, apellidos, nombre_display, email, password, tipo,
-            especialidad_id, telefono, numero_colegiatura } = req.body;
+            especialidad_id, telefono, numero_colegiatura, funcion_clinica } = req.body;
 
     if (!nombres || !apellidos || !email || !password || !tipo) {
       return res.status(400).json({ ok: false, msg: "nombres, apellidos, email, password y tipo son obligatorios" });
@@ -176,6 +239,13 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
        especialidad_id||null, telefono||null, numero_colegiatura||null]
     );
 
+    // Función clínica (solo médicos de clínicas de endocrinología)
+    if (FUNCIONES_CLINICA.includes(funcion_clinica) && tipo === "MEDICO" && await esClinicaEndocrinologia(clinicaId)) {
+      await ensureFuncionColumn();
+      await pool.query("UPDATE usuarios SET funcion_clinica=? WHERE id=?", [funcion_clinica, r.insertId]);
+      await sincronizarModulosFuncion(r.insertId, funcion_clinica);
+    }
+
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -203,7 +273,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     await ensureNombreDisplayColumn();
     const { nombres, apellidos, nombre_display, email, password, tipo,
-            especialidad_id, telefono, numero_colegiatura, firma_url, activo } = req.body;
+            especialidad_id, telefono, numero_colegiatura, firma_url, activo, funcion_clinica } = req.body;
 
     let passwordHash = undefined;
     if (password) {
@@ -225,9 +295,22 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
     if (firma_url    !== undefined) { fields.push("firma_url=?");          values.push(firma_url || null); }
     if (activo       !== undefined) { fields.push("activo=?");             values.push(activo); }
 
+    // Función clínica: solo aplica a médicos de clínicas de endocrinología ("" / null = médico normal)
+    let funcionFinal;
+    if (funcion_clinica !== undefined || (tipo !== undefined && tipo !== "MEDICO")) {
+      await ensureFuncionColumn();
+      const tipoFinal = tipo !== undefined ? tipo : rows[0].tipo;
+      const valida = FUNCIONES_CLINICA.includes(funcion_clinica) && tipoFinal === "MEDICO"
+        && await esClinicaEndocrinologia(rows[0].clinica_id);
+      funcionFinal = valida ? funcion_clinica : null;
+      fields.push("funcion_clinica=?"); values.push(funcionFinal);
+    }
+
     if (!fields.length) return res.json({ ok: true });
     values.push(req.params.id);
     await pool.query(`UPDATE usuarios SET ${fields.join(", ")} WHERE id=?`, values);
+
+    if (funcionFinal !== undefined) await sincronizarModulosFuncion(req.params.id, funcionFinal);
 
     res.json({ ok: true });
   } catch (e) {

@@ -22,6 +22,7 @@ export default function Consulta() {
   const [salaEspera, setSalaEspera] = useState([]);
   const [porLlegar, setPorLlegar] = useState([]);
   const [tieneRecepcionista, setTieneRecepcionista] = useState(true);
+  const [funcion, setFuncion] = useState(null); // EDUCADOR_DIABETES | CONTROL_SEGUIMIENTO | null
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
 
@@ -77,9 +78,23 @@ export default function Consulta() {
   }, []);
 
   useEffect(() => {
+    api.get("/usuarios/mi-funcion")
+      .then(r => setFuncion(r.data?.data?.funcion_clinica || null))
+      .catch(() => setFuncion(null));
+  }, []);
+
+  useEffect(() => {
     if (activeTab === "citas-hoy") loadCitasHoy();
     else if (activeTab === "sala-espera") loadSalaEspera();
   }, [activeTab, loadCitasHoy, loadSalaEspera]);
+
+  // A qué pantalla lleva "Consulta": cada función de endocrinología trabaja en su propio módulo
+  const irAConsulta = (cita) => {
+    const q = `paciente_id=${cita.paciente_id}&cita_id=${cita.id}`;
+    if (funcion === "EDUCADOR_DIABETES") return navigate(`/educacion/consulta?${q}`);
+    if (funcion === "CONTROL_SEGUIMIENTO") return navigate(`/endocrinologia/seguimiento?${q}`);
+    return navigate(`/consulta-medica?${q}`);
+  };
 
   const cambiarEstado = (citaId, nuevoEstado) => {
     api.patch(`/citas/${citaId}/estado`, { estado: nuevoEstado })
@@ -161,10 +176,10 @@ export default function Consulta() {
             </div>
           )}
           {!loading && activeTab === "citas-hoy" && (
-            <CitasDelDia citas={citasHoy} onEstadoChange={cambiarEstado} navigate={navigate} />
+            <CitasDelDia citas={citasHoy} onEstadoChange={cambiarEstado} onConsulta={irAConsulta} />
           )}
           {!loading && activeTab === "sala-espera" && (
-            <SalaDeEspera citas={salaEspera} porLlegar={porLlegar} onEstadoChange={cambiarEstado} navigate={navigate} tieneRecepcionista={tieneRecepcionista} />
+            <SalaDeEspera citas={salaEspera} porLlegar={porLlegar} onEstadoChange={cambiarEstado} onConsulta={irAConsulta} tieneRecepcionista={tieneRecepcionista} />
           )}
         </div>
       </div>
@@ -186,7 +201,7 @@ function EstadoBadge({ estado }) {
   );
 }
 
-function CitasDelDia({ citas, onEstadoChange, navigate }) {
+function CitasDelDia({ citas, onEstadoChange, onConsulta }) {
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
@@ -234,7 +249,7 @@ function CitasDelDia({ citas, onEstadoChange, navigate }) {
               </thead>
               <tbody>
                 {citas.map((cita, idx) => (
-                  <FilaCita key={cita.id} cita={cita} idx={idx} onEstadoChange={onEstadoChange} navigate={navigate} />
+                  <FilaCita key={cita.id} cita={cita} idx={idx} onEstadoChange={onEstadoChange} onConsulta={onConsulta} />
                 ))}
               </tbody>
             </table>
@@ -266,7 +281,7 @@ function TablaCitas({ children }) {
   );
 }
 
-function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, navigate, tieneRecepcionista }) {
+function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, onConsulta, tieneRecepcionista }) {
   const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
   const FLUJO_POR_LLEGAR = ["EN_ESPERA", "EN_ATENCION"];
   return (
@@ -321,7 +336,7 @@ function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, navigate, tieneRe
               <tbody>
                 {citas.map((cita, idx) => (
                   <FilaCita key={cita.id} cita={cita} idx={idx}
-                    onEstadoChange={onEstadoChange} navigate={navigate}
+                    onEstadoChange={onEstadoChange} onConsulta={onConsulta}
                     estadosDisponibles={FLUJO.filter(e => e !== cita.estado)} />
                 ))}
               </tbody>
@@ -349,7 +364,7 @@ function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, navigate, tieneRe
           <TablaCitas>
             {porLlegar.map((cita, idx) => (
               <FilaCita key={cita.id} cita={cita} idx={idx}
-                onEstadoChange={onEstadoChange} navigate={navigate}
+                onEstadoChange={onEstadoChange} onConsulta={onConsulta}
                 estadosDisponibles={FLUJO_POR_LLEGAR} />
             ))}
           </TablaCitas>
@@ -359,7 +374,7 @@ function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, navigate, tieneRe
   );
 }
 
-function FilaCita({ cita, idx, onEstadoChange, navigate, estadosDisponibles }) {
+function FilaCita({ cita, idx, onEstadoChange, onConsulta, estadosDisponibles }) {
   const [hover, setHover] = useState(false);
 
   const btnEstadoStyle = (color) => ({
@@ -409,7 +424,7 @@ function FilaCita({ cita, idx, onEstadoChange, navigate, estadosDisponibles }) {
               if (cita.estado !== "EN_ATENCION" && cita.estado !== "COMPLETADA") {
                 onEstadoChange(cita.id, "EN_ATENCION");
               }
-              navigate(`/consulta-medica?paciente_id=${cita.paciente_id}&cita_id=${cita.id}`);
+              onConsulta(cita);
             }}
             style={{
               background: "linear-gradient(135deg,#3b82f6,#2563eb)", border: "none",

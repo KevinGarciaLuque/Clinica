@@ -8,7 +8,7 @@ const TIPOS = ["ADMIN", "MEDICO", "PSICOLOGO", "ENFERMERA", "RECEPCIONISTA"];
 const EMPTY = {
   nombres: "", apellidos: "", nombre_display: "", email: "", password: "",
   tipo: "RECEPCIONISTA", especialidad_id: "", telefono: "",
-  numero_colegiatura: "", activo: 1,
+  numero_colegiatura: "", activo: 1, funcion_clinica: "",
 };
 
 const TIPO_CONFIG = {
@@ -55,6 +55,7 @@ export default function Usuarios() {
   const esSuperAdmin = user?.tipo === "SUPER_ADMIN";
 
   const [usuarios, setUsuarios]         = useState([]);
+  const [tipoClaveAdmin, setTipoClaveAdmin] = useState("");
   const [especialidades, setEspecialidades] = useState([]);
   const [clinicas, setClinicas]         = useState([]);
   const [clinicaSeleccionada, setClinicaSeleccionada] = useState("");
@@ -80,6 +81,16 @@ export default function Usuarios() {
       if (lista.length > 0) setClinicaSeleccionada(String(lista[0].id));
     }).catch(() => {});
   }, [esSuperAdmin]);
+
+  // Tipo de clínica: define si se muestra la "Función" (solo endocrinología)
+  useEffect(() => {
+    if (esSuperAdmin) return;
+    api.get("/clinicas").then((r) => setTipoClaveAdmin(r.data.data?.[0]?.tipo_clave || "")).catch(() => {});
+  }, [esSuperAdmin]);
+  const tipoClaveClinica = esSuperAdmin
+    ? (clinicas.find((c) => String(c.id) === String(clinicaSeleccionada))?.tipo_clave || "")
+    : tipoClaveAdmin;
+  const esEndocrinologia = tipoClaveClinica === "endocrinologia";
 
   const cargar = useCallback(async () => {
     const cid = esSuperAdmin ? clinicaSeleccionada : (user?.clinica_id || "");
@@ -110,7 +121,7 @@ export default function Usuarios() {
       password: "", tipo: u.tipo,
       especialidad_id: u.especialidad_id || "",
       telefono: u.telefono || "", numero_colegiatura: u.numero_colegiatura || "",
-      activo: u.activo,
+      activo: u.activo, funcion_clinica: u.funcion_clinica || "",
     });
     setEditId(u.id); setError(""); setShowModal(true);
   };
@@ -578,6 +589,34 @@ export default function Usuarios() {
                         <option value="">— Sin especialidad —</option>
                         {especialidades.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
                       </select>
+                    </div>
+                  </FieldGroup>
+                )}
+
+                {form.tipo === "MEDICO" && esEndocrinologia && (
+                  <FieldGroup label="Función en la clínica">
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {[
+                        { id: "", label: "Médico", icon: "bi-heart-pulse" },
+                        { id: "EDUCADOR_DIABETES", label: "Educador en diabetes", icon: "bi-book" },
+                        { id: "CONTROL_SEGUIMIENTO", label: "Control de seguimiento", icon: "bi-droplet-half" },
+                      ].map((f) => {
+                        const active = (form.funcion_clinica || "") === f.id;
+                        return (
+                          <button key={f.id || "medico"} type="button"
+                            onClick={() => setForm({ ...form, funcion_clinica: f.id })}
+                            style={{
+                              padding: "7px 14px", borderRadius: 9, cursor: "pointer", fontSize: 12, fontWeight: 600,
+                              background: active ? "#2563eb" : "#eff6ff", color: active ? "#fff" : "#2563eb",
+                              border: `1.5px solid ${active ? "#2563eb" : "#bfdbfe"}`, transition: "all .15s",
+                            }}>
+                            <i className={`bi ${f.icon} me-1`} />{f.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 6 }}>
+                      Define a qué pantalla lo lleva el botón "Consulta" y qué módulo de endocrinología ve en su menú.
                     </div>
                   </FieldGroup>
                 )}
