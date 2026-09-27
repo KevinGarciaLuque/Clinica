@@ -66,6 +66,17 @@ const TIPOS_DOC = [
   { value: "otro",          label: "Otro", icon: "bi-file-earmark" },
 ];
 
+// Campo de solo lectura del expediente: se oculta cuando el paciente no tiene ese dato
+function Dato({ col, label, value }) {
+  if (value === null || value === undefined || String(value).trim() === "") return null;
+  return (
+    <div className={col}>
+      <label className="text-muted small">{label}</label>
+      <p className="fw-semibold mb-0">{value}</p>
+    </div>
+  );
+}
+
 export default function PerfilPaciente() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -1489,76 +1500,35 @@ export default function PerfilPaciente() {
                       <label className="text-muted small">Apellidos</label>
                       <p className="fw-semibold mb-0">{paciente.apellidos}</p>
                     </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">DNI / Identidad</label>
-                      <p className="fw-semibold mb-0">{paciente.dni || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Fecha de nacimiento</label>
-                      <p className="fw-semibold mb-0">
-                        {paciente.fecha_nacimiento ? (() => {
-                          const hoy = new Date();
-                          const nac = new Date(paciente.fecha_nacimiento);
-                          let e = hoy.getFullYear() - nac.getFullYear();
-                          if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
-                          return `${nac.toLocaleDateString()} (${e} años)`;
-                        })() : "—"}
-                      </p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Sexo</label>
-                      <p className="fw-semibold mb-0">
-                        {paciente.sexo === "M" ? "Masculino" : paciente.sexo === "F" ? "Femenino" : paciente.sexo || "—"}
-                      </p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Grupo sanguíneo</label>
-                      <p className="fw-semibold mb-0">{paciente.grupo_sanguineo || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Estado Civil</label>
-                      <p className="fw-semibold mb-0">{paciente.estado_civil || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Ocupación</label>
-                      <p className="fw-semibold mb-0">{paciente.ocupacion || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Escolaridad</label>
-                      <p className="fw-semibold mb-0">{paciente.escolaridad || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Religión</label>
-                      <p className="fw-semibold mb-0">{paciente.religion || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Nacionalidad</label>
-                      <p className="fw-semibold mb-0">{paciente.nacionalidad || "—"}</p>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="text-muted small">Teléfono</label>
-                      <p className="fw-semibold mb-0">{paciente.telefono || "—"}</p>
-                    </div>
-                    <div className="col-md-6">
-                      <label className="text-muted small">Email</label>
-                      <p className="fw-semibold mb-0">{paciente.email || "—"}</p>
-                    </div>
-                    <div className="col-12">
-                      <label className="text-muted small">Dirección</label>
-                      <p className="fw-semibold mb-0">{paciente.direccion || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Departamento</label>
-                      <p className="fw-semibold mb-0">{paciente.departamento || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">Municipio / Ciudad</label>
-                      <p className="fw-semibold mb-0">{paciente.ciudad || "—"}</p>
-                    </div>
-                    <div className="col-md-4">
-                      <label className="text-muted small">País</label>
-                      <p className="fw-semibold mb-0">{paciente.pais || "—"}</p>
-                    </div>
+                    <Dato col="col-md-4" label="DNI / Identidad" value={paciente.dni} />
+                    <Dato
+                      col="col-md-4"
+                      label="Fecha de nacimiento"
+                      value={paciente.fecha_nacimiento ? (() => {
+                        const hoy = new Date();
+                        const nac = new Date(paciente.fecha_nacimiento);
+                        let e = hoy.getFullYear() - nac.getFullYear();
+                        if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
+                        return `${nac.toLocaleDateString()} (${e} años)`;
+                      })() : ""}
+                    />
+                    <Dato
+                      col="col-md-4"
+                      label="Sexo"
+                      value={paciente.sexo === "M" ? "Masculino" : paciente.sexo === "F" ? "Femenino" : paciente.sexo}
+                    />
+                    <Dato col="col-md-4" label="Grupo sanguíneo" value={paciente.grupo_sanguineo} />
+                    <Dato col="col-md-4" label="Estado Civil" value={paciente.estado_civil} />
+                    <Dato col="col-md-4" label="Ocupación" value={paciente.ocupacion} />
+                    <Dato col="col-md-4" label="Escolaridad" value={paciente.escolaridad} />
+                    <Dato col="col-md-4" label="Religión" value={paciente.religion} />
+                    <Dato col="col-md-4" label="Nacionalidad" value={paciente.nacionalidad} />
+                    <Dato col="col-md-6" label="Teléfono" value={paciente.telefono} />
+                    <Dato col="col-md-6" label="Email" value={paciente.email} />
+                    <Dato col="col-12" label="Dirección" value={paciente.direccion} />
+                    <Dato col="col-md-4" label="Departamento" value={paciente.departamento} />
+                    <Dato col="col-md-4" label="Municipio / Ciudad" value={paciente.ciudad} />
+                    <Dato col="col-md-4" label="País" value={paciente.pais} />
                   </div>
                 )}
 
@@ -1579,26 +1549,11 @@ export default function PerfilPaciente() {
                           <label className="text-muted small">Nombre del responsable</label>
                           <p className="fw-semibold mb-0">{paciente.responsable_nombre}</p>
                         </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Parentesco</label>
-                          <p className="fw-semibold mb-0">{paciente.responsable_parentesco || "—"}</p>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">DNI del responsable</label>
-                          <p className="fw-semibold mb-0">{paciente.responsable_dni || "—"}</p>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Teléfono</label>
-                          <p className="fw-semibold mb-0">{paciente.responsable_telefono || "—"}</p>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Email</label>
-                          <p className="fw-semibold mb-0">{paciente.responsable_email || "—"}</p>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Dirección</label>
-                          <p className="fw-semibold mb-0">{paciente.responsable_direccion || "—"}</p>
-                        </div>
+                        <Dato col="col-md-6" label="Parentesco" value={paciente.responsable_parentesco} />
+                        <Dato col="col-md-6" label="DNI del responsable" value={paciente.responsable_dni} />
+                        <Dato col="col-md-6" label="Teléfono" value={paciente.responsable_telefono} />
+                        <Dato col="col-md-6" label="Email" value={paciente.responsable_email} />
+                        <Dato col="col-md-6" label="Dirección" value={paciente.responsable_direccion} />
                       </div>
                     )}
                   </div>
@@ -1621,20 +1576,13 @@ export default function PerfilPaciente() {
                           <label className="text-muted small">Aseguradora</label>
                           <p className="fw-semibold mb-0">{paciente.aseguradora}</p>
                         </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Número de póliza</label>
-                          <p className="fw-semibold mb-0">{paciente.numero_poliza || "—"}</p>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Tipo de seguro</label>
-                          <p className="fw-semibold mb-0">{paciente.tipo_seguro || "—"}</p>
-                        </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Vigencia</label>
-                          <p className="fw-semibold mb-0">
-                            {paciente.vigencia_seguro ? new Date(paciente.vigencia_seguro).toLocaleDateString() : "—"}
-                          </p>
-                        </div>
+                        <Dato col="col-md-6" label="Número de póliza" value={paciente.numero_poliza} />
+                        <Dato col="col-md-6" label="Tipo de seguro" value={paciente.tipo_seguro} />
+                        <Dato
+                          col="col-md-6"
+                          label="Vigencia"
+                          value={paciente.vigencia_seguro ? new Date(paciente.vigencia_seguro).toLocaleDateString() : ""}
+                        />
                       </div>
                     )}
                   </div>
@@ -1657,10 +1605,7 @@ export default function PerfilPaciente() {
                           <label className="text-muted small">Nombre</label>
                           <p className="fw-semibold mb-0">{paciente.contacto_emergencia_nombre}</p>
                         </div>
-                        <div className="col-md-6">
-                          <label className="text-muted small">Teléfono de emergencia</label>
-                          <p className="fw-semibold mb-0">{paciente.contacto_emergencia_telefono || "—"}</p>
-                        </div>
+                        <Dato col="col-md-6" label="Teléfono de emergencia" value={paciente.contacto_emergencia_telefono} />
                       </div>
                     )}
                   </div>

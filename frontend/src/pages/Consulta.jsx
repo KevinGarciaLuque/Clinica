@@ -20,6 +20,7 @@ export default function Consulta() {
   const [activeTab, setActiveTab] = useState("citas-hoy");
   const [citasHoy, setCitasHoy] = useState([]);
   const [salaEspera, setSalaEspera] = useState([]);
+  const [porLlegar, setPorLlegar] = useState([]);
   const [tieneRecepcionista, setTieneRecepcionista] = useState(true);
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate();
@@ -63,8 +64,15 @@ export default function Consulta() {
             return new Date(a.inicio) - new Date(b.inicio);
           });
         setSalaEspera(activos);
+        // Con recepcionista, los citados de hoy que recepción aún no marcó como llegados
+        // no entran en `activos`; se muestran aparte para que el médico no los pierda de vista.
+        setPorLlegar(conRecepcionista
+          ? (r.data.data || [])
+              .filter(c => c.estado === "PENDIENTE" || c.estado === "CONFIRMADA")
+              .sort((a, b) => new Date(a.inicio) - new Date(b.inicio))
+          : []);
       })
-      .catch(() => setSalaEspera([]))
+      .catch(() => { setSalaEspera([]); setPorLlegar([]); })
       .finally(() => setLoading(false));
   }, []);
 
@@ -156,7 +164,7 @@ export default function Consulta() {
             <CitasDelDia citas={citasHoy} onEstadoChange={cambiarEstado} navigate={navigate} />
           )}
           {!loading && activeTab === "sala-espera" && (
-            <SalaDeEspera citas={salaEspera} onEstadoChange={cambiarEstado} navigate={navigate} tieneRecepcionista={tieneRecepcionista} />
+            <SalaDeEspera citas={salaEspera} porLlegar={porLlegar} onEstadoChange={cambiarEstado} navigate={navigate} tieneRecepcionista={tieneRecepcionista} />
           )}
         </div>
       </div>
@@ -237,8 +245,30 @@ function CitasDelDia({ citas, onEstadoChange, navigate }) {
   );
 }
 
-function SalaDeEspera({ citas, onEstadoChange, navigate, tieneRecepcionista }) {
+function TablaCitas({ children }) {
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse" }}>
+        <thead>
+          <tr style={{ background: "#f8fafc" }}>
+            {["#", "Paciente", "DNI", "Telefono", "Email", "Estado", "Acciones"].map(h => (
+              <th key={h} style={{
+                padding: "10px 14px", fontSize: "0.73rem", fontWeight: 700,
+                color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.05em",
+                borderBottom: "2px solid #e5e7eb", whiteSpace: "nowrap", textAlign: "left",
+              }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>{children}</tbody>
+      </table>
+    </div>
+  );
+}
+
+function SalaDeEspera({ citas, porLlegar = [], onEstadoChange, navigate, tieneRecepcionista }) {
   const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
+  const FLUJO_POR_LLEGAR = ["EN_ESPERA", "EN_ATENCION"];
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
@@ -253,9 +283,13 @@ function SalaDeEspera({ citas, onEstadoChange, navigate, tieneRecepcionista }) {
       </div>
 
       {citas.length === 0 && (
-        <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
+        <div style={{ textAlign: "center", padding: porLlegar.length ? "24px 0" : "48px 0", color: "#9ca3af" }}>
           <i className="bi bi-person-check" style={{ fontSize: "2.8rem", opacity: .3 }}></i>
-          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay pacientes en sala de espera.</p>
+          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>
+            {porLlegar.length
+              ? "Ningún paciente ha sido admitido por recepción todavía."
+              : "No hay pacientes en sala de espera."}
+          </p>
         </div>
       )}
 
@@ -294,6 +328,32 @@ function SalaDeEspera({ citas, onEstadoChange, navigate, tieneRecepcionista }) {
             </table>
           </div>
         </>
+      )}
+
+      {porLlegar.length > 0 && (
+        <div style={{ marginTop: citas.length > 0 ? 28 : 8 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 10 }}>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>Por llegar (citados hoy)</span>
+            <span style={{ background: "#fef9c3", color: "#854d0e", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
+              {porLlegar.length}
+            </span>
+          </div>
+          <div style={{
+            background: "#fffbeb", border: "1px solid #fde68a", borderRadius: 8,
+            padding: "8px 14px", marginBottom: 12, fontSize: "0.79rem", color: "#92400e",
+            display: "flex", alignItems: "center", gap: 7,
+          }}>
+            <i className="bi bi-info-circle"></i>
+            Recepción aún no los marca como llegados. Puedes pasarlos a espera o iniciar la consulta directamente.
+          </div>
+          <TablaCitas>
+            {porLlegar.map((cita, idx) => (
+              <FilaCita key={cita.id} cita={cita} idx={idx}
+                onEstadoChange={onEstadoChange} navigate={navigate}
+                estadosDisponibles={FLUJO_POR_LLEGAR} />
+            ))}
+          </TablaCitas>
+        </div>
       )}
     </div>
   );

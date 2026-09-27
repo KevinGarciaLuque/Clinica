@@ -887,7 +887,7 @@ export default function Citas() {
           <div>
             <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>
               {activeTab === "sala"
-                ? "Sala de Espera"
+                ? "Llegadas de hoy"
                 : view === Views.AGENDA
                 ? "Agenda"
                 : "Programar Citas"}
@@ -927,7 +927,7 @@ export default function Citas() {
         }}>
           {[
             { id: "calendario", icon: "bi-calendar3",        label: "Calendario" },
-            { id: "sala",       icon: "bi-person-lines-fill", label: "Sala de Espera" },
+            { id: "sala",       icon: "bi-person-lines-fill", label: "Llegadas de hoy" },
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
               background: "none", border: "none",
@@ -1155,19 +1155,57 @@ function EstadoBadgeCitas({ estado }) {
   );
 }
 
-// ─── Sala de Espera ───────────────────────────────────────────────────────────
+// ─── Llegadas de hoy (sala de espera) ─────────────────────────────────────────
+// Agrupa las citas del día por etapa para que se lea el flujo de arriba abajo:
+// por llegar → en sala de espera → en atención → atendidos.
+const GRUPOS_SALA = [
+  {
+    id: "por_llegar", titulo: "Por llegar", icono: "bi-hourglass-split",
+    badge: { bg: "#fef9c3", fg: "#854d0e" },
+    ayuda: "Tienen cita hoy pero aún no se registra su llegada.",
+    estados: ["PENDIENTE", "CONFIRMADA", "PENDIENTE_APROBACION"],
+    acciones: [
+      { estado: "EN_ESPERA", label: "Registrar llegada", primary: true },
+      { estado: "EN_ATENCION", label: "Pasar a atención" },
+    ],
+  },
+  {
+    id: "en_espera", titulo: "En sala de espera", icono: "bi-person-lines-fill",
+    badge: { bg: "#ede9fe", fg: "#7c3aed" },
+    ayuda: "Ya llegaron y esperan a ser atendidos.",
+    estados: ["EN_ESPERA"],
+    acciones: [{ estado: "EN_ATENCION", label: "Pasar a atención", primary: true }],
+  },
+  {
+    id: "en_atencion", titulo: "En atención", icono: "bi-clipboard2-pulse",
+    badge: { bg: "#dcfce7", fg: "#166534" },
+    ayuda: "Están con el médico en este momento.",
+    estados: ["EN_ATENCION"],
+    acciones: [{ estado: "COMPLETADA", label: "Finalizar", primary: true }],
+  },
+  {
+    id: "atendidos", titulo: "Atendidos hoy", icono: "bi-check2-circle",
+    badge: { bg: "#f1f5f9", fg: "#475569" },
+    ayuda: "",
+    estados: ["COMPLETADA"],
+    acciones: [],
+  },
+];
+
 function SalaEspera({ sala, onEstadoChange }) {
-  const FLUJO = ["EN_ESPERA", "EN_ATENCION", "COMPLETADA"];
+  const grupos = GRUPOS_SALA
+    .map(g => ({ ...g, citas: sala.filter(c => g.estados.includes(c.estado)) }))
+    .filter(g => g.citas.length > 0);
 
   return (
     <div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 16 }}>
         <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>
-          Sala de Espera - {dayjs().format("dddd D [de] MMMM")}
+          Llegadas de hoy - {dayjs().format("dddd D [de] MMMM")}
         </span>
         {sala.length > 0 && (
-          <span style={{ background: "#ede9fe", color: "#7c3aed", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
-            {sala.length}
+          <span style={{ background: "#eff6ff", color: "#3b82f6", borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
+            {sala.length} {sala.length === 1 ? "cita" : "citas"}
           </span>
         )}
       </div>
@@ -1175,20 +1213,20 @@ function SalaEspera({ sala, onEstadoChange }) {
       {sala.length === 0 && (
         <div style={{ textAlign: "center", padding: "48px 0", color: "#9ca3af" }}>
           <i className="bi bi-person-check" style={{ fontSize: "2.8rem", opacity: .3 }}></i>
-          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay pacientes en sala de espera.</p>
+          <p style={{ marginTop: 10, fontSize: "0.88rem" }}>No hay citas para hoy.</p>
         </div>
       )}
 
-      {sala.length > 0 && (
-        <>
-          <div style={{
-            background: "#f0f9ff", border: "1px solid #bae6fd", borderRadius: 8,
-            padding: "8px 14px", marginBottom: 16, fontSize: "0.79rem", color: "#0369a1",
-            display: "flex", alignItems: "center", gap: 7,
-          }}>
-            <i className="bi bi-info-circle"></i>
-            Se muestran todas las citas de hoy excepto las CANCELADAS y NO_ASISTIO
+      {grupos.map((g, idx) => (
+        <div key={g.id} style={{ marginTop: idx === 0 ? 0 : 26 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 9, marginBottom: 4 }}>
+            <i className={`bi ${g.icono}`} style={{ color: g.badge.fg }}></i>
+            <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>{g.titulo}</span>
+            <span style={{ background: g.badge.bg, color: g.badge.fg, borderRadius: 20, padding: "2px 10px", fontSize: "0.72rem", fontWeight: 700 }}>
+              {g.citas.length}
+            </span>
           </div>
+          {g.ayuda && <div style={{ fontSize: "0.77rem", color: "#9ca3af", marginBottom: 10 }}>{g.ayuda}</div>}
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -1203,24 +1241,23 @@ function SalaEspera({ sala, onEstadoChange }) {
                 </tr>
               </thead>
               <tbody>
-                {sala.map((c, i) => (
-                  <FilaSala key={c.id} c={c} i={i}
-                    flujo={FLUJO} onEstadoChange={onEstadoChange} />
+                {g.citas.map((c, i) => (
+                  <FilaSala key={c.id} c={c} i={i} acciones={g.acciones} onEstadoChange={onEstadoChange} />
                 ))}
               </tbody>
             </table>
           </div>
-        </>
-      )}
+        </div>
+      ))}
     </div>
   );
 }
 
-function FilaSala({ c, i, flujo, onEstadoChange }) {
+function FilaSala({ c, i, acciones, onEstadoChange }) {
   const [hover, setHover] = useState(false);
-  const btnStyle = (color) => ({
-    background: "transparent", border: `1px solid ${color}`,
-    borderRadius: 7, color, padding: "3px 10px", fontSize: "0.72rem",
+  const btnStyle = (color, primary) => ({
+    background: primary ? color : "transparent", border: `1px solid ${color}`,
+    borderRadius: 7, color: primary ? "#fff" : color, padding: "3px 10px", fontSize: "0.72rem",
     cursor: "pointer", fontWeight: 600, whiteSpace: "nowrap",
   });
   return (
@@ -1255,10 +1292,10 @@ function FilaSala({ c, i, flujo, onEstadoChange }) {
       </td>
       <td style={{ padding: "12px 14px" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-          {flujo.filter(e => e !== c.estado).map(e => (
-            <button key={e} onClick={() => onEstadoChange(c.id, e)}
-              style={btnStyle(ESTADO_COLOR[e]?.dot || "#6b7280")}>
-              {e.replace(/_/g, " ")}
+          {acciones.map(a => (
+            <button key={a.estado} onClick={() => onEstadoChange(c.id, a.estado)}
+              style={btnStyle(ESTADO_COLOR[a.estado]?.dot || "#6b7280", a.primary)}>
+              {a.label}
             </button>
           ))}
         </div>
