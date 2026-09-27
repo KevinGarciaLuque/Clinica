@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { CONDITIONS, UPPER_TEETH, LOWER_TEETH, SURFACE_LABEL, toothType } from "./constantes_odontologia";
+import { CONDITIONS, UPPER_TEETH, LOWER_TEETH, UPPER_TEMPORAL_ROW, LOWER_TEMPORAL_ROW, TEMPORAL_TEETH, esTemporal, SURFACE_LABEL, toothType } from "./constantes_odontologia";
 
 // ─── Dimensiones del SVG ──────────────────────────────────────────────────────
 const TW = 38;   // tooth width (px)
@@ -160,7 +160,16 @@ function ToothShape({ num, data, isSelected, isUpper, activeCond, readOnly, onSu
 }
 
 // ─── Odontograma principal ────────────────────────────────────────────────────
-export default function Odontograma({ value = {}, onChange, readOnly = false }) {
+// Dentición mostrada por defecto según la edad; si ya hay datos de temporales, se muestran también
+function modoInicial(value, edad) {
+  const hayTemporales = TEMPORAL_TEETH.some((n) => value?.[n] && (value[n].ausente || ['v', 'p', 'm', 'd', 'o'].some((s) => value[n][s] && value[n][s] !== 'sano')));
+  if (edad != null && edad < 6) return 'temporal';
+  if ((edad != null && edad <= 12) || hayTemporales) return 'mixta';
+  return 'permanente';
+}
+
+export default function Odontograma({ value = {}, onChange, readOnly = false, edad = null }) {
+  const [modo, setModo] = useState(() => modoInicial(value, edad)); // 'permanente' | 'temporal' | 'mixta'
   const [selected, setSelected]   = useState(null);
   const [activeCond, setActiveCond] = useState('caries');
 
@@ -201,7 +210,7 @@ export default function Odontograma({ value = {}, onChange, readOnly = false }) 
   };
 
   const selectedData = selected ? getTooth(selected) : null;
-  const isUpper = (num) => UPPER_TEETH.includes(num);
+  const isUpper = (num) => UPPER_TEETH.includes(num) || UPPER_TEMPORAL_ROW.includes(num);
 
   return (
     <div>
@@ -239,91 +248,61 @@ export default function Odontograma({ value = {}, onChange, readOnly = false }) 
         </div>
       )}
 
-      {/* ── SVG Odontograma ── */}
-      <div style={{ overflowX: 'auto', background: '#f8fafc', borderRadius: 10, padding: '10px 4px', border: '1px solid #e2e8f0' }}>
-        <svg
-          width={SVG_W}
-          height={SVG_H}
-          style={{ display: 'block', margin: '0 auto', userSelect: 'none' }}
-        >
-          {/* Etiquetas Superior / Inferior */}
-          <text x={PAD_L} y={TOP_Y - 4} fontSize={9} fill="#94a3b8" fontStyle="italic">Superior</text>
-          <text x={PAD_L} y={TOP_Y + TH + NL + AG - 4} fontSize={9} fill="#94a3b8" fontStyle="italic">Inferior</text>
-
-          {/* Línea de línea media */}
-          <line
-            x1={toothX(8) - MG / 2}  y1={TOP_Y - 2}
-            x2={toothX(8) - MG / 2}  y2={TOP_Y + TH + NL + AG + TH + NL}
-            stroke="#cbd5e1" strokeWidth={1} strokeDasharray="4,3"
-          />
-
-          {/* Línea separadora arcos */}
-          <line
-            x1={PAD_L} y1={TOP_Y + TH + NL + AG / 2}
-            x2={SVG_W - PAD_L} y2={TOP_Y + TH + NL + AG / 2}
-            stroke="#e2e8f0" strokeWidth={1}
-          />
-
-          {/* Dientes superiores */}
-          {UPPER_TEETH.map((num, i) => {
-            const x = toothX(i);
-            return (
-              <g key={num} transform={`translate(${x},${TOP_Y})`}>
-                <ToothShape
-                  num={num}
-                  data={value[num]}
-                  isSelected={selected === num}
-                  isUpper={true}
-                  activeCond={activeCond}
-                  readOnly={readOnly}
-                  onSurface={handleSurface}
-                  onSelect={handleSelect}
-                />
-                {/* Número de diente */}
-                <text
-                  x={TW / 2} y={TH + 10}
-                  textAnchor="middle" fontSize={9}
-                  fill={selected === num ? '#FF9800' : '#64748b'}
-                  fontWeight={selected === num ? 700 : 400}
-                  style={{ pointerEvents: 'none' }}
-                >
-                  {num}
-                </text>
-              </g>
-            );
-          })}
-
-          {/* Dientes inferiores */}
-          {LOWER_TEETH.map((num, i) => {
-            const x = toothX(i);
-            const y = TOP_Y + TH + NL + AG;
-            return (
-              <g key={num} transform={`translate(${x},${y})`}>
-                <ToothShape
-                  num={num}
-                  data={value[num]}
-                  isSelected={selected === num}
-                  isUpper={false}
-                  activeCond={activeCond}
-                  readOnly={readOnly}
-                  onSurface={handleSurface}
-                  onSelect={handleSelect}
-                />
-                {/* Número de diente */}
-                <text
-                  x={TW / 2} y={TH + 10}
-                  textAnchor="middle" fontSize={9}
-                  fill={selected === num ? '#FF9800' : '#64748b'}
-                  fontWeight={selected === num ? 700 : 400}
-                  style={{ pointerEvents: 'none' }}
-                >
-                  {num}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
+      {/* ── Dentición ── */}
+      <div role="tablist" aria-label="Tipo de dentición" style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+        <span style={{ fontSize: 12, color: '#64748b', fontWeight: 600, marginRight: 4 }}>Dentición:</span>
+        {[['permanente', 'Permanente'], ['temporal', 'Temporal'], ['mixta', 'Mixta']].map(([id, label]) => (
+          <button key={id} role="tab" aria-selected={modo === id} onClick={() => setModo(id)}
+            style={{
+              padding: '4px 12px', borderRadius: 999, fontSize: 12, cursor: 'pointer', fontWeight: modo === id ? 700 : 500,
+              border: `1.5px solid ${modo === id ? '#FF9800' : '#e2e8f0'}`,
+              background: modo === id ? '#fff7ed' : '#fff', color: modo === id ? '#c2410c' : '#64748b',
+            }}>
+            {label}
+          </button>
+        ))}
+        {edad != null && <span style={{ fontSize: 11, color: '#94a3b8' }}>Paciente de {edad} años</span>}
       </div>
+
+      {/* ── SVG Odontograma ── */}
+      {[
+        ...(modo !== 'temporal' ? [{ titulo: modo === 'mixta' ? 'Dientes permanentes' : '', sup: UPPER_TEETH, inf: LOWER_TEETH }] : []),
+        ...(modo !== 'permanente' ? [{ titulo: modo === 'mixta' ? 'Dientes temporales' : '', sup: UPPER_TEMPORAL_ROW, inf: LOWER_TEMPORAL_ROW }] : []),
+      ].map(({ titulo, sup, inf }) => (
+        <div key={titulo || modo} style={{ marginBottom: 10 }}>
+          {titulo && <div style={{ fontSize: 12, fontWeight: 700, color: '#475569', margin: '4px 2px' }}>{titulo}</div>}
+          <div style={{ overflowX: 'auto', background: '#f8fafc', borderRadius: 10, padding: '10px 4px', border: '1px solid #e2e8f0' }}>
+            <svg width={SVG_W} height={SVG_H} style={{ display: 'block', margin: '0 auto', userSelect: 'none' }}>
+              <text x={PAD_L} y={TOP_Y - 4} fontSize={9} fill="#94a3b8" fontStyle="italic">Superior</text>
+              <text x={PAD_L} y={TOP_Y + TH + NL + AG - 4} fontSize={9} fill="#94a3b8" fontStyle="italic">Inferior</text>
+
+              <line x1={toothX(8) - MG / 2} y1={TOP_Y - 2} x2={toothX(8) - MG / 2} y2={TOP_Y + TH + NL + AG + TH + NL}
+                stroke="#cbd5e1" strokeWidth={1} strokeDasharray="4,3" />
+              <line x1={PAD_L} y1={TOP_Y + TH + NL + AG / 2} x2={SVG_W - PAD_L} y2={TOP_Y + TH + NL + AG / 2}
+                stroke="#e2e8f0" strokeWidth={1} />
+
+              {[[sup, TOP_Y, true], [inf, TOP_Y + TH + NL + AG, false]].map(([fila, y, arribaFila]) =>
+                fila.map((num, i) => {
+                  if (num == null) return null;
+                  return (
+                    <g key={num} transform={`translate(${toothX(i)},${y})`}>
+                      <ToothShape
+                        num={num} data={value[num]} isSelected={selected === num} isUpper={arribaFila}
+                        activeCond={activeCond} readOnly={readOnly} onSurface={handleSurface} onSelect={handleSelect}
+                      />
+                      <text x={TW / 2} y={TH + 10} textAnchor="middle" fontSize={9}
+                        fill={selected === num ? '#FF9800' : '#64748b'} fontWeight={selected === num ? 700 : 400}
+                        style={{ pointerEvents: 'none' }}>
+                        {num}
+                      </text>
+                    </g>
+                  );
+                })
+              )}
+            </svg>
+          </div>
+        </div>
+      ))}
 
       {/* ── Panel del diente seleccionado ── */}
       {selected && selectedData && (
@@ -337,7 +316,7 @@ export default function Odontograma({ value = {}, onChange, readOnly = false }) 
               <div>
                 <strong style={{ color: '#FF9800', fontSize: 15 }}>Diente #{selected}</strong>
                 <span style={{ color: '#94a3b8', fontSize: 11, marginLeft: 8 }}>
-                  {isUpper(selected) ? 'Superior' : 'Inferior'} · {toothType(selected).charAt(0).toUpperCase() + toothType(selected).slice(1)}
+                  {isUpper(selected) ? 'Superior' : 'Inferior'} · {toothType(selected).charAt(0).toUpperCase() + toothType(selected).slice(1)}{esTemporal(selected) ? ' · Temporal' : ''}
                 </span>
               </div>
             </div>

@@ -5,7 +5,7 @@ import api from "../../api/api";
 import { nombreMedico } from "../../utils/medico";
 
 // ─── Modal Agendar Próxima Cita (desde tab Derma) ────────────────────────────
-export default function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm }) {
+export default function ModalAgendarProximaCita({ paciente, pacienteId, onClose, onConfirm, motivoSugerido = "" }) {
   const [medicos,     setMedicos]     = useState([]);
   const [medicoId,    setMedicoId]    = useState("");
   const [fechaSel,    setFechaSel]    = useState(dayjs().add(1, "week").format("YYYY-MM-DD"));
@@ -14,7 +14,7 @@ export default function ModalAgendarProximaCita({ paciente, pacienteId, onClose,
   const [horaInicio,  setHoraInicio]  = useState("");
   const [horaFin,     setHoraFin]     = useState("");
   const [tipo,        setTipo]        = useState("CONTROL");
-  const [motivo,      setMotivo]      = useState("");
+  const [motivo,      setMotivo]      = useState(motivoSugerido);
   const [loadSlots,   setLoadSlots]   = useState(false);
   const [saving,      setSaving]      = useState(false);
   const [err,         setErr]         = useState("");

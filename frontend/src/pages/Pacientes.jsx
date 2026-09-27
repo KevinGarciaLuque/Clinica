@@ -283,7 +283,19 @@ export default function Pacientes() {
     e.stopPropagation();
     e.preventDefault();
     if (soloOdontologia) {
-      navigate(`/odontologia/consulta?paciente_id=${paciente.id}`);
+      // Si el paciente tiene cita hoy, la consulta se abre ligada a ella: al iniciar pasa a
+      // EN ATENCIÓN y al firmar se completa. Sin cita (paciente de paso) se abre igual que antes.
+      setCheckingCita(true);
+      try {
+        const hoy = dayjs().format("YYYY-MM-DD");
+        const r = await api.get("/citas", { params: { desde: hoy, hasta: hoy, paciente_id: paciente.id } });
+        const citaHoy = (r.data.data || []).find(c => !["CANCELADA", "NO_ASISTIO", "COMPLETADA"].includes(c.estado));
+        navigate(`/odontologia/consulta?paciente_id=${paciente.id}${citaHoy ? `&cita_id=${citaHoy.id}` : ""}`);
+      } catch {
+        navigate(`/odontologia/consulta?paciente_id=${paciente.id}`);
+      } finally {
+        setCheckingCita(false);
+      }
       return;
     }
     setCheckingCita(true);

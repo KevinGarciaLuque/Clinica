@@ -4,9 +4,15 @@ import dayjs from "dayjs";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import Odontograma from "./Odontograma";
+import { proponerCambios, estable } from "./propuestasFirma.js";
+import { precioSugerido, lineasCobro, dinero, sugerirProximaSesion } from "./presupuesto.js";
+import ModalAgendarProximaCita from "../ConsultaMedica/ModalAgendarProximaCita";
+import PresupuestoPrint from "./PresupuestoPrint.jsx";
+import ModalCobroSesion from "./ModalCobroSesion.jsx";
+import PrescripcionTab from "../ConsultaMedica/PrescripcionTab";
 import {
   CONDITIONS, PROCEDIMIENTOS, DX_RAPIDOS, MATERIALES,
-  SURFACE_LABEL, EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS, ALL_TEETH,
+  SURFACE_LABEL, EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS, TODAS_LAS_PIEZAS,
   PLAN_FASES_DEFAULT
 } from "./constantes_odontologia";
 
@@ -32,6 +38,7 @@ const TABS = [
   { id: 'odontograma', label: 'Odontograma',          icon: 'bi-grid-3x3-gap-fill' },
   { id: 'sesion',      label: 'Consulta',             icon: 'bi-clipboard2-pulse' },
   { id: 'plan',        label: 'Plan de Tratamiento',  icon: 'bi-list-check' },
+  { id: 'receta',      label: 'Receta',               icon: 'bi-prescription2' },
   { id: 'historia',    label: 'Historia',             icon: 'bi-journal-medical' },
   { id: 'cuenta',      label: 'Estudios y Cuenta',    icon: 'bi-wallet2' },
 ];
@@ -183,6 +190,20 @@ export default function ConsultaOdontologia() {
   const [historia, setHistoria]       = useState(initHistoria());
   const [historiaGuardada, setHistoriaGuardada] = useState(false);
   const [catalogoCondiciones, setCatalogoCondiciones] = useState([]);
+  const [sinHistoria, setSinHistoria] = useState(false);
+
+  // Revisión previa a la firma (Fase 2) y control de cambios sin guardar
+  const [revisionFirma, setRevisionFirma] = useState(null);
+  const [servicios, setServicios] = useState([]);
+  const [cobro, setCobro] = useState(null);            // { sesion, lineas }
+  const [verPresupuesto, setVerPresupuesto] = useState(false);
+  const [verVersiones, setVerVersiones] = useState(false);
+  const puedeCobrar = ['MEDICO', 'ADMIN', 'SUPER_ADMIN'].includes(user?.tipo);
+  const [agendar, setAgendar] = useState(false);
+  const [addendas, setAddendas] = useState([]);
+  const [nuevaNota, setNuevaNota] = useState('');
+  const odoGuardadoRef  = useRef('');
+  const planGuardadoRef = useRef('');
 
   // Plan
   const [plan, setPlan]               = useState(initPlan());
@@ -202,7 +223,7 @@ export default function ConsultaOdontologia() {
   async function loadAll(pid) {
     setLoading(true);
     try {
-      const [rPac, rOdo, rHist, rPlan, rRes, rSes, rCond, rEst, rFact] = await Promise.all([
+      const [rPac, rOdo, rHist, rPlan, rRes, rSes, rCond, rEst, rFact, rServ] = await Promise.all([
         api.get(`/pacientes/${pid}`),
         api.get(`/odontologia/odontograma/${pid}`),
         api.get(`/odontologia/historia/${pid}`),
@@ -212,15 +233,22 @@ export default function ConsultaOdontologia() {
         api.get('/catalogos-condiciones-medicas'),
         api.get('/estudios', { params: { paciente_id: pid } }),
         api.get('/facturacion', { params: { paciente_id: pid } }),
+        api.get('/servicios').catch(() => ({ data: { data: [] } })), // el catálogo es opcional
       ]);
+      setServicios(rServ.data.data || []);
       setPaciente(rPac.data.data || rPac.data);
       setCatalogoCondiciones(rCond.data.data || []);
       setEstudios(rEst.data.data || []);
       setFacturas(rFact.data.data || []);
       if (rOdo.data.data?.dientes) {
         const d = rOdo.data.data.dientes;
-        setOdontograma(typeof d === 'string' ? JSON.parse(d) : d);
+        const odo = typeof d === 'string' ? JSON.parse(d) : d;
+        setOdontograma(odo);
+        odoGuardadoRef.current = estable(odo);
+      } else {
+        odoGuardadoRef.current = estable({});
       }
+      setSinHistoria(!rHist.data.data);
       if (rHist.data.data) {
         const h = rHist.data.data;
         const hSinNulos = Object.fromEntries(Object.entries(h).map(([k, v]) => [k, v === null ? '' : v]));
@@ -235,6 +263,7 @@ export default function ConsultaOdontologia() {
       if (rPlan.data.data) {
         const p = rPlan.data.data;
         const fases = typeof p.fases === 'string' ? JSON.parse(p.fases || 'null') : p.fases;
+        if (Array.isArray(fases) && fases.length > 0) planGuardadoRef.current = estable(fases);
         setPlan({
           fases: (Array.isArray(fases) && fases.length > 0) ? fases : PLAN_FASES_DEFAULT(),
           vigencia_dias: p.vigencia_dias || 90,
@@ -262,6 +291,7 @@ export default function ConsultaOdontologia() {
     setSaving(true);
     try {
       await api.post(`/odontologia/odontograma/${pacienteId}`, { dientes: odontograma });
+      odoGuardadoRef.current = estable(odontograma);
       setOdoGuardado(true);
       showMsg('ok', 'Odontograma guardado');
       setTimeout(() => setOdoGuardado(false), 3000);
@@ -289,16 +319,104 @@ export default function ConsultaOdontologia() {
     finally { setSaving(false); }
   }
 
-  async function firmarSesion() {
+  // Firmar en dos pasos: 1) se guarda lo escrito y se proponen cambios; 2) el dentista confirma
+  async function abrirRevisionFirma() {
     if (!sesionActual) return;
     setSaving(true);
     try {
-      await api.post(`/odontologia/sesiones/${sesionActual.id}/firmar`);
+      // Se guarda primero lo escrito para no perderlo al quedar la sesión firmada
+      await api.put(`/odontologia/sesiones/${sesionActual.id}`, { ...sesionForm, paciente_id: pacienteId });
+
+      const propuestas = proponerCambios({ procedimientos: sesionForm.procedimientos || [], fases: plan.fases, odontograma });
+      if (propuestas.odoProps.length && estable(odontograma) !== odoGuardadoRef.current) {
+        showMsg('error', 'Guarda el odontograma antes de firmar: tiene cambios sin guardar.');
+        return;
+      }
+      if (propuestas.planMatches.length && estable(plan.fases) !== planGuardadoRef.current) {
+        showMsg('error', 'Guarda el plan de tratamiento antes de firmar: tiene cambios sin guardar.');
+        return;
+      }
+      setRevisionFirma(propuestas);
+    } catch (e) {
+      showMsg('error', e.response?.data?.msg || 'No se pudo preparar la firma');
+    } finally { setSaving(false); }
+  }
+
+  async function confirmarFirma(aplicar) {
+    if (!sesionActual || !revisionFirma) return;
+    setSaving(true);
+    try {
+      const planSel = aplicar
+        ? revisionFirma.planMatches.filter(m => m.marcado).map(m => ({ fase_id: m.faseId, item_id: m.itemId }))
+        : [];
+      const odoSel = aplicar
+        ? revisionFirma.odoProps.filter(m => m.marcado).map(({ pieza, tipo, condicion, superficies }) => ({ pieza, tipo, condicion, superficies }))
+        : [];
+      const r = await api.post(`/odontologia/sesiones/${sesionActual.id}/firmar`, { plan_items: planSel, odontograma: odoSel });
       setSesionActual(prev => ({ ...prev, estado: 'FIRMADA' }));
-      showMsg('ok', 'Sesión firmada correctamente');
+      setRevisionFirma(null);
+      const ap = r.data?.aplicado || {};
+      showMsg('ok', `Sesión firmada${ap.plan_items ? ` · ${ap.plan_items} ítem(s) del plan completado(s)` : ''}${ap.odontograma ? ` · ${ap.odontograma} cambio(s) en el odontograma` : ''}`);
+      const rp = await api.get(`/odontologia/plan/${pacienteId}`).catch(() => null);
+      const fasesFrescas = rp?.data?.data?.fases
+        ? (typeof rp.data.data.fases === 'string' ? JSON.parse(rp.data.data.fases) : rp.data.data.fases)
+        : plan.fases;
+      await loadAll(pacienteId); // refleja plan, odontograma, resumen y lista de sesiones
+      // Ofrece cobrar lo realizado (quien atiende decide; nunca se factura solo)
+      if (puedeCobrar && (sesionForm.procedimientos || []).length > 0) {
+        abrirCobro({ id: sesionActual.id, procedimientos: sesionForm.procedimientos }, fasesFrescas);
+      }
+    } catch (e) { showMsg('error', e.response?.data?.msg || 'Error al firmar'); }
+    finally { setSaving(false); }
+  }
+
+  // ── Presupuesto imprimible: solo del plan ya guardado ───────────────────────
+  function abrirPresupuesto() {
+    if (estable(plan.fases) !== planGuardadoRef.current) {
+      showMsg('error', 'Guarda el plan antes de imprimir el presupuesto.');
+      return;
+    }
+    setVerPresupuesto(true);
+  }
+
+  // ── Cobro de la sesión (recibo con los procedimientos realizados) ────────────
+  function abrirCobro(sesion, fases = plan.fases) {
+    const lineas = lineasCobro({ sesion, fases, servicios });
+    setCobro({ sesion, lineas });
+  }
+
+  async function cerrarCobro(facturaId) {
+    const sesion = cobro?.sesion;
+    setCobro(null);
+    if (facturaId && sesion) {
+      setSesionActual(prev => (prev && prev.id === sesion.id ? { ...prev, factura_id: facturaId } : prev));
       const r = await api.get('/odontologia/sesiones', { params: { paciente_id: pacienteId, limit: 30 } });
       setSesiones(r.data.data);
-    } catch (e) { showMsg('error', e.response?.data?.msg || 'Error al firmar'); }
+      showMsg('ok', 'Cobro registrado');
+    }
+  }
+
+  // ── Notas posteriores a la firma (addendum): solo se agregan ─────────────────
+  useEffect(() => {
+    if (!sesionActual?.id || sesionActual.estado !== 'FIRMADA') { setAddendas([]); return; }
+    let vivo = true;
+    api.get(`/odontologia/sesiones/${sesionActual.id}/addendas`)
+      .then(r => { if (vivo) setAddendas(r.data.data || []); })
+      .catch(() => { if (vivo) setAddendas([]); });
+    return () => { vivo = false; };
+  }, [sesionActual?.id, sesionActual?.estado]);
+
+  async function agregarAddendum() {
+    const texto = nuevaNota.trim();
+    if (texto.length < 3 || !sesionActual) return;
+    setSaving(true);
+    try {
+      await api.post(`/odontologia/sesiones/${sesionActual.id}/addendas`, { texto });
+      const r = await api.get(`/odontologia/sesiones/${sesionActual.id}/addendas`);
+      setAddendas(r.data.data || []);
+      setNuevaNota('');
+      showMsg('ok', 'Nota agregada a la sesión');
+    } catch (e) { showMsg('error', e.response?.data?.msg || 'No se pudo agregar la nota'); }
     finally { setSaving(false); }
   }
 
@@ -340,6 +458,7 @@ export default function ConsultaOdontologia() {
     try {
       await api.post(`/odontologia/historia/${pacienteId}`, historia);
       setHistoriaGuardada(true);
+      setSinHistoria(false);
       showMsg('ok', 'Historia guardada');
       setTimeout(() => setHistoriaGuardada(false), 3000);
     } catch { showMsg('error', 'Error al guardar historia'); }
@@ -382,6 +501,7 @@ export default function ConsultaOdontologia() {
     setSaving(true);
     try {
       await api.post(`/odontologia/plan/${pacienteId}`, plan);
+      planGuardadoRef.current = estable(plan.fases);
       setPlanGuardado(true);
       showMsg('ok', 'Plan guardado');
       setTimeout(() => setPlanGuardado(false), 3000);
@@ -492,7 +612,7 @@ export default function ConsultaOdontologia() {
   function prellenarHallazgosDesdeOdontograma() {
     const existentes = new Set((sesionForm.hallazgos || []).map(h => h.pieza));
     const nuevos = [];
-    for (const pieza of ALL_TEETH) {
+    for (const pieza of TODAS_LAS_PIEZAS) {
       const key = String(pieza);
       if (existentes.has(key)) continue;
       const estado = odontograma[key];
@@ -528,6 +648,32 @@ export default function ConsultaOdontologia() {
 
   const readOnly = sesionActual?.estado === 'FIRMADA';
 
+  // ── Alertas clínicas del paciente (se muestran en todas las pestañas) ────────
+  // Salen de la historia ya registrada; nunca se completan solas.
+  const alertas = (() => {
+    const lista = [];
+    const agregar = (label, nivel = 'alto') => {
+      if (!lista.some(a => a.label.toLowerCase() === label.toLowerCase())) lista.push({ label, nivel });
+    };
+    if (historia.alergia_anestesia) agregar('Alergia a anestesia local');
+    if (historia.alergia_latex)     agregar('Alergia al látex');
+    if (historia.anticoagulantes)   agregar('Toma anticoagulantes');
+    if (historia.diabetes)          agregar('Diabetes', 'medio');
+    if (historia.hipertension)      agregar('Hipertensión', 'medio');
+    // Condiciones del catálogo marcadas como "alerta" y respondidas SÍ (sin repetir las de arriba)
+    const yaCubierto = (nombre) => /diabet|hipertens|anticoag|latex|látex|anest/i.test(nombre);
+    for (const a of (historia.antecedentes || [])) {
+      const cond = catalogoCondiciones.find(c => c.id === a.condicion_id);
+      if (cond?.es_alerta && a.respuesta === 'SI' && !yaCubierto(cond.nombre)) {
+        agregar(a.especifique ? `${cond.nombre}: ${a.especifique}` : cond.nombre);
+      }
+    }
+    if ((historia.otras_condiciones || '').trim()) agregar(`Otras: ${historia.otras_condiciones.trim()}`, 'medio');
+    const meds = (historia.medicamentos || []).length;
+    if (meds > 0) agregar(`Medicación actual: ${meds}`, 'info');
+    return lista;
+  })();
+
   // ── Render ───────────────────────────────────────────────────────────────────
   if (!pacienteId) {
     return (
@@ -560,6 +706,46 @@ export default function ConsultaOdontologia() {
         }}>
           <i className={`bi ${msg.type === 'ok' ? 'bi-check-circle-fill' : 'bi-exclamation-triangle-fill'} me-2`} />{msg.text}
         </div>
+      )}
+
+      {agendar && (
+        <ModalAgendarProximaCita
+          paciente={paciente} pacienteId={pacienteId}
+          motivoSugerido={(sugerirProximaSesion(plan.fases)?.texto) || 'Control odontológico'}
+          onClose={() => setAgendar(false)}
+          onConfirm={(fechaHora) => {
+            setAgendar(false);
+            if (!readOnly) setSesionForm(f => ({ ...f, proxima_cita: `Agendada: ${dayjs(fechaHora).format('DD/MM/YYYY HH:mm')}` }));
+            showMsg('ok', `Cita agendada para el ${dayjs(fechaHora).format('DD/MM/YYYY HH:mm')}`);
+          }}
+        />
+      )}
+      {verPresupuesto && (
+        <PresupuestoPrint
+          paciente={paciente} plan={plan}
+          dentista={user ? (user.nombre_display || `${user.nombres || ''} ${user.apellidos || ''}`.trim()) : ''}
+          clinicaId={user?.clinica_id} clinicaNombreInicial={user?.clinica_nombre || ''}
+          onClose={() => setVerPresupuesto(false)}
+        />
+      )}
+      {verVersiones && (
+        <VersionesPlanModal
+          pacienteId={pacienteId} onCerrar={() => setVerVersiones(false)}
+          onUsar={(fases) => { setPlan(p => ({ ...p, fases })); setVerVersiones(false); showMsg('ok', 'Versión cargada en el editor. Pulsa "Guardar plan" para conservarla.'); }}
+        />
+      )}
+      {cobro && (
+        <ModalCobroSesion
+          paciente={paciente} sesion={cobro.sesion} citaId={sesionActual?.cita_id || citaId}
+          lineasIniciales={cobro.lineas} onCerrar={cerrarCobro}
+          onFacturaFormal={() => { setCobro(null); navigate(`/facturacion?nueva=1&paciente_id=${pacienteId}${(sesionActual?.cita_id || citaId) ? `&cita_id=${sesionActual?.cita_id || citaId}` : ''}`); }}
+        />
+      )}
+      {revisionFirma && (
+        <RevisionFirmaModal
+          datos={revisionFirma} setDatos={setRevisionFirma} saving={saving}
+          onCancel={() => setRevisionFirma(null)} onConfirm={confirmarFirma}
+        />
       )}
 
       {/* ── Header ── */}
@@ -611,6 +797,38 @@ export default function ConsultaOdontologia() {
           </div>
         )}
       </div>
+
+      {/* ── Alertas clínicas ── */}
+      {!loading && pacienteId && (alertas.length > 0 || sinHistoria) && (
+        <div role="alert" style={{
+          display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', marginBottom: 16,
+          padding: '10px 14px', borderRadius: 12,
+          background: sinHistoria && alertas.length === 0 ? '#fffbeb' : '#fef2f2',
+          border: `1px solid ${sinHistoria && alertas.length === 0 ? '#fde68a' : '#fecaca'}`,
+        }}>
+          <i className="bi bi-exclamation-triangle-fill" aria-hidden="true"
+             style={{ color: sinHistoria && alertas.length === 0 ? '#d97706' : '#dc2626', fontSize: 16 }} />
+          <span style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.04em', textTransform: 'uppercase', color: '#7f1d1d' }}>
+            {alertas.length > 0 ? 'Alertas del paciente' : 'Historia médica pendiente'}
+          </span>
+          {alertas.map(a => (
+            <span key={a.label} style={{
+              fontSize: 12, fontWeight: 700, padding: '3px 10px', borderRadius: 999,
+              background: a.nivel === 'alto' ? '#dc2626' : a.nivel === 'medio' ? '#fff' : '#f1f5f9',
+              color: a.nivel === 'alto' ? '#fff' : a.nivel === 'medio' ? '#b91c1c' : '#475569',
+              border: a.nivel === 'medio' ? '1px solid #fca5a5' : '1px solid transparent',
+            }}>{a.label}</span>
+          ))}
+          {sinHistoria && (
+            <button onClick={() => setTab('historia')} style={{
+              marginLeft: 'auto', padding: '4px 12px', borderRadius: 8, cursor: 'pointer',
+              fontSize: 12, fontWeight: 700, background: '#fff', color: COLOR_D, border: `1px solid ${BORDER}`,
+            }}>
+              {alertas.length > 0 ? 'Completar historia' : 'Registrar antecedentes antes de atender'}
+            </button>
+          )}
+        </div>
+      )}
 
       {loading && (
         <div style={{ textAlign: 'center', padding: 40, color: '#94a3b8' }}>Cargando datos del paciente...</div>
@@ -681,7 +899,8 @@ export default function ConsultaOdontologia() {
               </div>
 
               {odoView === '2d' && (
-                <Odontograma value={odontograma} onChange={setOdontograma} />
+                <Odontograma value={odontograma} onChange={setOdontograma}
+                  edad={paciente?.fecha_nacimiento ? dayjs().diff(dayjs(paciente.fecha_nacimiento), 'year') : null} />
               )}
               {odoView === '3d' && (
                 <Suspense fallback={
@@ -721,7 +940,10 @@ export default function ConsultaOdontologia() {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-                        <span style={{ fontWeight: 700, fontSize: 13, color: COLOR_D }}>Sesión #{s.numero_sesion}</span>
+                        <span style={{ fontWeight: 700, fontSize: 13, color: COLOR_D }}>
+                          Sesión #{s.numero_sesion}
+                          {s.factura_id && <i className="bi bi-receipt ms-2" title={`Cobrada · recibo #${s.factura_id}`} style={{ color: '#16a34a', fontSize: 12 }} />}
+                        </span>
                         <span style={{
                           fontSize: 10, padding: '1px 7px', borderRadius: 10, fontWeight: 700,
                           background: s.estado === 'FIRMADA' ? '#dcfce7' : '#fef3c7',
@@ -752,8 +974,19 @@ export default function ConsultaOdontologia() {
                     {readOnly && <span style={{ marginLeft: 10, fontSize: 12, background: '#dcfce7', color: '#166534', padding: '2px 8px', borderRadius: 8, fontWeight: 700 }}>FIRMADA</span>}
                   </h3>
                   <div style={{ display: 'flex', gap: 8 }}>
+                    {readOnly && puedeCobrar && !sesionActual?.factura_id && (
+                      <button onClick={() => abrirCobro({ id: sesionActual.id, procedimientos: sesionForm.procedimientos })}
+                        style={{ padding: '7px 16px', borderRadius: 8, background: '#2563eb', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                        <i className="bi bi-receipt me-1" /> Cobrar sesión
+                      </button>
+                    )}
+                    {readOnly && sesionActual?.factura_id && (
+                      <span style={{ alignSelf: 'center', fontSize: 12, fontWeight: 700, color: '#166534', background: '#dcfce7', padding: '4px 10px', borderRadius: 999 }}>
+                        <i className="bi bi-receipt me-1" />Cobrada · recibo #{sesionActual.factura_id}
+                      </span>
+                    )}
                     {sesionActual && !readOnly && (
-                      <button onClick={firmarSesion} disabled={saving}
+                      <button onClick={abrirRevisionFirma} disabled={saving}
                         style={{ padding: '7px 16px', borderRadius: 8, background: '#16a34a', color: '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
                         <i className="bi bi-pen me-1" /> Firmar sesión
                       </button>
@@ -853,7 +1086,7 @@ export default function ConsultaOdontologia() {
                       <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 36px', gap: 6, marginTop: 6 }}>
                         <select value={nuevoHallazgo.pieza} onChange={e => setNuevoHallazgo(h => ({ ...h, pieza: e.target.value }))} style={inputStyle}>
                           <option value="">Pieza</option>
-                          {ALL_TEETH.map(p => <option key={p} value={p}>{p}</option>)}
+                          {TODAS_LAS_PIEZAS.map(p => <option key={p} value={p}>{p}</option>)}
                         </select>
                         <input value={nuevoHallazgo.descripcion} onChange={e => setNuevoHallazgo(h => ({ ...h, descripcion: e.target.value }))}
                           placeholder="Descripción del hallazgo (caries, prótesis, etc.)" style={inputStyle} />
@@ -937,6 +1170,26 @@ export default function ConsultaOdontologia() {
                         placeholder="En 7 días, control..."
                         style={inputStyle}
                       />
+                      {(() => {
+                        const sug = sugerirProximaSesion(plan.fases);
+                        return (
+                          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                            {sug && !readOnly && (
+                              <button type="button" onClick={() => setSesionForm(f => ({ ...f, proxima_cita: `Continuar plan — ${sug.texto}` }))}
+                                title={sug.texto}
+                                style={{ padding: '3px 10px', borderRadius: 999, border: `1px dashed ${BORDER}`, background: BG_LIGHT, color: COLOR_D, cursor: 'pointer', fontSize: 11.5, fontWeight: 700 }}>
+                                <i className="bi bi-lightbulb me-1" />Sugerido: {sug.texto.length > 46 ? `${sug.texto.slice(0, 46)}…` : sug.texto}
+                              </button>
+                            )}
+                            {puedeCobrar && (
+                              <button type="button" onClick={() => setAgendar(true)}
+                                style={{ padding: '3px 10px', borderRadius: 999, border: `1px solid ${LINE}`, background: '#fff', color: '#2563eb', cursor: 'pointer', fontSize: 11.5, fontWeight: 700 }}>
+                                <i className="bi bi-calendar-plus me-1" />Agendar cita
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                     <div>
                       <label style={lbl}>Observaciones generales</label>
@@ -948,6 +1201,37 @@ export default function ConsultaOdontologia() {
                       />
                     </div>
                   </div>
+
+                  {readOnly && (
+                    <div style={{ marginTop: 6, padding: 14, borderRadius: 12, background: '#f8fafc', border: `1px solid ${LINE}` }}>
+                      <div style={{ fontSize: 13, fontWeight: 800, color: INK }}>
+                        <i className="bi bi-journal-plus me-2" style={{ color: COLOR_D }} />Notas posteriores a la firma
+                      </div>
+                      <div style={{ fontSize: 11.5, color: MUTED, margin: '2px 0 10px' }}>
+                        La sesión firmada no se modifica. Estas notas quedan con fecha y autor, y no pueden editarse ni borrarse.
+                      </div>
+                      {addendas.length === 0 && <div style={{ fontSize: 12, color: '#94a3b8', marginBottom: 8 }}>Sin notas posteriores.</div>}
+                      {addendas.map(a => (
+                        <div key={a.id} style={{ padding: '8px 12px', marginBottom: 6, borderRadius: 8, background: '#fff', border: `1px solid ${LINE}`, fontSize: 13, color: INK }}>
+                          <div style={{ whiteSpace: 'pre-wrap' }}>{a.texto}</div>
+                          <div style={{ fontSize: 11, color: MUTED, marginTop: 4 }}>
+                            {dayjs(a.creado_en).format('DD/MM/YYYY HH:mm')}{a.usuario_nombre ? ` · ${a.usuario_nombre}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                      {puedeCobrar && (
+                        <div style={{ display: 'flex', gap: 8, alignItems: 'flex-end', marginTop: 8 }}>
+                          <textarea rows={2} value={nuevaNota} onChange={e => setNuevaNota(e.target.value)}
+                            maxLength={2000} placeholder="Agregar una nota (corrección, aclaración o seguimiento)…"
+                            style={{ ...textareaStyle(false), flex: 1 }} />
+                          <button onClick={agregarAddendum} disabled={saving || nuevaNota.trim().length < 3}
+                            style={{ padding: '8px 14px', borderRadius: 8, border: 'none', background: COLOR, color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700, opacity: nuevaNota.trim().length < 3 ? 0.5 : 1 }}>
+                            Agregar nota
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
 
                 </div>
               </div>
@@ -966,10 +1250,20 @@ export default function ConsultaOdontologia() {
                     Ordenado por prioridad clínica para garantizar el éxito y la duración del tratamiento.
                   </div>
                 </div>
-                <button onClick={guardarPlan} disabled={saving}
-                  style={{ padding: '7px 18px', borderRadius: 8, background: planGuardado ? '#dcfce7' : COLOR, color: planGuardado ? '#166534' : '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
-                  {saving ? 'Guardando...' : planGuardado ? 'Guardado' : 'Guardar plan'}
-                </button>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                  <button onClick={() => setVerVersiones(true)}
+                    style={{ padding: '7px 14px', borderRadius: 8, background: '#fff', color: MUTED, border: `1px solid ${LINE}`, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                    <i className="bi bi-clock-history me-1" />Versiones
+                  </button>
+                  <button onClick={abrirPresupuesto}
+                    style={{ padding: '7px 14px', borderRadius: 8, background: '#fff', color: COLOR_D, border: `1px solid ${BORDER}`, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+                    <i className="bi bi-printer me-1" />Presupuesto
+                  </button>
+                  <button onClick={guardarPlan} disabled={saving}
+                    style={{ padding: '7px 18px', borderRadius: 8, background: planGuardado ? '#dcfce7' : COLOR, color: planGuardado ? '#166534' : '#fff', border: 'none', cursor: 'pointer', fontSize: 13, fontWeight: 700, flexShrink: 0 }}>
+                    {saving ? 'Guardando...' : planGuardado ? 'Guardado' : 'Guardar plan'}
+                  </button>
+                </div>
               </div>
 
               {/* Fases */}
@@ -1026,7 +1320,12 @@ export default function ConsultaOdontologia() {
                         <div style={{ display: 'grid', gridTemplateColumns: '70px 1fr 130px 100px 36px', gap: 6, marginTop: 8 }}>
                           <input value={draft.pieza} onChange={e => setDraftItemFase(fase.id, { pieza: e.target.value })}
                             placeholder="Pieza" style={inputStyle} />
-                          <select value={draft.procedimiento} onChange={e => setDraftItemFase(fase.id, { procedimiento: e.target.value })} style={inputStyle}>
+                          <select value={draft.procedimiento} style={inputStyle} title="Al elegir un procedimiento se sugiere el precio del catálogo de servicios"
+                            onChange={e => {
+                              const proc = e.target.value;
+                              const sug = precioSugerido(proc, servicios);
+                              setDraftItemFase(fase.id, { procedimiento: proc, ...(sug && !draft.costo_estimado ? { costo_estimado: String(sug.precio) } : {}) });
+                            }}>
                             <option value="">— Procedimiento clínico —</option>
                             {PROCEDIMIENTOS.map(g => (
                               <optgroup key={g.grupo} label={g.grupo}>
@@ -1088,6 +1387,18 @@ export default function ConsultaOdontologia() {
                   <div style={{ fontSize: 26, fontWeight: 800, color: COLOR_D }}>L {costoTotal.toFixed(2)}</div>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* ══════════════════════════════════════════
+              TAB: RECETA (módulo de prescripciones existente)
+          ══════════════════════════════════════════ */}
+          {tab === 'receta' && (
+            <div style={{ ...CARD, padding: 20 }}>
+              <PrescripcionTab
+                historiaId={null} pacienteId={pacienteId} citaId={sesionActual?.cita_id || citaId} firmada={false}
+                diagnosticoCie={sesionForm.diagnostico_cie} diagnosticoDesc={sesionForm.diagnostico_desc}
+              />
             </div>
           )}
 
@@ -1465,6 +1776,161 @@ export default function ConsultaOdontologia() {
 
         </>
       )}
+    </div>
+  );
+}
+
+// ─── Versiones del plan de tratamiento ────────────────────────────────────────
+function VersionesPlanModal({ pacienteId, onCerrar, onUsar }) {
+  const [versiones, setVersiones] = useState(null);
+  const [abierta, setAbierta] = useState(null);
+
+  useEffect(() => {
+    api.get(`/odontologia/plan/${pacienteId}/versiones`)
+      .then(r => setVersiones(r.data.data || []))
+      .catch(() => setVersiones([]));
+  }, [pacienteId]);
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Versiones del plan" onClick={onCerrar}
+      style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ ...CARD, width: 'min(720px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+          <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: INK }}>
+            <i className="bi bi-clock-history me-2" style={{ color: COLOR_D }} />Versiones del plan
+          </h3>
+          <button onClick={onCerrar} aria-label="Cerrar" style={{ background: 'none', border: 'none', fontSize: 20, color: MUTED, cursor: 'pointer' }}>
+            <i className="bi bi-x-lg" />
+          </button>
+        </div>
+        <p style={{ fontSize: 13, color: MUTED, margin: '0 0 14px' }}>
+          Cada vez que cambia el plan se conserva una versión. Puedes revisarlas o cargar una como base para editar.
+        </p>
+
+        {versiones === null && <div style={{ color: MUTED, padding: 20, textAlign: 'center' }}>Cargando…</div>}
+        {versiones && versiones.length === 0 && (
+          <div style={{ color: MUTED, padding: 20, textAlign: 'center', fontSize: 13 }}>
+            Aún no hay versiones: se crean al guardar el plan.
+          </div>
+        )}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {(versiones || []).map(v => (
+            <div key={v.id} style={{ border: `1px solid ${LINE}`, borderRadius: 10, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '10px 14px', flexWrap: 'wrap' }}>
+                <strong style={{ color: COLOR_D }}>Versión {v.version}</strong>
+                {v.origen === 'INICIAL' && <span style={{ fontSize: 11, background: '#f1f5f9', color: MUTED, borderRadius: 999, padding: '1px 8px', fontWeight: 700 }}>anterior al historial</span>}
+                <span style={{ fontSize: 12, color: MUTED }}>
+                  {dayjs(v.creado_en).format('DD/MM/YYYY HH:mm')}{v.usuario_nombre ? ` · ${v.usuario_nombre}` : ''}
+                </span>
+                <span style={{ fontSize: 12, color: INK, marginLeft: 'auto' }}>
+                  {v.completados}/{v.total_items} realizados · <strong>{dinero(v.costo_total)}</strong>
+                </span>
+                <button onClick={() => setAbierta(abierta === v.id ? null : v.id)}
+                  style={{ padding: '4px 10px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', color: MUTED, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  {abierta === v.id ? 'Ocultar' : 'Ver detalle'}
+                </button>
+                <button onClick={() => onUsar(v.fases)}
+                  style={{ padding: '4px 10px', borderRadius: 8, border: `1px solid ${BORDER}`, background: BG_LIGHT, color: COLOR_D, cursor: 'pointer', fontSize: 12, fontWeight: 700 }}>
+                  Usar como base
+                </button>
+              </div>
+              {abierta === v.id && (
+                <div style={{ padding: '4px 14px 12px', background: '#f8fafc', borderTop: `1px solid ${LINE}`, fontSize: 12.5 }}>
+                  {v.fases.map(f => (
+                    <div key={f.id} style={{ marginTop: 8 }}>
+                      <div style={{ fontWeight: 700, color: INK }}>{f.nombre}</div>
+                      {(f.items || []).map(i => (
+                        <div key={i.id} style={{ display: 'flex', gap: 8, color: '#475569' }}>
+                          <span style={{ minWidth: 34, color: COLOR, fontWeight: 700 }}>{i.pieza || '—'}</span>
+                          <span style={{ flex: 1, textDecoration: i.completado ? 'line-through' : 'none' }}>{i.procedimiento}</span>
+                          <span>{dinero(i.costo_estimado)}</span>
+                        </div>
+                      ))}
+                      {(f.items || []).length === 0 && <div style={{ color: MUTED }}>Sin procedimientos</div>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─── Revisión previa a la firma ───────────────────────────────────────────────
+function RevisionFirmaModal({ datos, setDatos, saving, onCancel, onConfirm }) {
+  const alternar = (lista, key) =>
+    setDatos(d => ({ ...d, [lista]: d[lista].map(x => x.key === key ? { ...x, marcado: !x.marcado } : x) }));
+  const hayPropuestas = datos.planMatches.length + datos.odoProps.length > 0;
+  const marcados = datos.planMatches.filter(m => m.marcado).length + datos.odoProps.filter(m => m.marcado).length;
+
+  const fila = (children, marcado, onToggle, key) => (
+    <label key={key} style={{
+      display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+      border: `1px solid ${marcado ? BORDER : LINE}`, background: marcado ? BG_LIGHT : '#fff',
+    }}>
+      <input type="checkbox" checked={marcado} onChange={onToggle} style={{ marginTop: 3 }} />
+      <span style={{ fontSize: 13, color: INK, lineHeight: 1.45 }}>{children}</span>
+    </label>
+  );
+
+  return (
+    <div role="dialog" aria-modal="true" aria-label="Revisar antes de firmar" onClick={onCancel}
+      style={{ position: 'fixed', inset: 0, zIndex: 9000, background: 'rgba(15,23,42,.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div onClick={e => e.stopPropagation()} style={{ ...CARD, width: 'min(680px, 100%)', maxHeight: '90vh', overflowY: 'auto', padding: 24 }}>
+        <h3 style={{ margin: 0, fontSize: 18, fontWeight: 800, color: INK }}>
+          <i className="bi bi-pen me-2" style={{ color: COLOR_D }} />Revisar antes de firmar
+        </h3>
+        <p style={{ fontSize: 13, color: MUTED, margin: '6px 0 16px' }}>
+          Al firmar, la sesión ya no podrá editarse.
+          {hayPropuestas && ' Estos cambios se proponen a partir de los procedimientos que registraste; deja marcados solo los que correspondan.'}
+        </p>
+
+        {datos.planMatches.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...lbl, textTransform: 'uppercase', letterSpacing: '.04em' }}>Plan de tratamiento · marcar como completados</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {datos.planMatches.map(m => fila(
+                <>
+                  <strong>{m.pieza ? `Pieza ${m.pieza} · ` : ''}{m.procedimiento}</strong>
+                  <span style={{ color: MUTED }}>{m.faseNombre ? ` — ${m.faseNombre.split(':')[0]}` : ''}{m.costo ? ` · L ${Number(m.costo).toFixed(2)}` : ''}</span>
+                </>, m.marcado, () => alternar('planMatches', m.key), m.key))}
+            </div>
+          </div>
+        )}
+
+        {datos.odoProps.length > 0 && (
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ ...lbl, textTransform: 'uppercase', letterSpacing: '.04em' }}>Odontograma · actualizar estado</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {datos.odoProps.map(m => fila(
+                <>
+                  <strong>Pieza {m.pieza}</strong>: {m.antes} <i className="bi bi-arrow-right" style={{ color: COLOR_D }} /> <strong>{m.despues}</strong>
+                  <span style={{ display: 'block', fontSize: 11.5, color: MUTED }}>por «{m.procedimiento}»</span>
+                </>, m.marcado, () => alternar('odoProps', m.key), m.key))}
+            </div>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+          <button onClick={onCancel} disabled={saving}
+            style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${LINE}`, background: '#fff', color: MUTED, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            Volver a la sesión
+          </button>
+          {hayPropuestas && (
+            <button onClick={() => onConfirm(false)} disabled={saving}
+              style={{ padding: '8px 16px', borderRadius: 8, border: `1px solid ${BORDER}`, background: '#fff', color: COLOR_D, cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+              Firmar sin aplicar cambios
+            </button>
+          )}
+          <button onClick={() => onConfirm(true)} disabled={saving}
+            style={{ padding: '8px 18px', borderRadius: 8, border: 'none', background: '#16a34a', color: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 700 }}>
+            {saving ? 'Firmando...' : hayPropuestas ? `Firmar y aplicar (${marcados})` : 'Firmar sesión'}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

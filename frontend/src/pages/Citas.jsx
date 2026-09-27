@@ -12,6 +12,7 @@ import api from "../api/api";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import CompartirLink from "../components/CompartirLink";
 import GruposLlegadas from "../components/GruposLlegadas";
+import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { TIPOS_AUSENCIA } from "../components/AusenciasMedico";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 
@@ -380,7 +381,26 @@ function eventPropGetter(event) {
 export default function Citas() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user } = useAuth();
+  const { user, modulos } = useAuth();
+  const funcionClinica = useFuncionClinica();
+
+  // "Abrir consulta" desde Llegadas de hoy: solo para quien atiende (no recepción)
+  const puedeAbrirConsulta = ["MEDICO", "ADMIN", "SUPER_ADMIN"].includes(user?.tipo);
+  const tieneMod = (clave) => (modulos || []).some(m => m.clave === clave);
+  const abrirConsulta = async (cita) => {
+    const soloOdonto = tieneMod("consulta_odontologica") && !tieneMod("consulta");
+    const soloPsico  = tieneMod("consulta_psicologica") && !tieneMod("consulta");
+    if (soloOdonto) {
+      // El backend de odontología pasa la cita a EN ATENCIÓN al iniciar la sesión
+      navigate(`/odontologia/consulta?paciente_id=${cita.paciente_id}&cita_id=${cita.id}`);
+      return;
+    }
+    if (!["EN_ATENCION", "COMPLETADA"].includes(cita.estado)) {
+      try { await api.patch(`/citas/${cita.id}/estado`, { estado: "EN_ATENCION" }); } catch { /* no bloquea abrir la consulta */ }
+    }
+    if (soloPsico) navigate(`/psicologia/consulta?paciente_id=${cita.paciente_id}&sesion_id=nueva`);
+    else navigate(rutaConsulta(funcionClinica, cita.paciente_id, cita.id));
+  };
   const [tipoClinica, setTipoClinica] = useState("");
   const [tiposCita, setTiposCita] = useState([]);
   const [activeTab, setActiveTab]   = useState(searchParams.get("tab") || "calendario");
@@ -1060,6 +1080,7 @@ export default function Citas() {
           {activeTab === "sala" && (
             <SalaEspera
               sala={sala}
+              onAbrir={puedeAbrirConsulta ? abrirConsulta : null}
               onEstadoChange={(id, estado) => {
                 api.patch(`/citas/${id}/estado`, { estado })
                   .then(() => loadSalaEspera())
@@ -1198,7 +1219,7 @@ const GRUPOS_SALA = [
   },
 ];
 
-function SalaEspera({ sala, onEstadoChange }) {
+function SalaEspera({ sala, onEstadoChange, onAbrir }) {
   const grupos = GRUPOS_SALA.map(g => ({ ...g, citas: sala.filter(c => g.estados.includes(c.estado)) }));
 
   return (
@@ -1239,7 +1260,7 @@ function SalaEspera({ sala, onEstadoChange }) {
                 </thead>
                 <tbody>
                   {citas.map((c, i) => (
-                    <FilaSala key={c.id} c={c} i={i} acciones={g.acciones} onEstadoChange={onEstadoChange} />
+                    <FilaSala key={c.id} c={c} i={i} acciones={g.acciones} onEstadoChange={onEstadoChange} onAbrir={g.id !== "atendidos" ? onAbrir : null} />
                   ))}
                 </tbody>
               </table>
@@ -1251,7 +1272,7 @@ function SalaEspera({ sala, onEstadoChange }) {
   );
 }
 
-function FilaSala({ c, i, acciones, onEstadoChange }) {
+function FilaSala({ c, i, acciones, onEstadoChange, onAbrir }) {
   const [hover, setHover] = useState(false);
   const btnStyle = (color, primary) => ({
     background: primary ? color : "transparent", border: `1px solid ${color}`,
@@ -1290,6 +1311,12 @@ function FilaSala({ c, i, acciones, onEstadoChange }) {
       </td>
       <td style={{ padding: "12px 14px" }}>
         <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+          {onAbrir && (
+            <button onClick={() => onAbrir(c)}
+              style={{ background: "#2563eb", border: "1px solid #2563eb", borderRadius: 7, color: "#fff", padding: "3px 10px", fontSize: "0.72rem", cursor: "pointer", fontWeight: 700, whiteSpace: "nowrap" }}>
+              <i className="bi bi-clipboard2-pulse me-1" />Abrir consulta
+            </button>
+          )}
           {acciones.map(a => (
             <button key={a.estado} onClick={() => onEstadoChange(c.id, a.estado)}
               style={btnStyle(ESTADO_COLOR[a.estado]?.dot || "#6b7280", a.primary)}>

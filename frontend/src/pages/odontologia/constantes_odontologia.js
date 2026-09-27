@@ -27,11 +27,20 @@ export const UPPER_TEETH = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 
 export const LOWER_TEETH = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 export const ALL_TEETH   = [...UPPER_TEETH, ...LOWER_TEETH];
 
+// ─── Dentición temporal (FDI 51-55, 61-65, 71-75, 81-85) ─────────────────────
+// Las filas de 16 posiciones alinean cada temporal con su equivalente permanente (null = sin diente)
+export const UPPER_TEMPORAL_ROW = [null, null, null, 55, 54, 53, 52, 51, 61, 62, 63, 64, 65, null, null, null];
+export const LOWER_TEMPORAL_ROW = [null, null, null, 85, 84, 83, 82, 81, 71, 72, 73, 74, 75, null, null, null];
+export const TEMPORAL_TEETH = [...UPPER_TEMPORAL_ROW, ...LOWER_TEMPORAL_ROW].filter(Boolean);
+export const TODAS_LAS_PIEZAS = [...ALL_TEETH, ...TEMPORAL_TEETH];
+export const esTemporal = (num) => Number(num) >= 51 && Number(num) <= 85;
+
 // Clasificación por tipo de diente (para adaptar forma SVG)
 export function toothType(num) {
   const n = num % 10;  // FDI: last digit = position in quadrant (1-8)
   if (n <= 2) return 'incisor';
   if (n === 3) return 'canine';
+  if (num >= 51 && num <= 85) return 'molar'; // en dentición temporal las posiciones 4-5 son molares
   if (n <= 5) return 'premolar';
   return 'molar';
 }
