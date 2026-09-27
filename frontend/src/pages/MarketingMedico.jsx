@@ -370,13 +370,13 @@ export default function MarketingMedico() {
       )}
 
       {/* VIDEOS */}
-      {videosH.length > 0 && (
+      {videosV.length > 0 && (
         <section style={{ background: "#fff", padding: "84px 24px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <Encabezado color={color} kicker="Video" titulo="Videos de doctores"
-              texto="Testimonios y piezas audiovisuales que transmiten cercanía y profesionalismo." />
-            <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22, alignItems: "start" }}>
-              {videosH.map((v, i) => (
+            <Encabezado color={color} kicker="Shorts" titulo="Videos verticales"
+              texto="Formato corto y directo, ideal para Reels, TikTok y YouTube Shorts." />
+            <div className="mm-grid-v" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 20, alignItems: "start" }}>
+              {videosV.map((v, i) => (
                 <VideoCard key={v.id} v={v} i={i} color={color} onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })} />
               ))}
             </div>
@@ -384,13 +384,13 @@ export default function MarketingMedico() {
         </section>
       )}
 
-      {videosV.length > 0 && (
-        <section style={{ background: videosH.length > 0 ? "#f8fafc" : "#fff", padding: "84px 24px" }}>
+      {videosH.length > 0 && (
+        <section style={{ background: videosV.length > 0 ? "#f8fafc" : "#fff", padding: "84px 24px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <Encabezado color={color} kicker="Shorts" titulo="Videos verticales"
-              texto="Formato corto y directo, ideal para Reels, TikTok y YouTube Shorts." />
-            <div className="mm-grid-v" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(210px, 1fr))", gap: 20, alignItems: "start" }}>
-              {videosV.map((v, i) => (
+            <Encabezado color={color} kicker="Video" titulo="Videos de doctores"
+              texto="Testimonios y piezas audiovisuales que transmiten cercanía y profesionalismo." />
+            <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22, alignItems: "start" }}>
+              {videosH.map((v, i) => (
                 <VideoCard key={v.id} v={v} i={i} color={color} onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })} />
               ))}
             </div>
