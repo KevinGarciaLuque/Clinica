@@ -5,6 +5,7 @@ import dayjs from "dayjs";
 import "dayjs/locale/es";
 import api from "../api/api";
 import { nombreMedico } from "../utils/medico";
+import { CAMPOS_NOMBRE, capitalizarNombre } from "../utils/nombres";
 import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
@@ -100,6 +101,7 @@ export default function Pacientes() {
   const [q,      setQ]      = useState("");
   const [lista,  setLista]  = useState([]);
   const [msg,    setMsg]    = useState({ tipo: "", texto: "" });
+  const [duplicados, setDuplicados] = useState(null); // coincidencias devueltas por el backend
   const [sinClinica, setSinClinica] = useState(false);
   const [page,   setPage]   = useState(1);
   const [totalPac, setTotalPac] = useState(0);
@@ -185,9 +187,10 @@ export default function Pacientes() {
     return () => clearTimeout(t);
   }, [lista.length]);
 
-  const guardarPaciente = async (e) => {
-    e.preventDefault();
+  const guardarPaciente = async (e, forzar = false) => {
+    e?.preventDefault?.();
     setMsg({ tipo: "", texto: "" });
+    setDuplicados(null);
     try {
       let pacienteId = editandoId;
       
@@ -197,7 +200,7 @@ export default function Pacientes() {
         setMsg({ tipo: "success", texto: "Paciente actualizado correctamente" });
       } else {
         // Crear
-        const res = await api.post("/pacientes", form);
+        const res = await api.post("/pacientes", forzar ? { ...form, confirmar_duplicado: true } : form);
         pacienteId = res.data.id;
         setMsg({ tipo: "success", texto: "Paciente creado correctamente" });
       }
@@ -218,6 +221,10 @@ export default function Pacientes() {
       setShowForm(false);
       await cargar();
     } catch (err) {
+      if (err?.response?.status === 409 && err.response.data?.duplicado) {
+        setDuplicados(err.response.data.coincidencias || []);
+        return;
+      }
       setMsg({ tipo: "danger", texto: err?.response?.data?.msg || "Error al guardar paciente" });
     }
   };
@@ -318,7 +325,10 @@ export default function Pacientes() {
     setFotoPreview(null);
   };
 
-  const cambioForm = (e) => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  const cambioForm = (e) => {
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: CAMPOS_NOMBRE.has(name) ? capitalizarNombre(value) : value }));
+  };
 
   // ── Webcam ────────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1088,6 +1098,50 @@ export default function Pacientes() {
         onConfirm={feedbackModal.onConfirm || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
         onCancel={feedbackModal.onCancel || (() => setFeedbackModal((m) => ({ ...m, open: false })))}
       />
+
+      {duplicados && createPortal(
+        <div
+          onClick={() => setDuplicados(null)}
+          style={{ position: "fixed", inset: 0, zIndex: 2100, background: "rgba(2,6,15,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 16 }}
+        >
+          <div
+            role="dialog" aria-modal="true" aria-label="Posible paciente duplicado"
+            onClick={(e) => e.stopPropagation()}
+            style={{ background: "#fff", borderRadius: 16, width: "min(520px, 100%)", padding: 24, boxShadow: "0 24px 60px rgba(0,0,0,.4)" }}
+          >
+            <h5 style={{ fontWeight: 800, color: "#92400e", marginBottom: 6 }}>
+              <i className="bi bi-exclamation-triangle-fill me-2" />Posible paciente duplicado
+            </h5>
+            <p style={{ color: "#475569", fontSize: 14, marginBottom: 14 }}>
+              Ya hay pacientes registrados con datos muy parecidos. Revisa antes de crear uno nuevo:
+            </p>
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 18 }}>
+              {duplicados.map((d) => (
+                <div key={d.id} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, border: "1px solid #e2e8f0", borderRadius: 10, padding: "10px 12px" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: "#0f172a" }}>{d.nombres} {d.apellidos}</div>
+                    <div style={{ fontSize: 12.5, color: "#64748b" }}>
+                      {d.motivo}{d.dni ? ` · DNI ${d.dni}` : ""}{d.telefono ? ` · Tel. ${d.telefono}` : ""}
+                    </div>
+                  </div>
+                  <Link className="btn btn-sm btn-outline-primary" to={`/pacientes/${d.id}/perfil`} onClick={() => setDuplicados(null)}>
+                    Ver expediente
+                  </Link>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexWrap: "wrap" }}>
+              <button type="button" className="btn btn-outline-secondary" onClick={() => setDuplicados(null)}>
+                Cancelar
+              </button>
+              <button type="button" className="btn btn-warning" onClick={() => guardarPaciente(null, true)}>
+                Es otra persona, crear de todos modos
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
     </div>
   );
 }

@@ -38,6 +38,7 @@ const path    = require("path");
 const sse     = require("../utils/sseManager");
 const webPush = require("../utils/webPush");
 
+const { titleCaseNombre } = require("../utils/pacientesDuplicados");
 // ── Rate limiters ─────────────────────────────────────────
 const limiterStrict = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -217,8 +218,8 @@ router.post("/", limiterStrict, async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,0,1,1)`,
       [
         clinica_id,
-        nombres.trim(),
-        apellidos.trim(),
+        titleCaseNombre(nombres),
+        titleCaseNombre(apellidos),
         dni?.trim()   || null,
         fecha_nacimiento || null,
         sexo            || null,

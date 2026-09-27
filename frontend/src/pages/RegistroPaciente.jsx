@@ -9,6 +9,7 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 
+import { CAMPOS_NOMBRE, capitalizarNombre } from "../utils/nombres";
 const BASE     = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 
 // ── Departamentos y municipios de Honduras ────────────
@@ -596,7 +597,10 @@ export default function RegistroPaciente() {
   };
 
   // ── Submit datos (nuevo) ──────────────────────────────
-  const cambioForm = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
+  const cambioForm = e => {
+    const { name, value } = e.target;
+    setForm(f => ({ ...f, [name]: CAMPOS_NOMBRE.has(name) ? capitalizarNombre(value) : value }));
+  };
 
   const handleRegistro = async (e) => {
     e.preventDefault();

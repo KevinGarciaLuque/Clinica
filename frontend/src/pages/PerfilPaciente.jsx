@@ -158,6 +158,10 @@ export default function PerfilPaciente() {
 
   // nombreCompleto derivado del estado — disponible desde el inicio del componente
   const nombreCompleto = paciente ? `${paciente.nombres} ${paciente.apellidos}` : "";
+  // La confirmación de eliminar ignora mayúsculas, acentos y espacios repetidos/sobrantes
+  // (un espacio doble o final en el nombre guardado hacía imposible coincidir con el texto mostrado).
+  const normNombre = (t) => String(t || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
+  const nombreCoincide = normNombre(textoConfirmacion) === normNombre(nombreCompleto) && normNombre(nombreCompleto) !== "";
 
   // Modal confirmación eliminar documento
   const [docAEliminar, setDocAEliminar] = useState(null);
@@ -821,7 +825,7 @@ export default function PerfilPaciente() {
   // PESTAÑA 4: ELIMINAR PACIENTE (Doble confirmación)
   // ══════════════════════════════════════════════════════════
   const eliminarPaciente = async () => {
-    if (textoConfirmacion !== nombreCompleto) {
+    if (!nombreCoincide) {
       setMsg({ tipo: "danger", texto: "El nombre no coincide. Por favor verifica." });
       return;
     }
@@ -2627,7 +2631,7 @@ export default function PerfilPaciente() {
                   <button
                     className="btn btn-danger"
                     onClick={eliminarPaciente}
-                    disabled={textoConfirmacion !== nombreCompleto || eliminando}
+                    disabled={!nombreCoincide || eliminando}
                   >
                     {eliminando ? (
                       <><span className="spinner-border spinner-border-sm me-2" />Eliminando...</>

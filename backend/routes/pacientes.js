@@ -9,6 +9,7 @@ const path        = require("path");
 const ExcelJS     = require("exceljs");
 const archiver    = require("archiver");
 const { requireModulo } = require("../middlewares/moduloPermiso");
+const { titleCaseNombre, buscarDuplicados } = require("../utils/pacientesDuplicados");
 
 const PACIENTE_EXPORT_COLUMNS = [
   { header: "ID",                     key: "id",                            width: 8  },
@@ -528,11 +529,14 @@ router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","
     const clinicaId = req.tenant?.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta x-clinica-id" });
 
-    const { nombres, apellidos, dni, telefono, email, fecha_nacimiento, sexo, direccion } = req.body;
+    const { dni, telefono, email, fecha_nacimiento, sexo, direccion, confirmar_duplicado } = req.body;
 
-    if (!nombres || !apellidos) {
+    if (!req.body.nombres?.trim() || !req.body.apellidos?.trim()) {
       return res.status(400).json({ ok: false, msg: "nombres y apellidos son obligatorios" });
     }
+    // Siempre se guardan en formato "Nombre Apellido" (evita duplicados por mayúsculas/minúsculas)
+    const nombres   = titleCaseNombre(req.body.nombres);
+    const apellidos = titleCaseNombre(req.body.apellidos);
     if (nombres.length > 150 || apellidos.length > 150) {
       return res.status(400).json({ ok: false, msg: "Nombres o apellidos demasiado largos (máx. 150 caracteres)" });
     }
@@ -557,6 +561,20 @@ router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","
       ciudad, departamento, pais, grupo_sanguineo, notas,
       estado_civil, ocupacion, escolaridad, religion, lugar_nacimiento, nacionalidad,
     } = req.body;
+
+    // Posibles duplicados (mismo DNI, mismo nombre o nombre muy parecido). El médico puede
+    // confirmar que es otra persona reenviando confirmar_duplicado.
+    if (!confirmar_duplicado) {
+      const coincidencias = await buscarDuplicados(pool, { clinicaId, nombres, apellidos, dni });
+      if (coincidencias.length) {
+        return res.status(409).json({
+          ok: false,
+          duplicado: true,
+          coincidencias,
+          msg: "Ya existe un paciente con datos muy parecidos. Revisa antes de crear uno nuevo.",
+        });
+      }
+    }
 
     const [r] = await pool.query(
       `INSERT INTO pacientes
@@ -658,7 +676,7 @@ router.put("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
          contacto_emergencia_nombre=?,    contacto_emergencia_telefono=?
        WHERE id=? AND clinica_id=?`,
       [
-        nombres||null, apellidos||null,
+        nombres ? titleCaseNombre(nombres) : null, apellidos ? titleCaseNombre(apellidos) : null,
         v(dni), v(telefono), v(email),
         fechaFormateada||null, v(sexo),
         v(direccion), v(ciudad), v(departamento), v(pais),
@@ -837,6 +855,11 @@ router.delete(
 
       res.json({ ok: true, msg: "Paciente eliminado correctamente" });
     } catch (e) {
+      // 1451: otra tabla aún referencia al paciente sin ON DELETE CASCADE
+      if (e.errno === 1451 || e.code === "ER_ROW_IS_REFERENCED_2") {
+        console.error("[DELETE paciente] bloqueado por clave foránea:", e.sqlMessage);
+        return res.status(409).json({ ok: false, msg: "No se pudo eliminar: el paciente tiene registros vinculados que lo impiden. Avisa a soporte." });
+      }
       res.status(500).json({ ok: false, msg: e.message });
     }
   }
