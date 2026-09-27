@@ -53,6 +53,10 @@ const ADMIN_ROUTES = new Set([
   "/documentos-clinicos", "/catalogos", "/admin/config",
 ]);
 
+// Sección "Gestión": lo administrativo del día a día (cobros, caja, inventario,
+// recordatorios y cumpleañeros) sale de "Clínica" para que ahí quede solo lo clínico.
+const GESTION_ORDEN = ["/facturacion", "/caja", "/inventario", "/recordatorios", "/cumpleaneros"];
+
 const superItems = [
   { to: "/superadmin/clinicas",        label: "Clínicas",        icon: "bi-building-fill" },
   { to: "/superadmin/solicitudes-plan", label: "Solicitudes de Plan", icon: "bi-credit-card-fill" },
@@ -149,10 +153,13 @@ function getMenuSections(tipo, modulos) {
     mainItems = [...enPrioridad, ...resto, ...(cumple ? [cumple] : [])];
   }
 
-  if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, admin: filtrarPorPermiso(adminItems) };
-  if (tipo === "ADMIN")       return { super: [],          main: mainItems, admin: filtrarPorPermiso(adminItems) };
-  if (tipo === "MEDICO")      return { super: [],          main: mainItems, admin: filtrarPorPermiso(medicoItems) };
-  return                              { super: [],          main: mainItems, admin: [] };
+  const gestion = GESTION_ORDEN.map(to => mainItems.find(m => m.to === to)).filter(Boolean);
+  mainItems = mainItems.filter(m => !GESTION_ORDEN.includes(m.to));
+
+  if (tipo === "SUPER_ADMIN") return { super: superItems, main: mainItems, gestion, admin: filtrarPorPermiso(adminItems) };
+  if (tipo === "ADMIN")       return { super: [],          main: mainItems, gestion, admin: filtrarPorPermiso(adminItems) };
+  if (tipo === "MEDICO")      return { super: [],          main: mainItems, gestion, admin: filtrarPorPermiso(medicoItems) };
+  return                              { super: [],          main: mainItems, gestion, admin: [] };
 }
 
 /* ─── Rutas estéticas que se anidan bajo Consulta ───────────────── */
@@ -524,7 +531,7 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
 export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
   const { user, modulos } = useAuth();
   const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
-  const { super: sItems, main, admin } = getMenuSections(user?.tipo, modulos);
+  const { super: sItems, main, gestion, admin } = getMenuSections(user?.tipo, modulos);
   const [showFotoModal, setShowFotoModal] = useState(false);
 
   return (
@@ -696,6 +703,7 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
         >
           <SidebarSection title="Super Admin"    items={sItems} collapsed={collapsed} onNavigate={onNavigate} showDivider={false} />
           <SidebarSection title="Clínica"        items={main}   collapsed={collapsed} onNavigate={onNavigate} showDivider={sItems.length > 0} />
+          <SidebarSection title="Gestión"         items={gestion} collapsed={collapsed} onNavigate={onNavigate} showDivider={true} />
           <SidebarSection title="Administración" items={admin}  collapsed={collapsed} onNavigate={onNavigate} showDivider={true} />
         </div>
 
