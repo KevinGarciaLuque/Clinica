@@ -146,6 +146,7 @@ export default function LandingPage({ hero3d = false }) {
   const navigate = useNavigate();
   const [cfg, setCfg] = useState(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [navScrolled, setNavScrolled] = useState(false);
   const [resenas, setResenas] = useState([]);
   const [marketing, setMarketing] = useState({ posts: [], videos: [], planes: [] });
   const [pagos, setPagos] = useState(null);
@@ -169,6 +170,22 @@ export default function LandingPage({ hero3d = false }) {
       .then(d => setPagos(d.data || {}))
       .catch(() => setPagos({}));
   }, []);
+
+  // Navbar más compacta y con fondo sólido tras el primer scroll
+  useEffect(() => {
+    const onScroll = () => setNavScrolled(window.scrollY > 8);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
+  // El menú móvil bloquea el scroll del fondo mientras está abierto
+  useEffect(() => {
+    if (!menuOpen) return;
+    const prev = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => { document.body.style.overflow = prev; };
+  }, [menuOpen]);
 
   if (!cfg) return (
     <div style={{ display: "flex", justifyContent: "center", alignItems: "center", minHeight: "100vh", background: "#0f172a" }}>
@@ -291,8 +308,41 @@ export default function LandingPage({ hero3d = false }) {
         .mkt-tile:hover { transform: scale(1.03); }
         .plan-card { transition: transform .2s, box-shadow .2s; }
         .plan-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,.12) !important; }
-        .nav-link-lp { background: none; border: none; color: rgba(255,255,255,.8); font-size: 14px; font-weight: 500; cursor: pointer; padding: 6px 12px; border-radius: 8px; transition: color .15s, background .15s; }
-        .nav-link-lp:hover { color: #fff; background: rgba(255,255,255,.1); }
+        .nav-link-lp {
+          position: relative; background: none; border: none; color: rgba(255,255,255,.82);
+          font-size: 13.5px; font-weight: 600; letter-spacing: .01em; cursor: pointer;
+          padding: 8px 2px; margin: 0 10px; transition: color .15s;
+        }
+        .nav-link-lp::after {
+          content: ""; position: absolute; left: 2px; right: 2px; bottom: 3px; height: 2px;
+          background: #fff; border-radius: 2px; transform: scaleX(0); transform-origin: left;
+          transition: transform .2s ease;
+        }
+        .nav-link-lp:hover { color: #fff; }
+        .nav-link-lp:hover::after { transform: scaleX(1); }
+        .nav-cta-lp {
+          display: inline-flex; align-items: center; gap: 7px;
+          background: rgba(255,255,255,.14); border: 1.5px solid rgba(255,255,255,.4);
+          color: #fff; font-size: 13.5px; font-weight: 700; letter-spacing: .01em;
+          padding: 8px 16px; border-radius: 999px; cursor: pointer; white-space: nowrap;
+          transition: background .15s, border-color .15s, transform .15s;
+        }
+        .nav-cta-lp:hover { background: rgba(255,255,255,.24); border-color: rgba(255,255,255,.6); transform: translateY(-1px); }
+        .nav-login-btn {
+          background: transparent; border: 1.5px solid rgba(255,255,255,.3); color: #fff;
+          border-radius: 999px; padding: 7px 18px; font-size: 13px; font-weight: 700;
+          cursor: pointer; transition: background .15s, border-color .15s; white-space: nowrap;
+        }
+        .nav-login-btn:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.5); }
+        .nav-divider-lp { width: 1px; height: 22px; background: rgba(255,255,255,.2); margin: 0 6px; }
+        .mobile-link-lp {
+          display: flex; align-items: center; gap: 12px; width: 100%; text-align: left;
+          background: none; border: none; color: rgba(255,255,255,.88); font-size: 15px; font-weight: 600;
+          padding: 14px 20px; cursor: pointer; min-height: 48px; border-radius: 12px;
+          transition: background .15s;
+        }
+        .mobile-link-lp:hover, .mobile-link-lp:active { background: rgba(255,255,255,.08); }
+        .mobile-link-lp i { font-size: 17px; width: 20px; text-align: center; color: rgba(255,255,255,.6); flex-shrink: 0; }
         @media (max-width: 640px) {
           .hero-btns { flex-direction: column; }
           .planes-grid { grid-template-columns: 1fr !important; }
@@ -373,18 +423,21 @@ export default function LandingPage({ hero3d = false }) {
       {/* ── NAVBAR ── */}
       <nav style={{
         position: "fixed", top: 0, left: 0, right: 0, zIndex: 1000,
-        background: `linear-gradient(90deg, ${color} 0%, ${darken(color, 25)} 100%)`,
-        boxShadow: "0 2px 20px rgba(0,0,0,.25)",
+        background: navScrolled
+          ? `linear-gradient(90deg, ${darken(color, 6)} 0%, ${darken(color, 30)} 100%)`
+          : `linear-gradient(90deg, ${color} 0%, ${darken(color, 25)} 100%)`,
+        backdropFilter: navScrolled ? "blur(10px)" : "none",
+        boxShadow: navScrolled ? "0 4px 24px rgba(0,0,0,.35)" : "0 2px 20px rgba(0,0,0,.2)",
         display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "0 24px", height: 60,
+        padding: "0 24px", height: navScrolled ? 56 : 64,
+        transition: "height .25s ease, box-shadow .25s ease, background .25s ease",
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <img src={logoUrl} alt={nombre} style={{ height: 54, objectFit: "contain" }} />
-          <span style={{ color: "#fff", fontWeight: 800, fontSize: 18, letterSpacing: "-.3px" }}>{nombre}</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <img src={logoUrl} alt={nombre} style={{ height: navScrolled ? 40 : 48, objectFit: "contain", transition: "height .25s ease" }} />
+          <span style={{ color: "#fff", fontWeight: 800, fontSize: 17, letterSpacing: "-.3px", whiteSpace: "nowrap" }}>{nombre}</span>
         </div>
-        <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-          <div className="d-none d-md-flex" style={{ gap: 4 }}>
-            <button className="nav-link-lp" onClick={() => navigate("/agenda-tu-consulta")}>Agenda tu consulta médica</button>
+        <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
+          <div className="d-none d-lg-flex" style={{ alignItems: "center" }}>
             <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
             <button className="nav-link-lp" onClick={() => scrollTo("especialidades")}>Especialidades</button>
             {cfg.marketing_activo !== "0" && (
@@ -395,57 +448,74 @@ export default function LandingPage({ hero3d = false }) {
             <button className="nav-link-lp" onClick={() => scrollTo("nosotros")}>Nosotros</button>
             <button className="nav-link-lp" onClick={() => scrollTo("contacto")}>Contacto</button>
           </div>
-          <button
-            onClick={() => navigate("/login")}
-            style={{
-              marginLeft: 12,
-              background: "rgba(255,255,255,.18)", border: "1px solid rgba(255,255,255,.35)",
-              color: "#fff", borderRadius: 10, padding: "7px 18px",
-              fontSize: 13, fontWeight: 700, cursor: "pointer",
-              transition: "background .15s",
-            }}
-            onMouseOver={e => e.currentTarget.style.background = "rgba(255,255,255,.28)"}
-            onMouseOut={e  => e.currentTarget.style.background = "rgba(255,255,255,.18)"}
-          >
+          <span className="d-none d-lg-block nav-divider-lp" />
+          <button className="nav-cta-lp d-none d-lg-inline-flex" onClick={() => navigate("/agenda-tu-consulta")}>
+            <i className="bi bi-calendar2-heart" />Agenda tu consulta
+          </button>
+          <button className="nav-login-btn d-none d-lg-inline-flex" style={{ marginLeft: 10 }} onClick={() => navigate("/login")}>
             <i className="bi bi-box-arrow-in-right me-1" />Iniciar sesión
           </button>
           {/* Mobile menu button */}
           <button
-            className="d-md-none"
+            className="d-lg-none"
             onClick={() => setMenuOpen(v => !v)}
             aria-label={menuOpen ? "Cerrar menú" : "Abrir menú"}
             aria-expanded={menuOpen}
-            style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", marginLeft: 8, padding: 11, display: "flex", alignItems: "center", justifyContent: "center" }}
+            style={{ background: "none", border: "none", color: "#fff", fontSize: 22, cursor: "pointer", padding: 11, display: "flex", alignItems: "center", justifyContent: "center" }}
           >
             <i className={`bi ${menuOpen ? "bi-x-lg" : "bi-list"}`} aria-hidden="true" />
           </button>
         </div>
       </nav>
 
-      {/* Mobile dropdown */}
+      {/* Menú móvil: panel con overlay, cierra tocando fuera */}
       {menuOpen && (
-        <div style={{
-          position: "fixed", top: 60, left: 0, right: 0, zIndex: 999,
-          background: darken(color, 20), padding: 16,
-          display: "flex", flexDirection: "column", gap: 4,
-        }}>
-          <button className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => { setMenuOpen(false); navigate("/agenda-tu-consulta"); }}>
-            Agenda tu consulta médica
-          </button>
-          {cfg.marketing_activo !== "0" && (
-            <button className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => { setMenuOpen(false); navigate("/marketing-medico"); }}>
-              Marketing Médico
+        <>
+          <div
+            onClick={() => setMenuOpen(false)}
+            aria-hidden="true"
+            style={{ position: "fixed", inset: 0, top: 64, zIndex: 998, background: "rgba(0,0,0,.5)", animation: "fadeUp .2s ease both" }}
+          />
+          <div
+            role="dialog" aria-modal="true" aria-label="Menú de navegación"
+            style={{
+              position: "fixed", top: 64, left: 0, right: 0, zIndex: 999, maxHeight: "calc(100vh - 64px)", overflowY: "auto",
+              background: `linear-gradient(180deg, ${darken(color, 15)} 0%, ${darken(color, 28)} 100%)`,
+              borderTop: "1px solid rgba(255,255,255,.1)", boxShadow: "0 16px 40px rgba(0,0,0,.4)",
+              padding: "18px 14px calc(env(safe-area-inset-bottom, 0px) + 18px)",
+              display: "flex", flexDirection: "column", gap: 4,
+              animation: "fadeUp .22s ease both",
+            }}
+          >
+            <button
+              className="nav-cta-lp"
+              style={{ justifyContent: "center", padding: "13px 18px", fontSize: 15, marginBottom: 10, background: "rgba(255,255,255,.16)" }}
+              onClick={() => { setMenuOpen(false); navigate("/agenda-tu-consulta"); }}
+            >
+              <i className="bi bi-calendar2-heart" />Agenda tu consulta médica
             </button>
-          )}
-          {["Características|caracteristicas","Especialidades|especialidades","Planes|planes","Reseñas|resenas","Nosotros|nosotros","Contacto|contacto"].map(item => {
-            const [label, id] = item.split("|");
-            return (
-              <button key={id} className="nav-link-lp" style={{ textAlign: "left", padding: "10px 16px" }} onClick={() => scrollTo(id)}>
-                {label}
+
+            {[
+              ["bi-grid-1x2-fill", "Características", "caracteristicas"],
+              ["bi-heart-pulse-fill", "Especialidades", "especialidades"],
+              ...(cfg.marketing_activo !== "0" ? [["bi-megaphone-fill", "Marketing Médico", null]] : []),
+              ["bi-credit-card-fill", "Planes", "planes"],
+              ["bi-star-fill", "Reseñas", "resenas"],
+              ["bi-building-fill-check", "Nosotros", "nosotros"],
+              ["bi-envelope-heart-fill", "Contacto", "contacto"],
+            ].map(([icon, label, id]) => (
+              <button key={label} className="mobile-link-lp"
+                onClick={() => { if (id) scrollTo(id); else { setMenuOpen(false); navigate("/marketing-medico"); } }}>
+                <i className={`bi ${icon}`} aria-hidden="true" />{label}
               </button>
-            );
-          })}
-        </div>
+            ))}
+
+            <div style={{ borderTop: "1px solid rgba(255,255,255,.12)", margin: "10px 4px 4px" }} />
+            <button className="mobile-link-lp" onClick={() => { setMenuOpen(false); navigate("/login"); }}>
+              <i className="bi bi-box-arrow-in-right" aria-hidden="true" />Iniciar sesión
+            </button>
+          </div>
+        </>
       )}
 
       {/* ── HERO 3D (vista previa: /inicio-3d) ── */}
