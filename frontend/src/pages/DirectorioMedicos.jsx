@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { DEPARTAMENTOS_HONDURAS } from "../utils/departamentosHonduras";
+import { DEPARTAMENTOS_HONDURAS, MUNICIPIOS_POR_DEPARTAMENTO } from "../utils/departamentosHonduras";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -40,8 +40,8 @@ function DoctorCard({ medico, index, onSelect, fallbackColor, bandColor }) {
   const foto = !fotoError && medico.foto_doctor
     ? (medico.foto_doctor.startsWith("http") ? medico.foto_doctor : `${API}${medico.foto_doctor}`)
     : null;
-  // Con departamento: "Ciudad, Departamento". Sin él, se mantiene "Ciudad, País".
-  const ubicacion = [medico.ciudad, medico.departamento || medico.pais].filter(Boolean).join(", ");
+  // Con departamento: "Municipio, Departamento". Sin él, se mantiene "Ciudad, País".
+  const ubicacion = [medico.municipio || medico.ciudad, medico.departamento || medico.pais].filter(Boolean).join(", ");
 
   return (
     <div
@@ -136,6 +136,7 @@ export default function DirectorioMedicos() {
   const [error, setError] = useState(null);
   const [busqueda, setBusqueda] = useState("");
   const [departamento, setDepartamento] = useState("");
+  const [municipio, setMunicipio] = useState("");
   const [cfg, setCfg] = useState(DEFAULT_CFG);
 
   const COLOR = (cfg.directorio_color_primario || DEFAULT_CFG.directorio_color_primario).trim();
@@ -172,22 +173,45 @@ export default function DirectorioMedicos() {
       .map(nombre => ({ nombre, total: conteo[nombre] }));
   }, [medicos]);
 
+  // Municipios del departamento elegido que tienen al menos un médico
+  const municipios = useMemo(() => {
+    if (!departamento) return [];
+    const conteo = {};
+    (medicos || []).forEach(m => {
+      if (m.departamento === departamento && m.municipio) {
+        conteo[m.municipio] = (conteo[m.municipio] || 0) + 1;
+      }
+    });
+    const lista = MUNICIPIOS_POR_DEPARTAMENTO[departamento] || [];
+    const orden = (x) => {
+      const i = lista.indexOf(x);
+      return i === -1 ? lista.length : i;
+    };
+    return Object.keys(conteo)
+      .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, "es"))
+      .map(nombre => ({ nombre, total: conteo[nombre] }));
+  }, [medicos, departamento]);
+
+  const cambiarDepartamento = (valor) => { setDepartamento(valor); setMunicipio(""); };
+
   const filtrados = useMemo(() => {
     if (!medicos) return [];
     const q = busqueda.trim().toLowerCase();
     return medicos.filter(m => {
       if (departamento && m.departamento !== departamento) return false;
+      if (municipio && m.municipio !== municipio) return false;
       if (!q) return true;
       return (
         (m.nombre_doctor || "").toLowerCase().includes(q) ||
         (m.titulo_doctor || "").toLowerCase().includes(q) ||
         (m.ciudad || "").toLowerCase().includes(q) ||
+        (m.municipio || "").toLowerCase().includes(q) ||
         (m.departamento || "").toLowerCase().includes(q)
       );
     });
-  }, [medicos, busqueda, departamento]);
+  }, [medicos, busqueda, departamento, municipio]);
 
-  const limpiarFiltros = () => { setBusqueda(""); setDepartamento(""); };
+  const limpiarFiltros = () => { setBusqueda(""); setDepartamento(""); setMunicipio(""); };
 
   return (
     <>
@@ -321,7 +345,7 @@ export default function DirectorioMedicos() {
                   <select
                     className="dm-depto"
                     value={departamento}
-                    onChange={e => setDepartamento(e.target.value)}
+                    onChange={e => cambiarDepartamento(e.target.value)}
                     aria-label="Filtrar por departamento"
                     style={{
                       flex: 1, border: "none", background: "transparent", padding: "10px 4px",
@@ -339,6 +363,32 @@ export default function DirectorioMedicos() {
                 </div>
               </>
             )}
+            {municipios.length > 0 && (
+              <>
+                <div className="dm-sep" style={{ width: 1, alignSelf: "stretch", background: "#e2e8f0", margin: "4px 4px" }} />
+                <div className="dm-depto-wrap" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <i className="bi bi-pin-map-fill" style={{ color: municipio ? COLOR : "#94a3b8", fontSize: 15 }} />
+                  <select
+                    className="dm-depto"
+                    value={municipio}
+                    onChange={e => setMunicipio(e.target.value)}
+                    aria-label="Filtrar por municipio"
+                    style={{
+                      flex: 1, border: "none", background: "transparent", padding: "10px 4px",
+                      fontSize: 14, fontWeight: municipio ? 700 : 500,
+                      color: municipio ? COLOR : "#475569", cursor: "pointer", borderRadius: 8,
+                    }}
+                  >
+                    <option value="">Todos los municipios</option>
+                    {municipios.map(m => (
+                      <option key={m.nombre} value={m.nombre}>
+                        {m.nombre} ({m.total})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
 
           {/* Resumen del filtro activo */}
@@ -350,7 +400,9 @@ export default function DirectorioMedicos() {
               <span>
                 <strong style={{ color: "#0f172a" }}>{filtrados.length}</strong>{" "}
                 {filtrados.length === 1 ? "médico" : "médicos"}
-                {departamento && <> en <strong style={{ color: COLOR }}>{departamento}</strong></>}
+                {departamento && (
+                  <> en <strong style={{ color: COLOR }}>{municipio ? `${municipio}, ${departamento}` : departamento}</strong></>
+                )}
               </span>
               <button
                 type="button"
@@ -399,8 +451,8 @@ export default function DirectorioMedicos() {
             <div style={{ textAlign: "center", padding: "60px 0", color: "#64748b" }}>
               <i className="bi bi-search" style={{ fontSize: 36, color: "#cbd5e1", display: "block", marginBottom: 12 }} />
               {departamento && !busqueda
-                ? <>Aún no hay médicos en {departamento}.</>
-                : <>No encontramos médicos que coincidan con tu búsqueda{departamento ? ` en ${departamento}` : ""}.</>}
+                ? <>Aún no hay médicos en {municipio ? `${municipio}, ${departamento}` : departamento}.</>
+                : <>No encontramos médicos que coincidan con tu búsqueda{departamento ? ` en ${municipio || departamento}` : ""}.</>}
             </div>
           )}
 
