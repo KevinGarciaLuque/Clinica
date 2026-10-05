@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { DEPARTAMENTOS_HONDURAS } from "../utils/departamentosHonduras";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -39,6 +40,8 @@ function DoctorCard({ medico, index, onSelect, fallbackColor, bandColor }) {
   const foto = !fotoError && medico.foto_doctor
     ? (medico.foto_doctor.startsWith("http") ? medico.foto_doctor : `${API}${medico.foto_doctor}`)
     : null;
+  // Con departamento: "Ciudad, Departamento". Sin él, se mantiene "Ciudad, País".
+  const ubicacion = [medico.ciudad, medico.departamento || medico.pais].filter(Boolean).join(", ");
 
   return (
     <div
@@ -104,10 +107,10 @@ function DoctorCard({ medico, index, onSelect, fallbackColor, bandColor }) {
         </p>
       )}
 
-      {(medico.ciudad || medico.pais) && (
+      {ubicacion && (
         <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 18, display: "flex", alignItems: "center", justifyContent: "center", gap: 4 }}>
           <i className="bi bi-geo-alt" />
-          {medico.ciudad}{medico.ciudad && medico.pais ? ", " : ""}{medico.pais}
+          {ubicacion}
         </div>
       )}
 
@@ -132,6 +135,7 @@ export default function DirectorioMedicos() {
   const [medicos, setMedicos] = useState(null);
   const [error, setError] = useState(null);
   const [busqueda, setBusqueda] = useState("");
+  const [departamento, setDepartamento] = useState("");
   const [cfg, setCfg] = useState(DEFAULT_CFG);
 
   const COLOR = (cfg.directorio_color_primario || DEFAULT_CFG.directorio_color_primario).trim();
@@ -153,16 +157,37 @@ export default function DirectorioMedicos() {
       .catch(() => {});
   }, []);
 
+  // Departamentos que tienen al menos un médico, con su cantidad
+  const departamentos = useMemo(() => {
+    const conteo = {};
+    (medicos || []).forEach(m => {
+      if (m.departamento) conteo[m.departamento] = (conteo[m.departamento] || 0) + 1;
+    });
+    const orden = (d) => {
+      const i = DEPARTAMENTOS_HONDURAS.indexOf(d);
+      return i === -1 ? DEPARTAMENTOS_HONDURAS.length : i;
+    };
+    return Object.keys(conteo)
+      .sort((a, b) => orden(a) - orden(b) || a.localeCompare(b, "es"))
+      .map(nombre => ({ nombre, total: conteo[nombre] }));
+  }, [medicos]);
+
   const filtrados = useMemo(() => {
     if (!medicos) return [];
     const q = busqueda.trim().toLowerCase();
-    if (!q) return medicos;
-    return medicos.filter(m =>
-      (m.nombre_doctor || "").toLowerCase().includes(q) ||
-      (m.titulo_doctor || "").toLowerCase().includes(q) ||
-      (m.ciudad || "").toLowerCase().includes(q)
-    );
-  }, [medicos, busqueda]);
+    return medicos.filter(m => {
+      if (departamento && m.departamento !== departamento) return false;
+      if (!q) return true;
+      return (
+        (m.nombre_doctor || "").toLowerCase().includes(q) ||
+        (m.titulo_doctor || "").toLowerCase().includes(q) ||
+        (m.ciudad || "").toLowerCase().includes(q) ||
+        (m.departamento || "").toLowerCase().includes(q)
+      );
+    });
+  }, [medicos, busqueda, departamento]);
+
+  const limpiarFiltros = () => { setBusqueda(""); setDepartamento(""); };
 
   return (
     <>
@@ -192,8 +217,13 @@ export default function DirectorioMedicos() {
         }
         .dm-search:focus { outline: none; box-shadow: 0 0 0 4px rgba(33,54,101,.12); border-color: ${COLOR} !important; }
         .dm-back:hover { background: rgba(255,255,255,.16) !important; }
+        .dm-depto:focus { outline: none; box-shadow: 0 0 0 4px rgba(33,54,101,.12); }
+        .dm-clear:hover { background: #e2e8f0 !important; }
         @media (max-width: 640px) {
           .dm-grid { grid-template-columns: 1fr !important; }
+          .dm-filtros { flex-wrap: wrap; }
+          .dm-filtros .dm-sep { display: none; }
+          .dm-filtros .dm-depto-wrap { flex-basis: 100%; border-top: 1px solid #eef1f6; padding-top: 8px; }
         }
       `}</style>
 
@@ -266,10 +296,11 @@ export default function DirectorioMedicos() {
         {/* CONTENIDO */}
         <section style={{ maxWidth: 1100, margin: "-64px auto 0", padding: "0 20px 80px", position: "relative" }}>
 
-          {/* Buscador */}
-          <div style={{
+          {/* Buscador + filtro por departamento */}
+          <div className="dm-filtros" style={{
             background: "#fff", borderRadius: 18, padding: "10px 18px",
-            boxShadow: "0 10px 40px rgba(15,23,42,.12)", marginBottom: 40,
+            boxShadow: "0 10px 40px rgba(15,23,42,.12)",
+            marginBottom: departamento || busqueda ? 18 : 40,
             display: "flex", alignItems: "center", gap: 10,
             animation: "dmRise .5s .1s ease both",
           }}>
@@ -279,9 +310,62 @@ export default function DirectorioMedicos() {
               value={busqueda}
               onChange={e => setBusqueda(e.target.value)}
               placeholder="Buscar por nombre, especialidad o ciudad..."
-              style={{ flex: 1, border: "none", padding: "10px 0", fontSize: 14.5, background: "transparent" }}
+              aria-label="Buscar médicos"
+              style={{ flex: 1, minWidth: 0, border: "none", padding: "10px 0", fontSize: 14.5, background: "transparent" }}
             />
+            {departamentos.length > 0 && (
+              <>
+                <div className="dm-sep" style={{ width: 1, alignSelf: "stretch", background: "#e2e8f0", margin: "4px 4px" }} />
+                <div className="dm-depto-wrap" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <i className="bi bi-geo-alt-fill" style={{ color: departamento ? COLOR : "#94a3b8", fontSize: 15 }} />
+                  <select
+                    className="dm-depto"
+                    value={departamento}
+                    onChange={e => setDepartamento(e.target.value)}
+                    aria-label="Filtrar por departamento"
+                    style={{
+                      flex: 1, border: "none", background: "transparent", padding: "10px 4px",
+                      fontSize: 14, fontWeight: departamento ? 700 : 500,
+                      color: departamento ? COLOR : "#475569", cursor: "pointer", borderRadius: 8,
+                    }}
+                  >
+                    <option value="">Todos los departamentos</option>
+                    {departamentos.map(d => (
+                      <option key={d.nombre} value={d.nombre}>
+                        {d.nombre} ({d.total})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </>
+            )}
           </div>
+
+          {/* Resumen del filtro activo */}
+          {medicos && medicos.length > 0 && (departamento || busqueda) && (
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap",
+              gap: 10, marginBottom: 22, fontSize: 13.5, color: "#475569",
+            }}>
+              <span>
+                <strong style={{ color: "#0f172a" }}>{filtrados.length}</strong>{" "}
+                {filtrados.length === 1 ? "médico" : "médicos"}
+                {departamento && <> en <strong style={{ color: COLOR }}>{departamento}</strong></>}
+              </span>
+              <button
+                type="button"
+                className="dm-clear"
+                onClick={limpiarFiltros}
+                style={{
+                  background: "#eef2f7", border: "none", borderRadius: 10, padding: "6px 12px",
+                  fontSize: 12.5, fontWeight: 600, color: "#475569", cursor: "pointer",
+                  display: "inline-flex", alignItems: "center", gap: 6, transition: "background .15s",
+                }}
+              >
+                <i className="bi bi-x-lg" /> Quitar filtros
+              </button>
+            </div>
+          )}
 
           {/* Loading */}
           {medicos === null && !error && (
@@ -314,7 +398,9 @@ export default function DirectorioMedicos() {
           {medicos && medicos.length > 0 && filtrados.length === 0 && (
             <div style={{ textAlign: "center", padding: "60px 0", color: "#64748b" }}>
               <i className="bi bi-search" style={{ fontSize: 36, color: "#cbd5e1", display: "block", marginBottom: 12 }} />
-              No encontramos médicos que coincidan con "{busqueda}".
+              {departamento && !busqueda
+                ? <>Aún no hay médicos en {departamento}.</>
+                : <>No encontramos médicos que coincidan con tu búsqueda{departamento ? ` en ${departamento}` : ""}.</>}
             </div>
           )}
 
