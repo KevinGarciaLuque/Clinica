@@ -108,7 +108,8 @@ router.get("/directorio", publicLimiter, async (req, res) => {
               MAX(CASE WHEN cc.clave='perfil_descripcion'    THEN cc.valor END) AS descripcion,
               MAX(CASE WHEN cc.clave='perfil_foto_doctor'    THEN cc.valor END) AS foto_doctor,
               MAX(CASE WHEN cc.clave='perfil_color_primario' THEN cc.valor END) AS color_primario,
-              MAX(CASE WHEN cc.clave='perfil_departamento'   THEN cc.valor END) AS departamento
+              MAX(CASE WHEN cc.clave='perfil_departamento'   THEN cc.valor END) AS departamento,
+              MAX(CASE WHEN cc.clave='perfil_municipio'      THEN cc.valor END) AS municipio
        FROM clinicas c
        JOIN clinica_config cc ON cc.clinica_id = c.id
        WHERE c.activo = 1
