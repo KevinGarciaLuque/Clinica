@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { createPortal } from "react-dom";
 import api from "../../api/api";
+import { DEPARTAMENTOS_HONDURAS } from "../../utils/departamentosHonduras";
 import { useAuth } from "../../auth/AuthContext";
 
 function pct(value) {
@@ -78,6 +79,7 @@ export default function ConfigClinica() {
           perfil_color_primario:  cfgMap.perfil_color_primario  || "#213665",
           perfil_agendar_activo:  cfgMap.perfil_agendar_activo  !== undefined ? cfgMap.perfil_agendar_activo : "1",
           perfil_mostrar_directorio: cfgMap.perfil_mostrar_directorio || "0",
+          perfil_departamento:    cfgMap.perfil_departamento    || "",
           whatsapp_cumpleanos_activo: cfgMap.whatsapp_cumpleanos_activo !== undefined ? cfgMap.whatsapp_cumpleanos_activo : "1",
         });
 
@@ -737,6 +739,20 @@ export default function ConfigClinica() {
                     value={formPerfil.perfil_titulo_doctor || ""}
                     onChange={e => setFormPerfil({ ...formPerfil, perfil_titulo_doctor: e.target.value })}
                   />
+                </div>
+                <div className="col-md-6">
+                  <label className="form-label">Departamento</label>
+                  <select
+                    className="form-select"
+                    value={formPerfil.perfil_departamento || ""}
+                    onChange={e => setFormPerfil({ ...formPerfil, perfil_departamento: e.target.value })}
+                  >
+                    <option value="">Selecciona el departamento</option>
+                    {DEPARTAMENTOS_HONDURAS.map(d => <option key={d} value={d}>{d}</option>)}
+                  </select>
+                  <div style={{ fontSize: 12, color: "#64748b", marginTop: 4 }}>
+                    Los pacientes pueden filtrar el directorio de medickg.com por departamento.
+                  </div>
                 </div>
                 <div className="col-12">
                   <label className="form-label">Descripción pública</label>
