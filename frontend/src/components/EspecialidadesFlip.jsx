@@ -1,0 +1,98 @@
+import { useState } from "react";
+import { motion } from "framer-motion";
+
+// Cuadrícula de especialidades con tarjetas que giran en 3D.
+// - Al pasar el mouse (o al enfocarla con el teclado) la tarjeta gira y muestra la
+//   descripción por detrás, con el color de la especialidad.
+// - En pantallas táctiles gira al tocar y vuelve al tocar de nuevo.
+// - Con prefers-reduced-motion cambia de cara sin animación.
+
+const CSS = `
+  .esp-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 16px; }
+  .esp-card { display: block; width: 100%; height: 200px; padding: 0; border: none; background: none;
+    cursor: pointer; perspective: 1000px; text-align: center; font: inherit; }
+  .esp-card:focus-visible { outline: none; }
+  .esp-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d;
+    transition: transform .65s cubic-bezier(.2,.8,.2,1); }
+  @media (hover: hover) { .esp-card:hover .esp-inner { transform: rotateY(180deg); } }
+  .esp-card.is-flipped .esp-inner, .esp-card:focus-visible .esp-inner { transform: rotateY(180deg); }
+
+  .esp-face { position: absolute; inset: 0; border-radius: 20px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; padding: 20px 18px;
+    -webkit-backface-visibility: hidden; backface-visibility: hidden; }
+  .esp-front { background: #fff; border: 1px solid color-mix(in srgb, var(--c) 22%, transparent);
+    box-shadow: 0 6px 22px color-mix(in srgb, var(--c) 10%, transparent); transition: box-shadow .25s ease; }
+  .esp-card:hover .esp-front { box-shadow: 0 14px 34px color-mix(in srgb, var(--c) 22%, transparent); }
+  .esp-icon { width: 64px; height: 64px; border-radius: 20px; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--c) 12%, #fff); border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+    margin-bottom: 14px; }
+  .esp-icon i { font-size: 28px; color: var(--c); }
+  .esp-name { font-weight: 800; font-size: 15px; color: #0f172a; line-height: 1.3; }
+  .esp-hint { margin-top: 10px; font-size: 11.5px; font-weight: 600; color: #94a3b8; display: inline-flex; align-items: center; gap: 5px; }
+
+  .esp-back { transform: rotateY(180deg); color: #fff; overflow: hidden;
+    background: var(--c);
+    background: linear-gradient(150deg, var(--c) 0%, color-mix(in srgb, var(--c) 62%, #0f172a) 100%);
+    box-shadow: 0 16px 36px color-mix(in srgb, var(--c) 35%, transparent); }
+  .esp-back::before { content: ""; position: absolute; top: -40px; right: -40px; width: 130px; height: 130px;
+    border-radius: 50%; background: rgba(255,255,255,.12); }
+  .esp-back i.esp-bgicon { position: absolute; bottom: -14px; right: -6px; font-size: 84px; color: rgba(255,255,255,.12); }
+  .esp-back-name { position: relative; font-weight: 800; font-size: 14.5px; margin-bottom: 8px; }
+  .esp-back-desc { position: relative; font-size: 13px; line-height: 1.55; color: rgba(255,255,255,.92); }
+
+  @media (max-width: 640px) {
+    .esp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+    .esp-card { height: 190px; }
+    .esp-face { padding: 16px 12px; }
+    .esp-icon { width: 54px; height: 54px; border-radius: 16px; margin-bottom: 10px; }
+    .esp-icon i { font-size: 24px; }
+    .esp-name { font-size: 14px; }
+    .esp-back-desc { font-size: 12.5px; }
+  }
+  @media (prefers-reduced-motion: reduce) { .esp-inner, .esp-front { transition: none; } }
+`;
+
+function Tarjeta({ esp, index }) {
+  const [volteada, setVolteada] = useState(false);
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 14 }}
+      whileInView={{ opacity: 1, y: 0 }}
+      viewport={{ once: true, amount: 0.2 }}
+      transition={{ duration: 0.45, delay: Math.min(index * 0.035, 0.45), ease: "easeOut" }}
+    >
+      <button
+        type="button"
+        className={`esp-card${volteada ? " is-flipped" : ""}`}
+        style={{ "--c": esp.color }}
+        aria-label={`${esp.label}: ${esp.desc}`}
+        // En táctil, tocar voltea; con mouse ya gira al pasar por encima
+        onPointerUp={e => { if (e.pointerType !== "mouse") setVolteada(v => !v); }}
+      >
+        <div className="esp-inner">
+          <div className="esp-face esp-front" aria-hidden="true">
+            <div className="esp-icon"><i className={`bi ${esp.icon}`} /></div>
+            <div className="esp-name">{esp.label}</div>
+            <div className="esp-hint"><i className="bi bi-arrow-repeat" />Ver más</div>
+          </div>
+          <div className="esp-face esp-back" aria-hidden="true">
+            <i className={`bi ${esp.icon} esp-bgicon`} />
+            <div className="esp-back-name">{esp.label}</div>
+            <div className="esp-back-desc">{esp.desc}</div>
+          </div>
+        </div>
+      </button>
+    </motion.div>
+  );
+}
+
+export default function EspecialidadesFlip({ items }) {
+  return (
+    <>
+      <style>{CSS}</style>
+      <div className="esp-grid">
+        {items.map((esp, i) => <Tarjeta key={esp.label} esp={esp} index={i} />)}
+      </div>
+    </>
+  );
+}

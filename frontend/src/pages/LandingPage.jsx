@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { motion, MotionConfig, useMotionValue, useSpring, useInView, animate } from "framer-motion";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
 import MarketingShowcase from "../components/MarketingShowcase";
+import EspecialidadesFlip from "../components/EspecialidadesFlip";
 import { construirItems } from "../utils/marketingItems";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -664,40 +665,11 @@ export default function LandingPage({ hero3d = false }) {
             <p style={{ fontSize: 16, color: "#64748b", marginTop: 12, maxWidth: 560, margin: "12px auto 0" }}>
               Un solo sistema para todas tus especialidades. Pediatría, adultos y más.
             </p>
+            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-hand-index" /> Pasa el mouse o toca una especialidad para ver qué incluye
+            </p>
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: 14 }}>
-            {ESPECIALIDADES.map((esp, i) => (
-              <Reveal
-                key={i}
-                delay={Math.min(i * 0.04, 0.4)}
-                y={12}
-                whileHover={{ y: -4, boxShadow: `0 12px 32px ${esp.color}22`, transition: { duration: 0.2 } }}
-                style={{
-                  background: "#fff",
-                  borderRadius: 18,
-                  padding: "26px 24px",
-                  border: `1px solid ${esp.color}30`,
-                  boxShadow: `0 4px 20px ${esp.color}12`,
-                  display: "flex",
-                  alignItems: "flex-start",
-                  gap: 16,
-                  cursor: "default",
-                }}
-              >
-                <div style={{
-                  width: 48, height: 48, borderRadius: 14, flexShrink: 0,
-                  background: `${esp.color}15`, border: `1px solid ${esp.color}30`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <i className={`bi ${esp.icon}`} style={{ fontSize: 22, color: esp.color }} />
-                </div>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a", marginBottom: 6 }}>{esp.label}</div>
-                  <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.6 }}>{esp.desc}</div>
-                </div>
-              </Reveal>
-            ))}
-          </div>
+          <EspecialidadesFlip items={ESPECIALIDADES} />
         </div>
       </section>
 
