@@ -434,8 +434,8 @@ export default function LandingPage({ hero3d = false }) {
         </div>
         <div style={{ display: "flex", gap: 0, alignItems: "center" }}>
           <div className="d-none d-lg-flex" style={{ alignItems: "center" }}>
-            <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
             <button className="nav-link-lp" onClick={() => scrollTo("especialidades")}>Especialidades</button>
+            <button className="nav-link-lp" onClick={() => scrollTo("caracteristicas")}>Características</button>
             {cfg.marketing_activo !== "0" && (
               <button className="nav-link-lp" onClick={() => navigate("/marketing-medico")}>Marketing Médico</button>
             )}
@@ -492,8 +492,8 @@ export default function LandingPage({ hero3d = false }) {
             </button>
 
             {[
-              ["bi-grid-1x2-fill", "Características", "caracteristicas"],
               ["bi-heart-pulse-fill", "Especialidades", "especialidades"],
+              ["bi-grid-1x2-fill", "Características", "caracteristicas"],
               ...(cfg.marketing_activo !== "0" ? [["bi-megaphone-fill", "Marketing Médico", null]] : []),
               ["bi-credit-card-fill", "Planes", "planes"],
               ["bi-star-fill", "Reseñas", "resenas"],
@@ -614,6 +614,27 @@ export default function LandingPage({ hero3d = false }) {
         </div>
       </section>}
 
+      {/* ── ESPECIALIDADES ── */}
+      <section id="especialidades" style={{ background: "#fff", padding: "80px 24px" }}>
+        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+          <div style={{ textAlign: "center", marginBottom: 52 }}>
+            <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
+              Especialidades
+            </span>
+            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
+              Diseñado para cada área médica
+            </h2>
+            <p style={{ fontSize: 16, color: "#64748b", marginTop: 12, maxWidth: 560, margin: "12px auto 0" }}>
+              Un solo sistema para todas tus especialidades. Pediatría, adultos y más.
+            </p>
+            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
+              <i className="bi bi-hand-index" /> Pasa el mouse o toca una especialidad para ver qué incluye
+            </p>
+          </div>
+          <EspecialidadesFlip items={ESPECIALIDADES} />
+        </div>
+      </section>
+
       {/* ── CARACTERÍSTICAS ── */}
       <section id="caracteristicas" style={{ background: "#f8fafc", padding: "80px 24px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
@@ -659,27 +680,6 @@ export default function LandingPage({ hero3d = false }) {
               ))}
             </div>
           )}
-        </div>
-      </section>
-
-      {/* ── ESPECIALIDADES ── */}
-      <section id="especialidades" style={{ background: "#fff", padding: "80px 24px" }}>
-        <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ textAlign: "center", marginBottom: 52 }}>
-            <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
-              Especialidades
-            </span>
-            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
-              Diseñado para cada área médica
-            </h2>
-            <p style={{ fontSize: 16, color: "#64748b", marginTop: 12, maxWidth: 560, margin: "12px auto 0" }}>
-              Un solo sistema para todas tus especialidades. Pediatría, adultos y más.
-            </p>
-            <p style={{ fontSize: 13, color: "#94a3b8", marginTop: 10, display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <i className="bi bi-hand-index" /> Pasa el mouse o toca una especialidad para ver qué incluye
-            </p>
-          </div>
-          <EspecialidadesFlip items={ESPECIALIDADES} />
         </div>
       </section>
 
