@@ -18,6 +18,7 @@ const router  = require("express").Router();
 const pool    = require("../db");
 const { v4: uuidv4 } = require("uuid");
 const jwt     = require("jsonwebtoken");
+const crypto  = require("crypto");
 const rateLimit = require("express-rate-limit");
 const { enviarEmail, templateVerificacion, templateBienvenida } = require("../utils/mailer");
 const gcal = require("../utils/googleCalendar");
@@ -61,6 +62,47 @@ function generarSessionToken(pacienteId, clinicaId) {
     SESSION_SECRET,
     { expiresIn: "2h" }
   );
+}
+
+// ── Códigos de verificación para pacientes subsecuentes (tabla nueva) ──
+let tablaCodigos = null;
+function asegurarTablaCodigos() {
+  if (!tablaCodigos) {
+    tablaCodigos = pool.query(`
+      CREATE TABLE IF NOT EXISTS registro_codigos (
+        id          CHAR(48) NOT NULL PRIMARY KEY,
+        paciente_id INT UNSIGNED NOT NULL,
+        clinica_id  INT UNSIGNED NOT NULL,
+        codigo_hash CHAR(64) NOT NULL,
+        intentos    TINYINT UNSIGNED NOT NULL DEFAULT 0,
+        expira_en   DATETIME NOT NULL,
+        usado_en    DATETIME NULL,
+        creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+        INDEX idx_registro_codigos_paciente (paciente_id, creado_en)
+      ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
+    `).catch((e) => { tablaCodigos = null; throw e; });
+  }
+  return tablaCodigos;
+}
+
+// El código (6 dígitos) se guarda como HMAC ligado a su verificación, nunca en claro
+function hashCodigo(verificacionId, codigo) {
+  return crypto.createHmac("sha256", SESSION_SECRET).update(`${verificacionId}:${codigo}`).digest("hex");
+}
+
+function templateCodigoAgendar({ nombres, codigo, clinicaNombre }) {
+  const esc = (t) => String(t || "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  return `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;background:#f1f5f9;padding:24px">
+    <div style="background:#fff;border-radius:12px;max-width:480px;margin:auto;padding:32px;text-align:center">
+      <h2 style="color:#198754;margin:0 0 8px">Tu código para agendar</h2>
+      <p style="color:#475569">Hola ${esc(nombres)}, usa este código para continuar agendando tu cita en
+        <strong>${esc(clinicaNombre || "la clínica")}</strong>:</p>
+      <div style="font-size:34px;font-weight:800;letter-spacing:8px;color:#198754;margin:20px 0">${codigo}</div>
+      <p style="color:#94a3b8;font-size:13px">Vence en <strong>10 minutos</strong>. Si no fuiste tú, ignora este correo:
+        sin este código nadie puede agendar a tu nombre.</p>
+    </div>
+  </div>`;
 }
 
 // ── Helper: valida session token ─────────────────────────
@@ -466,21 +508,98 @@ router.get("/buscar-dni", limiterStrict, async (req, res) => {
     if (!p)
       return res.status(404).json({ ok: false, encontrado: false, msg: "No se encontró paciente con ese DNI en esta clínica" });
 
-    // Enmascarar email: ana***@gmail.com
-    const emailMasked = p.email
-      ? p.email.replace(/^(..)(.*?)(@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 3)) + c)
-      : null;
+    // El DNI solo identifica; para continuar hay que probar acceso al correo
+    // registrado con un código de 6 dígitos (antes bastaba con conocer el DNI).
+    if (!p.email) {
+      return res.json({
+        ok: true, encontrado: true, sin_email: true,
+        msg: "Tu expediente no tiene un correo registrado. Comunícate con la clínica para agendar tu cita.",
+      });
+    }
 
-    const sessionToken = generarSessionToken(p.id, clinica_id);
+    // Enmascarar email: ana***@gmail.com
+    const emailMasked = p.email.replace(/^(..)(.*?)(@.*)$/, (_, a, b, c) => a + "*".repeat(Math.max(b.length, 3)) + c);
+
+    await asegurarTablaCodigos();
+    // Máximo 3 códigos por paciente cada 15 minutos
+    const [[{ recientes }]] = await pool.query(
+      "SELECT COUNT(*) AS recientes FROM registro_codigos WHERE paciente_id=? AND creado_en > NOW() - INTERVAL 15 MINUTE",
+      [p.id]
+    );
+    if (recientes >= 3)
+      return res.status(429).json({ ok: false, msg: "Ya enviamos varios códigos a tu correo. Revisa tu bandeja o espera unos minutos." });
+
+    const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, "0");
+    const verificacionId = crypto.randomBytes(24).toString("hex");
+    await pool.query(
+      `INSERT INTO registro_codigos (id, paciente_id, clinica_id, codigo_hash, expira_en)
+       VALUES (?, ?, ?, ?, NOW() + INTERVAL 10 MINUTE)`,
+      [verificacionId, p.id, clinica_id, hashCodigo(verificacionId, codigo)]
+    );
+
+    const [[clinica]] = await pool.query("SELECT nombre FROM clinicas WHERE id=? LIMIT 1", [clinica_id]);
+    await enviarEmail({
+      to: p.email,
+      subject: `Tu código para agendar: ${codigo}`,
+      html: templateCodigoAgendar({ nombres: p.nombres, codigo, clinicaNombre: clinica?.nombre }),
+    });
 
     res.json({
       ok: true,
       encontrado: true,
-      session_token: sessionToken,
+      requiere_codigo: true,
+      verificacion_id: verificacionId,
       paciente: { id: p.id, nombres: p.nombres, apellidos: p.apellidos, email: emailMasked },
     });
   } catch (e) {
-    res.status(500).json({ ok: false, msg: e.message });
+    console.error("[buscar-dni]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo verificar. Intenta de nuevo." });
+  }
+});
+
+// ══════════════════════════════════════════════════════════
+// POST /api/registro/verificar-codigo  { verificacion_id, codigo } — Público
+// Canjea el código enviado al correo por el session token del paciente
+// ══════════════════════════════════════════════════════════
+router.post("/verificar-codigo", limiterStrict, async (req, res) => {
+  try {
+    const verificacionId = String(req.body?.verificacion_id || "");
+    const codigo = String(req.body?.codigo || "").replace(/\D/g, "");
+    if (!/^[a-f0-9]{48}$/.test(verificacionId) || codigo.length !== 6)
+      return res.status(400).json({ ok: false, msg: "Escribe el código de 6 dígitos que te enviamos." });
+
+    await asegurarTablaCodigos();
+    const [[v]] = await pool.query(
+      `SELECT id, paciente_id, clinica_id, codigo_hash, intentos,
+              (usado_en IS NULL AND expira_en > NOW()) AS vigente
+       FROM registro_codigos WHERE id=?`,
+      [verificacionId]
+    );
+    if (!v || !v.vigente || v.intentos >= 5)
+      return res.status(400).json({ ok: false, vencido: true, msg: "El código venció o ya se usó. Pide uno nuevo." });
+
+    const esperado = Buffer.from(v.codigo_hash);
+    const recibido = Buffer.from(hashCodigo(verificacionId, codigo));
+    if (!crypto.timingSafeEqual(esperado, recibido)) {
+      await pool.query("UPDATE registro_codigos SET intentos = intentos + 1 WHERE id=?", [verificacionId]);
+      const quedan = 4 - v.intentos;
+      return res.status(400).json({
+        ok: false,
+        vencido: quedan <= 0,
+        msg: quedan > 0 ? `Código incorrecto. Te quedan ${quedan} intento(s).` : "Demasiados intentos. Pide un código nuevo.",
+      });
+    }
+
+    // Se marca usado en la misma sentencia: un código sirve una sola vez
+    const [r] = await pool.query(
+      "UPDATE registro_codigos SET usado_en = NOW() WHERE id=? AND usado_en IS NULL", [verificacionId]);
+    if (!r.affectedRows)
+      return res.status(400).json({ ok: false, vencido: true, msg: "El código ya se usó. Pide uno nuevo." });
+
+    res.json({ ok: true, session_token: generarSessionToken(v.paciente_id, v.clinica_id) });
+  } catch (e) {
+    console.error("[verificar-codigo]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo verificar el código." });
   }
 });
 

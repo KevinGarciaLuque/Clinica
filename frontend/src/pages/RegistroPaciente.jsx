@@ -529,6 +529,11 @@ export default function RegistroPaciente() {
   // ── DNI (subsecuente) ─────────────────────────────────
   const [dniBuscar,   setDniBuscar]   = useState("");
   const [buscandoDni, setBuscandoDni] = useState(false);
+  // Verificación por código enviado al correo (paciente subsecuente)
+  const [verif, setVerif] = useState(null);       // { id, paciente }
+  const [codigo, setCodigo] = useState("");
+  const [verificando, setVerificando] = useState(false);
+  const [sinEmailMsg, setSinEmailMsg] = useState("");
 
   const DOCS_CHECKLIST = [
     { icon: "bi-person-vcard",  label: "DNI / Carnet de identidad (original + copia)" },
@@ -630,18 +635,47 @@ export default function RegistroPaciente() {
     try {
       const res  = await fetch(`${BASE}/registro/buscar-dni?dni=${encodeURIComponent(dniBuscar.trim())}&clinica_id=${clinicaId}`);
       const data = await res.json();
-      if (!data.ok || !data.encontrado) {
+      if (res.status === 404 || (data.ok && !data.encontrado)) {
         setError("No encontramos un paciente con ese DNI. ¿Quizás eres nuevo?");
         return;
       }
-      setPacienteId(data.paciente.id);
-      setSessionToken(data.session_token);
-      setPacienteInfo(data.paciente);
-      setPaso(1);
+      if (!data.ok) { setError(data.msg || "No se pudo verificar. Intenta de nuevo."); return; }
+      if (data.sin_email) { setSinEmailMsg(data.msg); return; }
+      setVerif({ id: data.verificacion_id, paciente: data.paciente });
+      setCodigo("");
     } catch {
       setError("Error al buscar. Intenta de nuevo.");
     } finally {
       setBuscandoDni(false);
+    }
+  };
+
+  // ── Verificar el código enviado al correo ─────────────
+  const verificarCodigo = async (e) => {
+    e.preventDefault();
+    setError("");
+    setVerificando(true);
+    try {
+      const res  = await fetch(`${BASE}/registro/verificar-codigo`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ verificacion_id: verif.id, codigo }),
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        setError(data.msg || "Código incorrecto.");
+        if (data.vencido) setVerif(null);
+        return;
+      }
+      setPacienteId(verif.paciente.id);
+      setSessionToken(data.session_token);
+      setPacienteInfo(verif.paciente);
+      setVerif(null);
+      setPaso(1);
+    } catch {
+      setError("Error al verificar. Intenta de nuevo.");
+    } finally {
+      setVerificando(false);
     }
   };
 
@@ -656,6 +690,8 @@ export default function RegistroPaciente() {
     setPaso(0);
     setError("");
     setCitaConf(null);
+    setVerif(null);
+    setSinEmailMsg("");
   };
 
   // ════════════════════════════════════════════════════════
@@ -1027,6 +1063,45 @@ export default function RegistroPaciente() {
                     <h5 className="fw-bold mb-1">Verifica tu identidad</h5>
                     <p className="text-muted" style={{ fontSize: "0.875rem" }}>Ingresa tu número de DNI para encontrar tu expediente</p>
                   </div>
+                  {sinEmailMsg ? (
+                    <div className="alert alert-warning" style={{ fontSize: "0.9rem" }}>
+                      <i className="bi bi-telephone me-2" />{sinEmailMsg}
+                      <div className="mt-2">
+                        <button type="button" className="btn btn-link btn-sm p-0" onClick={() => setSinEmailMsg("")}>Intentar con otro DNI</button>
+                      </div>
+                    </div>
+                  ) : verif ? (
+                    <form onSubmit={verificarCodigo}>
+                      <p className="text-center" style={{ fontSize: "0.9rem" }}>
+                        Te enviamos un código de 6 dígitos a <strong>{verif.paciente.email}</strong>.
+                        Escríbelo para continuar.
+                      </p>
+                      <div className="mb-3">
+                        <input
+                          className="form-control form-control-lg text-center"
+                          value={codigo}
+                          onChange={e => { setCodigo(e.target.value.replace(/\D/g, "").slice(0, 6)); setError(""); }}
+                          inputMode="numeric"
+                          autoComplete="one-time-code"
+                          placeholder="000000"
+                          style={{ letterSpacing: 8, fontWeight: 700 }}
+                          autoFocus
+                          required
+                        />
+                      </div>
+                      <button className="btn btn-success w-100 py-2" disabled={verificando || codigo.length !== 6}>
+                        {verificando
+                          ? <><span className="spinner-border spinner-border-sm me-2" />Verificando...</>
+                          : <><i className="bi bi-shield-check me-2" />Continuar</>}
+                      </button>
+                      <div className="text-center mt-3" style={{ fontSize: "0.82rem" }}>
+                        <span className="text-muted">¿No te llegó? Revisa spam o </span>
+                        <button type="button" className="btn btn-link btn-sm p-0" onClick={() => { setVerif(null); setError(""); }}>
+                          pide otro código
+                        </button>
+                      </div>
+                    </form>
+                  ) : (
                   <form onSubmit={buscarPorDni}>
                     <div className="mb-4">
                       <label className="form-label fw-semibold">Número de DNI</label>
@@ -1045,6 +1120,7 @@ export default function RegistroPaciente() {
                         : <><i className="bi bi-search me-2" />Verificar identidad</>}
                     </button>
                   </form>
+                  )}
                   <div className="text-center mt-4">
                     <span className="text-muted" style={{ fontSize: "0.875rem" }}>¿No tienes expediente? </span>
                     <button className="btn btn-link p-0 text-primary fw-semibold" style={{ fontSize: "0.875rem" }}
