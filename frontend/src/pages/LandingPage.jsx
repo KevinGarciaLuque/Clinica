@@ -300,13 +300,6 @@ export default function LandingPage({ hero3d = false }) {
         .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 36px rgba(0,0,0,.1) !important; }
         .mkt-chip { transition: transform .2s ease, background .2s ease, border-color .2s ease; }
         .mkt-chip:hover { transform: translateY(-2px); background: rgba(255,255,255,.16) !important; border-color: rgba(255,255,255,.35) !important; }
-        .mkt-bar-run { animation-name: mktBar; animation-timing-function: linear; animation-fill-mode: forwards; }
-        @keyframes mktBar { from { width: 0%; } to { width: 100%; } }
-        .mkt-glow { animation: mktGlow 4s ease-in-out infinite; }
-        @keyframes mktGlow { 0%, 100% { opacity: .25; } 50% { opacity: .5; } }
-        .mkt-play { animation: mktPlay 2.2s ease-in-out infinite; }
-        @keyframes mktPlay { 0%, 100% { box-shadow: 0 10px 30px rgba(0,0,0,.4), 0 0 0 0 rgba(255,255,255,.45); } 60% { box-shadow: 0 10px 30px rgba(0,0,0,.4), 0 0 0 16px rgba(255,255,255,0); } }
-        .mkt-thumb:hover { opacity: 1 !important; transform: translateY(-2px); }
         .plan-card { transition: transform .2s, box-shadow .2s; }
         .plan-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,.12) !important; }
         .nav-link-lp {
