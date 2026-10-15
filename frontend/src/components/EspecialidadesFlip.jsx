@@ -1,10 +1,12 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 
 // Cuadrícula de especialidades con tarjetas que giran en 3D.
 // - Al pasar el mouse (o al enfocarla con el teclado) la tarjeta gira y muestra la
 //   descripción por detrás, con el color de la especialidad.
-// - En pantallas táctiles gira al tocar y vuelve al tocar de nuevo.
+// - En pantallas táctiles gira al tocar y vuelve al tocar de nuevo. Además,
+//   la primera vez que cada tarjeta aparece en pantalla da una vuelta sola
+//   (muestra el reverso y regresa) para que se note que se puede girar.
 // - Por detrás tiene un enlace "Ver qué incluye" que lleva a los planes.
 // - Con prefers-reduced-motion cambia de cara sin animación.
 
@@ -65,11 +67,39 @@ const CSS = `
     .esp-back-desc { font-size: 12px; }
     .esp-link { margin-top: 10px; font-size: 11px; padding: 5px 8px; gap: 4px; }
   }
-  @media (prefers-reduced-motion: reduce) { .esp-inner, .esp-front { transition: none; } }
+  /* Vuelta de demostración en pantallas táctiles: gira, muestra el reverso y regresa */
+  @keyframes espPeek {
+    0%       { transform: rotateY(0deg); }
+    24%, 68% { transform: rotateY(180deg); }
+    92%, 100% { transform: rotateY(0deg); }
+  }
+  .esp-card.is-peek .esp-inner { animation: espPeek 2.6s cubic-bezier(.2,.8,.2,1) var(--peek-delay, .35s) both; }
+  @media (prefers-reduced-motion: reduce) {
+    .esp-inner, .esp-front { transition: none; }
+    .esp-card.is-peek .esp-inner { animation: none; }
+  }
 `;
 
 function Tarjeta({ esp, index, onVerQueIncluye }) {
   const [volteada, setVolteada] = useState(false);
+  const [peek, setPeek] = useState(false);
+  const ref = useRef(null);
+
+  // Solo en pantallas táctiles: la primera vez que la tarjeta entra en pantalla, da una vuelta sola
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || !("IntersectionObserver" in window)) return;
+    let tactil = false;
+    try {
+      tactil = window.matchMedia("(hover: none)").matches && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    } catch { /* sin matchMedia: no se anima */ }
+    if (!tactil) return;
+    const io = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) { setPeek(true); io.disconnect(); }
+    }, { threshold: 0.7 });
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
   return (
     <motion.div
       initial={{ opacity: 0, y: 14 }}
@@ -78,13 +108,16 @@ function Tarjeta({ esp, index, onVerQueIncluye }) {
       transition={{ duration: 0.45, delay: Math.min(index * 0.035, 0.45), ease: "easeOut" }}
     >
       <div
+        ref={ref}
         role="group"
         tabIndex={0}
-        className={`esp-card${volteada ? " is-flipped" : ""}`}
-        style={{ "--c": esp.color }}
+        className={`esp-card${volteada ? " is-flipped" : ""}${peek ? " is-peek" : ""}`}
+        // Las tarjetas de la columna derecha giran un poco después que las de la izquierda
+        style={{ "--c": esp.color, "--peek-delay": `${0.35 + (index % 2) * 0.18}s` }}
         aria-label={esp.label}
-        // En táctil, tocar voltea; con mouse ya gira al pasar por encima
-        onPointerUp={e => { if (e.pointerType !== "mouse") setVolteada(v => !v); }}
+        // En táctil, tocar voltea (y cancela la vuelta de demostración); con mouse ya gira al pasar por encima
+        onPointerUp={e => { if (e.pointerType !== "mouse") { setPeek(false); setVolteada(v => !v); } }}
+        onAnimationEnd={e => { if (e.animationName === "espPeek") setPeek(false); }}
       >
         <div className="esp-inner">
           <div className="esp-face esp-front" aria-hidden="true">
