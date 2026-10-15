@@ -4,6 +4,7 @@ import { motion, MotionConfig, useMotionValue, useSpring, useInView, animate } f
 import { SIMBOLO_MONEDA } from "../utils/monedas";
 import MarketingShowcase from "../components/MarketingShowcase";
 import EspecialidadesFlip from "../components/EspecialidadesFlip";
+import FuncionesPorPlan from "../components/FuncionesPorPlan";
 import { construirItems } from "../utils/marketingItems";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -623,32 +624,41 @@ export default function LandingPage({ hero3d = false }) {
             <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
               Todo lo que tu clínica necesita
             </h2>
+            {planes.some(p => p.features?.length) && (
+              <p style={{ fontSize: 16, color: "#64748b", maxWidth: 560, margin: "12px auto 0" }}>
+                Elige un plan y descubre todo lo que incluye.
+              </p>
+            )}
           </div>
-          <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
-            {FEATURES.map((f, i) => (
-              <Reveal
-                key={i}
-                delay={i * 0.05}
-                className="feature-card"
-                style={{
-                  background: "#fff", borderRadius: 16, padding: "22px 20px",
-                  border: "1px solid #e2e8f0",
-                  boxShadow: "0 2px 12px rgba(0,0,0,.05)",
-                  transition: "transform .2s, box-shadow .2s",
-                }}
-              >
-                <div style={{
-                  width: 44, height: 44, borderRadius: 12, marginBottom: 14,
-                  background: `rgba(${colorRgb},.1)`, border: `1px solid rgba(${colorRgb},.2)`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <i className={`bi ${f.icon}`} style={{ fontSize: 20, color }} />
-                </div>
-                <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", marginBottom: 6 }}>{f.label}</div>
-                <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.55 }}>{f.desc}</div>
-              </Reveal>
-            ))}
-          </div>
+          {planes.some(p => p.features?.length) ? (
+            <FuncionesPorPlan planes={planes} onVerPrecio={() => scrollTo("planes")} />
+          ) : (
+            <div className="features-grid" style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 18 }}>
+              {FEATURES.map((f, i) => (
+                <Reveal
+                  key={i}
+                  delay={i * 0.05}
+                  className="feature-card"
+                  style={{
+                    background: "#fff", borderRadius: 16, padding: "22px 20px",
+                    border: "1px solid #e2e8f0",
+                    boxShadow: "0 2px 12px rgba(0,0,0,.05)",
+                    transition: "transform .2s, box-shadow .2s",
+                  }}
+                >
+                  <div style={{
+                    width: 44, height: 44, borderRadius: 12, marginBottom: 14,
+                    background: `rgba(${colorRgb},.1)`, border: `1px solid rgba(${colorRgb},.2)`,
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                  }}>
+                    <i className={`bi ${f.icon}`} style={{ fontSize: 20, color }} />
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: "#0f172a", marginBottom: 6 }}>{f.label}</div>
+                  <div style={{ fontSize: 13, color: "#64748b", lineHeight: 1.55 }}>{f.desc}</div>
+                </Reveal>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
