@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/api";
+import PerfilPublicoPanel from "../components/PerfilPublicoPanel";
 import { nombreMedico } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 
@@ -942,6 +943,11 @@ export default function Dashboard() {
                 </div>
               </motion.div>
             </div>
+
+            {/* Perfil público: enlace, QR y visitas (médico: el suyo; admin: toda la clínica) */}
+            {["ADMIN", "MEDICO", "PSICOLOGO"].includes(user?.tipo) && user?.clinica_id && (
+              <PerfilPublicoPanel isMobile={isMobile} />
+            )}
 
             {/* Accesos rápidos según rol */}
             {(user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN") && (

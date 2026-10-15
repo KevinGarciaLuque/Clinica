@@ -30,6 +30,7 @@ const SolicitarPlan     = lazy(() => import("./pages/SolicitarPlan"));
 const ResenaPublica     = lazy(() => import("./pages/ResenaPublica"));
 const MiCita            = lazy(() => import("./pages/MiCita"));
 const EspacioLiberado   = lazy(() => import("./pages/EspacioLiberado"));
+const PerfilMedicoPage  = lazy(() => import("./pages/PerfilMedicoPage"));
 const PortalPaciente    = lazy(() => import("./pages/portal/PortalPaciente"));
 const PortalEntrar      = lazy(() => import("./pages/portal/PortalEntrar"));
 
@@ -133,6 +134,7 @@ export default function App() {
       <Route path="/restablecer-password"  element={<RestablecerContrasena />} />
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
+      <Route path="/dr/:slug"         element={<PerfilMedicoPage />} />
       <Route path="/agenda-tu-consulta" element={<DirectorioMedicos />} />
       <Route path="/solicitar-plan"   element={<SolicitarPlan />} />
       <Route path="/resena/:token"    element={<ResenaPublica />} />

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import AgendarModal from "./AgendarModal";
+import { registrarEvento } from "../utils/perfilEventos";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const DEFAULT_COLOR = "#213665";
@@ -42,6 +43,7 @@ export default function PublicClinicaPage() {
         ]);
         setClinica(resCli.data.data);
         setServicios(resSrv.data.data || []);
+        registrarEvento({ clinica_slug: slug }, "VISTA");
       } catch (e) {
         setError(e.response?.status === 404 ? "Página no encontrada" : "Error al cargar la página");
       } finally {
@@ -220,7 +222,7 @@ export default function PublicClinicaPage() {
           {/* Botón principal: Agendar Cita */}
           {perfil.perfil_agendar_activo !== "0" && (
             <button
-              onClick={() => setShowAgendar(true)}
+              onClick={() => { setShowAgendar(true); registrarEvento({ clinica_slug: slug }, "AGENDAR_CLIC"); }}
               style={{
                 display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
                 background: color, color: "#fff", border: "none", borderRadius: 18,
@@ -243,6 +245,7 @@ export default function PublicClinicaPage() {
               <a
                 href={`https://wa.me/${perfil.perfil_whatsapp.replace(/\D/g, "")}`}
                 target="_blank" rel="noopener noreferrer"
+                onClick={() => registrarEvento({ clinica_slug: slug }, "WHATSAPP")}
                 className="pub-btn-accion"
                 style={{
                   display: "flex", alignItems: "center", gap: 14,
@@ -319,6 +322,7 @@ export default function PublicClinicaPage() {
                   key={r.key}
                   href={r.href(perfil[r.key])}
                   target="_blank" rel="noopener noreferrer"
+                  onClick={r.key === "perfil_whatsapp" ? () => registrarEvento({ clinica_slug: slug }, "WHATSAPP") : undefined}
                   className="pub-red"
                   title={r.label}
                   style={{
@@ -364,6 +368,7 @@ export default function PublicClinicaPage() {
             color={color}
             servicios={servicios}
             onClose={() => setShowAgendar(false)}
+            onAgendado={() => registrarEvento({ clinica_slug: slug }, "CITA")}
           />
         )}
 

@@ -11,7 +11,9 @@ function toYMD(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.ge
 // Convierte dia_semana (0=Lun) a getDay() (0=Dom)
 function diaSemanaToGetDay(ds) { return ds === 6 ? 0 : ds + 1; }
 
-export default function AgendarModal({ slug, color, servicios, onClose }) {
+// medicoFijo: id del médico cuando se agenda desde su perfil (/dr/:slug)
+// onAgendado: se llama cuando la solicitud de cita se envió con éxito
+export default function AgendarModal({ slug, color, servicios, onClose, medicoFijo = null, onAgendado }) {
   const [paso, setPaso]         = useState(1); // 1=servicio 2=fecha 3=hora 4=datos 5=ok
   const [medicos, setMedicos]   = useState([]);
   const [medicoId, setMedicoId] = useState(null);
@@ -32,12 +34,13 @@ export default function AgendarModal({ slug, color, servicios, onClose }) {
   useEffect(() => {
     axios.get(`${API}/api/public/clinica/${slug}/medicos`)
       .then(r => {
-        const lista = r.data.data || [];
-        setMedicos(lista);
+        const todos = r.data.data || [];
+        const lista = medicoFijo ? todos.filter(m => m.id === medicoFijo) : todos;
+        setMedicos(lista.length ? lista : todos);
         if (lista.length === 1) setMedicoId(lista[0].id);
       })
       .catch(() => {});
-  }, [slug]);
+  }, [slug, medicoFijo]);
 
   // Médico seleccionado
   const medico = medicos.find(m => m.id === medicoId);
@@ -106,6 +109,7 @@ export default function AgendarModal({ slug, color, servicios, onClose }) {
         servicio_id: servicio?.id || undefined,
       });
       setPaso(5);
+      onAgendado?.();
     } catch (e) {
       setError(e.response?.data?.msg || "Error al agendar. Intenta de nuevo.");
     } finally {
