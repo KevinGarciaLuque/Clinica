@@ -128,22 +128,22 @@ export default function ListaEspera({ medicos = [] }) {
     const est = ESTADO[r.estado];
     return (
       <tr>
-        <td>
+        <td data-label="Paciente">
           <div className="fw-semibold">{r.paciente_nombres} {r.paciente_apellidos}</div>
           <div className="text-muted small">
             {r.paciente_telefono || ""}
             {!r.tiene_email && <span className="text-danger ms-1"><i className="bi bi-envelope-slash" /> sin correo</span>}
           </div>
         </td>
-        <td className="small">{r.medico || <span className="text-muted">Cualquiera</span>}</td>
-        <td className="small">{fechaCorta(r.desde)}{r.hasta ? ` – ${fechaCorta(r.hasta)}` : " en adelante"}</td>
-        <td className="small text-muted" style={{ maxWidth: 200 }}>{r.nota}</td>
-        <td className="small">
+        <td className="small" data-label="Médico">{r.medico || <span className="text-muted">Cualquiera</span>}</td>
+        <td className="small" data-label="Fechas">{fechaCorta(r.desde)}{r.hasta ? ` – ${fechaCorta(r.hasta)}` : " en adelante"}</td>
+        <td className="small text-muted le-nota" data-label="Nota" style={{ maxWidth: 200 }}>{r.nota}</td>
+        <td className="small" data-label="Estado">
           <span style={{ color: est.color, fontWeight: 700 }}>{est.label}</span>
           {r.estado === "AGENDADA" && r.cita_inicio && <div className="text-muted">{dayjs(r.cita_inicio).format("DD/MM h:mm A")}</div>}
           {r.estado === "ACTIVA" && r.ofertas > 0 && <div className="text-muted">{r.ofertas} aviso(s) enviado(s)</div>}
         </td>
-        <td className="text-end">
+        <td className="text-end le-acciones">
           {r.estado === "ACTIVA" && (
             <button className="btn btn-link btn-sm text-danger p-0" onClick={() => cambiarEstado(r.id, "CANCELADA")}>Quitar</button>
           )}
@@ -157,6 +157,19 @@ export default function ListaEspera({ medicos = [] }) {
 
   return (
     <div>
+      <style>{`
+        /* En teléfonos cada paciente se muestra como tarjeta en vez de fila */
+        @media (max-width: 767.98px) {
+          .le-tabla thead { display: none; }
+          .le-tabla, .le-tabla tbody, .le-tabla tr, .le-tabla td { display: block; width: 100%; }
+          .le-tabla tr { border: 1px solid #e5e7eb; border-radius: 10px; padding: 10px 12px; margin-bottom: 10px; position: relative; }
+          .le-tabla td { border: none !important; padding: 2px 0 !important; text-align: left !important; }
+          .le-tabla td[data-label]:not([data-label="Paciente"])::before {
+            content: attr(data-label) ": "; color: #94a3b8; font-weight: 600; }
+          .le-tabla td.le-nota:empty { display: none; }
+          .le-tabla td.le-acciones { position: absolute; top: 10px; right: 12px; width: auto; }
+        }
+      `}</style>
       <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <p className="text-muted mb-0" style={{ fontSize: "0.85rem", maxWidth: 560 }}>
           <i className="bi bi-lightning-charge-fill me-1" style={{ color: "#f59e0b" }} />
@@ -183,7 +196,7 @@ export default function ListaEspera({ medicos = [] }) {
             </div>
           ) : (
             <div className="table-responsive">
-              <table className="table table-sm align-middle" style={{ fontSize: "0.87rem" }}>
+              <table className="table table-sm align-middle le-tabla" style={{ fontSize: "0.87rem" }}>
                 <thead><tr className="text-muted small"><th>Paciente</th><th>Médico</th><th>Fechas</th><th>Nota</th><th>Estado</th><th /></tr></thead>
                 <tbody>{data.activas.map((r) => <Fila key={r.id} r={r} />)}</tbody>
               </table>
@@ -196,7 +209,7 @@ export default function ListaEspera({ medicos = [] }) {
               </button>
               {verCerradas && (
                 <div className="table-responsive">
-                  <table className="table table-sm align-middle" style={{ fontSize: "0.87rem" }}>
+                  <table className="table table-sm align-middle le-tabla" style={{ fontSize: "0.87rem" }}>
                     <tbody>{data.cerradas.map((r) => <Fila key={r.id} r={r} />)}</tbody>
                   </table>
                 </div>

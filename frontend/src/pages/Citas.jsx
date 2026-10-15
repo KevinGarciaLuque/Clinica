@@ -765,8 +765,27 @@ export default function Citas() {
   };
 
   return (
-    <div style={{ background: "#f0f2f5", minHeight: "100vh", margin: "-1.5rem", width: "calc(100% + 3rem)" }}>
+    <div className="cit-root" style={{ background: "#f0f2f5", minHeight: "100vh" }}>
       <style>{`
+        /* ── Responsivo: el layout usa 1.5rem de padding en escritorio y 1rem en móvil ── */
+        .cit-root { margin: -1.5rem; width: calc(100% + 3rem); }
+        .cit-header { padding: 16px 24px; }
+        .cit-body { padding: 20px 24px; }
+        .cit-panel { padding: 16px 20px; }
+        .cit-tabs { overflow-x: auto; scrollbar-width: none; -webkit-overflow-scrolling: touch; }
+        .cit-tabs::-webkit-scrollbar { display: none; }
+        .cit-tab { padding: 12px 20px; flex: 0 0 auto; }
+        .cit-tab-corto { display: none; }
+        @media (max-width: 767.98px) {
+          .cit-root { margin: -1rem; width: calc(100% + 2rem); overflow-x: hidden; }
+          .cit-header { padding: 14px 16px; flex-wrap: wrap; gap: 12px; }
+          .cit-header-acciones { width: 100%; }
+          .cit-body { padding: 12px 10px; }
+          .cit-panel { padding: 12px 10px; }
+          .cit-tab { padding: 11px 10px; gap: 5px !important; font-size: 0.84rem !important; }
+          .cit-tab-largo { display: none; }
+          .cit-tab-corto { display: inline; }
+        }
         .event-hover:hover {
           transform: translateY(-1px);
           box-shadow: 0 3px 10px rgba(0,0,0,0.18) !important;
@@ -892,9 +911,8 @@ export default function Citas() {
       `}</style>
 
       {/* Header */}
-      <div ref={headerRef} style={{
+      <div ref={headerRef} className="cit-header" style={{
         background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
-        padding: "16px 24px",
         display: "flex", alignItems: "center", justifyContent: "space-between",
         boxShadow: "0 2px 12px rgba(0,0,0,.18)",
       }}>
@@ -910,6 +928,8 @@ export default function Citas() {
             <div style={{ color: "#fff", fontWeight: 700, fontSize: "1.05rem" }}>
               {activeTab === "sala"
                 ? "Llegadas de hoy"
+                : activeTab === "espera"
+                ? "Lista de espera"
                 : view === Views.AGENDA
                 ? "Agenda"
                 : "Programar Citas"}
@@ -919,7 +939,7 @@ export default function Citas() {
             </div>
           </div>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+        <div className="cit-header-acciones" style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
           <CompartirLink
             texto="Link para agendar cita"
             icon="bi-calendar-plus-fill"
@@ -940,27 +960,28 @@ export default function Citas() {
         </div>
       </div>
 
-      <div style={{ padding: "20px 24px" }}>
+      <div className="cit-body">
         {/* Tabs */}
-        <div style={{
+        <div className="cit-tabs" style={{
           background: "#fff", borderRadius: "12px 12px 0 0",
           borderBottom: "1px solid #e5e7eb", display: "flex", padding: "0 6px",
           boxShadow: "0 1px 4px rgba(0,0,0,.04)",
         }}>
           {[
-            { id: "calendario", icon: "bi-calendar3",        label: "Calendario" },
-            { id: "sala",       icon: "bi-person-lines-fill", label: "Llegadas de hoy" },
-            { id: "espera",     icon: "bi-hourglass-split",   label: "Lista de espera" },
+            { id: "calendario", icon: "bi-calendar3",        label: "Calendario",      corto: "Calendario" },
+            { id: "sala",       icon: "bi-person-lines-fill", label: "Llegadas de hoy", corto: "Llegadas" },
+            { id: "espera",     icon: "bi-hourglass-split",   label: "Lista de espera", corto: "En espera" },
           ].map(t => (
-            <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
+            <button key={t.id} className="cit-tab" onClick={() => setActiveTab(t.id)} style={{
               background: "none", border: "none",
               borderBottom: activeTab === t.id ? "2.5px solid #3b82f6" : "2.5px solid transparent",
               color: activeTab === t.id ? "#2563eb" : "#6b7280",
               fontWeight: activeTab === t.id ? 700 : 500,
-              padding: "12px 20px", fontSize: "0.87rem", cursor: "pointer",
+              fontSize: "0.87rem", cursor: "pointer",
               display: "flex", alignItems: "center", gap: 7, whiteSpace: "nowrap",
             }}>
-              <i className={`bi ${t.icon}`}></i>{t.label}
+              <i className={`bi ${t.icon}`}></i>
+              <span className="cit-tab-largo">{t.label}</span><span className="cit-tab-corto">{t.corto}</span>
               {t.id === "sala" && pendientesSala > 0 && (
                 <span style={{ background: "#3b82f6", color: "#fff", borderRadius: 999, padding: "1px 8px", fontSize: "0.7rem", fontWeight: 800 }}>
                   {pendientesSala}
@@ -971,9 +992,9 @@ export default function Citas() {
         </div>
 
         {/* Tab content */}
-        <div style={{
+        <div className="cit-panel" style={{
           background: "#fff", borderRadius: "0 0 12px 12px",
-          boxShadow: "0 2px 8px rgba(0,0,0,.06)", padding: "16px 20px",
+          boxShadow: "0 2px 8px rgba(0,0,0,.06)",
         }}>
           {activeTab === "calendario" && (
         <>
