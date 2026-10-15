@@ -200,6 +200,8 @@ app.use("/rx",                 require("./routes/rx"));
 app.use("/api/public",         require("./routes/public"));
 app.use("/api/cita-publica",   require("./routes/citaPublica"));
 app.use("/api/portal",         require("./routes/portalPaciente"));
+app.use("/api/lista-espera",   require("./routes/listaEspera"));
+app.use("/api/espacio",        require("./routes/espacioPublico"));
 
 // ===== 404 =====
 app.use((req, res) => {
@@ -423,6 +425,8 @@ const pool = require("./db");
     console.log("✅ [auto-migrate] cita_enlaces OK");
     await require("./routes/portalPaciente").asegurarTabla();
     console.log("✅ [auto-migrate] portal_accesos OK");
+    await require("./utils/listaEspera").asegurarTablas();
+    console.log("✅ [auto-migrate] lista_espera OK");
 
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`

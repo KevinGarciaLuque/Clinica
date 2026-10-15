@@ -12,6 +12,7 @@ import api from "../api/api";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import CompartirLink from "../components/CompartirLink";
 import GruposLlegadas from "../components/GruposLlegadas";
+import ListaEspera from "../components/ListaEspera";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { TIPOS_AUSENCIA } from "../components/AusenciasMedico";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
@@ -949,6 +950,7 @@ export default function Citas() {
           {[
             { id: "calendario", icon: "bi-calendar3",        label: "Calendario" },
             { id: "sala",       icon: "bi-person-lines-fill", label: "Llegadas de hoy" },
+            { id: "espera",     icon: "bi-hourglass-split",   label: "Lista de espera" },
           ].map(t => (
             <button key={t.id} onClick={() => setActiveTab(t.id)} style={{
               background: "none", border: "none",
@@ -1076,6 +1078,8 @@ export default function Citas() {
           </div>
         </>
       )}
+
+          {activeTab === "espera" && <ListaEspera medicos={medicos} />}
 
           {activeTab === "sala" && (
             <SalaEspera

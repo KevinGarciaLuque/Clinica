@@ -317,6 +317,7 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
         "UPDATE citas SET estado = 'CANCELADA', notas_internas = CONCAT(COALESCE(notas_internas,''), ' | Cancelación: ', ?) WHERE id = ?",
         [motivo, args.cita_id]
       );
+      require("../utils/listaEspera").ofrecerEspacio(Number(args.cita_id));
       return { ok: true, mensaje: `Cita #${args.cita_id} cancelada exitosamente.` };
     }
 

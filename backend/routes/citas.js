@@ -233,10 +233,14 @@ router.patch("/:id/estado", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEP
     if (!estadosValidos.includes(estado)) {
       return res.status(400).json({ ok: false, msg: "Estado inválido" });
     }
-    await pool.query(
+    const [upd] = await pool.query(
       "UPDATE citas SET estado=? WHERE id=? AND clinica_id=?",
       [estado, req.params.id, clinicaId]
     );
+    // Espacio liberado: se ofrece a la lista de espera (en segundo plano)
+    if (estado === "CANCELADA" && upd.affectedRows) {
+      require("../utils/listaEspera").ofrecerEspacio(Number(req.params.id));
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -426,10 +430,11 @@ router.delete("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONIS
       [req.params.id, clinicaId]
     );
 
-    await pool.query(
+    const [upd] = await pool.query(
       "UPDATE citas SET estado='CANCELADA' WHERE id=? AND clinica_id=?",
       [req.params.id, clinicaId]
     );
+    if (upd.affectedRows) require("../utils/listaEspera").ofrecerEspacio(Number(req.params.id));
 
     if (citaCancelar?.google_event_id) {
       gcal.borrarEvento(citaCancelar.medico_id, citaCancelar.google_event_id)

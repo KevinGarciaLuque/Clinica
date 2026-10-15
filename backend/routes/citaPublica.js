@@ -146,6 +146,7 @@ router.post("/:token/cancelar", limiter, async (req, res) => {
           .catch((e) => console.error("[citaPublica] Google Calendar:", e.message));
       }
       avisarClinica(cita, "CANCELADA");
+      require("../utils/listaEspera").ofrecerEspacio(cita.id); // avisa a la lista de espera
     }
     res.json({ ok: true, data: vista(await buscarCita(req.params.token)) });
   } catch (e) {
