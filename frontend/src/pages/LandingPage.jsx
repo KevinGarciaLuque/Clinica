@@ -5,6 +5,7 @@ import { SIMBOLO_MONEDA } from "../utils/monedas";
 import MarketingShowcase from "../components/MarketingShowcase";
 import EspecialidadesFlip from "../components/EspecialidadesFlip";
 import FuncionesPorPlan from "../components/FuncionesPorPlan";
+import DoctoresCarrusel from "../components/DoctoresCarrusel";
 import { construirItems } from "../utils/marketingItems";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -746,6 +747,35 @@ export default function LandingPage({ hero3d = false }) {
         </section>
         );
       })()}
+
+      {/* ── AGENDA TU CONSULTA: médicos del directorio en carrusel ── */}
+      <DoctoresCarrusel
+        id="medicos"
+        style={{ background: "#fff", padding: "80px 0 72px", overflow: "hidden" }}
+        cardColor={(cfg.directorio_color_tarjetas || "#213665").trim()}
+        bandColor={(cfg.directorio_color_franja || "#eef2f7").trim()}
+        onSelect={(slug) => navigate(`/p/${slug}`)}
+        encabezado={
+          <div style={{ textAlign: "center", marginBottom: 26, padding: "0 24px" }}>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1px" }}>
+              <i className="bi bi-calendar2-heart" />{cfg.directorio_badge_texto || "Directorio médico"}
+            </span>
+            <h2 style={{ fontSize: "clamp(1.6rem, 3vw, 2.4rem)", fontWeight: 800, color: "#0f172a", marginTop: 8 }}>
+              {cfg.directorio_titulo || "Agenda tu consulta médica"}
+            </h2>
+            <p style={{ fontSize: 16, color: "#64748b", maxWidth: 560, margin: "12px auto 0" }}>
+              {cfg.directorio_subtitulo || "Los mejores médicos y especialistas los encuentras aquí. Compara perfiles y agenda tu cita en línea, sin llamadas ni esperas."}
+            </p>
+          </div>
+        }
+        pie={
+          <div style={{ textAlign: "center", marginTop: 10, padding: "0 24px" }}>
+            <button className="lp-btn-primary" onClick={() => navigate("/agenda-tu-consulta")}>
+              <i className="bi bi-search me-2" />Ver todos los médicos
+            </button>
+          </div>
+        }
+      />
 
       {/* ── PLANES ── */}
       <section id="planes" style={{ background: "#f8fafc", padding: "80px 24px" }}>
