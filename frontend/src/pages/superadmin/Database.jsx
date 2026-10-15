@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../../api/api";
+import RespaldosAutomaticos from "./RespaldosAutomaticos";
 
 /* ── Paleta compartida ── */
 const C = {
@@ -307,6 +308,9 @@ export default function Database() {
           </div>
         </>
       )}
+
+      {/* ════════ RESPALDOS AUTOMÁTICOS ════════ */}
+      <RespaldosAutomaticos />
 
       {/* ════════ EXPORT / IMPORT / VACIAR ════════ */}
       <div className="row g-4">

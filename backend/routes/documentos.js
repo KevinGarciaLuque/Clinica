@@ -182,7 +182,7 @@ router.post(
           .replace(/\.[^.]+$/, "")
           .replace(/[^a-zA-Z0-9_-]/g, "_")
           .slice(0, 50);
-        const filename = `doc-${pacienteId}-${Date.now()}-${safeBase}${ext}`;
+        const filename = `doc-${pacienteId}-${Date.now()}-${require("crypto").randomBytes(8).toString("hex")}-${safeBase}${ext}`;
         const uploadsDir = path.join(__dirname, "../uploads/pacientes");
         if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
         fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);

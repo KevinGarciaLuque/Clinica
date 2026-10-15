@@ -57,7 +57,7 @@ async function guardarArchivo(file, clinicaId) {
   const dir = path.join(__dirname, "../uploads/galeria-estetica");
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
   const ext = path.extname(file.originalname || "") || ".jpg";
-  const filename = `foto_${Date.now()}${ext}`;
+  const filename = `foto_${Date.now()}_${require("crypto").randomBytes(8).toString("hex")}${ext}`;
   fs.writeFileSync(path.join(dir, filename), file.buffer);
   return { archivo_nombre: filename, cloudinary_public_id: null };
 }

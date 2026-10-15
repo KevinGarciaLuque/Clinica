@@ -1,0 +1,4 @@
+
+# Credenciales locales: nunca subirlas
+User.txt
+*.credentials.txt

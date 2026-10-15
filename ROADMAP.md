@@ -40,7 +40,7 @@ INSERT INTO usuarios (clinica_id, nombres, apellidos, email, password_hash, tipo
 VALUES (NULL, 'Super', 'Admin', 'super@plataforma.com',
         '$argon2id$...hash_aqui...', 'SUPER_ADMIN');
 ```
-> Credenciales de prueba guardadas en `backend/User.txt`
+> No guardes credenciales en el repositorio (es público). Usa un gestor de contraseñas.
 
 ### 4. Arrancar el backend
 ```bash

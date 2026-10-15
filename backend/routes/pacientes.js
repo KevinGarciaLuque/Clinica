@@ -764,7 +764,7 @@ router.post(
 
       // ── Fallback: guardar en disco local ──────────────────────────────────
       const ext      = path.extname(req.file.originalname).toLowerCase() || ".jpg";
-      const filename = `paciente-${id}-${Date.now()}${ext}`;
+      const filename = `paciente-${id}-${Date.now()}-${require("crypto").randomBytes(8).toString("hex")}${ext}`;
       const uploadsDir = path.join(__dirname, "../uploads/pacientes");
       if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
       fs.writeFileSync(path.join(uploadsDir, filename), req.file.buffer);

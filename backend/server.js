@@ -96,7 +96,14 @@ app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
 
 // ===== Archivos estáticos =====
-app.use("/uploads", express.static(path.join(__dirname, "uploads")));
+// Los archivos subidos no deben aparecer en buscadores ni listarse
+app.use("/uploads", express.static(path.join(__dirname, "uploads"), {
+  index: false,
+  setHeaders: (res) => {
+    res.setHeader("X-Robots-Tag", "noindex, nofollow");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+  },
+}));
 
 // ===== Middleware Multi-clínica =====
 app.use((req, res, next) => {
@@ -896,6 +903,14 @@ cron.schedule("0 * * * *", async () => {
     console.error("❌ [CRON] Error en recordatorios:", err.message);
   }
 });
+
+// ===== CRON: Respaldo automático de la base de datos (diario 02:30, hora de Honduras) =====
+// Solo lee la base de datos y sube un .sql.gz privado a Cloudinary. Desactivar con RESPALDO_DIARIO=0.
+if (process.env.RESPALDO_DIARIO !== "0") {
+  const { ejecutarRespaldo } = require("./scripts/respaldo-diario");
+  cron.schedule("30 2 * * *", () => { ejecutarRespaldo({ origen: "automatico" }); },
+    { timezone: "America/Tegucigalpa" });
+}
 
 // ===== CRON: Facturación mensual de licencias (diario 06:10) =====
 const correrFacturacionMensual = require("./scripts/facturacion-mensual");

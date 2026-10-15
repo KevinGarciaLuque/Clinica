@@ -542,7 +542,7 @@ router.post("/me/firma", auth(), uploadFoto.single("firma"), async (req, res) =>
     } else {
       const dir = path.join(__dirname, "../uploads/firmas");
       if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-      const filename = `firma-${req.user.uid}-${Date.now()}.png`;
+      const filename = `firma-${req.user.uid}-${Date.now()}-${require("crypto").randomBytes(8).toString("hex")}.png`;
       const filepath  = path.join(dir, filename);
       if (u?.firma_url && u.firma_url.includes("/uploads/firmas/")) {
         const oldFile = path.join(__dirname, "..", u.firma_url.replace(/^\//, ""));

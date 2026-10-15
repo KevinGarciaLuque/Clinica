@@ -255,6 +255,40 @@ router.post("/truncate", auth("SUPER_ADMIN"), async (req, res) => {
 });
 
 /* ─────────────────────────────────────────────────────────
+   Respaldos automáticos (Cloudinary privado)
+──────────────────────────────────────────────────────────── */
+const { ejecutarRespaldo, enlaceDescarga, asegurarTabla } = require("../scripts/respaldo-diario");
+
+router.get("/respaldos", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const [rows] = await pool.query(
+      `SELECT id, archivo, tamanio_bytes, estado, error_msg, creado_en
+       FROM backups_log WHERE tipo = 'NUBE' AND clinica_id IS NULL
+       ORDER BY creado_en DESC, id DESC LIMIT 30`);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.get("/respaldos/:id/descargar", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    const [[r]] = await pool.query(
+      "SELECT archivo FROM backups_log WHERE id = ? AND tipo = 'NUBE' AND estado = 'OK'", [req.params.id]);
+    if (!r) return res.status(404).json({ ok: false, msg: "Respaldo no encontrado" });
+    res.json({ ok: true, url: enlaceDescarga(r.archivo) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.post("/respaldos/ejecutar", auth("SUPER_ADMIN"), async (req, res) => {
+  const r = await ejecutarRespaldo({ origen: "manual" });
+  res.status(r.ok ? 200 : 500).json(r);
+});
+
+/* ─────────────────────────────────────────────────────────
    GET /api/database/backups/history  (historial en memoria)
 ──────────────────────────────────────────────────────────── */
 // Simple registro en memoria (se pierde al reiniciar — extensión futura: guardar en BD)
