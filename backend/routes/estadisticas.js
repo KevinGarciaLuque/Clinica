@@ -4,10 +4,14 @@
  * GET /api/estadisticas/resumen      → KPIs (pacientes nuevos, consultas, canal, ingresos)
  * GET /api/estadisticas/serie-citas  → conteo diario de citas para gráfico
  * GET /api/estadisticas/por-medico   → ranking de consultas por médico (solo ADMIN/SUPER_ADMIN)
+ * GET /api/estadisticas/asistencia   → asistencia, ausencias, confirmaciones y lista de espera
  */
 const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
+const dayjs  = require("dayjs");
+dayjs.extend(require("dayjs/plugin/utc"));
+dayjs.extend(require("dayjs/plugin/timezone"));
 
 function rangoFechas(req) {
   const hoy = new Date();
@@ -142,6 +146,123 @@ router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// GET /api/estadisticas/asistencia?desde&hasta
+// Solo lectura. Cuenta citas cuyo horario ya pasó (en la hora local de la clínica).
+// El médico ve solo sus citas; ADMIN/RECEPCIONISTA ven toda la clínica.
+const ASISTIO = "('COMPLETADA','EN_ATENCION','EN_ESPERA')";
+router.get("/asistencia", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (req, res) => {
+  try {
+    const clinicaId = req.user.clinica_id;
+    const esMedico  = req.user.tipo === "MEDICO";
+    const { desde, hasta } = rangoFechas(req);
+    const fm = esMedico ? " AND c.medico_id = ? " : "";
+    const pm = esMedico ? [req.user.id] : [];
+
+    const [[cl]] = await pool.query("SELECT COALESCE(timezone,'America/Tegucigalpa') AS tz FROM clinicas WHERE id=?", [clinicaId]);
+    const ahora = dayjs().tz(cl?.tz || "America/Tegucigalpa").format("YYYY-MM-DD HH:mm:ss");
+    const finRango = `${hasta} 23:59:59`;
+    const corte = finRango < ahora ? finRango : ahora;
+
+    // Tablas creadas por las funciones nuevas: si aún no existen, los conteos son 0
+    const [tablas] = await pool.query(
+      `SELECT TABLE_NAME FROM information_schema.TABLES
+       WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ('cita_enlaces')`);
+    const hayEnlaces = tablas.length > 0;
+
+    // Asistencia: solo citas cuyo horario ya pasó. Cancelaciones: todo el mes
+    // (una cancelación se conoce aunque la cita sea más adelante).
+    const conteos = `
+      COUNT(*) AS total,
+      SUM(c.inicio <= ? AND c.estado IN ${ASISTIO}) AS asistieron,
+      SUM(c.inicio <= ? AND c.estado = 'NO_ASISTIO') AS no_asistio,
+      SUM(c.estado = 'CANCELADA') AS canceladas,
+      SUM(c.inicio <= ? AND c.estado IN ('PENDIENTE','CONFIRMADA')) AS sin_marcar`;
+    const base = `FROM citas c WHERE c.clinica_id = ? AND c.estado <> 'PENDIENTE_APROBACION'
+                  AND c.inicio >= ? AND c.inicio <= ? ${fm}`;
+    const params = [corte, corte, corte, clinicaId, `${desde} 00:00:00`, finRango, ...pm];
+
+    const [
+      [[totales]],
+      [porMedico],
+      [[enlaces]],
+      [[recordatorios]],
+      [[listaEspera]],
+      [tendencia],
+      [ausentes],
+    ] = await Promise.all([
+      pool.query(`SELECT ${conteos} ${base}`, params),
+      pool.query(
+        `SELECT c.medico_id, u.nombres, u.apellidos, ${conteos}
+         FROM citas c JOIN usuarios u ON u.id = c.medico_id
+         WHERE c.clinica_id = ? AND c.estado <> 'PENDIENTE_APROBACION'
+           AND c.inicio >= ? AND c.inicio <= ? ${fm}
+         GROUP BY c.medico_id, u.nombres, u.apellidos
+         ORDER BY total DESC`, params),
+      hayEnlaces
+        ? pool.query(
+            `SELECT SUM(e.accion = 'CONFIRMADA') AS confirmadas, SUM(e.accion = 'CANCELADA') AS canceladas
+             FROM cita_enlaces e JOIN citas c ON c.id = e.cita_id
+             WHERE c.clinica_id = ? AND c.inicio BETWEEN ? AND ? ${fm}`,
+            [clinicaId, `${desde} 00:00:00`, finRango, ...pm])
+        : Promise.resolve([[{ confirmadas: 0, canceladas: 0 }]]),
+      pool.query(
+        `SELECT COUNT(*) AS enviados, COUNT(DISTINCT h.cita_id) AS citas
+         FROM historial_recordatorios h JOIN citas c ON c.id = h.cita_id
+         WHERE h.clinica_id = ? AND h.estado = 'ENVIADO' AND c.inicio BETWEEN ? AND ? ${fm}`,
+        [clinicaId, `${desde} 00:00:00`, finRango, ...pm]),
+      pool.query(
+        `SELECT COUNT(*) AS recuperadas FROM citas c
+         WHERE c.clinica_id = ? AND c.canal = 'LISTA_ESPERA' AND c.inicio BETWEEN ? AND ? ${fm}`,
+        [clinicaId, `${desde} 00:00:00`, finRango, ...pm]),
+      // Últimos 6 meses hasta el mes consultado
+      pool.query(
+        `SELECT DATE_FORMAT(c.inicio, '%Y-%m') AS mes,
+                SUM(c.estado IN ${ASISTIO}) AS asistieron,
+                SUM(c.estado = 'NO_ASISTIO') AS no_asistio,
+                SUM(c.estado = 'CANCELADA') AS canceladas
+         FROM citas c
+         WHERE c.clinica_id = ? AND c.estado <> 'PENDIENTE_APROBACION'
+           AND c.inicio >= ? AND c.inicio <= ? ${fm}
+         GROUP BY mes ORDER BY mes`,
+        [clinicaId, dayjs(desde).subtract(5, "month").startOf("month").format("YYYY-MM-DD 00:00:00"), corte, ...pm]),
+      // Pacientes que más faltan (últimos 6 meses)
+      pool.query(
+        `SELECT p.id, p.nombres, p.apellidos, p.telefono,
+                SUM(c.estado = 'NO_ASISTIO') AS ausencias, COUNT(*) AS citas,
+                DATE_FORMAT(MAX(CASE WHEN c.estado = 'NO_ASISTIO' THEN c.inicio END), '%Y-%m-%d') AS ultima
+         FROM citas c JOIN pacientes p ON p.id = c.paciente_id
+         WHERE c.clinica_id = ? AND c.estado <> 'PENDIENTE_APROBACION'
+           AND c.inicio >= ? AND c.inicio <= ? ${fm}
+         GROUP BY p.id, p.nombres, p.apellidos, p.telefono
+         HAVING ausencias >= 2
+         ORDER BY ausencias DESC, ultima DESC
+         LIMIT 10`,
+        [clinicaId, dayjs(desde).subtract(5, "month").startOf("month").format("YYYY-MM-DD 00:00:00"), corte, ...pm]),
+    ]);
+
+    // SUM() devuelve texto/NULL en MySQL: solo esas columnas se pasan a número
+    const NUMERICAS = new Set(["total", "asistieron", "no_asistio", "canceladas", "sin_marcar", "confirmadas",
+      "enviados", "citas", "recuperadas", "ausencias"]);
+    const num = (o) => Object.fromEntries(Object.entries(o).map(([k, v]) => [k, NUMERICAS.has(k) ? Number(v || 0) : v]));
+    res.json({
+      ok: true,
+      data: {
+        rango: { desde, hasta },
+        totales: num(totales),
+        por_medico: porMedico.map(num),
+        enlaces: num(enlaces || {}),
+        recordatorios: num(recordatorios),
+        lista_espera: num(listaEspera),
+        tendencia: tendencia.map(num),
+        ausentes: ausentes.map(num),
+      },
+    });
+  } catch (e) {
+    console.error("[estadisticas/asistencia]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo calcular la asistencia" });
   }
 });
 

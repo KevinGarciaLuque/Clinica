@@ -8,6 +8,7 @@ import {
 import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 import { prefijoDr } from "../utils/medico";
+import AsistenciaPanel from "../components/AsistenciaPanel";
 
 function useIsMobile() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -24,12 +25,14 @@ const CANAL_LABEL = {
   PORTAL:    "Portal del paciente",
   IA:        "Asistente IA",
   TELEFONO:  "Teléfono",
+  LISTA_ESPERA: "Lista de espera",
 };
 const CANAL_COLOR = {
   RECEPCION: "#667eea",
   PORTAL:    "#10b981",
   IA:        "#f59e0b",
   TELEFONO:  "#f5576c",
+  LISTA_ESPERA: "#0ea5e9",
 };
 
 function fmtMoneda(n) {
@@ -308,6 +311,7 @@ export default function Estadisticas() {
               </div>
             </motion.div>
           )}
+          <AsistenciaPanel desde={desde} hasta={hasta} isMobile={isMobile} />
         </motion.div>
       )}
     </div>
