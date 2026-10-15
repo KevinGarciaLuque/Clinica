@@ -6,6 +6,7 @@ import MarketingShowcase from "../components/MarketingShowcase";
 import EspecialidadesFlip from "../components/EspecialidadesFlip";
 import FuncionesPorPlan from "../components/FuncionesPorPlan";
 import DoctoresCarrusel from "../components/DoctoresCarrusel";
+import EspecialidadesCinta from "../components/EspecialidadesCinta";
 import { construirItems } from "../utils/marketingItems";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -345,6 +346,10 @@ export default function LandingPage({ hero3d = false }) {
           .planes-grid { grid-template-columns: 1fr !important; }
           .features-grid { grid-template-columns: 1fr 1fr !important; }
           .mkt-grid { grid-template-columns: 1fr !important; gap: 28px !important; }
+        }
+        @media (max-width: 640px) {
+          .nos-stats { grid-template-columns: 1fr 1fr !important; }
+          .nos-stats > :last-child:nth-child(odd) { grid-column: 1 / -1; }
         }
         @media (max-width: 900px) {
           .mkt-grid { grid-template-columns: 1fr !important; gap: 32px !important; }
@@ -1073,7 +1078,7 @@ export default function LandingPage({ hero3d = false }) {
       )}
 
       {/* ── NOSOTROS ── */}
-      <section id="nosotros" style={{ background: "#0f172a", padding: "96px 24px", position: "relative", overflow: "hidden" }}>
+      <section id="nosotros" style={{ background: "#0f172a", padding: "96px 24px", position: "relative", overflow: "hidden", "--acento": `color-mix(in srgb, ${color} 35%, #93c5fd)` }}>
         {/* Decoración de fondo */}
         <div style={{ position: "absolute", top: -120, right: -120, width: 500, height: 500, borderRadius: "50%", background: `radial-gradient(circle, ${color}22 0%, transparent 70%)`, pointerEvents: "none" }} />
         <div style={{ position: "absolute", bottom: -80, left: -80, width: 360, height: 360, borderRadius: "50%", background: `radial-gradient(circle, ${color}15 0%, transparent 70%)`, pointerEvents: "none" }} />
@@ -1087,12 +1092,12 @@ export default function LandingPage({ hero3d = false }) {
               background: `${color}22`, border: `1px solid ${color}44`,
               borderRadius: 100, padding: "6px 18px", marginBottom: 20,
             }}>
-              <i className="bi bi-building-fill-check" style={{ color, fontSize: 14 }} />
-              <span style={{ fontSize: 12, fontWeight: 700, color, textTransform: "uppercase", letterSpacing: "1.5px" }}>Sobre nosotros</span>
+              <i className="bi bi-building-fill-check" style={{ color: "var(--acento)", fontSize: 14 }} />
+              <span style={{ fontSize: 12, fontWeight: 700, color: "var(--acento)", textTransform: "uppercase", letterSpacing: "1.5px" }}>Sobre nosotros</span>
             </div>
             <h2 style={{ fontSize: "clamp(1.8rem, 3.5vw, 2.8rem)", fontWeight: 900, color: "#fff", lineHeight: 1.2, marginBottom: 20 }}>
               Tecnología al servicio<br />
-              <span style={{ color }}>de la salud</span>
+              <span style={{ color: "var(--acento)" }}>de la salud</span>
             </h2>
             <p style={{ fontSize: 17, color: "rgba(255,255,255,.65)", lineHeight: 1.8, maxWidth: 620, margin: "0 auto" }}>
               {cfg.landing_nosotros_texto ||
@@ -1101,28 +1106,39 @@ export default function LandingPage({ hero3d = false }) {
           </div>
 
           {/* Stats */}
-          <div style={{
+          <div className="nos-stats" style={{
             display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))",
             gap: 1, background: "rgba(255,255,255,.06)", borderRadius: 20,
-            border: "1px solid rgba(255,255,255,.08)", overflow: "hidden", marginBottom: 64,
+            border: "1px solid rgba(255,255,255,.08)", overflow: "hidden", marginBottom: 36,
           }}>
             {[
-              { val: "5+",    label: "Especialidades médicas",  icon: "bi-heart-pulse-fill" },
+              { val: "10+",   label: "Años de experiencia en el flujo de pacientes", icon: "bi-award-fill" },
+              // Se cuenta de la lista de especialidades de la landing (sin "Y más especialidades")
+              { val: `${ESPECIALIDADES.filter(e => !e.label.startsWith("Y más")).length}+`, label: "Especialidades médicas", icon: "bi-heart-pulse-fill" },
               { val: "100%",  label: "En la nube",              icon: "bi-cloud-check-fill" },
               { val: "24/7",  label: "Acceso disponible",       icon: "bi-clock-fill" },
               { val: "Multi", label: "Clínica y sedes",         icon: "bi-building-fill" },
-            ].map((s, i) => (
+            ].map((s, i, arr) => (
               <Reveal key={i} delay={i * 0.08} style={{
                 padding: "32px 24px", textAlign: "center",
                 background: i % 2 === 0 ? "rgba(255,255,255,.03)" : "transparent",
-                borderRight: i < 3 ? "1px solid rgba(255,255,255,.06)" : "none",
+                borderRight: i < arr.length - 1 ? "1px solid rgba(255,255,255,.06)" : "none",
               }}>
-                <i className={`bi ${s.icon}`} style={{ fontSize: 24, color, display: "block", marginBottom: 12 }} />
+                <i className={`bi ${s.icon}`} style={{ fontSize: 24, color: "var(--acento)", display: "block", marginBottom: 12 }} />
                 <StatValue value={s.val} style={{ fontSize: "clamp(1.6rem, 3vw, 2.2rem)", fontWeight: 900, color: "#fff", lineHeight: 1 }} />
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,.5)", marginTop: 8, lineHeight: 1.4 }}>{s.label}</div>
               </Reveal>
             ))}
           </div>
+
+          {/* Adaptado a cada especialidad */}
+          <Reveal style={{ marginBottom: 64 }}>
+            <div style={{ textAlign: "center", marginBottom: 14, fontSize: 14, fontWeight: 700, color: "rgba(255,255,255,.8)" }}>
+              <i className="bi bi-sliders me-2" style={{ color: "var(--acento)" }} />
+              Adaptado a cada especialidad
+            </div>
+            <EspecialidadesCinta items={ESPECIALIDADES.filter(e => !e.label.startsWith("Y más"))} />
+          </Reveal>
 
           {/* Valores / pilares */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(240px, 1fr))", gap: 20 }}>
@@ -1163,7 +1179,7 @@ export default function LandingPage({ hero3d = false }) {
                   background: `${color}20`, border: `1px solid ${color}40`,
                   display: "flex", alignItems: "center", justifyContent: "center",
                 }}>
-                  <i className={`bi ${v.icon}`} style={{ fontSize: 20, color }} />
+                  <i className={`bi ${v.icon}`} style={{ fontSize: 20, color: "var(--acento)" }} />
                 </div>
                 <div style={{ fontWeight: 700, fontSize: 15, color: "#fff", marginBottom: 10 }}>{v.title}</div>
                 <div style={{ fontSize: 13, color: "rgba(255,255,255,.55)", lineHeight: 1.7 }}>{v.desc}</div>
