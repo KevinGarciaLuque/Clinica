@@ -20,6 +20,7 @@ const mysql = require("mysql2/promise");
 const nodemailer = require("nodemailer");
 const crypto = require("crypto");
 const db = require("../db");
+const { enlaceCita } = require("../utils/citaEnlace");
 const dayjs = require("dayjs");
 dayjs.extend(require("dayjs/plugin/utc"));
 dayjs.extend(require("dayjs/plugin/timezone"));
@@ -56,6 +57,14 @@ function reemplazarVariables(texto, variables) {
 // ═══════════════════════════════════════════════════════════════
 // ENVÍO DE RECORDATORIOS
 // ═══════════════════════════════════════════════════════════════
+
+function bloqueEnlaceEmail(url) {
+  return `
+<div style="margin:24px 0 8px;text-align:center;font-family:Arial,sans-serif">
+  <p style="margin:0 0 12px;color:#334155;font-size:14px">¿Podrás asistir? Confírmanos o cancela con un clic:</p>
+  <a href="${url}" style="display:inline-block;background:#10b981;color:#fff;text-decoration:none;padding:11px 22px;border-radius:8px;font-weight:bold;font-size:14px">Confirmar o cancelar mi cita</a>
+</div>`;
+}
 
 async function enviarRecordatoriosAutomaticos() {
   // Usar el pool compartido de db.js para garantizar misma conexión/timezone
@@ -151,7 +160,15 @@ async function procesarClinica(connection, clinica) {
           minute: "2-digit",
         }),
         clinica: clinica.nombre,
+        enlace_cita: "",
       };
+      // Enlace para que el paciente confirme o cancele. Si falla, el
+      // recordatorio se envía igual que antes, sin el enlace.
+      try {
+        variables.enlace_cita = (await enlaceCita(cita.id, connection)) || "";
+      } catch (e) {
+        console.error(`   ⚠️  No se pudo generar el enlace de la cita #${cita.id}:`, e.message);
+      }
 
       // Verificar si ya se envió este recordatorio
       const [existente] = await connection.query(
@@ -229,7 +246,11 @@ async function enviarEmail(connection, clinicaId, cita, horas, variables) {
 
     const plantilla = plantillaRows[0];
     const asunto = reemplazarVariables(plantilla.asunto, variables);
-    const contenido = reemplazarVariables(plantilla.contenido, variables);
+    let contenido = reemplazarVariables(plantilla.contenido, variables);
+    // Plantillas antiguas no traen {enlace_cita}: se agregan los botones al final
+    if (variables.enlace_cita && !String(plantilla.contenido).includes("{enlace_cita}")) {
+      contenido += bloqueEnlaceEmail(variables.enlace_cita);
+    }
 
     // Enviar email
     const transporter = nodemailer.createTransport({

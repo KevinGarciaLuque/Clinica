@@ -198,6 +198,7 @@ app.use("/api/endocrinologia", require("./routes/endocrinologia"));
 app.use("/api/educacion-diabetes", require("./routes/educacionDiabetes"));
 app.use("/rx",                 require("./routes/rx"));
 app.use("/api/public",         require("./routes/public"));
+app.use("/api/cita-publica",   require("./routes/citaPublica"));
 
 // ===== 404 =====
 app.use((req, res) => {
@@ -415,6 +416,10 @@ const pool = require("./db");
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
     console.log("✅ [auto-migrate] resenas_medicos OK");
+
+    // Enlaces para confirmar/cancelar la cita desde el recordatorio (tabla nueva)
+    await require("./utils/citaEnlace").asegurarTabla();
+    console.log("✅ [auto-migrate] cita_enlaces OK");
 
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`

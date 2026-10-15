@@ -794,7 +794,8 @@ const Recordatorios = () => {
               }}>
                 <strong>Variables disponibles:</strong>{" "}
                 <code>{"{paciente}"}</code>, <code>{"{medico}"}</code>, <code>{"{fecha}"}</code>,{" "}
-                <code>{"{hora}"}</code>, <code>{"{clinica}"}</code>
+                <code>{"{hora}"}</code>, <code>{"{clinica}"}</code>,{" "}
+                <code>{"{enlace_cita}"}</code>
               </div>
               <div style={{ overflowX: "auto" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
@@ -1174,7 +1175,8 @@ const ModalPlantilla = ({ show, onHide, plantilla, onSave }) => {
             />
             <Form.Text className="text-muted">
               Variables: <code>{"{paciente}"}</code>, <code>{"{medico}"}</code>, <code>{"{fecha}"}</code>,{" "}
-              <code>{"{hora}"}</code>, <code>{"{clinica}"}</code>
+              <code>{"{hora}"}</code>, <code>{"{clinica}"}</code>,{" "}
+              <code>{"{enlace_cita}"}</code> (enlace para que el paciente confirme o cancele; en email se agrega solo si no lo incluyes)
             </Form.Text>
           </Form.Group>
 

@@ -28,6 +28,7 @@ const PublicClinicaPage = lazy(() => import("./pages/PublicClinicaPage"));
 const DirectorioMedicos = lazy(() => import("./pages/DirectorioMedicos"));
 const SolicitarPlan     = lazy(() => import("./pages/SolicitarPlan"));
 const ResenaPublica     = lazy(() => import("./pages/ResenaPublica"));
+const MiCita            = lazy(() => import("./pages/MiCita"));
 
 // Admin
 const Usuarios     = lazy(() => import("./pages/admin/Usuarios"));
@@ -132,6 +133,7 @@ export default function App() {
       <Route path="/agenda-tu-consulta" element={<DirectorioMedicos />} />
       <Route path="/solicitar-plan"   element={<SolicitarPlan />} />
       <Route path="/resena/:token"    element={<ResenaPublica />} />
+      <Route path="/mi-cita/:token"   element={<MiCita />} />
       <Route path="/inicio"           element={<LandingPage />} />
       <Route path="/inicio-3d"        element={<LandingPage hero3d />} />
       <Route path="/marketing-medico" element={<MarketingMedico />} />

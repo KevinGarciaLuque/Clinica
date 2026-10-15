@@ -558,7 +558,8 @@ Hola {paciente} 👋
 
 Por favor llega 10 minutos antes.
 
-Si necesitas cancelar, contáctanos lo antes posible.
+Confirma o cancela tu cita aquí:
+{enlace_cita}
 
 ¡Te esperamos! 😊`,
         es_predeterminada: 1,
@@ -569,7 +570,7 @@ Si necesitas cancelar, contáctanos lo antes posible.
         nombre: "SMS 24h",
         horas_antes: 24,
         asunto: null,
-        contenido: "{clinica}: Recordatorio - Cita mañana {fecha} a las {hora} con Dr/a {medico}. Llegar 10 min antes.",
+        contenido: "{clinica}: Recordatorio - Cita mañana {fecha} a las {hora} con Dr/a {medico}. Confirma o cancela: {enlace_cita}",
         es_predeterminada: 1,
       },
     ];
@@ -749,6 +750,7 @@ router.post("/enviar-manual", auth(), withRecordatoriosSchema(async (req, res) =
       fecha: "",
       hora: "",
       medico: req.user?.nombre || "",
+      enlace_cita: "", // solo existe en los recordatorios automáticos (ligados a una cita)
     };
     const asuntoFinal = canalNorm === "EMAIL" ? (reemplazarVariables(asunto || `Recordatorio - ${variables.clinica}`, variables)) : null;
     const contenidoFinal = reemplazarVariables(String(contenido), variables);
