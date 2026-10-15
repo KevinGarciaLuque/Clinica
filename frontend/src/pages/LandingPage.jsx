@@ -2,6 +2,8 @@ import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, MotionConfig, useMotionValue, useSpring, useInView, animate } from "framer-motion";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
+import MarketingShowcase from "../components/MarketingShowcase";
+import { construirItems } from "../utils/marketingItems";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -98,14 +100,6 @@ const NIVEL_POR_PLAN = { trial: "basico", semestral: "avanzado", anual: "empresa
 function hexToRgb(hex) {
   const r = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return r ? `${parseInt(r[1],16)},${parseInt(r[2],16)},${parseInt(r[3],16)}` : "59,130,246";
-}
-
-const mediaAbs = (u) => (!u ? "" : (u.startsWith("http") || u.startsWith("data:") ? u : `${import.meta.env.VITE_API_URL || "http://localhost:5000"}${u}`));
-
-function ytThumb(url) {
-  if (!url) return null;
-  const m = url.match(/(?:youtube\.com\/(?:watch\?v=|embed\/|shorts\/)|youtu\.be\/)([\w-]{11})/);
-  return m ? `https://i.ytimg.com/vi/${m[1]}/hqdefault.jpg` : null;
 }
 
 const FEATURES = [
@@ -304,8 +298,15 @@ export default function LandingPage({ hero3d = false }) {
         }
         .lp-btn-outline:hover { background: ${color}; color: #fff; }
         .feature-card:hover { transform: translateY(-4px); box-shadow: 0 12px 36px rgba(0,0,0,.1) !important; }
-        .mkt-tile { transition: transform .25s ease; }
-        .mkt-tile:hover { transform: scale(1.03); }
+        .mkt-chip { transition: transform .2s ease, background .2s ease, border-color .2s ease; }
+        .mkt-chip:hover { transform: translateY(-2px); background: rgba(255,255,255,.16) !important; border-color: rgba(255,255,255,.35) !important; }
+        .mkt-bar-run { animation-name: mktBar; animation-timing-function: linear; animation-fill-mode: forwards; }
+        @keyframes mktBar { from { width: 0%; } to { width: 100%; } }
+        .mkt-glow { animation: mktGlow 4s ease-in-out infinite; }
+        @keyframes mktGlow { 0%, 100% { opacity: .25; } 50% { opacity: .5; } }
+        .mkt-play { animation: mktPlay 2.2s ease-in-out infinite; }
+        @keyframes mktPlay { 0%, 100% { box-shadow: 0 10px 30px rgba(0,0,0,.4), 0 0 0 0 rgba(255,255,255,.45); } 60% { box-shadow: 0 10px 30px rgba(0,0,0,.4), 0 0 0 16px rgba(255,255,255,0); } }
+        .mkt-thumb:hover { opacity: 1 !important; transform: translateY(-2px); }
         .plan-card { transition: transform .2s, box-shadow .2s; }
         .plan-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,.12) !important; }
         .nav-link-lp {
@@ -709,16 +710,7 @@ export default function LandingPage({ hero3d = false }) {
 
       {/* ── MARKETING MÉDICO ── */}
       {cfg.marketing_activo !== "0" && (() => {
-        const mPosts  = (marketing.posts  || []).filter(p => p.media_url);
-        const mVideos = (marketing.videos || []);
-        const featVideo = mVideos.find(v => v.formato !== "vertical") || mVideos[0];
-        const featVideoImg = featVideo ? ytThumb(featVideo.media_url) : null;
-        const tiles = [];
-        if (featVideo) tiles.push({ key: `v${featVideo.id}`, video: true, vertical: featVideo.formato === "vertical", img: featVideoImg, title: featVideo.titulo });
-        mPosts.forEach(p => tiles.push({ key: `p${p.id}`, img: mediaAbs(p.media_url), title: p.titulo }));
-        const visibles = tiles.slice(0, 5);
-        const extra = (mPosts.length + mVideos.length) - visibles.length;
-        const hayPreview = visibles.length > 0;
+        const hayPreview = construirItems(marketing.posts, marketing.videos).length > 0;
         const go = () => navigate("/marketing-medico");
 
         return (
@@ -739,7 +731,7 @@ export default function LandingPage({ hero3d = false }) {
               </p>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 30 }}>
                 {["Redes sociales", "Reels y video", "Identidad visual", "Pauta digital"].map(t => (
-                  <span key={t} style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.9)", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", padding: "5px 12px", borderRadius: 8 }}>{t}</span>
+                  <span key={t} className="mkt-chip" style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.9)", background: "rgba(255,255,255,.08)", border: "1px solid rgba(255,255,255,.14)", padding: "5px 12px", borderRadius: 8 }}>{t}</span>
                 ))}
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: 18, flexWrap: "wrap" }}>
@@ -755,53 +747,8 @@ export default function LandingPage({ hero3d = false }) {
             </Reveal>
 
             {hayPreview ? (
-              <Reveal
-                delay={0.15}
-                onClick={go}
-                role="button"
-                tabIndex={0}
-                aria-label="Ver galería de Marketing Médico"
-                onKeyDown={e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); go(); } }}
-                whileHover={{ scale: 1.015, transition: { duration: 0.2 } }}
-                style={{ cursor: "pointer", background: "rgba(255,255,255,.06)", border: "1px solid rgba(255,255,255,.14)", borderRadius: 22, padding: 14, boxShadow: "0 30px 60px rgba(0,0,0,.28)" }}>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
-                  {visibles.map((t, i) => {
-                    const last = i === visibles.length - 1 && extra > 0;
-                    return (
-                      <div key={t.key} className="mkt-tile" style={{
-                        position: "relative", gridColumn: t.video && !t.vertical ? "span 2" : "auto",
-                        aspectRatio: t.video && !t.vertical ? "16/9" : "1/1", borderRadius: 12, overflow: "hidden",
-                        background: `linear-gradient(135deg, ${darken(color, 10)}, ${darken(color, 40)})`,
-                      }}>
-                        {t.img && <img src={t.img} alt={t.title || ""} loading="lazy" style={{ width: "100%", height: "100%", objectFit: "cover" }} />}
-                        {t.video && (
-                          <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,.18)" }}>
-                            <div style={{ width: 54, height: 54, borderRadius: "50%", background: "rgba(255,255,255,.94)", display: "flex", alignItems: "center", justifyContent: "center", boxShadow: "0 8px 24px rgba(0,0,0,.35)" }}>
-                              <i className="bi bi-play-fill" style={{ fontSize: 26, color, marginLeft: 3 }} />
-                            </div>
-                          </div>
-                        )}
-                        {last && (
-                          <div style={{ position: "absolute", inset: 0, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(15,23,42,.72)", color: "#fff" }}>
-                            <span style={{ fontSize: 22, fontWeight: 800 }}>+{extra}</span>
-                            <span style={{ fontSize: 12, fontWeight: 600, opacity: .85 }}>Ver todo</span>
-                          </div>
-                        )}
-                        {!last && t.title && !t.video && (
-                          <div style={{ position: "absolute", left: 0, right: 0, bottom: 0, padding: "16px 10px 8px", fontSize: 11, fontWeight: 600, color: "#fff", background: "linear-gradient(transparent, rgba(0,0,0,.6))", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {t.title}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "12px 6px 4px" }}>
-                  <span style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,.7)" }}>
-                    <i className="bi bi-collection-play me-2" />Ejemplos y videos reales
-                  </span>
-                  <span style={{ fontSize: 12.5, fontWeight: 700, color: "#fff" }}>Ver galería <i className="bi bi-arrow-right" /></span>
-                </div>
+              <Reveal delay={0.15} style={{ minWidth: 0 }}>
+                <MarketingShowcase posts={marketing.posts} videos={marketing.videos} color={color} onGallery={go} />
               </Reveal>
             ) : (
               <div style={{ display: "grid", gap: 14 }}>
