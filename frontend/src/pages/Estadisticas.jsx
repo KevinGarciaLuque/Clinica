@@ -311,7 +311,8 @@ export default function Estadisticas() {
               </div>
             </motion.div>
           )}
-          <AsistenciaPanel desde={desde} hasta={hasta} isMobile={isMobile} />
+          {/* key: al cambiar de mes se monta de nuevo y muestra "Calculando…" */}
+          <AsistenciaPanel key={desde} desde={desde} hasta={hasta} isMobile={isMobile} />
         </motion.div>
       )}
     </div>

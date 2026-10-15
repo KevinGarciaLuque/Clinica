@@ -33,7 +33,6 @@ export default function AsistenciaPanel({ desde, hasta, isMobile }) {
   const [error, setError] = useState(false);
 
   useEffect(() => {
-    setD(null); setError(false);
     api.get("/estadisticas/asistencia", { params: { desde, hasta } })
       .then((r) => setD(r.data.data))
       .catch(() => setError(true));
