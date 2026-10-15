@@ -199,6 +199,7 @@ app.use("/api/educacion-diabetes", require("./routes/educacionDiabetes"));
 app.use("/rx",                 require("./routes/rx"));
 app.use("/api/public",         require("./routes/public"));
 app.use("/api/cita-publica",   require("./routes/citaPublica"));
+app.use("/api/portal",         require("./routes/portalPaciente"));
 
 // ===== 404 =====
 app.use((req, res) => {
@@ -420,6 +421,8 @@ const pool = require("./db");
     // Enlaces para confirmar/cancelar la cita desde el recordatorio (tabla nueva)
     await require("./utils/citaEnlace").asegurarTabla();
     console.log("✅ [auto-migrate] cita_enlaces OK");
+    await require("./routes/portalPaciente").asegurarTabla();
+    console.log("✅ [auto-migrate] portal_accesos OK");
 
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`

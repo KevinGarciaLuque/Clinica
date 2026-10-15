@@ -444,7 +444,14 @@ export default function Login() {
             </>
           )}
 
-          <p className="text-center mt-4 mb-0" style={{ color: "rgba(255,255,255,.35)", fontSize: ".75rem" }}>
+          <p className="text-center mt-4 mb-0">
+            <a href="/portal" onClick={(e) => { e.preventDefault(); navigate("/portal"); }}
+              style={{ color: "rgba(255,255,255,.75)", fontSize: ".82rem", textDecoration: "none" }}>
+              <i className="bi bi-person-heart me-1" />¿Eres paciente? Entra a tu portal
+            </a>
+          </p>
+
+          <p className="text-center mt-3 mb-0" style={{ color: "rgba(255,255,255,.35)", fontSize: ".75rem" }}>
             © {new Date().getFullYear()} {cfg.copyright_texto}
           </p>
           <p className="text-center mt-1 mb-0">
