@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 // - Al pasar el mouse (o al enfocarla con el teclado) la tarjeta gira y muestra la
 //   descripción por detrás, con el color de la especialidad.
 // - En pantallas táctiles gira al tocar y vuelve al tocar de nuevo.
+// - Por detrás tiene un enlace "Ver qué incluye" que lleva a los planes.
 // - Con prefers-reduced-motion cambia de cara sin animación.
 
 const CSS = `
@@ -12,10 +13,12 @@ const CSS = `
   .esp-card { display: block; width: 100%; height: 200px; padding: 0; border: none; background: none;
     cursor: pointer; perspective: 1000px; text-align: center; font: inherit; }
   .esp-card:focus-visible { outline: none; }
+  .esp-card { -webkit-tap-highlight-color: transparent; }
   .esp-inner { position: relative; width: 100%; height: 100%; transform-style: preserve-3d;
     transition: transform .65s cubic-bezier(.2,.8,.2,1); }
   @media (hover: hover) { .esp-card:hover .esp-inner { transform: rotateY(180deg); } }
-  .esp-card.is-flipped .esp-inner, .esp-card:focus-visible .esp-inner { transform: rotateY(180deg); }
+  .esp-card.is-flipped .esp-inner, .esp-card:focus-visible .esp-inner,
+  .esp-card:has(.esp-link:focus-visible) .esp-inner { transform: rotateY(180deg); }
 
   .esp-face { position: absolute; inset: 0; border-radius: 20px; display: flex; flex-direction: column;
     align-items: center; justify-content: center; padding: 20px 18px;
@@ -38,21 +41,34 @@ const CSS = `
     border-radius: 50%; background: rgba(255,255,255,.12); }
   .esp-back i.esp-bgicon { position: absolute; bottom: -14px; right: -6px; font-size: 84px; color: rgba(255,255,255,.12); }
   .esp-back-name { position: relative; font-weight: 800; font-size: 14.5px; margin-bottom: 8px; }
-  .esp-back-desc { position: relative; font-size: 13px; line-height: 1.55; color: rgba(255,255,255,.92); }
+  .esp-back-desc { position: relative; font-size: 13px; line-height: 1.5; color: rgba(255,255,255,.92); }
+  /* El enlace solo recibe clics cuando la tarjeta está girada, para que el
+     primer toque en el celular voltee la tarjeta y no salte a otra sección */
+  .esp-link { position: relative; margin-top: 12px; display: inline-flex; align-items: center; gap: 6px;
+    border: 1px solid rgba(255,255,255,.45); background: rgba(255,255,255,.16); color: #fff;
+    font: inherit; font-size: 12.5px; font-weight: 700; padding: 6px 12px; border-radius: 999px;
+    cursor: pointer; pointer-events: none; white-space: nowrap; transition: background .2s ease, transform .2s ease; }
+  .esp-link i { transition: transform .2s ease; }
+  .esp-link:hover { background: #fff; color: var(--c); }
+  .esp-link:hover i { transform: translateX(3px); }
+  .esp-link:focus-visible { outline: 2px solid #fff; outline-offset: 2px; }
+  @media (hover: hover) { .esp-card:hover .esp-link { pointer-events: auto; } }
+  .esp-card.is-flipped .esp-link, .esp-card:focus-within .esp-link { pointer-events: auto; }
 
   @media (max-width: 640px) {
     .esp-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
-    .esp-card { height: 190px; }
-    .esp-face { padding: 16px 12px; }
+    .esp-card { height: 222px; }
+    .esp-face { padding: 16px 10px; }
     .esp-icon { width: 54px; height: 54px; border-radius: 16px; margin-bottom: 10px; }
     .esp-icon i { font-size: 24px; }
     .esp-name { font-size: 14px; }
-    .esp-back-desc { font-size: 12.5px; }
+    .esp-back-desc { font-size: 12px; }
+    .esp-link { margin-top: 10px; font-size: 11px; padding: 5px 8px; gap: 4px; }
   }
   @media (prefers-reduced-motion: reduce) { .esp-inner, .esp-front { transition: none; } }
 `;
 
-function Tarjeta({ esp, index }) {
+function Tarjeta({ esp, index, onVerQueIncluye }) {
   const [volteada, setVolteada] = useState(false);
   return (
     <motion.div
@@ -61,11 +77,12 @@ function Tarjeta({ esp, index }) {
       viewport={{ once: true, amount: 0.2 }}
       transition={{ duration: 0.45, delay: Math.min(index * 0.035, 0.45), ease: "easeOut" }}
     >
-      <button
-        type="button"
+      <div
+        role="group"
+        tabIndex={0}
         className={`esp-card${volteada ? " is-flipped" : ""}`}
         style={{ "--c": esp.color }}
-        aria-label={`${esp.label}: ${esp.desc}`}
+        aria-label={esp.label}
         // En táctil, tocar voltea; con mouse ya gira al pasar por encima
         onPointerUp={e => { if (e.pointerType !== "mouse") setVolteada(v => !v); }}
       >
@@ -75,23 +92,30 @@ function Tarjeta({ esp, index }) {
             <div className="esp-name">{esp.label}</div>
             <div className="esp-hint"><i className="bi bi-arrow-repeat" />Ver más</div>
           </div>
-          <div className="esp-face esp-back" aria-hidden="true">
-            <i className={`bi ${esp.icon} esp-bgicon`} />
+          <div className="esp-face esp-back">
+            <i className={`bi ${esp.icon} esp-bgicon`} aria-hidden="true" />
             <div className="esp-back-name">{esp.label}</div>
             <div className="esp-back-desc">{esp.desc}</div>
+            {onVerQueIncluye && (
+              <button type="button" className="esp-link"
+                onPointerUp={e => e.stopPropagation()}
+                onClick={onVerQueIncluye}>
+                Ver qué incluye <i className="bi bi-arrow-right" />
+              </button>
+            )}
           </div>
         </div>
-      </button>
+      </div>
     </motion.div>
   );
 }
 
-export default function EspecialidadesFlip({ items }) {
+export default function EspecialidadesFlip({ items, onVerQueIncluye }) {
   return (
     <>
       <style>{CSS}</style>
       <div className="esp-grid">
-        {items.map((esp, i) => <Tarjeta key={esp.label} esp={esp} index={i} />)}
+        {items.map((esp, i) => <Tarjeta key={esp.label} esp={esp} index={i} onVerQueIncluye={onVerQueIncluye} />)}
       </div>
     </>
   );

@@ -631,7 +631,7 @@ export default function LandingPage({ hero3d = false }) {
               <i className="bi bi-hand-index" /> Pasa el mouse o toca una especialidad para ver qué incluye
             </p>
           </div>
-          <EspecialidadesFlip items={ESPECIALIDADES} />
+          <EspecialidadesFlip items={ESPECIALIDADES} onVerQueIncluye={() => scrollTo("caracteristicas")} />
         </div>
       </section>
 
