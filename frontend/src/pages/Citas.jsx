@@ -13,6 +13,7 @@ import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import CompartirLink from "../components/CompartirLink";
 import GruposLlegadas from "../components/GruposLlegadas";
 import ListaEspera from "../components/ListaEspera";
+import ControlesPanel, { ModalProgramarControl } from "../components/Controles";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { TIPOS_AUSENCIA } from "../components/AusenciasMedico";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
@@ -416,6 +417,7 @@ export default function Citas() {
   const [showNew,   setShowNew]     = useState(false);
   const [slotInfo,  setSlotInfo]    = useState(null);
   const [showDet,   setShowDet]     = useState(false);
+  const [showControl, setShowControl] = useState(false);
   const [selEvent,  setSelEvent]    = useState(null);
   const [sala,      setSala]        = useState([]);
   // Citas de hoy que aún requieren acción de recepción (por llegar + en sala de espera)
@@ -930,6 +932,8 @@ export default function Citas() {
                 ? "Llegadas de hoy"
                 : activeTab === "espera"
                 ? "Lista de espera"
+                : activeTab === "controles"
+                ? "Controles"
                 : view === Views.AGENDA
                 ? "Agenda"
                 : "Programar Citas"}
@@ -971,6 +975,7 @@ export default function Citas() {
             { id: "calendario", icon: "bi-calendar3",        label: "Calendario",      corto: "Calendario" },
             { id: "sala",       icon: "bi-person-lines-fill", label: "Llegadas de hoy", corto: "Llegadas" },
             { id: "espera",     icon: "bi-hourglass-split",   label: "Lista de espera", corto: "En espera" },
+            { id: "controles",  icon: "bi-arrow-repeat",      label: "Controles",       corto: "Controles" },
           ].map(t => (
             <button key={t.id} className="cit-tab" onClick={() => setActiveTab(t.id)} style={{
               background: "none", border: "none",
@@ -1101,6 +1106,7 @@ export default function Citas() {
       )}
 
           {activeTab === "espera" && <ListaEspera medicos={medicos} />}
+          {activeTab === "controles" && <ControlesPanel />}
 
           {activeTab === "sala" && (
             <SalaEspera
@@ -1141,6 +1147,20 @@ export default function Citas() {
           onEditar={() => { setShowDet(false); setShowEdit(true); }}
           onRecordatorio={abrirRecordatorio}
           onVerHistoria={verHistoriaClinica}
+          onControl={() => { setShowDet(false); setShowControl(true); }}
+        />
+      )}
+
+      {showControl && selEvent && (
+        <ModalProgramarControl
+          cita={selEvent.resource}
+          onClose={() => setShowControl(false)}
+          onGuardado={() => {
+            setShowControl(false);
+            setFeedbackModal({ open: true, type: "success", title: "Control programado",
+              message: "El paciente recibirá un correo 7 días antes para agendar. Puedes verlo en la pestaña Controles.",
+              confirmText: "Entendido", showCancel: false });
+          }}
         />
       )}
 
@@ -1686,7 +1706,7 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
 }
 
 // ─── Modal Detalle Cita ───────────────────────────────────────────────────────
-function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar, onRecordatorio, onVerHistoria }) {
+function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDelete, onEditar, onRecordatorio, onVerHistoria, onControl }) {
   const c = event.resource;
   const color = ESTADO_COLOR[c.estado] || { bg: "#6c757d", fg: "#fff" };
   const ACCIONES = {
@@ -2042,6 +2062,11 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
             <button className="dcm-btn dcm-ghost" onClick={onVerHistoria}>
               <i className="bi bi-journal-medical"></i> Historia
             </button>
+            {c.estado !== "CANCELADA" && onControl && (
+              <button className="dcm-btn dcm-ghost" onClick={onControl}>
+                <i className="bi bi-arrow-repeat"></i> Control
+              </button>
+            )}
             {c.estado === "PENDIENTE" && (
               <button className="dcm-btn dcm-primary" onClick={onEditar}>
                 <i className="bi bi-pencil"></i> Editar

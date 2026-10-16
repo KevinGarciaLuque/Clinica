@@ -329,3 +329,4 @@ router.get("/estadisticas", auth("ADMIN", "MEDICO", "PSICOLOGO"), async (req, re
 
 module.exports = router;
 module.exports.asegurarTablas = asegurarTablas;
+module.exports.slugDeMedico = slugDeMedico;

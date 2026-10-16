@@ -204,6 +204,7 @@ app.use("/api/lista-espera",   require("./routes/listaEspera"));
 app.use("/api/espacio",        require("./routes/espacioPublico"));
 app.use("/api/perfil-publico", require("./routes/perfilPublico"));
 app.use("/api/opiniones",      require("./routes/opiniones"));
+app.use("/api/controles",      require("./routes/controles"));
 
 // ===== 404 =====
 app.use((req, res) => {
@@ -433,6 +434,8 @@ const pool = require("./db");
     console.log("✅ [auto-migrate] perfil_eventos OK");
     await require("./routes/opiniones").asegurarTabla();
     console.log("✅ [auto-migrate] opiniones_pacientes OK");
+    await require("./routes/controles").asegurarTabla();
+    console.log("✅ [auto-migrate] controles_programados OK");
 
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`
@@ -932,6 +935,10 @@ if (process.env.RESPALDO_DIARIO !== "0") {
 
 // ===== CRON: Encuestas de opinión (diario 10:05, solo clínicas que las activaron) =====
 cron.schedule("5 10 * * *", () => { require("./routes/opiniones").enviarEncuestas(); },
+  { timezone: "America/Tegucigalpa" });
+
+// ===== CRON: Avisos de control (diario 09:05): 7 días antes de la fecha indicada =====
+cron.schedule("5 9 * * *", () => { require("./routes/controles").enviarAvisosControl(); },
   { timezone: "America/Tegucigalpa" });
 
 // ===== CRON: Facturación mensual de licencias (diario 06:10) =====
