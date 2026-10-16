@@ -120,7 +120,10 @@ export default function PerfilPaciente() {
   // Pestaña activa
   const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "evolucion", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "cuenta", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
-  const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
+  // Pestaña inicial: "Evolución" en clínicas con consulta médica (recepción sigue
+  // entrando a "Datos Generales", que es lo que más usa); si no, "Datos Generales"
+  const tabInicial = tieneModulo("consulta") && user?.tipo !== "RECEPCIONISTA" ? "evolucion" : "datos";
+  const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : tabInicial);
   
   // Edición datos generales
   const [editandoDatos, setEditandoDatos] = useState(false);
@@ -910,6 +913,9 @@ export default function PerfilPaciente() {
   ].some(clave => tieneModulo(clave));
 
   const TABS_PERFIL = [
+    ...(tieneModulo("consulta")
+      ? [{ key: "evolucion", label: "Evolución", short: "Evolución", icon: "bi-graph-up-arrow", color: "#2563eb" }]
+      : []),
     { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
     ...(tieneModulo("control_seguimiento_dm1")
       ? [
@@ -923,9 +929,6 @@ export default function PerfilPaciente() {
     ...(tieneModulo("consulta")
       ? [{ key: "historial", label: "Historial Clínico", short: "Historial", icon: "bi-journal-medical",
           badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" }]
-      : []),
-    ...(tieneModulo("consulta")
-      ? [{ key: "evolucion", label: "Evolución", short: "Evolución", icon: "bi-graph-up-arrow", color: "#2563eb" }]
       : []),
     ...(tieneModulo("consulta_odontologica")
       ? [{ key: "historial_odonto", label: "Historial Odontológico", short: "Odonto", icon: "bi-emoji-smile-fill",
