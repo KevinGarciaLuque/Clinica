@@ -100,13 +100,47 @@ const limiterEventos = rateLimit({
   message: { ok: false },
 });
 
+// ── Nombre público del médico ────────────────────────────────────────────────
+// 1. nombre_display que el médico configuró ("Dra. Diana Anchecta") → tal cual
+// 2. clínica de un solo médico → el nombre del perfil público de la clínica
+// 3. "Dr. Nombre Apellido" (o sin título si la clínica lo desactivó o es psicólogo)
+function nombrePublico(m, perfilClinica, unico) {
+  const display = String(m.nombre_display || "").trim();
+  if (display) return display;
+  if (unico && perfilClinica.perfil_nombre_doctor) return perfilClinica.perfil_nombre_doctor.trim();
+  const titulo = m.titulo_medico !== 0 && m.tipo !== "PSICOLOGO" ? "Dr. " : "";
+  return `${titulo}${m.nombres} ${m.apellidos}`.replace(/\s+/g, " ").trim();
+}
+
+async function medicosActivos(clinicaId) {
+  const [rows] = await pool.query(
+    `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.foto_url, u.tipo, u.clinica_id,
+            e.nombre AS especialidad, c.titulo_medico
+     FROM usuarios u
+     JOIN clinicas c ON c.id = u.clinica_id
+     LEFT JOIN especialidades e ON e.id = u.especialidad_id
+     WHERE u.clinica_id = ? AND u.activo = 1 AND u.tipo IN ('MEDICO','PSICOLOGO')
+     ORDER BY u.nombres`, [clinicaId]);
+  return rows;
+}
+
+async function perfilDeClinica(clinicaId) {
+  const [config] = await pool.query(
+    `SELECT clave, valor FROM clinica_config WHERE clinica_id = ? AND clave IN (
+       'perfil_whatsapp','perfil_instagram','perfil_tiktok','perfil_facebook',
+       'perfil_google_maps','perfil_color_primario','perfil_agendar_activo','perfil_titulo_doctor',
+       'perfil_nombre_doctor','perfil_foto_doctor','perfil_descripcion'
+     )`, [clinicaId]);
+  return Object.fromEntries(config.map((r) => [r.clave, r.valor]));
+}
+
 // ── GET /medico/:slug ────────────────────────────────────────────────────────
 router.get("/medico/:slug", limiterPublico, async (req, res) => {
   try {
     await asegurarTablas();
     const [[m]] = await pool.query(
-      `SELECT u.id, u.nombres, u.apellidos, u.foto_url, u.tipo, e.nombre AS especialidad,
-              c.id AS clinica_id, c.nombre AS clinica, c.slug AS clinica_slug, c.logo_url,
+      `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.foto_url, u.tipo, e.nombre AS especialidad,
+              c.id AS clinica_id, c.nombre AS clinica, c.slug AS clinica_slug, c.logo_url, c.titulo_medico,
               c.telefono AS clinica_telefono, c.direccion, c.ciudad
        FROM medico_perfiles mp
        JOIN usuarios u ON u.id = mp.usuario_id
@@ -116,12 +150,11 @@ router.get("/medico/:slug", limiterPublico, async (req, res) => {
       [String(req.params.slug || "").slice(0, 120)]);
     if (!m) return res.status(404).json({ ok: false, msg: "Perfil no encontrado" });
 
-    const [config] = await pool.query(
-      `SELECT clave, valor FROM clinica_config WHERE clinica_id = ? AND clave IN (
-         'perfil_whatsapp','perfil_instagram','perfil_tiktok','perfil_facebook',
-         'perfil_google_maps','perfil_color_primario','perfil_agendar_activo','perfil_titulo_doctor'
-       )`, [m.clinica_id]);
-    const perfil = Object.fromEntries(config.map((r) => [r.clave, r.valor]));
+    const perfil = await perfilDeClinica(m.clinica_id);
+    const medicos = await medicosActivos(m.clinica_id);
+    // Clínica de un solo médico: su página usa los datos del perfil público de la
+    // clínica (foto, título, descripción) cuando el médico no tiene los suyos.
+    const unico = medicos.length <= 1;
 
     const [dias] = await pool.query(
       "SELECT DISTINCT dia_semana FROM horarios_medico WHERE medico_id = ? AND activo = 1 ORDER BY dia_semana", [m.id]);
@@ -132,9 +165,12 @@ router.get("/medico/:slug", limiterPublico, async (req, res) => {
         medico_id: m.id,
         nombres: m.nombres,
         apellidos: m.apellidos,
-        foto_url: m.foto_url,
-        especialidad: m.especialidad,
+        nombre_mostrar: nombrePublico(m, perfil, unico),
+        foto_url: m.foto_url || (unico ? perfil.perfil_foto_doctor || null : null),
+        especialidad: m.especialidad || (unico ? perfil.perfil_titulo_doctor || null : null),
+        descripcion: unico ? perfil.perfil_descripcion || null : null,
         es_psicologo: m.tipo === "PSICOLOGO",
+        unico,
         clinica: { nombre: m.clinica, slug: m.clinica_slug, logo_url: m.logo_url, telefono: m.clinica_telefono, direccion: m.direccion, ciudad: m.ciudad },
         perfil,
         dias_disponibles: dias.map((d) => d.dia_semana),
@@ -143,6 +179,31 @@ router.get("/medico/:slug", limiterPublico, async (req, res) => {
   } catch (e) {
     console.error("[perfil-publico] medico:", e.message);
     res.status(500).json({ ok: false, msg: "No se pudo cargar el perfil" });
+  }
+});
+
+// ── GET /clinica/:slug/medicos → médicos con su enlace (para la página de la clínica) ──
+router.get("/clinica/:slug/medicos", limiterPublico, async (req, res) => {
+  try {
+    await asegurarTablas();
+    const [[c]] = await pool.query("SELECT id FROM clinicas WHERE slug=? AND activo=1", [String(req.params.slug).slice(0, 120)]);
+    if (!c) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
+    const perfil = await perfilDeClinica(c.id);
+    const medicos = await medicosActivos(c.id);
+    const unico = medicos.length <= 1;
+    const data = [];
+    for (const m of medicos) {
+      data.push({
+        slug: await slugDeMedico(m),
+        nombre_mostrar: nombrePublico(m, perfil, unico),
+        foto_url: m.foto_url,
+        especialidad: m.especialidad,
+      });
+    }
+    res.json({ ok: true, data });
+  } catch (e) {
+    console.error("[perfil-publico] medicos clinica:", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudieron cargar los médicos" });
   }
 });
 

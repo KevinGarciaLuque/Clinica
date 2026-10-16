@@ -34,6 +34,7 @@ export default function PublicClinicaPage() {
   const [error, setError] = useState(null);
   const [fotoError, setFotoError] = useState(false);
   const [showAgendar, setShowAgendar] = useState(false);
+  const [medicos, setMedicos] = useState([]);
 
   useEffect(() => {
     const cargar = async () => {
@@ -45,6 +46,9 @@ export default function PublicClinicaPage() {
         setClinica(resCli.data.data);
         setServicios(resSrv.data.data || []);
         registrarEvento({ clinica_slug: slug }, "VISTA");
+        // Lista de médicos con su página propia (solo se muestra si hay más de uno)
+        axios.get(`${API}/api/perfil-publico/clinica/${slug}/medicos`)
+          .then((r) => setMedicos(r.data.data || [])).catch(() => {});
       } catch (e) {
         setError(e.response?.status === 404 ? "Página no encontrada" : "Error al cargar la página");
       } finally {
@@ -289,6 +293,31 @@ export default function PublicClinicaPage() {
               </a>
             )}
           </div>
+
+          {/* Médicos de la clínica: cada uno lleva a su página /dr/:slug */}
+          {medicos.length > 1 && (
+            <div style={{ background: "#fff", borderRadius: 18, padding: "18px 20px", boxShadow: "0 4px 16px rgba(0,0,0,.06)", marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 15, color: "#1e293b", marginBottom: 10 }}>
+                <i className="bi bi-people-fill me-2" style={{ color }} />Nuestros médicos
+              </div>
+              {medicos.map((m) => {
+                const foto = m.foto_url ? (m.foto_url.startsWith("http") ? m.foto_url : `${API}${m.foto_url}`) : null;
+                return (
+                  <a key={m.slug} href={`/dr/${m.slug}`} onClick={(e) => { e.preventDefault(); navigate(`/dr/${m.slug}`); }}
+                    style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 0", borderTop: "1px solid #f1f5f9", textDecoration: "none", color: "#1e293b" }}>
+                    <div style={{ width: 46, height: 46, borderRadius: "50%", overflow: "hidden", background: `rgba(${colorRgb},.12)`, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
+                      {foto ? <img src={foto} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <i className="bi bi-person-fill" style={{ fontSize: 22, color }} />}
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, fontSize: 14.5 }}>{m.nombre_mostrar}</div>
+                      {m.especialidad && <div style={{ fontSize: 12.5, color: "#64748b" }}>{m.especialidad}</div>}
+                    </div>
+                    <i className="bi bi-chevron-right" style={{ color: "#94a3b8" }} />
+                  </a>
+                );
+              })}
+            </div>
+          )}
 
           {/* Opiniones verificadas de pacientes (si la clínica ya tiene) */}
           <OpinionesPublicas clinicaSlug={slug} />

@@ -47,7 +47,7 @@ export default function PerfilMedicoPage() {
   }, [slug]);
 
   useEffect(() => {
-    if (d) document.title = `${d.es_psicologo ? "" : "Dr(a). "}${d.nombres} ${d.apellidos} | Medic-KG`;
+    if (d) document.title = `${d.nombre_mostrar} | Medic-KG`;
   }, [d]);
 
   if (error) {
@@ -73,9 +73,16 @@ export default function PerfilMedicoPage() {
   const colorRgb = hexToRgb(color);
   const foto = fotoError ? null : resolverUrl(d.foto_url);
   const logo = resolverUrl(clinica.logo_url);
-  const titulo = d.es_psicologo ? "" : "Dr(a). ";
+  const nombre = d.nombre_mostrar || `${d.nombres} ${d.apellidos}`;
+  // Descripción del perfil de la clínica (clínicas de un solo médico): una idea por línea
+  const descripcion = String(d.descripcion || "").split("\n").map((l) => l.trim().replace(/^[-•]\s*/, "")).filter(Boolean);
+  const redes = [
+    { key: "perfil_instagram", icon: "bi-instagram", href: (v) => (v.startsWith("http") ? v : `https://instagram.com/${v.replace("@", "")}`) },
+    { key: "perfil_facebook", icon: "bi-facebook", href: (v) => (v.startsWith("http") ? v : `https://facebook.com/${v}`) },
+    { key: "perfil_tiktok", icon: "bi-tiktok", href: (v) => (v.startsWith("http") ? v : `https://tiktok.com/@${v.replace("@", "")}`) },
+  ].filter((r) => perfil[r.key]);
   const whatsapp = perfil.perfil_whatsapp ? perfil.perfil_whatsapp.replace(/\D/g, "") : null;
-  const mensajeWa = encodeURIComponent(`Hola, quisiera información para una cita con ${titulo}${d.nombres} ${d.apellidos}.`);
+  const mensajeWa = encodeURIComponent(`Hola, quisiera información para una cita con ${nombre}.`);
   const pagina = { medico_slug: slug };
 
   return (
@@ -101,11 +108,21 @@ export default function PerfilMedicoPage() {
                   : <i className="bi bi-person-fill" style={{ fontSize: 54, color: "rgba(255,255,255,.6)" }} />}
               </div>
             </div>
-            <h1 style={{ color: "#fff", fontSize: 25, fontWeight: 800, margin: "0 0 6px" }}>{titulo}{d.nombres} {d.apellidos}</h1>
+            <h1 style={{ color: "#fff", fontSize: 25, fontWeight: 800, margin: "0 0 6px" }}>{nombre}</h1>
             {d.especialidad && <p style={{ color: "rgba(255,255,255,.85)", fontSize: 15, fontWeight: 600, margin: "0 0 6px" }}>{d.especialidad}</p>}
             <p style={{ color: "rgba(255,255,255,.7)", fontSize: 13.5, margin: 0 }}>
               <i className="bi bi-hospital me-1" />{clinica.nombre}{clinica.ciudad ? ` · ${clinica.ciudad}` : ""}
             </p>
+            {descripcion.length > 0 && (
+              <div style={{ display: "grid", gridTemplateColumns: descripcion.length > 1 ? "repeat(auto-fit, minmax(150px, 1fr))" : "1fr", gap: "6px 16px", maxWidth: 380, margin: "14px auto 0", textAlign: descripcion.length > 1 ? "left" : "center" }}>
+                {descripcion.map((linea, i) => (
+                  <div key={i} style={{ display: "flex", gap: 6, color: "rgba(255,255,255,.8)", fontSize: 13.5, lineHeight: 1.5, justifyContent: descripcion.length > 1 ? "flex-start" : "center" }}>
+                    {descripcion.length > 1 && <i className="bi bi-check-circle-fill" style={{ fontSize: 12, marginTop: 3, color: "rgba(255,255,255,.55)" }} />}
+                    <span>{linea}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
@@ -167,7 +184,19 @@ export default function PerfilMedicoPage() {
 
           <OpinionesPublicas medicoSlug={slug} />
 
-          {clinica.slug && (
+          {redes.length > 0 && (
+            <div style={{ display: "flex", justifyContent: "center", gap: 12, margin: "6px 0 10px" }}>
+              {redes.map((r) => (
+                <a key={r.key} href={r.href(perfil[r.key])} target="_blank" rel="noopener noreferrer" aria-label={r.key.replace("perfil_", "")}
+                  style={{ width: 46, height: 46, borderRadius: "50%", background: "#fff", boxShadow: "0 4px 14px rgba(0,0,0,.08)", display: "flex", alignItems: "center", justifyContent: "center", color, fontSize: 19 }}>
+                  <i className={`bi ${r.icon}`} />
+                </a>
+              ))}
+            </div>
+          )}
+
+          {/* En clínicas de un solo médico las dos páginas son la misma: no se enlaza */}
+          {clinica.slug && !d.unico && (
             <Link to={`/p/${clinica.slug}`} style={{ display: "block", textAlign: "center", fontSize: 13.5, color: "#64748b", marginTop: 10 }}>
               Ver la página de {clinica.nombre}
             </Link>
