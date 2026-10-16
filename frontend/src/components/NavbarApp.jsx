@@ -6,6 +6,7 @@ import api from "../api/api";
 import ModalAyudaSoporte from "./ModalAyudaSoporte";
 import ModalResenaEncuesta from "./ModalResenaEncuesta";
 import NovedadesBoton from "./Novedades";
+import BuscadorRapido from "./BuscadorRapido";
 import { playNotificationSound } from "../utils/notificationSound";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -471,7 +472,15 @@ export default function NavbarApp({ onMenuClick }) {
       }}
     >
       {/* Izquierda: brand centrado dentro del ancho del sidebar (240px) */}
-      <div style={{
+      {/* En teléfonos el bloque de marca se ajusta a su contenido para dejar espacio a los botones */}
+      <style>{`@media (max-width: 575.98px) {
+        .nav-marca { width: auto !important; min-width: 0 !important; gap: 6px !important; justify-content: flex-start !important; padding-left: 6px; }
+        .nav-centro { gap: 4px !important; }
+        .nav-marca .nav-sub { display: none; }
+        .nav-marca .nav-logo { width: 36px !important; height: 36px !important; border-radius: 10px !important; }
+      }
+      @media (max-width: 379.98px) { .nav-marca .nav-texto { display: none; } }`}</style>
+      <div className="nav-marca" style={{
         width: 240, minWidth: 240, flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
       }}>
@@ -493,7 +502,7 @@ export default function NavbarApp({ onMenuClick }) {
         </button>
 
         {/* Ícono / Logo */}
-        <div style={{
+        <div className="nav-logo" style={{
           width: 46, height: 46, borderRadius: 12, flexShrink: 0,
           background: cfg.logoUrl ? "transparent" : "linear-gradient(135deg, #1d4ed8, #3b82f6)",
           display: "flex", alignItems: "center", justifyContent: "center",
@@ -509,11 +518,11 @@ export default function NavbarApp({ onMenuClick }) {
         </div>
 
         {/* Texto de marca */}
-        <div style={{ lineHeight: 1.2, textAlign: "left" }}>
+        <div className="nav-texto" style={{ lineHeight: 1.2, textAlign: "left" }}>
           <div style={{ fontSize: "1rem", fontWeight: 800, letterSpacing: "0.04em" }}>
             <BrandName name={cfg.nombre_sistema} c1={cfg.color_nombre1} c2={cfg.color_nombre2} />
           </div>
-          <div style={{
+          <div className="nav-sub" style={{
             fontSize: "0.6rem", fontWeight: 600, letterSpacing: "0.12em",
             textTransform: "uppercase", color: "rgba(147,197,253,.6)",
           }}>
@@ -523,7 +532,9 @@ export default function NavbarApp({ onMenuClick }) {
       </div>
 
       {/* Centro: ✨ Novedades de la plataforma */}
-      <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+      <div className="nav-centro" style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, minWidth: 0 }}>
+        {/* 🔎 Búsqueda rápida (Ctrl+K) */}
+        <BuscadorRapido />
         <NovedadesBoton />
       </div>
 

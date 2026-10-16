@@ -51,4 +51,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "busqueda-rapida",
+    version: "1.14",
+    titulo: "Búsqueda rápida de pacientes",
+    descripcion: "Toca la lupa 🔍 de la barra superior (o presiona Ctrl+K en la computadora) desde cualquier pantalla para encontrar un paciente por nombre, DNI o teléfono y abrir su perfil o su historia al instante. También te muestra los últimos pacientes que abriste.",
+    icono: "bi-search",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];
