@@ -126,7 +126,7 @@ router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","PSICOLOGO",
 
     await ensureNombreDisplayColumn();
     const [recetas] = await pool.query(
-      `SELECT pr.id, pr.estado, pr.notas, pr.creado_en,
+      `SELECT pr.id, pr.historia_id, pr.estado, pr.notas, pr.creado_en,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos,
               u.nombre_display AS med_nombre_display, u.sexo AS med_sexo,
               hc.diagnostico_cie, hc.subjetivo,
@@ -142,7 +142,7 @@ router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","PSICOLOGO",
 
     for (const r of recetas) {
       const [items] = await pool.query(
-        `SELECT pi.medicamento_texto, pi.dosis, pi.duracion, pi.cantidad, pi.instrucciones,
+        `SELECT pi.medicamento_id, pi.medicamento_texto, pi.dosis, pi.duracion, pi.cantidad, pi.instrucciones,
                 COALESCE(m.nombre_generico, pi.medicamento_texto) AS nombre,
                 m.presentacion
          FROM prescripcion_items pi

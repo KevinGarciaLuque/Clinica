@@ -5,15 +5,29 @@ import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import { nombreMedico } from "../../utils/medico";
 
+// Convierte los medicamentos de una receta anterior al formato del formulario
+// (se copian dosis, duración, cantidad e indicaciones; el médico puede editarlos)
+function itemsDeReceta(rx) {
+  return (rx?.items || []).map((it) => ({
+    medicamento_id: it.medicamento_id || null,
+    medicamento_texto: it.medicamento_id && it.nombre
+      ? it.nombre + (it.presentacion ? ` (${it.presentacion})` : "")
+      : (it.medicamento_texto || it.nombre || ""),
+    dosis: it.dosis || "", duracion: it.duracion || "", cantidad: it.cantidad || "", instrucciones: it.instrucciones || "",
+  })).filter((it) => it.medicamento_texto || it.medicamento_id);
+}
+
 // ══════════════════════════════════════════════════════════════════════
 // TAB: Prescripción (con sub-tabs)
 // ══════════════════════════════════════════════════════════════════════
 export default function PrescripcionTab({ historiaId, pacienteId, citaId, firmada, diagnosticoCie, diagnosticoDesc, firmaDigitalUrl }) {
   const [subTab, setSubTab] = useState("receta");
   const [pendingSugItems, setPendingSugItems] = useState([]);
+  const [pendingNotas, setPendingNotas] = useState(null);
 
-  const handleAgregar = (newItems) => {
+  const handleAgregar = (newItems, notas = null) => {
     setPendingSugItems(newItems);
+    setPendingNotas(notas);
     setSubTab("receta");
   };
 
@@ -48,16 +62,16 @@ export default function PrescripcionTab({ historiaId, pacienteId, citaId, firmad
         ))}
       </div>
 
-      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} pendingSugItems={pendingSugItems} onClearPending={() => setPendingSugItems([])} firmaDigitalUrl={firmaDigitalUrl} />}
-      {subTab === "historial" && <SubHistorialPaciente pacienteId={pacienteId} />}
+      {subTab === "receta"    && <SubRecetaActual historiaId={historiaId} pacienteId={pacienteId} citaId={citaId} firmada={firmada} pendingSugItems={pendingSugItems} pendingNotas={pendingNotas} onClearPending={() => { setPendingSugItems([]); setPendingNotas(null); }} firmaDigitalUrl={firmaDigitalUrl} />}
+      {subTab === "historial" && <SubHistorialPaciente pacienteId={pacienteId} firmada={firmada} onRepetir={(rx) => handleAgregar(itemsDeReceta(rx), rx.notas || null)} />}
       {subTab === "sugeridas" && <SubSugeridadCie diagnosticoCie={diagnosticoCie} diagnosticoDesc={diagnosticoDesc} onAgregar={handleAgregar} />}
-      {subTab === "favoritas" && <SubFavoritas firmada={firmada} />}
+      {subTab === "favoritas" && <SubFavoritas firmada={firmada} onUsar={(fav) => handleAgregar(itemsDeReceta(fav), fav.notas || null)} />}
     </div>
   );
 }
 
 // ── Sub-tab: Receta de esta consulta ──────────────────────────────────────────
-function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugItems = [], onClearPending, firmaDigitalUrl }) {
+function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugItems = [], pendingNotas = null, onClearPending, firmaDigitalUrl }) {
   const { tieneRecepcionista } = useAuth();
   const [list,      setList]      = useState([]);
   const [showForm,  setShowForm]  = useState(false);
@@ -68,6 +82,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   useEffect(() => {
     if (!pendingSugItems.length) return;
     setItems(pendingSugItems);
+    if (pendingNotas) setNotas(pendingNotas);
     setShowForm(true);
     onClearPending?.();
   }, [pendingSugItems]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -91,6 +106,29 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   function newRxItem() {
     return { medicamento_id: null, medicamento_texto: "", dosis: "", duracion: "", cantidad: "", instrucciones: "" };
   }
+
+  // Última receta del paciente en una consulta anterior (para "Repetir última receta")
+  const [ultimaRx, setUltimaRx] = useState(null);
+  useEffect(() => {
+    if (!pacienteId || firmada) return;
+    let vivo = true;
+    api.get(`/prescripciones/historial-paciente/${pacienteId}`)
+      .then(r => {
+        const rx = (r.data.data || []).find(x => x.estado !== "CANCELADA" && x.items?.length && (!historiaId || Number(x.historia_id) !== Number(historiaId)));
+        if (vivo) setUltimaRx(rx || null);
+      })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [pacienteId, historiaId, firmada]);
+
+  const repetirUltima = () => {
+    const nuevos = itemsDeReceta(ultimaRx);
+    if (!nuevos.length) return;
+    setItems(nuevos);
+    setNotas(ultimaRx.notas || "");
+    setShowForm(true);
+    setAlertMsg({ type: "info", msg: `Se copiaron ${nuevos.length} medicamento(s) de la receta del ${dayjs(ultimaRx.creado_en).format("DD/MM/YYYY")}. Revisa las dosis y guarda la receta.` });
+  };
 
   // Cargar favoritos del médico al montar
   useEffect(() => {
@@ -275,12 +313,26 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
         </div>
       )}
 
-      <div className="d-flex justify-content-between align-items-center mb-3">
+      <div className="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
         <div>
           <span style={{ fontWeight: 700, fontSize: "0.95rem", color: "#111827" }}>Recetas de esta consulta</span>
           {list.length > 0 && <span className="ms-2 badge" style={{ background: "#eff6ff", color: "#3b82f6", fontSize: "0.72rem" }}>{list.length}</span>}
         </div>
         {!firmada && !showForm && (
+          <div className="d-flex gap-2 flex-wrap">
+          {ultimaRx && (
+            <button
+              onClick={repetirUltima}
+              title={`Copiar ${ultimaRx.total_items} medicamento(s) de la receta del ${dayjs(ultimaRx.creado_en).format("DD/MM/YYYY")}`}
+              style={{
+                background: "#fff", border: "1px solid #c4b5fd", borderRadius: 8, color: "#6d28d9",
+                padding: "6px 14px", fontSize: "0.82rem", cursor: "pointer", fontWeight: 600,
+                display: "flex", alignItems: "center", gap: 6,
+              }}>
+              <i className="bi bi-arrow-repeat"></i> Repetir última receta
+              <span style={{ fontWeight: 500, color: "#8b5cf6", fontSize: "0.74rem" }}>({dayjs(ultimaRx.creado_en).format("DD/MM/YY")})</span>
+            </button>
+          )}
           <button
             onClick={() => setShowForm(true)}
             style={{
@@ -291,6 +343,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
             }}>
             <i className="bi bi-plus-lg"></i> Nueva Receta
           </button>
+          </div>
         )}
       </div>
 
@@ -527,7 +580,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
 }
 
 // ── Sub-tab: Historial completo del paciente ──────────────────────────────────
-function SubHistorialPaciente({ pacienteId }) {
+function SubHistorialPaciente({ pacienteId, firmada, onRepetir }) {
   const [historial, setHistorial] = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [expanded,  setExpanded]  = useState(null);
@@ -564,11 +617,21 @@ function SubHistorialPaciente({ pacienteId }) {
                   </span>
                 )}
               </div>
-              <div className="text-end">
-                <div className="small text-muted">{dayjs(rx.creado_en).format("DD/MM/YYYY")}</div>
-                <div style={{ fontSize: "0.75rem", color: "#888" }}>
-                  {nombreMedico(rx)}
+              <div className="d-flex align-items-center gap-2">
+                <div className="text-end">
+                  <div className="small text-muted">{dayjs(rx.creado_en).format("DD/MM/YYYY")}</div>
+                  <div style={{ fontSize: "0.75rem", color: "#888" }}>
+                    {nombreMedico(rx)}
+                  </div>
                 </div>
+                {!firmada && onRepetir && rx.items?.length > 0 && (
+                  <button className="btn btn-sm btn-outline-primary py-0 px-2 text-nowrap"
+                    style={{ fontSize: "0.74rem" }}
+                    title="Copiar estos medicamentos a una nueva receta en esta consulta"
+                    onClick={(e) => { e.stopPropagation(); onRepetir(rx); }}>
+                    <i className="bi bi-arrow-repeat me-1"></i>Repetir
+                  </button>
+                )}
               </div>
             </div>
             {expanded === rx.id && rx.items?.length > 0 && (
@@ -682,7 +745,7 @@ function SubSugeridadCie({ diagnosticoCie, diagnosticoDesc, onAgregar }) {
 }
 
 // ── Sub-tab: Recetas favoritas del médico ─────────────────────────────────────
-function SubFavoritas({ firmada }) {
+function SubFavoritas({ firmada, onUsar }) {
   const [favoritas, setFavoritas] = useState([]);
   const [loading,   setLoading]   = useState(false);
   const [expandedFav, setExpandedFav] = useState(null);
@@ -745,7 +808,8 @@ function SubFavoritas({ firmada }) {
                     title="Usar esta receta en la consulta actual"
                     onClick={(e) => {
                       e.stopPropagation();
-                      // Mensaje orientativo — el usuario la ve y la recrea manualmente o con el buscador
+                      // Carga los medicamentos de la favorita en "Nueva Receta" para revisarlos y guardar
+                      if (onUsar && fav.items?.length) { onUsar(fav); return; }
                       setAlertMsg({ type: "info", msg: `Ve a "Nueva Receta" y usa el buscador para agregar los medicamentos de "${fav.nombre}".` });
                       setExpandedFav(fav.id);
                     }}>

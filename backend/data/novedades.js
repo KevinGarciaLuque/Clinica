@@ -60,4 +60,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "repetir-receta",
+    version: "1.15",
+    titulo: "Repetir la última receta",
+    descripcion: "En la consulta, pestaña Prescripción, el botón “Repetir última receta” copia los medicamentos de la receta anterior del paciente para que solo revises y guardes. También puedes repetir cualquier receta desde Historial, y el botón “Usar” de Mis Favoritas ahora carga los medicamentos directamente.",
+    icono: "bi-arrow-repeat",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];
