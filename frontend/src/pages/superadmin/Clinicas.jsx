@@ -21,7 +21,7 @@ const C = {
 };
 
 const EMPTY_C = {
-  nombre: "", slug: "", tipo_id: "", es_pediatrica: false, titulo_medico: true, email: "", telefono: "", direccion: "", ciudad: "", pais: "PE", ruc: "",
+  nombre: "", slug: "", tipo_id: "", es_pediatrica: false, titulo_medico: true, email: "", telefono: "", direccion: "", ciudad: "", pais: "HN", ruc: "",
 };
 const EMPTY_A = { admin_nombres: "", admin_apellidos: "", admin_email: "", admin_password: "" };
 
@@ -159,7 +159,7 @@ export default function Clinicas() {
               titulo_medico: c.titulo_medico == null ? true : !!c.titulo_medico,
               email: c.email||"", telefono: c.telefono||"",
               direccion: c.direccion||"", ciudad: c.ciudad||"",
-              pais: c.pais||"PE", ruc: c.ruc||"",
+              pais: c.pais||"HN", ruc: c.ruc||"",
               inactividad_minutos: "20",
               ...EMPTY_A });
     setEditId(c.id); setError(""); setShowModal(true);

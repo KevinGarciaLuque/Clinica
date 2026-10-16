@@ -776,6 +776,19 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] pacientes.pais default → Honduras");
 
+    // País de las clínicas: Honduras por defecto (antes 'PE'). La corrección de las
+    // clínicas existentes que quedaron en 'PE' por ese default se aplica UNA sola vez,
+    // así una clínica que después elija Perú a propósito no se vuelve a cambiar.
+    await pool.query("ALTER TABLE clinicas ALTER COLUMN pais SET DEFAULT 'HN'");
+    await pool.query(`CREATE TABLE IF NOT EXISTS migraciones_unicas (
+      clave VARCHAR(100) PRIMARY KEY, aplicada_en DATETIME DEFAULT CURRENT_TIMESTAMP
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+    const [marca] = await pool.query("INSERT IGNORE INTO migraciones_unicas (clave) VALUES ('clinicas_pais_pe_a_hn')");
+    if (marca.affectedRows) {
+      const [r] = await pool.query("UPDATE clinicas SET pais = 'HN' WHERE pais IN ('PE','Peru','Perú') OR pais IS NULL OR pais = ''");
+      console.log(`✅ [auto-migrate] clinicas.pais → HN (${r.affectedRows} clínica(s) corregidas, una sola vez)`);
+    }
+
     // Agregar PENDIENTE_APROBACION al ENUM de citas.estado (citas desde portal público)
     const [colEstado] = await pool.query(`
       SELECT COLUMN_TYPE FROM information_schema.COLUMNS

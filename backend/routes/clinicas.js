@@ -925,7 +925,7 @@ router.post("/", auth("SUPER_ADMIN"), async (req, res) => {
     const [r] = await pool.query(
       `INSERT INTO clinicas (nombre, slug, tipo_id, es_pediatrica, email, telefono, direccion, ciudad, pais, ruc, plan_tipo, licencia_inicio, licencia_fin)
        VALUES (?,?,?,?,?,?,?,?,?,?, 'trial', NOW(), DATE_ADD(NOW(), INTERVAL 14 DAY))`,
-      [nombre, slug, tipoIdFinal, es_pediatrica ? 1 : 0, email||null, telefono||null, direccion||null, ciudad||null, pais||"PE", ruc||null]
+      [nombre, slug, tipoIdFinal, es_pediatrica ? 1 : 0, email||null, telefono||null, direccion||null, ciudad||null, pais||"HN", ruc||null]
     );
     const clinicaId = r.insertId;
 
