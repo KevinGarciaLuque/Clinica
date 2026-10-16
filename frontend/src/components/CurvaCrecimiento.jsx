@@ -752,10 +752,12 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
           </div>
         </div>
 
-        {/* Fila 2: Botones acción — siempre en fila, scrollable en móvil */}
+        {/* Fila 2: Botones acción — en móvil bajan a otra línea si no caben.
+            (Antes la fila tenía scroll horizontal y eso recortaba los menús
+            desplegables de Imprimir/Descargar: no se veían las opciones.) */}
         <div style={{
           display: "flex", gap: 8, alignItems: "center",
-          overflowX: "auto", WebkitOverflowScrolling: "touch",
+          flexWrap: "wrap",
           paddingBottom: 2,
         }}>
 
