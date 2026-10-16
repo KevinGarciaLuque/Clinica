@@ -25,6 +25,7 @@ import HistoriaEndocrinologiaTab from "../components/HistoriaEndocrinologiaTab";
 import SeguimientosEndocrinologia from "../components/SeguimientosEndocrinologia";
 import EducacionDiabetesTab from "../components/EducacionDiabetesTab";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
+import EvolucionPaciente from "../components/EvolucionPaciente";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/constantes_odontologia";
 
@@ -117,7 +118,7 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "cuenta", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "evolucion", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "cuenta", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
   const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : "datos");
   
@@ -922,6 +923,9 @@ export default function PerfilPaciente() {
     ...(tieneModulo("consulta")
       ? [{ key: "historial", label: "Historial Clínico", short: "Historial", icon: "bi-journal-medical",
           badge: historias.length > 0 ? historias.length : null, badgeColor: "#2196f3" }]
+      : []),
+    ...(tieneModulo("consulta")
+      ? [{ key: "evolucion", label: "Evolución", short: "Evolución", icon: "bi-graph-up-arrow", color: "#2563eb" }]
       : []),
     ...(tieneModulo("consulta_odontologica")
       ? [{ key: "historial_odonto", label: "Historial Odontológico", short: "Odonto", icon: "bi-emoji-smile-fill",
@@ -1954,6 +1958,11 @@ export default function PerfilPaciente() {
       {/* ─────────────────────────────────────────────────────── */}
       {/* TAB: HISTORIAL ODONTOLÓGICO */}
       {/* ─────────────────────────────────────────────────────── */}
+      {/* 📈 Evolución del paciente según sus consultas */}
+      {tab === "evolucion" && (
+        <EvolucionPaciente pacienteId={id} />
+      )}
+
       {tab === "historial_odonto" && (
         <div className="card shadow-sm">
           <div className="card-header bg-white d-flex justify-content-between align-items-center">

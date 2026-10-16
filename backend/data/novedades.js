@@ -87,4 +87,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "evolucion-paciente",
+    version: "1.18",
+    titulo: "Evolución del paciente en gráficas",
+    descripcion: "En el expediente del paciente, la nueva pestaña “Evolución” muestra cómo ha ido según sus consultas: último valor de presión, peso, IMC y demás signos con su tendencia (en verde, amarillo o rojo), gráficas en el tiempo, diagnósticos más frecuentes, asistencia a citas y una línea de tiempo de consultas.",
+    icono: "bi-graph-up-arrow",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];
