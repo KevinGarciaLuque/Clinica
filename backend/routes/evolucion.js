@@ -208,22 +208,25 @@ function calcularAvisos({ consultas, labs, asistencia12, diagnosticos }) {
 }
 
 async function consultasDelPaciente(pid, clinicaId) {
-  const sql = (conDisplay) => `
-    SELECT h.id, h.estado, h.diagnostico_cie, h.diagnostico_desc, h.objetivo,
-           DATE_FORMAT(h.creado_en, '%Y-%m-%d') AS fecha,
-           u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.sexo AS med_sexo, u.tipo AS med_tipo
-           ${conDisplay ? ", u.nombre_display AS med_nombre_display" : ""}
-    FROM historias_clinicas h
-    LEFT JOIN usuarios u ON u.id = h.medico_id
-    WHERE h.paciente_id = ? AND h.clinica_id = ?
-    ORDER BY h.creado_en ASC, h.id ASC
-    LIMIT 300`;
-  try {
-    return (await pool.query(sql(true), [pid, clinicaId]))[0];
-  } catch (e) {
-    if (e.code !== "ER_BAD_FIELD_ERROR") throw e;
-    return (await pool.query(sql(false), [pid, clinicaId]))[0];   // sin columna nombre_display
+  // h.* y los médicos en otra consulta: así no falla si a alguna base le falta una columna
+  const [filas] = await pool.query(
+    `SELECT h.*, DATE_FORMAT(h.creado_en, '%Y-%m-%d') AS fecha
+     FROM historias_clinicas h
+     WHERE h.paciente_id = ? AND h.clinica_id = ?
+     ORDER BY h.creado_en ASC, h.id ASC
+     LIMIT 300`, [pid, clinicaId]);
+  const ids = [...new Set(filas.map((h) => h.medico_id).filter(Boolean))];
+  const medicos = new Map();
+  if (ids.length) {
+    try {
+      const [us] = await pool.query("SELECT * FROM usuarios WHERE id IN (?)", [ids]);
+      for (const u of us) medicos.set(u.id, u);
+    } catch (e) { console.error("[evolucion] médicos", e.message); }
   }
+  return filas.map((h) => {
+    const u = medicos.get(h.medico_id) || {};
+    return { ...h, med_nombres: u.nombres, med_apellidos: u.apellidos, med_sexo: u.sexo, med_tipo: u.tipo, med_nombre_display: u.nombre_display };
+  });
 }
 
 router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
@@ -231,8 +234,7 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     const clinicaId = clinicaDe(req);
     const pid = Number(req.params.pacienteId);
     const [[p]] = await pool.query(
-      `SELECT id, nombres, apellidos, dni, fecha_nacimiento, sexo, grupo_sanguineo
-       FROM pacientes WHERE id = ? AND clinica_id = ?`, [pid, clinicaId]);
+      "SELECT * FROM pacientes WHERE id = ? AND clinica_id = ?", [pid, clinicaId]);
     if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
     const filas = await consultasDelPaciente(pid, clinicaId);
@@ -286,7 +288,8 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     let asistencia = null;
     let asistencia12 = null;
     try {
-      const [[cl]] = await pool.query("SELECT COALESCE(timezone,'America/Tegucigalpa') AS tz FROM clinicas WHERE id=?", [clinicaId]);
+      const [[cl]] = await pool.query("SELECT * FROM clinicas WHERE id=?", [clinicaId]);
+      if (cl) cl.tz = cl.timezone || "America/Tegucigalpa";
       const ahora = dayjs().tz(cl?.tz || "America/Tegucigalpa").format("YYYY-MM-DD HH:mm:ss");
       const [[a]] = await pool.query(
         `SELECT SUM(estado IN ('COMPLETADA','EN_ATENCION','EN_ESPERA')) AS asistio,
@@ -312,11 +315,16 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     };
     const labs = await opcional(() => laboratorios(pid, clinicaId));
     const tratamiento = await opcional(() => cambiosTratamiento(pid, clinicaId));
-    const avisos = calcularAvisos({ consultas, labs, asistencia12, diagnosticos });
+    let avisos = [];
+    try { avisos = calcularAvisos({ consultas, labs, asistencia12, diagnosticos }); }
+    catch (e) { console.error("[evolucion] avisos", e.message); }
 
     // Para el resumen imprimible: datos de la clínica, alergias y antecedentes
-    const [[clinica]] = await pool.query(
-      "SELECT nombre, logo_url, telefono, direccion, ciudad, email FROM clinicas WHERE id = ?", [clinicaId]);
+    let clinica = null;
+    try {
+      const [[c]] = await pool.query("SELECT * FROM clinicas WHERE id = ?", [clinicaId]);
+      if (c) clinica = { nombre: c.nombre, logo_url: c.logo_url || null, telefono: c.telefono || null, direccion: c.direccion || null, ciudad: c.ciudad || null, email: c.email || null };
+    } catch (e) { console.error("[evolucion] clínica", e.message); }
     const alergias = await opcional(async () => (await pool.query(
       `SELECT agente, severidad, reaccion FROM alergias_paciente
        WHERE paciente_id = ? AND clinica_id = ? AND activo = 1
@@ -350,8 +358,8 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
       },
     });
   } catch (e) {
-    console.error("[evolucion]", e.message);
-    res.status(500).json({ ok: false, msg: "No se pudo cargar la evolución del paciente" });
+    console.error("[evolucion]", e.code || "", e.message, e.stack?.split("\n")[1]?.trim());
+    res.status(500).json({ ok: false, msg: `No se pudo cargar la evolución del paciente${e.code ? ` (${e.code})` : ""}` });
   }
 });
 
