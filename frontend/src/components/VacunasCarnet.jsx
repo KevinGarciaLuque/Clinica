@@ -1413,56 +1413,26 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
                 <h6 className="fw-bold mb-3" style={{ color: pal.azulOscuro }}>
                   <i className="bi bi-person-fill me-2" />Datos del Paciente
                 </h6>
+                {/* Solo se muestran los datos que están llenos */}
                 <table className="table table-sm table-bordered" style={{ fontSize: 13 }}>
                   <tbody>
-                    <tr>
-                      <th style={{ background: pal.azulClaro, width: "30%" }}>Nombre</th>
-                      <td>{paciente?.nombres} {paciente?.apellidos}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>No. Identidad (DNI)</th>
-                      <td>{paciente?.dni || <span className="text-muted fst-italic">No registrado</span>}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Fecha de Nacimiento</th>
-                      <td>{paciente?.fecha_nacimiento || "—"}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Sexo</th>
-                      <td>{paciente?.sexo || "—"}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Edad Actual</th>
-                      <td>{calcEdad()}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>No. en el LINVI</th>
-                      <td className="text-muted">&nbsp;</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Dirección de Residencia</th>
-                      <td>{paciente?.direccion || paciente?.ciudad || "—"}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Responsable o Tutor</th>
-                      <td>{paciente?.responsable_nombre || "—"}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Teléfono / Celular</th>
-                      <td>{paciente?.telefono || "—"}</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Nombre del Establecimiento</th>
-                      <td className="text-muted">&nbsp;</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Código Establecimiento</th>
-                      <td className="text-muted">&nbsp;</td>
-                    </tr>
-                    <tr>
-                      <th style={{ background: pal.azulClaro }}>Dirección y Teléfono del Establecimiento</th>
-                      <td className="text-muted">&nbsp;</td>
-                    </tr>
+                    {[
+                      ["Nombre", [paciente?.nombres, paciente?.apellidos].filter(Boolean).join(" ")],
+                      ["No. Identidad (DNI)", paciente?.dni],
+                      ["Fecha de Nacimiento", paciente?.fecha_nacimiento],
+                      ["Sexo", paciente?.sexo],
+                      ["Edad Actual", paciente?.fecha_nacimiento ? calcEdad() : null],
+                      ["Dirección de Residencia", paciente?.direccion || paciente?.ciudad],
+                      ["Responsable o Tutor", paciente?.responsable_nombre],
+                      ["Teléfono / Celular", paciente?.telefono],
+                    ]
+                      .filter(([, valor]) => valor != null && String(valor).trim() !== "" && String(valor).trim() !== "—")
+                      .map(([etiqueta, valor], i) => (
+                        <tr key={etiqueta}>
+                          <th style={{ background: pal.azulClaro, width: i === 0 ? "30%" : undefined }}>{etiqueta}</th>
+                          <td>{valor}</td>
+                        </tr>
+                      ))}
                   </tbody>
                 </table>
               </div>
