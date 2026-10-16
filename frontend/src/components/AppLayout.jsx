@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
 import LicenciaVencidaModal from "./LicenciaVencidaModal";
+import DictadoVoz from "./DictadoVoz";
 import useClinicaActiva from "../utils/useClinicaActiva";
 import { limpiarClinicaActiva } from "../utils/clinicaActiva";
 
@@ -30,6 +31,9 @@ export default function AppLayout() {
 
       {/* Modal bloqueante de licencia vencida */}
       <LicenciaVencidaModal />
+
+      {/* 🎤 Dictado por voz en los campos de texto grandes */}
+      <DictadoVoz />
 
       {/* ── Navbar fija arriba ── */}
       <NavbarApp onMenuClick={() => setMobileOpen(o => !o)} />

@@ -33,4 +33,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "dictado-por-voz",
+    version: "1.12",
+    titulo: "Dictado por voz 🎤",
+    descripcion: "Al entrar a cualquier campo de texto de la consulta (motivo, examen, diagnóstico, plan…) aparece un micrófono en la esquina: tócalo y habla, el texto se escribe solo. Puedes decir “punto”, “coma” o “nueva línea”. Funciona en Chrome, Edge y Safari.",
+    icono: "bi-mic-fill",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];
