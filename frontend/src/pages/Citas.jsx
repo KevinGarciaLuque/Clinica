@@ -1414,6 +1414,61 @@ function TimePicker12h({ value, onChange, label, required }) {
 }
 
 // ─── Modal Nueva Cita ─────────────────────────────────────────────────────────
+// ─── Repetición de citas (como "Se repite" de Google Calendar) ───────────────
+const ORDINAL = ["primer", "segundo", "tercer", "cuarto", "último"];
+function opcionesRepeticion(fecha) {
+  const d = dayjs(fecha);
+  if (!d.isValid()) return [{ id: "NO", label: "No se repite" }];
+  const dia = d.format("dddd");
+  const n = Math.ceil(d.date() / 7);                       // 1..5
+  const esUltimo = d.add(7, "day").month() !== d.month();
+  const nth = esUltimo && n >= 4 ? "último" : ORDINAL[n - 1];
+  return [
+    { id: "NO", label: "No se repite" },
+    { id: "SEMANAL", label: `Cada semana el ${dia}` },
+    { id: "QUINCENAL", label: `Cada 2 semanas el ${dia}` },
+    { id: "MENSUAL_DIA", label: `Cada mes el día ${d.date()}` },
+    { id: "MENSUAL_NTH", label: `Cada mes el ${nth} ${dia}` },
+    { id: "LABORABLES", label: "Todos los días laborables (lunes a viernes)" },
+  ];
+}
+// Fechas (YYYY-MM-DD) de la serie, empezando por `fecha` e incluyéndola
+function fechasRepeticion(fecha, tipo, veces) {
+  const d0 = dayjs(fecha);
+  if (tipo === "NO" || !d0.isValid()) return [d0.format("YYYY-MM-DD")];
+  const out = [];
+  if (tipo === "LABORABLES") {
+    for (let d = d0; out.length < veces; d = d.add(1, "day")) {
+      if (d.day() >= 1 && d.day() <= 5) out.push(d.format("YYYY-MM-DD"));
+    }
+    return out;
+  }
+  const n = Math.ceil(d0.date() / 7);
+  const esUltimo = d0.add(7, "day").month() !== d0.month() && n >= 4;
+  for (let i = 0; out.length < veces && i < veces * 2; i++) {
+    let d;
+    if (tipo === "SEMANAL") d = d0.add(i, "week");
+    else if (tipo === "QUINCENAL") d = d0.add(i * 2, "week");
+    else if (tipo === "MENSUAL_DIA") {
+      d = d0.add(i, "month");
+      if (d.date() !== d0.date()) continue;               // ese mes no tiene día 31/30/29: se salta
+    } else if (tipo === "MENSUAL_NTH") {
+      const mes = d0.add(i, "month").startOf("month");
+      if (esUltimo) {
+        d = mes.endOf("month").startOf("day");
+        while (d.day() !== d0.day()) d = d.subtract(1, "day");
+      } else {
+        d = mes;
+        while (d.day() !== d0.day()) d = d.add(1, "day");
+        d = d.add(n - 1, "week");
+        if (d.month() !== mes.month()) continue;
+      }
+    }
+    if (d) out.push(d.format("YYYY-MM-DD"));
+  }
+  return out;
+}
+
 function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClose, onCreated }) {
   const tiposConsulta = tiposCita.length > 0 ? tiposCita.map(t => t.nombre) : getTiposConsulta(tipoClinica);
   const [form, setForm] = useState({
@@ -1430,6 +1485,15 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
   const [horaFin,    setHoraFin]    = useState(slotInfo ? dayjs(slotInfo.fin).format("HH:mm") : "");
   const [saving,   setSaving]   = useState(false);
   const [err,      setErr]      = useState("");
+  const [repetir,  setRepetir]  = useState("NO");
+  const [veces,    setVeces]    = useState(4);
+  const [resultado, setResultado] = useState(null); // { creadas, fallidas: [{fecha, msg}] }
+
+  // Un solo médico en la clínica: queda seleccionado de entrada
+  const unicoMedico = medicos.length === 1 ? medicos[0] : null;
+  useEffect(() => {
+    if (unicoMedico) setForm(f => (f.medico_id ? f : { ...f, medico_id: String(unicoMedico.id) }));
+  }, [unicoMedico]);
 
   useEffect(() => {
     if (slotInfo) {
@@ -1506,19 +1570,36 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
     }
     
     setSaving(true); setErr("");
-    try {
-      const payload = {
-        ...form,
-        inicio: inicio.format("YYYY-MM-DD HH:mm:ss"),
-        fin:    fin.format("YYYY-MM-DD HH:mm:ss"),
-      };
-      await api.post("/citas", payload);
-      onCreated();
-    } catch (ex) {
-      setErr(ex.response?.data?.msg || "Error al guardar");
-    } finally {
-      setSaving(false);
+    const fechas = fechasRepeticion(fechaSel, repetir, repetir === "NO" ? 1 : veces);
+    if (fechas.length === 1) {
+      try {
+        await api.post("/citas", {
+          ...form,
+          inicio: inicio.format("YYYY-MM-DD HH:mm:ss"),
+          fin:    fin.format("YYYY-MM-DD HH:mm:ss"),
+        });
+        onCreated();
+      } catch (ex) {
+        setErr(ex.response?.data?.msg || "Error al guardar");
+      } finally {
+        setSaving(false);
+      }
+      return;
     }
+    // Serie: se crea una cita por fecha; si alguna choca con otra, se informa y se siguen creando las demás
+    let creadas = 0;
+    const fallidas = [];
+    for (const f of fechas) {
+      try {
+        await api.post("/citas", { ...form, inicio: `${f} ${horaInicio}:00`, fin: `${f} ${horaFin}:00` });
+        creadas++;
+      } catch (ex) {
+        fallidas.push({ fecha: f, msg: ex.response?.data?.msg || "Error al guardar" });
+      }
+    }
+    setSaving(false);
+    if (!fallidas.length) { onCreated(); return; }
+    setResultado({ creadas, fallidas });
   };
 
   return createPortal(
@@ -1552,6 +1633,16 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
         <form onSubmit={handleSubmit} style={{ display: "flex", flexDirection: "column", flex: 1, overflow: "hidden" }}>
           <div style={{ padding: "18px 20px", overflowY: "auto", flex: 1, fontSize: "0.85rem" }}>
             {err && <div className="alert alert-danger py-1 px-2 mb-3" style={{ fontSize: "0.8rem", borderRadius: 8 }}><i className="bi bi-exclamation-triangle me-1"></i>{err}</div>}
+            {resultado && (
+              <div className="alert alert-warning py-2 px-2 mb-3" style={{ fontSize: "0.8rem", borderRadius: 8 }}>
+                <div className="fw-semibold mb-1"><i className="bi bi-info-circle me-1" />Se crearon {resultado.creadas} de {resultado.creadas + resultado.fallidas.length} citas.</div>
+                No se pudieron agendar:
+                <ul className="mb-1 ps-3">
+                  {resultado.fallidas.map(f => <li key={f.fecha}><span style={{ textTransform: "capitalize" }}>{dayjs(f.fecha).format("ddd D MMM")}</span>: {f.msg}</li>)}
+                </ul>
+                Puedes agendarlas aparte en otro horario.
+              </div>
+            )}
 
             <div className="row g-2">
               {/* Paciente */}
@@ -1612,15 +1703,22 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
               {/* Médico + Fecha */}
               <div className="col-8">
                 <label className="form-label fw-semibold small mb-1">Médico</label>
-                <select className="form-select form-select-sm" value={form.medico_id}
-                  onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
-                  <option value="">— Selecciona —</option>
-                  {medicos.map(m => (
-                    <option key={m.id} value={m.id}>
-                      {nombreMedico(m, { conEspecialidad: true })}
-                    </option>
-                  ))}
-                </select>
+                {unicoMedico ? (
+                  <div className="form-control form-control-sm" style={{ background: "#f8fafc", display: "flex", alignItems: "center", gap: 6 }}>
+                    <i className="bi bi-person-badge" style={{ color: "#213564" }} />
+                    <span className="text-truncate">{nombreMedico(unicoMedico, { conEspecialidad: true })}</span>
+                  </div>
+                ) : (
+                  <select className="form-select form-select-sm" value={form.medico_id}
+                    onChange={e => setForm(f => ({ ...f, medico_id: e.target.value }))}>
+                    <option value="">— Selecciona —</option>
+                    {medicos.map(m => (
+                      <option key={m.id} value={m.id}>
+                        {nombreMedico(m, { conEspecialidad: true })}
+                      </option>
+                    ))}
+                  </select>
+                )}
               </div>
               <div className="col-4">
                 <label className="form-label fw-semibold small mb-1">Fecha</label>
@@ -1667,6 +1765,38 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
                 <TimePicker12h label="Hora fin" value={horaFin} onChange={setHoraFin} required />
               </div>
 
+              {/* Repetición */}
+              <div className={repetir === "NO" ? "col-12" : "col-8"}>
+                <label className="form-label fw-semibold small mb-1"><i className="bi bi-arrow-repeat me-1" />Se repite</label>
+                <select className="form-select form-select-sm" value={repetir} onChange={e => setRepetir(e.target.value)}>
+                  {opcionesRepeticion(fechaSel).map(o => <option key={o.id} value={o.id}>{o.label}</option>)}
+                </select>
+              </div>
+              {repetir !== "NO" && (
+                <div className="col-4">
+                  <label className="form-label fw-semibold small mb-1">Nº de citas</label>
+                  <select className="form-select form-select-sm" value={veces} onChange={e => setVeces(Number(e.target.value))}>
+                    {[2, 3, 4, 5, 6, 8, 10, 12, 16, 20, 24].map(n => <option key={n} value={n}>{n} citas</option>)}
+                  </select>
+                </div>
+              )}
+              {repetir !== "NO" && fechaSel && (
+                <div className="col-12">
+                  <div style={{ background: "#f8fafc", border: "1px solid #e5e7eb", borderRadius: 8, padding: "8px 10px" }}>
+                    <div style={{ fontSize: "0.74rem", color: "#64748b", marginBottom: 5 }}>
+                      Se agendarán estas fechas{horaInicio ? `, a las ${dayjs(`2000-01-01 ${horaInicio}`).format("h:mm A")}` : ""}:
+                    </div>
+                    <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                      {fechasRepeticion(fechaSel, repetir, veces).map(f => (
+                        <span key={f} style={{ fontSize: "0.72rem", fontWeight: 600, padding: "2px 8px", borderRadius: 6, background: "#e0e7ff", color: "#3730a3", textTransform: "capitalize" }}>
+                          {dayjs(f).format("ddd D MMM YYYY")}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
               {/* Tipo + Canal + Motivo */}
               <div className="col-4">
                 <label className="form-label fw-semibold small mb-1">Tipo</label>
@@ -1692,11 +1822,21 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
 
           {/* Footer */}
           <div style={{ padding: "12px 20px 16px", borderTop: "1px solid #e5e7eb", display: "flex", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
-            <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancelar</button>
-            <button type="submit" className="btn btn-sm" disabled={saving}
-              style={{ background: "linear-gradient(135deg, #213564, #1a2744)", color: "#fff", border: "none", fontWeight: 600, borderRadius: 8, padding: "6px 20px" }}>
-              <i className="bi bi-calendar-check me-1"></i>{saving ? "Guardando…" : "Crear Cita"}
-            </button>
+            {resultado ? (
+              <button type="button" className="btn btn-sm" onClick={onCreated}
+                style={{ background: "linear-gradient(135deg, #213564, #1a2744)", color: "#fff", border: "none", fontWeight: 600, borderRadius: 8, padding: "6px 20px" }}>
+                <i className="bi bi-check2 me-1"></i>Listo
+              </button>
+            ) : (
+              <>
+                <button type="button" className="btn btn-outline-secondary btn-sm" onClick={onClose}>Cancelar</button>
+                <button type="submit" className="btn btn-sm" disabled={saving}
+                  style={{ background: "linear-gradient(135deg, #213564, #1a2744)", color: "#fff", border: "none", fontWeight: 600, borderRadius: 8, padding: "6px 20px" }}>
+                  <i className="bi bi-calendar-check me-1"></i>
+                  {saving ? "Guardando…" : repetir === "NO" ? "Crear Cita" : `Crear ${fechasRepeticion(fechaSel, repetir, veces).length} citas`}
+                </button>
+              </>
+            )}
           </div>
         </form>
       </div>
