@@ -5,6 +5,7 @@ import { useConfigSistema } from "../context/ConfigSistemaContext";
 import api from "../api/api";
 import ModalAyudaSoporte from "./ModalAyudaSoporte";
 import ModalResenaEncuesta from "./ModalResenaEncuesta";
+import NovedadesBoton from "./Novedades";
 import { playNotificationSound } from "../utils/notificationSound";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -519,6 +520,11 @@ export default function NavbarApp({ onMenuClick }) {
             {cfg.subtitulo}
           </div>
         </div>
+      </div>
+
+      {/* Centro: ✨ Novedades de la plataforma */}
+      <div style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+        <NovedadesBoton />
       </div>
 
       {/* Derecha: notificaciones + usuario */}

@@ -46,6 +46,7 @@ const Plantillas    = lazy(() => import("./pages/admin/Plantillas"));
 const Clinicas                 = lazy(() => import("./pages/superadmin/Clinicas"));
 const Database                 = lazy(() => import("./pages/superadmin/Database"));
 const Reportes                 = lazy(() => import("./pages/superadmin/Reportes"));
+const NovedadesAdmin          = lazy(() => import("./pages/superadmin/NovedadesAdmin"));
 const SoporteHistorial         = lazy(() => import("./pages/superadmin/SoporteHistorial"));
 const SolicitudesPlan          = lazy(() => import("./pages/superadmin/SolicitudesPlan"));
 const ResenasMedicos           = lazy(() => import("./pages/superadmin/ResenasMedicos"));
@@ -272,6 +273,11 @@ export default function App() {
         <Route path="/superadmin/marketing-medico" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <MarketingMedicoAdmin />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/novedades" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <NovedadesAdmin />
           </RolRoute>
         } />
 

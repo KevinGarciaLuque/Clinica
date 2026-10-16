@@ -1,5 +1,6 @@
 import { NavLink, useLocation } from "react-router-dom";
 import { useState, useEffect } from "react";
+import { useNovedades, abrirPanelNovedades } from "../utils/novedades";
 import { useAuth } from "../auth/AuthContext";
 
 /* ─── Paleta ─────────────────────────────────────────────────────── */
@@ -66,6 +67,7 @@ const superItems = [
   { to: "/superadmin/personalizacion", label: "Personalización", icon: "bi-palette-fill" },
   { to: "/superadmin/landing",         label: "Página Pública",  icon: "bi-globe2" },
   { to: "/superadmin/marketing-medico", label: "Marketing Médico", icon: "bi-megaphone-fill" },
+  { to: "/superadmin/novedades",       label: "Novedades",       icon: "bi-stars" },
 ];
 
 /** Renderiza ícono: Bootstrap Icons (bi-*) o emoji/texto */
@@ -529,6 +531,7 @@ function SidebarSection({ title, items, collapsed, onNavigate, showDivider }) {
 
 /* ─── Sidebar principal ──────────────────────────────────────────── */
 export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
+  const novedades = useNovedades();
   const { user, modulos } = useAuth();
   const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
   const { super: sItems, main, gestion, admin } = getMenuSections(user?.tipo, modulos);
@@ -718,9 +721,12 @@ export default function Sidebar({ collapsed, onToggleCollapse, onNavigate }) {
             gap: 6,
           }}>
             <i className="bi bi-shield-fill-check" style={{ color: C.accent, fontSize: "0.75rem" }} />
-            <span style={{ color: C.textMuted, fontSize: "0.62rem", letterSpacing: "0.02em" }}>
-              Medic-KG v1.0 · 2026
-            </span>
+            {/* Versión actual (sube con cada novedad publicada); al tocarla abre las novedades */}
+            <button type="button" onClick={abrirPanelNovedades} title="Ver novedades"
+              style={{ background: "none", border: "none", padding: 0, cursor: "pointer", color: C.textMuted, fontSize: "0.62rem", letterSpacing: "0.02em" }}>
+              Medic-KG v{novedades?.version || "1.0"} · {new Date().getFullYear()}
+              {novedades?.no_leidas > 0 && <span style={{ marginLeft: 6, color: "#fde68a", fontWeight: 700 }}>✨ nuevo</span>}
+            </button>
           </div>
         )}
       </div>

@@ -205,6 +205,7 @@ app.use("/api/espacio",        require("./routes/espacioPublico"));
 app.use("/api/perfil-publico", require("./routes/perfilPublico"));
 app.use("/api/opiniones",      require("./routes/opiniones"));
 app.use("/api/controles",      require("./routes/controles"));
+app.use("/api/novedades",      require("./routes/novedades"));
 
 // ===== 404 =====
 app.use((req, res) => {
@@ -441,6 +442,8 @@ const pool = require("./db");
     console.log("✅ [auto-migrate] opiniones_pacientes OK");
     await require("./routes/controles").asegurarTabla();
     console.log("✅ [auto-migrate] controles_programados OK");
+    await require("./routes/novedades").asegurarTablas();
+    console.log("✅ [auto-migrate] novedades OK");
 
     // Solicitudes públicas de compra de plan (antes de que exista la clínica)
     await pool.query(`
