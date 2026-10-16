@@ -844,8 +844,9 @@ export default function RegistroPaciente() {
                       <input className="form-control" name="apellidos" value={form.apellidos} onChange={cambioForm} required placeholder="Ej. García López" />
                     </div>
                     <div className="col-sm-6">
-                      <label className="form-label fw-semibold">DNI / Documento</label>
-                      <input className="form-control" name="dni" value={form.dni} onChange={cambioForm} placeholder="Número de documento" />
+                      <label className="form-label fw-semibold">DNI / Acta de nacimiento <span className="text-danger">*</span></label>
+                      <input className="form-control" name="dni" value={form.dni} onChange={cambioForm} required maxLength={30} placeholder="Ej. 0801-1990-01234" />
+                      <div className="form-text" style={{ fontSize: "0.75rem" }}>Si es menor de edad sin DNI, escribe el número del acta de nacimiento.</div>
                     </div>
                     <div className="col-sm-6">
                       <label className="form-label fw-semibold">Fecha de nacimiento</label>
@@ -1061,7 +1062,7 @@ export default function RegistroPaciente() {
                       <i className="bi bi-person-badge-fill text-success" style={{ fontSize: "1.8rem" }} />
                     </div>
                     <h5 className="fw-bold mb-1">Verifica tu identidad</h5>
-                    <p className="text-muted" style={{ fontSize: "0.875rem" }}>Ingresa tu número de DNI para encontrar tu expediente</p>
+                    <p className="text-muted" style={{ fontSize: "0.875rem" }}>Ingresa tu número de DNI o de acta de nacimiento para encontrar tu expediente</p>
                   </div>
                   {sinEmailMsg ? (
                     <div className="alert alert-warning" style={{ fontSize: "0.9rem" }}>
@@ -1104,7 +1105,7 @@ export default function RegistroPaciente() {
                   ) : (
                   <form onSubmit={buscarPorDni}>
                     <div className="mb-4">
-                      <label className="form-label fw-semibold">Número de DNI</label>
+                      <label className="form-label fw-semibold">DNI o acta de nacimiento</label>
                       <input
                         className="form-control form-control-lg"
                         value={dniBuscar}

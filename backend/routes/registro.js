@@ -230,6 +230,9 @@ router.post("/", limiterStrict, async (req, res) => {
     if (!email?.trim())
       return res.status(400).json({ ok: false, msg: "El email es obligatorio" });
 
+    if (!dni?.trim())
+      return res.status(400).json({ ok: false, msg: "El DNI o número de acta de nacimiento es obligatorio" });
+
     if (!clinica_id)
       return res.status(400).json({ ok: false, msg: "clinica_id es obligatorio" });
 
@@ -248,6 +251,14 @@ router.post("/", limiterStrict, async (req, res) => {
     );
     if (dup)
       return res.status(409).json({ ok: false, msg: "Ya existe un paciente con ese email en esta clínica" });
+
+    // ── DNI / acta duplicado: ya tiene expediente, debe usar "Ya tengo expediente" ──
+    const [[dupDni]] = await conn.query(
+      "SELECT id FROM pacientes WHERE dni=? AND clinica_id=? LIMIT 1",
+      [dni.trim(), clinica_id]
+    );
+    if (dupDni)
+      return res.status(409).json({ ok: false, msg: "Ya existe un expediente con ese DNI o acta de nacimiento en esta clínica. Usa la opción \"Ya tengo expediente\" para agendar." });
 
     await conn.beginTransaction();
 
