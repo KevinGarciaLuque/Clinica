@@ -2,6 +2,8 @@
 
 Sistema de gestión clínica multi-clínica (medickg.com). **Está en producción con clínicas reales.**
 
+**Dominio oficial: https://medickg.com.** La dirección antigua de Vercel (`clinica-nine-xi.vercel.app` o cualquier `*.vercel.app`) **no se debe usar** en enlaces, textos, correos, QR, ejemplos ni configuración nueva.
+
 - `frontend/`: React + Vite, desplegado en Vercel.
 - `backend/`: Node/Express + MySQL (mysql2), desplegado en Railway.
 
@@ -38,6 +40,7 @@ El servidor la publica sola al arrancar y nunca la duplica. Los arreglos interno
 
 - **Fechas de citas:** `citas.inicio` es hora local de la clínica, sin zona horaria. Para comparar con "ahora", usar `dayjs().tz(clinica.timezone)` y comparar como texto.
 - **Título del médico:** se arma con `utils/tituloMedico.js` (backend) y `utils/medico.js` (frontend), según `usuarios.sexo` y `nombre_display`.
-- **Correos a pacientes:** usar `utils/mailer.js` (`enviarEmail`). Los enlaces públicos se arman con `FRONTEND_URL`.
+- **Correos a pacientes:** usar `utils/mailer.js` (`enviarEmail`).
+- **Enlaces públicos:** armarlos siempre con `urlPublica()` de `backend/utils/urlPublica.js` (nunca leer `FRONTEND_URL` directo) y en el frontend con `origenPublico()` de `frontend/src/utils/origenPublico.js` (nunca `window.location.origin`). Ambos convierten la dirección de Vercel en https://medickg.com.
 - **Avisos a la clínica:** insertar en `notificaciones_usuario`, avisar en tiempo real con `sse.notifyUser` y enviar push con `webPush.sendToUsers`.
 - **No guardar credenciales en el repositorio** (el repo es público).
