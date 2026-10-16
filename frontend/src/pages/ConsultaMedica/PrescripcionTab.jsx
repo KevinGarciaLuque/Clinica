@@ -90,6 +90,8 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   const [savingFav,      setSavingFav]      = useState(false);
   const [alertMsg,       setAlertMsg]       = useState(null);
   const [showRxSuccess,  setShowRxSuccess]  = useState(false);
+  const [rxCreadaId,     setRxCreadaId]     = useState(null);
+  const [waRxId,         setWaRxId]         = useState(null); // receta a enviar por WhatsApp
 
   useEffect(() => {
     if (!showRxSuccess) return;
@@ -201,7 +203,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
     if (!pacienteId) { setAlertMsg({ type: "danger", msg: "Falta paciente_id" }); return; }
     setSaving(true);
     try {
-      await api.post("/prescripciones", {
+      const creada = await api.post("/prescripciones", {
         historia_id: historiaId || null,
         cita_id: citaId || null,
         paciente_id: pacienteId,
@@ -215,6 +217,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
       setShowForm(false);
       setItems([newRxItem()]);
       setNotas("");
+      setRxCreadaId(creada.data?.id || null);
       setShowRxSuccess(true);
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error" });
@@ -292,6 +295,17 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
             <div style={{ fontSize: "0.88rem", color: "#6b7280", marginBottom: 24 }}>
               La receta fue guardada exitosamente.
             </div>
+            <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>
+            {rxCreadaId && (
+              <button
+                onClick={() => { setShowRxSuccess(false); setWaRxId(rxCreadaId); }}
+                style={{
+                  background: "#fff", border: "1.5px solid #25d366", borderRadius: 10, color: "#128c7e",
+                  padding: "10px 18px", fontSize: "0.9rem", fontWeight: 700, cursor: "pointer",
+                }}>
+                <i className="bi bi-whatsapp me-1"></i>Enviar por WhatsApp
+              </button>
+            )}
             <button
               onClick={() => setShowRxSuccess(false)}
               style={{
@@ -302,10 +316,13 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
               }}>
               Aceptar
             </button>
+            </div>
           </div>
         </div>,
         document.body
       )}
+
+      {waRxId && createPortal(<ModalWhatsappReceta rxId={waRxId} onClose={() => setWaRxId(null)} />, document.body)}
 
       {alertMsg && (
         <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
@@ -499,7 +516,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
       )}
 
       {list.map(p => (
-        <div key={p.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
+        <div key={p.id} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "10px 16px", marginBottom: 10, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
             <div style={{ width: 36, height: 36, borderRadius: 9, background: "linear-gradient(135deg,#3b82f6,#2563eb)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>
               <i className="bi bi-capsule-pill" style={{ color: "#fff", fontSize: "0.85rem" }}></i>
@@ -510,7 +527,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
               <div style={{ fontSize: "0.75rem", color: "#9ca3af", marginTop: 1 }}>{dayjs(p.creado_en).format("DD/MM/YYYY HH:mm")}</div>
             </div>
           </div>
-          <div className="d-flex gap-1">
+          <div className="d-flex gap-1 flex-wrap ms-auto">
             {p.estado === "ACTIVA" && !firmada && (
               <button className="btn btn-outline-success btn-sm"
                 style={{ fontSize: "0.75rem", borderRadius: 7 }}
@@ -534,6 +551,15 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
                 </span>
               )
             )}
+            <button
+              onClick={() => setWaRxId(p.id)}
+              title="Enviar la receta al paciente por WhatsApp"
+              style={{
+                background: "transparent", border: "1px solid #25d366", borderRadius: 7, color: "#128c7e",
+                padding: "4px 10px", fontSize: "0.75rem", cursor: "pointer", fontWeight: 600,
+              }}>
+              <i className="bi bi-whatsapp me-1"></i>WhatsApp
+            </button>
             <div style={{ position: "relative", display: "flex" }}>
               <button
                 onClick={() => printRx(p.id)}
@@ -843,6 +869,84 @@ function SubFavoritas({ firmada, onUsar }) {
           </div>
         </div>
       ))}
+    </div>
+  );
+}
+
+// ── Modal: enviar la receta al paciente por WhatsApp ─────────────────────────
+// Prepara el mensaje (medicamentos + enlace a la receta digital) y abre WhatsApp
+// con el número del paciente. El médico puede corregir el número o el texto antes.
+function ModalWhatsappReceta({ rxId, onClose }) {
+  const [cargando, setCargando] = useState(true);
+  const [error, setError] = useState("");
+  const [telefono, setTelefono] = useState("");
+  const [mensaje, setMensaje] = useState("");
+  const [copiado, setCopiado] = useState(false);
+
+  useEffect(() => {
+    let vivo = true;
+    api.get(`/prescripciones/${rxId}/whatsapp`)
+      .then(r => { if (vivo) { setTelefono(r.data.data.telefono || ""); setMensaje(r.data.data.mensaje || ""); } })
+      .catch(e => { if (vivo) setError(e.response?.data?.msg || "No se pudo preparar el mensaje"); })
+      .finally(() => { if (vivo) setCargando(false); });
+    return () => { vivo = false; };
+  }, [rxId]);
+
+  const tel = telefono.replace(/\D/g, "");
+  const abrir = () => {
+    window.open(`https://wa.me/${tel}?text=${encodeURIComponent(mensaje)}`, "_blank", "noopener");
+    onClose();
+  };
+  const copiar = async () => {
+    try { await navigator.clipboard.writeText(mensaje); setCopiado(true); setTimeout(() => setCopiado(false), 2000); } catch { /* sin portapapeles */ }
+  };
+
+  return (
+    <div onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,.45)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
+      <div style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "calc(100dvh - 24px)", display: "flex", flexDirection: "column", boxShadow: "0 20px 60px rgba(0,0,0,.25)", overflow: "hidden" }}>
+        <div style={{ background: "linear-gradient(135deg,#25d366,#128c7e)", color: "#fff", padding: "14px 18px", display: "flex", alignItems: "center", gap: 10 }}>
+          <i className="bi bi-whatsapp" style={{ fontSize: 22 }}></i>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 800 }}>Enviar receta por WhatsApp</div>
+            <div style={{ fontSize: "0.76rem", opacity: .9 }}>Revisa el mensaje y se abrirá WhatsApp para enviarlo</div>
+          </div>
+          <button onClick={onClose} aria-label="Cerrar" style={{ background: "none", border: "none", color: "#fff", fontSize: 20 }}><i className="bi bi-x-lg"></i></button>
+        </div>
+
+        <div style={{ padding: 16, overflowY: "auto" }}>
+          {cargando && <div className="text-center py-4 text-muted"><span className="spinner-border spinner-border-sm me-2"></span>Preparando mensaje…</div>}
+          {error && <div className="alert alert-danger py-2">{error}</div>}
+          {!cargando && !error && (
+            <>
+              <label className="form-label small fw-semibold mb-1">Teléfono del paciente (con código de país)</label>
+              <div className="input-group input-group-sm mb-1">
+                <span className="input-group-text">+</span>
+                <input className="form-control" inputMode="tel" value={telefono} onChange={e => setTelefono(e.target.value)} placeholder="50499999999" />
+              </div>
+              <div className="small mb-3" style={{ color: tel ? "#64748b" : "#b45309" }}>
+                {tel
+                  ? "Puedes corregirlo si el paciente usa otro número para WhatsApp."
+                  : <><i className="bi bi-exclamation-triangle me-1"></i>El paciente no tiene teléfono registrado: WhatsApp te dejará elegir el contacto.</>}
+              </div>
+
+              <label className="form-label small fw-semibold mb-1">Mensaje</label>
+              <textarea className="form-control form-control-sm" rows={10} value={mensaje} onChange={e => setMensaje(e.target.value)} style={{ fontSize: "0.82rem" }} />
+            </>
+          )}
+        </div>
+
+        {!cargando && !error && (
+          <div style={{ padding: "12px 16px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+            <button className="btn btn-sm btn-light" onClick={copiar}>
+              <i className={`bi ${copiado ? "bi-check2" : "bi-clipboard"} me-1`}></i>{copiado ? "Copiado" : "Copiar mensaje"}
+            </button>
+            <button className="btn btn-sm text-white fw-semibold" style={{ background: "#25d366" }} onClick={abrir} disabled={!mensaje.trim()}>
+              <i className="bi bi-whatsapp me-1"></i>Abrir WhatsApp
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

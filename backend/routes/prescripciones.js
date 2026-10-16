@@ -392,6 +392,103 @@ router.delete("/:id", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => 
   }
 });
 
+// ─────────────────────────────────────────────────────────────────────────────
+// GET /api/prescripciones/:id/whatsapp — mensaje listo para enviar la receta
+// al paciente por WhatsApp (el médico lo revisa y lo envía desde su WhatsApp).
+// Devuelve el teléfono con código de país y el texto con los medicamentos y el
+// enlace a la receta digital (/rx/:codigo, la misma del QR del PDF). Solo lectura.
+// ─────────────────────────────────────────────────────────────────────────────
+const CODIGO_PAIS = {
+  HN: "504", GT: "502", SV: "503", NI: "505", CR: "506", PA: "507", MX: "52", US: "1", DO: "1",
+  CO: "57", PE: "51", EC: "593", BO: "591", CL: "56", AR: "54", VE: "58", ES: "34", PY: "595", UY: "598",
+};
+
+// Número en formato internacional (solo dígitos) para wa.me
+function telefonoWhatsapp(tel, pais) {
+  let d = String(tel || "").replace(/\D/g, "");
+  if (!d) return "";
+  if (d.startsWith("00")) d = d.slice(2);
+  const cod = CODIGO_PAIS[String(pais || "HN").toUpperCase()] || "504";
+  if (String(tel).trim().startsWith("+")) return d;          // ya trae código de país
+  if (d.startsWith(cod) && d.length > cod.length + 6) return d;
+  return cod + d;
+}
+
+router.get("/:id/whatsapp", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    await ensureNombreDisplayColumn();
+    const [[pr]] = await pool.query(
+      `SELECT pr.id, pr.codigo_qr, pr.notas, pr.creado_en,
+              p.nombres AS pac_nombres, p.telefono AS pac_telefono,
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display,
+              u.sexo AS med_sexo, u.tipo AS med_tipo,
+              c.nombre AS clinica_nombre, c.pais AS clinica_pais
+       FROM prescripciones pr
+       JOIN pacientes p ON p.id = pr.paciente_id
+       JOIN usuarios  u ON u.id = pr.medico_id
+       JOIN clinicas  c ON c.id = pr.clinica_id
+       WHERE pr.id = ? AND pr.clinica_id = ?`,
+      [req.params.id, cid]
+    );
+    if (!pr) return res.status(404).json({ ok: false, msg: "Receta no encontrada" });
+
+    const [items] = await pool.query(
+      `SELECT COALESCE(m.nombre_generico, pi.medicamento_texto) AS nombre, m.presentacion,
+              pi.medicamento_id, pi.medicamento_texto, pi.dosis, pi.duracion, pi.cantidad, pi.instrucciones
+       FROM prescripcion_items pi
+       LEFT JOIN medicamentos m ON m.id = pi.medicamento_id
+       WHERE pi.prescripcion_id = ? ORDER BY pi.id`,
+      [pr.id]
+    );
+
+    // clinicas.titulo_medico se crea bajo demanda: si aún no existe, se usa el título
+    try {
+      const [[c]] = await pool.query("SELECT titulo_medico FROM clinicas WHERE id = ?", [cid]);
+      pr.titulo_medico = c?.titulo_medico;
+    } catch { pr.titulo_medico = 1; }
+    const { tituloMedico } = require("../utils/tituloMedico");
+    const medico = String(pr.med_nombre_display || "").trim() ||
+      `${Number(pr.titulo_medico) === 0 ? "" : tituloMedico(pr.med_sexo, { tipo: pr.med_tipo, desconocido: "Dr. " })}${pr.med_nombres} ${pr.med_apellidos}`.replace(/\s+/g, " ").trim();
+    const fecha = new Date(pr.creado_en);
+    const fechaTxt = `${String(fecha.getDate()).padStart(2, "0")}/${String(fecha.getMonth() + 1).padStart(2, "0")}/${fecha.getFullYear()}`;
+    const nombrePac = String(pr.pac_nombres || "").trim().split(/\s+/)[0] || "";
+
+    const lineas = [];
+    lineas.push(`Hola${nombrePac ? ` ${nombrePac}` : ""} 👋, le saluda ${pr.clinica_nombre}.`);
+    lineas.push(`Esta es su receta del ${fechaTxt}, indicada por ${medico}:`);
+    lineas.push("");
+    items.forEach((it, i) => {
+      const nombre = it.medicamento_id && it.nombre
+        ? `${it.nombre}${it.presentacion ? ` (${it.presentacion})` : ""}`
+        : (it.medicamento_texto || it.nombre || "");
+      const detalle = [it.dosis, it.duracion, it.cantidad ? `cantidad: ${it.cantidad}` : null].filter(Boolean).join(" · ");
+      lineas.push(`${i + 1}. *${nombre}*${detalle ? ` — ${detalle}` : ""}`);
+      if (it.instrucciones) lineas.push(`   ${it.instrucciones}`);
+    });
+    if (pr.notas) { lineas.push(""); lineas.push(`📝 ${pr.notas}`); }
+    if (pr.codigo_qr) {
+      const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+      lineas.push("");
+      lineas.push(`📄 Su receta digital (puede mostrarla en la farmacia): ${frontendUrl}/rx/${pr.codigo_qr}`);
+    }
+    lineas.push("");
+    lineas.push("¡Que se mejore pronto! 🙏");
+
+    res.json({
+      ok: true,
+      data: {
+        telefono: telefonoWhatsapp(pr.pac_telefono, pr.clinica_pais),
+        telefono_original: pr.pac_telefono || "",
+        mensaje: lineas.join("\n"),
+      },
+    });
+  } catch (e) {
+    console.error("[prescripciones/whatsapp]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo preparar el mensaje" });
+  }
+});
+
 /**
  * GET /api/prescripciones/:id/pdf
  * Genera y devuelve la receta en PDF con código QR usando la plantilla predeterminada.

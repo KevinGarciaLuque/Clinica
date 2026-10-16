@@ -69,4 +69,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "receta-whatsapp",
+    version: "1.16",
+    titulo: "Enviar la receta por WhatsApp",
+    descripcion: "En la consulta, pestaña Prescripción, el botón verde “WhatsApp” prepara un mensaje con los medicamentos y el enlace a la receta digital (la misma del código QR) y abre WhatsApp con el número del paciente. Puedes revisar el número y el texto antes de enviarlo.",
+    icono: "bi-whatsapp",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];
