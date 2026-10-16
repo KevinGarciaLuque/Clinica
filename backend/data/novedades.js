@@ -114,4 +114,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "presion-clasificacion-hn",
+    version: "1.21",
+    titulo: "Presión arterial: clasificación ajustada",
+    descripcion: "En la Evolución del paciente la presión ahora se clasifica como Óptima, Normal, Normal alta o Hipertensión grado 1, 2 y 3, con hipertensión desde 140/90 (criterio de la OMS que se usa en Honduras). Por ejemplo, 120/80 aparece como Normal.",
+    icono: "bi-heart-pulse",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

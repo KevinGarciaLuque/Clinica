@@ -155,10 +155,10 @@ export default function EvolucionImprimible({ d, desde, periodoTxt, usuario, onL
 
       {/* Gráficas de signos */}
       {hay("sis") && (
-        <Grafica titulo="Presión arterial (mmHg) — rojo: sistólica · azul: diastólica · meta < 130/80" data={puntos} ancho={700} alto={170}>
+        <Grafica titulo="Presión arterial (mmHg) — rojo: sistólica · azul: diastólica · líneas: hipertensión ≥ 140/90" data={puntos} ancho={700} alto={170}>
           <YAxis {...ejeY} domain={[(min) => Math.min(50, Math.floor(min / 10) * 10), (max) => Math.max(160, Math.ceil(max / 10) * 10)]} />
-          <ReferenceLine y={130} stroke="#f87171" strokeDasharray="4 4" />
-          <ReferenceLine y={80} stroke="#fb923c" strokeDasharray="4 4" />
+          <ReferenceLine y={140} stroke="#f87171" strokeDasharray="4 4" />
+          <ReferenceLine y={90} stroke="#fb923c" strokeDasharray="4 4" />
           {marcas()}
           <Line dataKey="sis" stroke="#dc2626" strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />
           <Line dataKey="dia" stroke="#2563eb" strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />

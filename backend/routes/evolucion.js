@@ -139,14 +139,18 @@ function calcularAvisos({ consultas, labs, asistencia12, diagnosticos }) {
   const avisos = [];
   const conPa = consultas.filter((c) => c.vitales.sis != null && c.vitales.dia != null);
   const ult3 = conPa.slice(-3);
-  if (ult3.length === 3 && ult3.every((c) => c.vitales.sis >= 140 || c.vitales.dia >= 90)) {
-    avisos.push({ nivel: "alto", icono: "bi-heart-pulse-fill", texto: "Presión arterial alta (≥ 140/90) en las últimas 3 consultas." });
-  } else if (ult3.length === 3 && ult3.every((c) => c.vitales.sis >= 130 || c.vitales.dia >= 80)) {
-    avisos.push({ nivel: "medio", icono: "bi-heart-pulse", texto: "Presión por encima de la meta (130/80) en las últimas 3 consultas." });
+  // Clasificación europea (ESC/ESH): hipertensión desde 140/90 (criterio OMS que
+  // usa la Secretaría de Salud de Honduras); "normal alta" 130–139 / 85–89.
+  const hta = (c) => c.vitales.sis >= 140 || c.vitales.dia >= 90;
+  const normalAlta = (c) => c.vitales.sis >= 130 || c.vitales.dia >= 85;
+  if (ult3.length === 3 && ult3.every(hta)) {
+    avisos.push({ nivel: "alto", icono: "bi-heart-pulse-fill", texto: "Presión en rango de hipertensión (≥ 140/90) en las últimas 3 consultas." });
+  } else if (ult3.length === 3 && ult3.every(normalAlta)) {
+    avisos.push({ nivel: "medio", icono: "bi-heart-pulse", texto: "Presión normal alta (130–139 / 85–89) o mayor en las últimas 3 consultas." });
   } else if (conPa.length >= 2) {
     const [a, b] = conPa.slice(-2);
-    if ((a.vitales.sis >= 130 || a.vitales.dia >= 80) && b.vitales.sis < 130 && b.vitales.dia < 80) {
-      avisos.push({ nivel: "bueno", icono: "bi-heart-pulse", texto: `Presión dentro de la meta en la última consulta (${b.vitales.sis}/${b.vitales.dia}).` });
+    if (hta(a) && !hta(b)) {
+      avisos.push({ nivel: "bueno", icono: "bi-heart-pulse", texto: `Presión por debajo de 140/90 en la última consulta (${b.vitales.sis}/${b.vitales.dia}).` });
     }
   }
 

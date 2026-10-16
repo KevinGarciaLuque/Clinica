@@ -11,7 +11,7 @@ import api from "../api/api";
 import { useAuth } from "../auth/AuthContext";
 import EvolucionImprimible from "./EvolucionImprimible";
 import {
-  estadoPresion, estadoImc, estadoFc, estadoSpo2, estadoTemp, OTROS, fechaCorta, haceCuanto,
+  estadoPresion, presionEnRango, estadoImc, estadoFc, estadoSpo2, estadoTemp, OTROS, fechaCorta, haceCuanto,
   ultimos, NIVEL, textoCambio, conFechas,
 } from "../utils/evolucion";
 
@@ -239,7 +239,7 @@ export default function EvolucionPaciente({ pacienteId }) {
         <div className="evo-tarjetas">
           {pa.ultimo && (
             <Tarjeta icono="bi-heart-pulse-fill" color="#ef4444" titulo="Presión" valor={`${pa.ultimo.vitales.sis}/${pa.ultimo.vitales.dia}`} unidad="mmHg" estado={estPa} fecha={pa.ultimo.fecha}>
-              <Tendencia actual={pa.ultimo.vitales.sis} anterior={pa.anterior?.vitales.sis} unidad="" decimales={0} fueraDeRango={estPa?.txt !== "Normal"} />
+              <Tendencia actual={pa.ultimo.vitales.sis} anterior={pa.anterior?.vitales.sis} unidad="" decimales={0} fueraDeRango={!!estPa && !presionEnRango(estPa)} />
             </Tarjeta>
           )}
           {peso.ultimo && (
@@ -279,7 +279,7 @@ export default function EvolucionPaciente({ pacienteId }) {
         <div className="evo-graficas">
           {hay("sis") && (
             <Panel titulo="Presión arterial" icono="bi-heart-pulse" color="#ef4444"
-              extra={<span style={{ fontSize: "0.72rem", color: "#64748b" }}>meta &lt; 130/80</span>}>
+              extra={<span style={{ fontSize: "0.72rem", color: "#64748b" }}>hipertensión ≥ 140/90</span>}>
               <ResponsiveContainer width="100%" height={220}>
                 <LineChart data={puntos} margin={{ top: 6, right: 8, left: -8, bottom: 0 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
@@ -287,9 +287,9 @@ export default function EvolucionPaciente({ pacienteId }) {
                   <YAxis {...ejeY} domain={[(min) => Math.min(50, Math.floor(min / 10) * 10), (max) => Math.max(160, Math.ceil(max / 10) * 10)]} />
                   <Tooltip {...tooltip} />
                   <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
-                  <ReferenceLine y={130} stroke="#f87171" strokeDasharray="4 4" />
+                  <ReferenceLine y={140} stroke="#f87171" strokeDasharray="4 4" />
                   {marcas}
-                  <ReferenceLine y={80} stroke="#fb923c" strokeDasharray="4 4" />
+                  <ReferenceLine y={90} stroke="#fb923c" strokeDasharray="4 4" />
                   <Line type="monotone" dataKey="sis" name="Sistólica" stroke="#dc2626" strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
                   <Line type="monotone" dataKey="dia" name="Diastólica" stroke="#2563eb" strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
                 </LineChart>

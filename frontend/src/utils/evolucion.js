@@ -9,14 +9,19 @@ export const ROJO = { bg: "#fee2e2", fg: "#b91c1c" };
 export const GRIS = { bg: "#f1f5f9", fg: "#475569" };
 
 // Clasificación de cada signo (para el color de la tarjeta)
+// Presión arterial: clasificación europea (ESC/ESH), con hipertensión desde 140/90
+// como usa la Secretaría de Salud de Honduras (criterio OMS). 120/80 es "Normal".
 export const estadoPresion = (s, d) => {
   if (s == null || d == null) return null;
-  if (s >= 140 || d >= 90) return { ...ROJO, txt: "Alta" };
-  if (s >= 130 || d >= 80) return { ...NARANJA, txt: "Alta etapa 1" };
-  if (s >= 120) return { ...AMBAR, txt: "Elevada" };
+  if (s >= 180 || d >= 110) return { ...ROJO, txt: "HTA grado 3" };
+  if (s >= 160 || d >= 100) return { ...ROJO, txt: "HTA grado 2" };
+  if (s >= 140 || d >= 90) return { ...NARANJA, txt: "HTA grado 1" };
+  if (s >= 130 || d >= 85) return { ...AMBAR, txt: "Normal alta" };
   if (s < 90 || d < 60) return { ...AMBAR, txt: "Baja" };
-  return { ...VERDE, txt: "Normal" };
+  if (s >= 120 || d >= 80) return { ...VERDE, txt: "Normal" };
+  return { ...VERDE, txt: "Óptima" };
 };
+export const presionEnRango = (e) => !!e && e.fg === VERDE.fg;
 export const estadoImc = (v) => v == null ? null
   : v < 18.5 ? { ...AMBAR, txt: "Bajo peso" } : v < 25 ? { ...VERDE, txt: "Normal" }
   : v < 30 ? { ...AMBAR, txt: "Sobrepeso" } : { ...ROJO, txt: "Obesidad" };
