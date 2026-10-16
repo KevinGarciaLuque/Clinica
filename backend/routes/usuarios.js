@@ -25,6 +25,11 @@ async function ensureNombreDisplayColumn() {
     if (!cols.length) {
       await pool.query("ALTER TABLE usuarios ADD COLUMN nombre_display VARCHAR(150) NULL AFTER apellidos");
     }
+    // Sexo del médico ('F' → "Dra.", 'M' → "Dr."); columna nueva y opcional
+    const [colSexo] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'sexo'");
+    if (!colSexo.length) {
+      await pool.query("ALTER TABLE usuarios ADD COLUMN sexo ENUM('F','M') NULL");
+    }
     nombreDisplayColReady = true;
   } catch (e) {
     console.error("ensureNombreDisplayColumn:", e.message);
@@ -106,7 +111,7 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","RECEPCIONISTA"), async (req, res) =>
     const { tipo } = req.query;
     await ensureNombreDisplayColumn();
     await ensureFuncionColumn();
-    let sql = `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo, u.activo, u.funcion_clinica,
+    let sql = `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.sexo, u.email, u.tipo, u.activo, u.funcion_clinica,
                       u.telefono, u.numero_colegiatura, u.firma_url,
                       e.nombre AS especialidad, e.id AS especialidad_id,
                       u.creado_en
@@ -147,7 +152,7 @@ router.get("/medicos", auth(), async (req, res) => {
     if (!clinicaId && req.user.super) {
       // SUPER_ADMIN sin clínica específica → traer todos los médicos de todas las clínicas
       [rows] = await pool.query(
-        `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.clinica_id,
+        `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.sexo, u.clinica_id,
                 c.nombre AS clinica_nombre,
                 e.nombre AS especialidad
          FROM usuarios u
@@ -159,7 +164,7 @@ router.get("/medicos", auth(), async (req, res) => {
     } else {
       if (!clinicaId) return res.json({ ok: true, data: [] });
       [rows] = await pool.query(
-        `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.clinica_id,
+        `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.sexo, u.clinica_id,
                 e.nombre AS especialidad
          FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
          WHERE u.clinica_id=? AND u.tipo='MEDICO' AND u.activo=1
@@ -179,7 +184,7 @@ router.get("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
     await ensureNombreDisplayColumn();
     await ensureFuncionColumn();
     const clinicaId = req.user.super ? null : req.user.clinica_id;
-    let sql = `SELECT u.id, u.clinica_id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo,
+    let sql = `SELECT u.id, u.clinica_id, u.nombres, u.apellidos, u.nombre_display, u.sexo, u.email, u.tipo,
                       u.activo, u.funcion_clinica, u.telefono, u.numero_colegiatura, u.firma_url,
                       e.nombre AS especialidad, e.id AS especialidad_id
                FROM usuarios u LEFT JOIN especialidades e ON e.id = u.especialidad_id
@@ -206,7 +211,7 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     await ensureNombreDisplayColumn();
     const { nombres, apellidos, nombre_display, email, password, tipo,
-            especialidad_id, telefono, numero_colegiatura, funcion_clinica } = req.body;
+            especialidad_id, telefono, numero_colegiatura, funcion_clinica, sexo } = req.body;
 
     if (!nombres || !apellidos || !email || !password || !tipo) {
       return res.status(400).json({ ok: false, msg: "nombres, apellidos, email, password y tipo son obligatorios" });
@@ -246,6 +251,10 @@ router.post("/", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
       await sincronizarModulosFuncion(r.insertId, funcion_clinica);
     }
 
+    if (["F", "M"].includes(sexo)) {
+      await pool.query("UPDATE usuarios SET sexo=? WHERE id=?", [sexo, r.insertId]);
+    }
+
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -273,7 +282,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
 
     await ensureNombreDisplayColumn();
     const { nombres, apellidos, nombre_display, email, password, tipo,
-            especialidad_id, telefono, numero_colegiatura, firma_url, activo, funcion_clinica } = req.body;
+            especialidad_id, telefono, numero_colegiatura, firma_url, activo, funcion_clinica, sexo } = req.body;
 
     let passwordHash = undefined;
     if (password) {
@@ -286,6 +295,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN"), async (req, res) => {
     if (nombres      !== undefined) { fields.push("nombres=?");            values.push(nombres || null); }
     if (apellidos    !== undefined) { fields.push("apellidos=?");          values.push(apellidos || null); }
     if (nombre_display !== undefined) { fields.push("nombre_display=?");   values.push((nombre_display && nombre_display.trim()) || null); }
+    if (sexo         !== undefined) { fields.push("sexo=?");               values.push(["F", "M"].includes(sexo) ? sexo : null); }
     if (email        !== undefined) { fields.push("email=?");              values.push(email || null); }
     if (passwordHash !== undefined) { fields.push("password_hash=?");      values.push(passwordHash); }
     if (tipo         !== undefined) { fields.push("tipo=?");               values.push(tipo || null); }

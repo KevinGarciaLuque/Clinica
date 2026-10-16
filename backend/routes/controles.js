@@ -81,7 +81,7 @@ async function enviarAvisosControl() {
 
     const [pendientes] = await pool.query(
       `SELECT cp.id, cp.medico_id, cp.motivo, DATE_FORMAT(cp.fecha_objetivo,'%Y-%m-%d') AS fecha,
-              p.nombres, p.email, u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.tipo AS med_tipo, u.clinica_id,
+              p.nombres, p.email, u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.tipo AS med_tipo, u.sexo AS med_sexo, u.clinica_id,
               cl.nombre AS clinica, cl.slug AS clinica_slug
        FROM controles_programados cp
        JOIN pacientes p ON p.id = cp.paciente_id
@@ -110,7 +110,7 @@ async function enviarAvisosControl() {
         "UPDATE controles_programados SET estado='AVISADO', avisado_en=NOW() WHERE id=? AND estado='PENDIENTE'", [c.id]);
       if (!r.affectedRows) continue;
       try {
-        const medico = `${c.med_tipo === "PSICOLOGO" ? "" : "Dr(a). "}${c.med_nombres} ${c.med_apellidos}`;
+        const medico = `${require("../utils/tituloMedico").tituloMedico(c.med_sexo, { tipo: c.med_tipo })}${c.med_nombres} ${c.med_apellidos}`;
         await enviarEmail({
           to: c.email,
           subject: `Es momento de tu control con ${medico}`,

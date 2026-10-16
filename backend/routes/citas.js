@@ -191,7 +191,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
                       p.departamento AS paciente_departamento,
                       p.foto_perfil AS paciente_foto_perfil,
                       u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
-                      u.nombre_display AS medico_nombre_display,
+                      u.nombre_display AS medico_nombre_display, u.sexo AS medico_sexo,
                       e.nombre AS especialidad
                FROM citas c
                JOIN pacientes p ON p.id = c.paciente_id

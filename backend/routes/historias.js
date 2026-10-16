@@ -70,7 +70,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
              h.subjetivo, h.objetivo, h.diagnostico_cie, h.plan, h.examen_fisico,
              h.diagnosticos_secundarios${selectExtras ? `, ${selectExtras}` : ""},
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
-             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, e.nombre AS especialidad
+             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, u.sexo AS med_sexo, e.nombre AS especialidad
       FROM historias_clinicas h
       JOIN pacientes p ON p.id = h.paciente_id
       JOIN usuarios  u ON u.id = h.medico_id
@@ -111,7 +111,7 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
       `SELECT h.*${selectExtras ? `, ${selectExtras}` : ""}, h.datos_derma,
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.sexo, p.telefono AS pac_tel, p.email AS pac_email,
-              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, e.nombre AS especialidad
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, u.sexo AS med_sexo, e.nombre AS especialidad
        FROM historias_clinicas h
        JOIN pacientes p ON p.id = h.paciente_id
        JOIN usuarios  u ON u.id = h.medico_id
@@ -479,7 +479,7 @@ router.get("/paciente/:paciente_id/resumen", auth("ADMIN","MEDICO","PSICOLOGO","
       SELECT h.id, h.creado_en, h.diagnostico_cie,
              ${hasDxDesc ? "h.diagnostico_desc," : "NULL AS diagnostico_desc,"}
              h.plan, h.subjetivo,
-             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display,
+             u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.nombre_display AS med_nombre_display, u.sexo AS med_sexo,
              e.nombre AS especialidad,
              c.descripcion AS cie_desc
       FROM historias_clinicas h

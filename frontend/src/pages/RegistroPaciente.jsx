@@ -383,7 +383,7 @@ function CitaConfirmada({ citaConf, email, subsecuente, pacienteId, clinicaId, s
                         {ex.descripcion || "Sin descripción"}
                       </p>
                       <p style={{ fontSize: "0.75rem", color: "#6b7280", marginTop: 4, marginBottom: 0 }}>
-                        Solicitado por: {tituloMedico ? "Dr(a). " : ""}{ex.medico_apellidos}, {ex.medico_nombres}
+                        Solicitado por: {tituloMedico ? (ex.medico_sexo === "F" ? "Dra. " : ex.medico_sexo === "M" ? "Dr. " : "Dr(a). ") : ""}{ex.medico_apellidos}, {ex.medico_nombres}
                       </p>
                     </div>
                   ))}
@@ -736,7 +736,7 @@ export default function RegistroPaciente() {
                         ? `${clinicaInfo.medico.nombres} ${clinicaInfo.medico.apellidos}`
                         : clinicaInfo.medico.especialidad
                           ? `${clinicaInfo.medico.apellidos.split(' ')[0]}, ${clinicaInfo.medico.especialidad}`
-                          : `Dr(a). ${clinicaInfo.medico.nombres} ${clinicaInfo.medico.apellidos}`}
+                          : `${clinicaInfo.medico.sexo === "F" ? "Dra." : clinicaInfo.medico.sexo === "M" ? "Dr." : "Dr(a)."} ${clinicaInfo.medico.nombres} ${clinicaInfo.medico.apellidos}`}
                     </p>
                   )}
                   <p className="text-muted" style={{ fontSize: "0.9rem" }}>¿Cómo podemos ayudarte hoy?</p>

@@ -282,6 +282,7 @@ async function construirSesion(user) {
       nombres: user.nombres,
       apellidos: user.apellidos,
       nombre_display: extra.nombre_display || null,
+      sexo: await sexoDe(user.id),
       email: user.email,
       tipo: user.tipo,
       super: esSuper,
@@ -365,6 +366,14 @@ router.post("/google-login", async (req, res) => {
 });
 
 // ── GET /api/auth/me  → datos completos del usuario autenticado ──────────────
+// Sexo del usuario ('F' | 'M' | null). Tolerante: si la columna aún no existe, null.
+async function sexoDe(id) {
+  try {
+    const [[r]] = await pool.query("SELECT sexo FROM usuarios WHERE id=? LIMIT 1", [id]);
+    return r?.sexo || null;
+  } catch { return null; }
+}
+
 router.get("/me", auth(), async (req, res) => {
   try {
     let rows;
@@ -387,7 +396,7 @@ router.get("/me", auth(), async (req, res) => {
       );
     }
     if (!rows.length) return res.status(404).json({ ok: false, msg: "Usuario no encontrado" });
-    res.json({ ok: true, data: rows[0] });
+    res.json({ ok: true, data: { ...rows[0], sexo: await sexoDe(req.user.uid) } });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -396,7 +405,7 @@ router.get("/me", auth(), async (req, res) => {
 // ── PUT /api/auth/me  → actualizar propio perfil ──────────────────────────────
 router.put("/me", auth(), async (req, res) => {
   try {
-    const { nombres, apellidos, nombre_display, telefono, foto_url, firma_url, numero_colegiatura, password_actual, password_nuevo } = req.body;
+    const { nombres, apellidos, nombre_display, telefono, foto_url, firma_url, numero_colegiatura, password_actual, password_nuevo, sexo } = req.body;
 
     // Si quiere cambiar contraseña, verificar la actual
     let passwordHash;
@@ -439,6 +448,12 @@ router.put("/me", auth(), async (req, res) => {
       }
     }
 
+    // Sexo (define "Dr." / "Dra."): columna nueva, se guarda aparte para no afectar el resto
+    if (sexo !== undefined) {
+      await pool.query("UPDATE usuarios SET sexo=? WHERE id=?", [["F", "M"].includes(sexo) ? sexo : null, req.user.uid])
+        .catch((e) => console.error("[auth/me] sexo:", e.message));
+    }
+
     // Devolver usuario actualizado
     let rows;
     try {
@@ -457,7 +472,7 @@ router.put("/me", auth(), async (req, res) => {
         [req.user.uid]
       );
     }
-    res.json({ ok: true, data: rows[0] });
+    res.json({ ok: true, data: { ...rows[0], sexo: await sexoDe(req.user.uid) } });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

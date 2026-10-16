@@ -53,7 +53,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
              pr.enviado_recepcion_en, pr.recibido_recepcion_en,
              p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
              u.nombres AS med_nombres, u.apellidos AS med_apellidos,
-             u.nombre_display AS med_nombre_display,
+             u.nombre_display AS med_nombre_display, u.sexo AS med_sexo,
              (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
       FROM prescripciones pr
       JOIN pacientes p ON p.id = pr.paciente_id
@@ -128,7 +128,7 @@ router.get("/historial-paciente/:pacienteId", auth("ADMIN","MEDICO","PSICOLOGO",
     const [recetas] = await pool.query(
       `SELECT pr.id, pr.estado, pr.notas, pr.creado_en,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos,
-              u.nombre_display AS med_nombre_display,
+              u.nombre_display AS med_nombre_display, u.sexo AS med_sexo,
               hc.diagnostico_cie, hc.subjetivo,
               (SELECT COUNT(*) FROM prescripcion_items pi WHERE pi.prescripcion_id = pr.id) AS total_items
        FROM prescripciones pr
@@ -230,7 +230,7 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
               p.nombres AS pac_nombres, p.apellidos AS pac_apellidos,
               p.fecha_nacimiento, p.dni,
               u.nombres AS med_nombres, u.apellidos AS med_apellidos,
-              u.nombre_display AS med_nombre_display, e.nombre AS especialidad
+              u.nombre_display AS med_nombre_display, u.sexo AS med_sexo, e.nombre AS especialidad
        FROM prescripciones pr
        JOIN pacientes p ON p.id = pr.paciente_id
        JOIN usuarios  u ON u.id = pr.medico_id
@@ -412,7 +412,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
               p.nombres   AS pac_nombres,   p.apellidos   AS pac_apellidos,
               p.fecha_nacimiento,           p.dni,
               u.nombres   AS med_nombres,   u.apellidos   AS med_apellidos,
-              u.nombre_display AS med_nombre_display,
+              u.nombre_display AS med_nombre_display, u.sexo AS med_sexo,
               u.numero_colegiatura, ${firmaSelect}
               e.nombre    AS especialidad,
               c.nombre    AS clinica_nombre, c.direccion   AS clinica_direccion,
@@ -592,7 +592,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
       const raw = String(name || "").replace(/\s+/g, " ").trim();
       if (!raw) return "";
       const hasPrefix = /^(dr|dra|doctor|doctora)\.?/i.test(raw);
-      return hasPrefix ? raw : `Dr(a). ${raw}`;
+      return hasPrefix ? raw : `${require("../utils/tituloMedico").tituloMedico(pr.med_sexo)}${raw}`;
     };
     const escapeRegExp = (s = "") => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
     const dedupeMedicoName = (rawName, fallbackBase) => {

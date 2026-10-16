@@ -23,6 +23,7 @@ const pool      = require("../db");
 const auth      = require("../middlewares/auth");
 const sse       = require("../utils/sseManager");
 const { enviarEmail } = require("../utils/mailer");
+const { tituloMedico } = require("../utils/tituloMedico");
 
 const DIAS_ENTRE_ENCUESTAS = 60; // no preguntar al mismo paciente más de una vez cada 60 días
 
@@ -76,7 +77,7 @@ async function enviarEncuestas() {
     const [citas] = await pool.query(
       `SELECT c.id AS cita_id, c.clinica_id, c.medico_id, c.paciente_id,
               p.nombres, p.email, cl.nombre AS clinica,
-              CONCAT(u.nombres, ' ', u.apellidos) AS medico, u.tipo AS medico_tipo
+              CONCAT(u.nombres, ' ', u.apellidos) AS medico, u.tipo AS medico_tipo, u.sexo AS medico_sexo
        FROM citas c
        JOIN pacientes p ON p.id = c.paciente_id
        JOIN usuarios u  ON u.id = c.medico_id
@@ -101,7 +102,7 @@ async function enviarEncuestas() {
          VALUES (?, ?, ?, ?, ?)`, [c.clinica_id, c.medico_id, c.paciente_id, c.cita_id, token]);
       if (!r.affectedRows) continue;
       try {
-        const titulo = c.medico_tipo === "PSICOLOGO" ? "" : "Dr(a). ";
+        const titulo = tituloMedico(c.medico_sexo, { tipo: c.medico_tipo });
         await enviarEmail({
           to: c.email,
           subject: `¿Cómo fue tu consulta con ${titulo}${c.medico}?`,
@@ -154,7 +155,7 @@ async function buscarPorToken(token) {
   const [[o]] = await pool.query(
     `SELECT o.id, o.clinica_id, o.medico_id, o.estrellas, o.respondida_en,
             p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
-            CONCAT(u.nombres, ' ', u.apellidos) AS medico, u.tipo AS medico_tipo, u.foto_url,
+            CONCAT(u.nombres, ' ', u.apellidos) AS medico, u.tipo AS medico_tipo, u.sexo AS medico_sexo, u.foto_url,
             cl.nombre AS clinica, cl.logo_url,
             (SELECT valor FROM clinica_config WHERE clinica_id = o.clinica_id AND clave = 'opiniones_google_url' LIMIT 1) AS google_url
      FROM opiniones_pacientes o
@@ -169,7 +170,7 @@ function vistaToken(o) {
   return {
     paciente: String(o.paciente_nombres || "").split(" ")[0],
     nombre_corto: nombreCorto(o.paciente_nombres, o.paciente_apellidos),
-    medico: `${o.medico_tipo === "PSICOLOGO" ? "" : "Dr(a). "}${o.medico}`,
+    medico: `${tituloMedico(o.medico_sexo, { tipo: o.medico_tipo })}${o.medico}`,
     foto_url: o.foto_url,
     clinica: o.clinica,
     logo_url: o.logo_url,

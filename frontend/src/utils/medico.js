@@ -22,9 +22,18 @@ export function tituloMedicoActivo() {
   }
 }
 
-/** Prefijo "Dr. " (con espacio) o cadena vacía. */
-export function prefijoDr(titulo = tituloMedicoActivo()) {
-  return titulo ? "Dr. " : "";
+/**
+ * Prefijo "Dr. " / "Dra. " (con espacio) o cadena vacía.
+ * `sexo` viene del perfil del médico ('F' → "Dra. "); sin configurar → "Dr. ".
+ */
+export function prefijoDr(titulo = tituloMedicoActivo(), sexo = null) {
+  if (!titulo) return "";
+  return sexo === "F" ? "Dra. " : "Dr. ";
+}
+
+/** Sexo del médico desde cualquier forma de objeto (médico, cita, historia). */
+export function sexoMedico(m) {
+  return (m && (m.sexo ?? m.medico_sexo ?? m.med_sexo)) || null;
 }
 
 /**
@@ -60,7 +69,7 @@ export function nombreMedico(m, { conEspecialidad = false, sep = "–", titulo }
   if (display) return display;
   const nom = (m.nombres ?? m.medico_nombres ?? m.med_nombres ?? "").trim();
   const ape = (m.apellidos ?? m.medico_apellidos ?? m.med_apellidos ?? "").trim();
-  const base = `${t ? "Dr. " : ""}${nom} ${ape}`.replace(/\s+/g, " ").trim();
+  const base = `${prefijoDr(t, sexoMedico(m))}${nom} ${ape}`.replace(/\s+/g, " ").trim();
   const esp = m.especialidad ?? "";
   return conEspecialidad ? base + sufijoEsp(esp, sep, t) : base;
 }

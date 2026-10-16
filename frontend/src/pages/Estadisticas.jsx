@@ -297,7 +297,7 @@ export default function Estadisticas() {
                         {porMedico.map(m => (
                           <tr key={m.medico_id} style={{ borderTop: "1px solid #f3f4f6" }}>
                             <td style={{ padding: "10px 12px", fontWeight: 600, color: "#1a1a1a", fontSize: 13 }}>
-                              {prefijoDr()}{m.nombres} {m.apellidos}
+                              {prefijoDr(undefined, m.sexo)}{m.nombres} {m.apellidos}
                             </td>
                             <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 13 }}>{m.citas_totales}</td>
                             <td style={{ padding: "10px 12px", textAlign: "center", fontSize: 13, color: "#10b981", fontWeight: 700 }}>{m.consultas_atendidas}</td>

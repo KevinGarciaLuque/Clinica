@@ -6,7 +6,7 @@ import { tituloMedicoActivo } from "../../utils/medico";
 
 const TIPOS = ["ADMIN", "MEDICO", "PSICOLOGO", "ENFERMERA", "RECEPCIONISTA"];
 const EMPTY = {
-  nombres: "", apellidos: "", nombre_display: "", email: "", password: "",
+  nombres: "", apellidos: "", nombre_display: "", sexo: "", email: "", password: "",
   tipo: "RECEPCIONISTA", especialidad_id: "", telefono: "",
   numero_colegiatura: "", activo: 1, funcion_clinica: "",
 };
@@ -116,7 +116,7 @@ export default function Usuarios() {
   const abrirNuevo = () => { setForm(EMPTY); setEditId(null); setError(""); setShowModal(true); };
   const abrirEditar = (u) => {
     setForm({
-      nombres: u.nombres, apellidos: u.apellidos, nombre_display: u.nombre_display || "",
+      nombres: u.nombres, apellidos: u.apellidos, nombre_display: u.nombre_display || "", sexo: u.sexo || "",
       email: u.email,
       password: "", tipo: u.tipo,
       especialidad_id: u.especialidad_id || "",
@@ -487,6 +487,22 @@ export default function Usuarios() {
                   )}
                   {(form.tipo === "MEDICO" || form.tipo === "PSICOLOGO") && (
                     <div style={{ gridColumn: "1 / -1" }}>
+                      <FieldGroup label="Sexo">
+                        <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                          {[["F", "Femenino", "Dra."], ["M", "Masculino", "Dr."]].map(([v, label, tit]) => (
+                            <button key={v} type="button" onClick={() => setForm({ ...form, sexo: form.sexo === v ? "" : v })}
+                              style={{ padding: "7px 14px", borderRadius: 8, fontWeight: 600, fontSize: 13, cursor: "pointer",
+                                border: `1.5px solid ${form.sexo === v ? "#243b72" : "#e2e8f0"}`,
+                                background: form.sexo === v ? "#eef2ff" : "#fff", color: form.sexo === v ? "#1a2744" : "#475569" }}>
+                              {label} <span style={{ color: "#94a3b8", fontWeight: 500 }}>({tit})</span>
+                            </button>
+                          ))}
+                        </div>
+                      </FieldGroup>
+                    </div>
+                  )}
+                  {(form.tipo === "MEDICO" || form.tipo === "PSICOLOGO") && (
+                    <div style={{ gridColumn: "1 / -1" }}>
                       <FieldGroup label="Nombre para mostrar (opcional)">
                         <StyledInput
                           value={form.nombre_display}
@@ -497,7 +513,7 @@ export default function Usuarios() {
                       </FieldGroup>
                       <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
                         Cómo aparece este médico en citas, consultas y documentos. Si se deja vacío,
-                        se usa "{tituloMedicoActivo() ? "Dr. " : ""}{form.nombres || "Nombre"} {form.apellidos || "Apellido"}".
+                        se usa "{tituloMedicoActivo() ? (form.sexo === "F" ? "Dra. " : "Dr. ") : ""}{form.nombres || "Nombre"} {form.apellidos || "Apellido"}".
                       </div>
                     </div>
                   )}

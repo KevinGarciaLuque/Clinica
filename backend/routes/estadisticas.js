@@ -131,14 +131,14 @@ router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
     const { desde, hasta } = rangoFechas(req);
 
     const [rows] = await pool.query(
-      `SELECT u.id AS medico_id, u.nombres, u.apellidos,
+      `SELECT u.id AS medico_id, u.nombres, u.apellidos, u.sexo,
               COUNT(*) AS citas_totales,
               SUM(CASE WHEN c.estado='COMPLETADA' THEN 1 ELSE 0 END) AS consultas_atendidas,
               SUM(CASE WHEN c.estado IN ('CANCELADA','NO_ASISTIO') THEN 1 ELSE 0 END) AS canceladas_no_asistio
        FROM citas c
        JOIN usuarios u ON u.id = c.medico_id
        WHERE c.clinica_id=? AND DATE(c.inicio) BETWEEN ? AND ?
-       GROUP BY u.id, u.nombres, u.apellidos
+       GROUP BY u.id, u.nombres, u.apellidos, u.sexo
        ORDER BY consultas_atendidas DESC`,
       [clinicaId, desde, hasta]
     );
@@ -195,11 +195,11 @@ router.get("/asistencia", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"
     ] = await Promise.all([
       pool.query(`SELECT ${conteos} ${base}`, params),
       pool.query(
-        `SELECT c.medico_id, u.nombres, u.apellidos, ${conteos}
+        `SELECT c.medico_id, u.nombres, u.apellidos, u.sexo, ${conteos}
          FROM citas c JOIN usuarios u ON u.id = c.medico_id
          WHERE c.clinica_id = ? AND c.estado <> 'PENDIENTE_APROBACION'
            AND c.inicio >= ? AND c.inicio <= ? ${fm}
-         GROUP BY c.medico_id, u.nombres, u.apellidos
+         GROUP BY c.medico_id, u.nombres, u.apellidos, u.sexo
          ORDER BY total DESC`, params),
       hayEnlaces
         ? pool.query(

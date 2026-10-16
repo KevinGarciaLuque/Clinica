@@ -25,6 +25,7 @@ dayjs.extend(require("dayjs/plugin/utc"));
 dayjs.extend(require("dayjs/plugin/timezone"));
 const pool      = require("../db");
 const auth      = require("../middlewares/auth");
+const { tituloMedico } = require("../utils/tituloMedico");
 
 const TIPOS   = ["VISTA", "WHATSAPP", "AGENDAR_CLIC", "CITA"];
 const ORIGENES = ["DIRECTO", "QR", "GOOGLE", "FACEBOOK", "INSTAGRAM", "WHATSAPP", "TIKTOK", "OTRO"];
@@ -108,13 +109,13 @@ function nombrePublico(m, perfilClinica, unico) {
   const display = String(m.nombre_display || "").trim();
   if (display) return display;
   if (unico && perfilClinica.perfil_nombre_doctor) return perfilClinica.perfil_nombre_doctor.trim();
-  const titulo = m.titulo_medico !== 0 && m.tipo !== "PSICOLOGO" ? "Dr. " : "";
+  const titulo = m.titulo_medico === 0 ? "" : tituloMedico(m.sexo, { tipo: m.tipo, desconocido: "Dr. " });
   return `${titulo}${m.nombres} ${m.apellidos}`.replace(/\s+/g, " ").trim();
 }
 
 async function medicosActivos(clinicaId) {
   const [rows] = await pool.query(
-    `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.foto_url, u.tipo, u.clinica_id,
+    `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.sexo, u.foto_url, u.tipo, u.clinica_id,
             e.nombre AS especialidad, c.titulo_medico
      FROM usuarios u
      JOIN clinicas c ON c.id = u.clinica_id
@@ -139,7 +140,7 @@ router.get("/medico/:slug", limiterPublico, async (req, res) => {
   try {
     await asegurarTablas();
     const [[m]] = await pool.query(
-      `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.foto_url, u.tipo, e.nombre AS especialidad,
+      `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.sexo, u.foto_url, u.tipo, e.nombre AS especialidad,
               c.id AS clinica_id, c.nombre AS clinica, c.slug AS clinica_slug, c.logo_url, c.titulo_medico,
               c.telefono AS clinica_telefono, c.direccion, c.ciudad
        FROM medico_perfiles mp

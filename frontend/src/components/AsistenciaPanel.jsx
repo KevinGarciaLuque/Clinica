@@ -129,7 +129,7 @@ export default function AsistenciaPanel({ desde, hasta, isMobile }) {
                   const tm = pct(m.asistieron, m.asistieron + m.no_asistio);
                   return (
                     <tr key={m.medico_id}>
-                      <td className="fw-semibold">{prefijoDr()}{m.nombres} {m.apellidos}</td>
+                      <td className="fw-semibold">{prefijoDr(undefined, m.sexo)}{m.nombres} {m.apellidos}</td>
                       <td className="text-center">{m.total}</td>
                       <td className="text-center">{m.asistieron}</td>
                       <td className="text-center">{m.no_asistio}</td>

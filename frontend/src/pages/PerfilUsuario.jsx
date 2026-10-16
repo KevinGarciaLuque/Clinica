@@ -10,7 +10,7 @@ export default function PerfilUsuario() {
   const [googleStatus, setGoogleStatus] = useState({ conectado: false, google_email: null });
   const [cargandoGoogle, setCargandoGoogle] = useState(false);
   const [form, setForm] = useState({
-    nombres: "", apellidos: "", nombre_display: "", telefono: "", foto_url: "",
+    nombres: "", apellidos: "", nombre_display: "", sexo: "", telefono: "", foto_url: "",
     numero_colegiatura: "",
   });
   const [pwForm, setPwForm]       = useState({ password_actual: "", password_nuevo: "", confirmar: "" });
@@ -44,6 +44,7 @@ export default function PerfilUsuario() {
         nombres:            user.nombres            || "",
         apellidos:          user.apellidos          || "",
         nombre_display:     user.nombre_display     || "",
+        sexo:               user.sexo               || "",
         telefono:           user.telefono           || "",
         foto_url:           user.foto_url           || "",
         numero_colegiatura: user.numero_colegiatura || "",
@@ -56,6 +57,7 @@ export default function PerfilUsuario() {
         if (d) setForm(f => ({
           ...f,
           nombre_display:     d.nombre_display     ?? f.nombre_display,
+          sexo:               d.sexo               ?? f.sexo,
           numero_colegiatura: d.numero_colegiatura ?? f.numero_colegiatura,
           telefono:           d.telefono           ?? f.telefono,
         }));
@@ -127,6 +129,7 @@ export default function PerfilUsuario() {
         nombres:            form.nombres,
         apellidos:          form.apellidos,
         nombre_display:     form.nombre_display || null,
+        sexo:               form.sexo || null,
         telefono:           form.telefono,
         foto_url:           form.foto_url,
         numero_colegiatura: form.numero_colegiatura || null,
@@ -135,6 +138,7 @@ export default function PerfilUsuario() {
         nombres:            form.nombres,
         apellidos:          form.apellidos,
         nombre_display:     form.nombre_display || null,
+        sexo:               form.sexo || null,
         telefono:           form.telefono,
         foto_url:           form.foto_url,
         numero_colegiatura: form.numero_colegiatura || null,
@@ -516,6 +520,24 @@ export default function PerfilUsuario() {
                       placeholder="Ej: CMH-12345"
                       onChange={e => setForm(f => ({ ...f, numero_colegiatura: e.target.value }))} />
                   </div>
+                  {["MEDICO", "PSICOLOGO", "ADMIN"].includes(user?.tipo) && (
+                    <div style={{ gridColumn: isMobile ? undefined : "1 / -1" }}>
+                      <label style={labelSt}>Sexo</label>
+                      <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                        {[["F", "Femenino", "Dra."], ["M", "Masculino", "Dr."]].map(([v, label, tit]) => (
+                          <button key={v} type="button" onClick={() => setForm(f => ({ ...f, sexo: f.sexo === v ? "" : v }))}
+                            style={{ padding: "8px 16px", borderRadius: 8, fontWeight: 600, fontSize: "0.86rem", cursor: "pointer",
+                              border: `1.5px solid ${form.sexo === v ? "#243b72" : "#e2e8f0"}`,
+                              background: form.sexo === v ? "#eef2ff" : "#fff", color: form.sexo === v ? "#1a2744" : "#475569" }}>
+                            {label} <span style={{ color: "#94a3b8", fontWeight: 500 }}>({tit})</span>
+                          </button>
+                        ))}
+                      </div>
+                      <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 4 }}>
+                        Se usa para escribir “Dr.” o “Dra.” en citas, recetas, tu página pública y los correos a pacientes.
+                      </div>
+                    </div>
+                  )}
                   {["MEDICO", "PSICOLOGO"].includes(user?.tipo) && (
                     <div style={{ gridColumn: isMobile ? undefined : "1 / -1" }}>
                       <label style={labelSt}>Nombre para mostrar (opcional)</label>
@@ -523,7 +545,7 @@ export default function PerfilUsuario() {
                         placeholder={`Ej: ${form.nombres || "Sebastián"} ${form.apellidos || "Manzanares"}`}
                         onChange={e => setForm(f => ({ ...f, nombre_display: e.target.value }))} />
                       <div style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 4 }}>
-                        Así aparecés en citas, consultas y documentos. Si lo dejás vacío, se usa tu nombre y apellido.
+                        Así aparecés en citas, consultas y documentos, tal cual lo escribas. Si lo dejás vacío, se usa {form.sexo === "F" ? "“Dra.”" : "“Dr.”"} + tu nombre y apellido.
                       </div>
                     </div>
                   )}

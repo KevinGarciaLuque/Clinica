@@ -102,7 +102,7 @@ router.get("/sala-espera", auth(), async (req, res) => {
               c.estado, c.tipo_consulta, c.motivo, c.canal,
               p.id AS paciente_id, p.nombres AS paciente_nombres, p.apellidos AS paciente_apellidos,
               p.telefono AS paciente_tel, p.dni AS paciente_dni, p.email AS paciente_email,
-              u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos, u.nombre_display AS medico_nombre_display,
+              u.id AS medico_id, u.nombres AS medico_nombres, u.apellidos AS medico_apellidos, u.nombre_display AS medico_nombre_display, u.sexo AS medico_sexo,
               e.nombre AS especialidad
        FROM citas c
        JOIN pacientes p  ON p.id = c.paciente_id

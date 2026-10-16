@@ -481,7 +481,7 @@ router.get("/info", async (req, res) => {
 
     // Médico principal: primer MEDICO activo (o ADMIN si no hay médico)
     const [[medico]] = await pool.query(
-      `SELECT nombres, apellidos, foto_url, e.nombre AS especialidad
+      `SELECT nombres, apellidos, foto_url, u.sexo, e.nombre AS especialidad
        FROM usuarios u
        LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE u.clinica_id=? AND u.activo=1 AND u.tipo IN ('MEDICO','ADMIN','SUPER_ADMIN')
@@ -496,7 +496,7 @@ router.get("/info", async (req, res) => {
       telefono: clinica.telefono || null,
       logo_url: clinica.logo_url || null,
       titulo_medico: clinica.titulo_medico == null ? 1 : Number(clinica.titulo_medico),
-      medico: medico ? { nombres: medico.nombres, apellidos: medico.apellidos, especialidad: medico.especialidad, foto_url: medico.foto_url || null } : null,
+      medico: medico ? { nombres: medico.nombres, apellidos: medico.apellidos, sexo: medico.sexo || null, especialidad: medico.especialidad, foto_url: medico.foto_url || null } : null,
     });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -837,7 +837,7 @@ router.get("/estudios-pendientes", limiterModerate, async (req, res) => {
 
     const [rows] = await pool.query(
       `SELECT es.id, es.tipo, es.descripcion, es.urgente, es.creado_en,
-              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos
+              u.nombres AS medico_nombres, u.apellidos AS medico_apellidos, u.sexo AS medico_sexo
        FROM estudios_solicitudes es
        JOIN usuarios u ON u.id = es.medico_id
        WHERE es.paciente_id = ? AND es.clinica_id = ?

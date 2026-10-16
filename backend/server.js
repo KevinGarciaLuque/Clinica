@@ -238,6 +238,11 @@ const PORT = process.env.PORT || 5000;
 const pool = require("./db");
 (async () => {
   try {
+    // Sexo del médico (define "Dr." / "Dra."). Primero: varias rutas ya lo leen.
+    const [colSexo] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'sexo'");
+    if (!colSexo.length) await pool.query("ALTER TABLE usuarios ADD COLUMN sexo ENUM('F','M') NULL");
+    console.log("✅ [auto-migrate] usuarios.sexo OK");
+
     await pool.query(`
       CREATE TABLE IF NOT EXISTS verificaciones_email (
         id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
