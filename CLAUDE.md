@@ -34,7 +34,9 @@ Sistema de gestión clínica multi-clínica (medickg.com). **Está en producció
 - `audiencia`: `TODOS`, `MEDICOS` o `ADMIN`.
 - `importante`: `true` solo para cambios grandes.
 
-El servidor la publica sola al arrancar y nunca la duplica. Los arreglos internos sin efecto visible no llevan novedad.
+El servidor la publica sola al arrancar y nunca la duplica.
+
+**No se publican como novedad:** las correcciones de errores (bugs), los arreglos de algo que ya debía funcionar y los ajustes internos sin efecto visible. Las novedades son solo para funciones nuevas o mejoras reales.
 
 ## Convenciones útiles
 
