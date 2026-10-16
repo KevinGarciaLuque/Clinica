@@ -171,6 +171,8 @@ router.get("/medico/:slug", limiterPublico, async (req, res) => {
         descripcion: unico ? perfil.perfil_descripcion || null : null,
         es_psicologo: m.tipo === "PSICOLOGO",
         unico,
+        // El frontend redirige a la página de la clínica (una sola página por clínica)
+        redirigir_a_clinica: unico && Boolean(m.clinica_slug),
         clinica: { nombre: m.clinica, slug: m.clinica_slug, logo_url: m.logo_url, telefono: m.clinica_telefono, direccion: m.direccion, ciudad: m.ciudad },
         perfil,
         dias_disponibles: dias.map((d) => d.dia_semana),
@@ -193,7 +195,10 @@ router.get("/clinica/:slug/medicos", limiterPublico, async (req, res) => {
     const unico = medicos.length <= 1;
     const data = [];
     for (const m of medicos) {
+      const [dias] = await pool.query(
+        "SELECT DISTINCT dia_semana FROM horarios_medico WHERE medico_id = ? AND activo = 1 ORDER BY dia_semana", [m.id]);
       data.push({
+        dias_disponibles: dias.map((x) => x.dia_semana),
         slug: await slugDeMedico(m),
         nombre_mostrar: nombrePublico(m, perfil, unico),
         foto_url: m.foto_url,
@@ -298,8 +303,13 @@ router.get("/mis-enlaces", auth("ADMIN", "MEDICO", "PSICOLOGO"), async (req, res
       esAdmin ? [clinicaId] : [clinicaId, req.user.id]);
 
     const base = frontendUrl();
+    // Clínica de un solo médico (con página propia): se comparte solo la página de la
+    // clínica; /dr/:slug redirige a ella.
+    const [[{ total }]] = await pool.query(
+      "SELECT COUNT(*) AS total FROM usuarios WHERE clinica_id=? AND activo=1 AND tipo IN ('MEDICO','PSICOLOGO')", [clinicaId]);
+    const unico = Number(total) <= 1 && Boolean(clinica?.slug);
     const lista = [];
-    for (const m of medicos) {
+    for (const m of unico ? [] : medicos) {
       const slug = await slugDeMedico(m);
       lista.push({ id: m.id, nombres: m.nombres, apellidos: m.apellidos, slug, url: `${base}/dr/${slug}` });
     }
@@ -308,6 +318,7 @@ router.get("/mis-enlaces", auth("ADMIN", "MEDICO", "PSICOLOGO"), async (req, res
       data: {
         clinica: clinica?.slug ? { nombre: clinica.nombre, slug: clinica.slug, url: `${base}/p/${clinica.slug}` } : null,
         medicos: lista,
+        unico,
       },
     });
   } catch (e) {
@@ -331,7 +342,10 @@ router.get("/estadisticas", auth("ADMIN", "MEDICO", "PSICOLOGO"), async (req, re
     const d = desde.format("YYYY-MM-DD");
     const h = hoy.format("YYYY-MM-DD");
 
-    const filtro = esAdmin ? "" : " AND medico_id = ? ";
+    // Médico único de la clínica: la página de la clínica también es su página
+    const [[{ total: nMedicos }]] = await pool.query(
+      "SELECT COUNT(*) AS total FROM usuarios WHERE clinica_id=? AND activo=1 AND tipo IN ('MEDICO','PSICOLOGO')", [clinicaId]);
+    const filtro = esAdmin ? "" : Number(nMedicos) <= 1 ? " AND medico_id IN (0, ?) " : " AND medico_id = ? ";
     const p = esAdmin ? [clinicaId, d, h] : [clinicaId, d, h, req.user.id];
 
     const [[totales]] = await pool.query(

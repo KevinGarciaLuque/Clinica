@@ -294,6 +294,25 @@ export default function PublicClinicaPage() {
             )}
           </div>
 
+          {/* Un solo médico: sus días de consulta (con varios, se ven en la página de cada uno) */}
+          {medicos.length === 1 && medicos[0].dias_disponibles?.length > 0 && (
+            <div style={{ background: "#fff", borderRadius: 18, padding: "18px 20px", boxShadow: "0 4px 16px rgba(0,0,0,.06)", marginBottom: 14 }}>
+              <div style={{ fontWeight: 700, fontSize: 14, color: "#1e293b", marginBottom: 10 }}>
+                <i className="bi bi-clock me-2" style={{ color }} />Días de consulta
+              </div>
+              <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dia, i) => {
+                  const activo = medicos[0].dias_disponibles.includes(i); // dia_semana 0 = lunes
+                  return (
+                    <span key={dia} style={{ padding: "6px 10px", borderRadius: 10, fontSize: 13, fontWeight: 700, background: activo ? `rgba(${colorRgb},.12)` : "#f1f5f9", color: activo ? color : "#cbd5e1" }}>
+                      {dia}
+                    </span>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Médicos de la clínica: cada uno lleva a su página /dr/:slug */}
           {medicos.length > 1 && (
             <div style={{ background: "#fff", borderRadius: 18, padding: "18px 20px", boxShadow: "0 4px 16px rgba(0,0,0,.06)", marginBottom: 14 }}>

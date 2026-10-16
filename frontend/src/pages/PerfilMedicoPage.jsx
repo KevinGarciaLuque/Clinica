@@ -4,7 +4,7 @@
  * la página de la clínica, con el médico ya seleccionado.
  */
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import AgendarModal from "./AgendarModal";
 import { registrarEvento } from "../utils/perfilEventos";
@@ -28,6 +28,8 @@ const resolverUrl = (url) => (!url ? null : url.startsWith("http") ? url : `${AP
 
 export default function PerfilMedicoPage() {
   const { slug } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [d, setD] = useState(null);
   const [error, setError] = useState(null);
   const [servicios, setServicios] = useState([]);
@@ -38,13 +40,19 @@ export default function PerfilMedicoPage() {
     axios.get(`${API}/api/perfil-publico/medico/${slug}`)
       .then((r) => {
         const data = r.data.data;
+        // Clínica de un solo médico: hay una sola página, la de la clínica. Se conserva
+        // ?ref=qr para que la visita cuente con su origen (p. ej. un QR ya impreso).
+        if (data.redirigir_a_clinica) {
+          navigate(`/p/${data.clinica.slug}${location.search}`, { replace: true });
+          return;
+        }
         setD(data);
         registrarEvento({ medico_slug: slug }, "VISTA");
         axios.get(`${API}/api/public/clinica/${data.clinica.slug}/servicios`)
           .then((s) => setServicios(s.data.data || [])).catch(() => {});
       })
       .catch((e) => setError(e.response?.status === 404 ? "Perfil no encontrado" : "Error al cargar el perfil"));
-  }, [slug]);
+  }, [slug, navigate, location.search]);
 
   useEffect(() => {
     if (d) document.title = `${d.nombre_mostrar} | Medic-KG`;

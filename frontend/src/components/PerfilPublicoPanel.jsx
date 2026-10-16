@@ -136,7 +136,10 @@ export default function PerfilPublicoPanel({ isMobile }) {
         {/* Enlaces y QR */}
         {enlaces && (
           <div className="mb-3 p-3" style={{ background: "#f8fafc", borderRadius: 12 }}>
-            {esAdmin ? (
+            {enlaces.unico ? (
+              // Un solo médico: una sola página (la de la clínica), un solo enlace y QR
+              enlaces.clinica && <Compartir principal titulo={esAdmin ? enlaces.clinica.nombre : "Tu enlace"} url={enlaces.clinica.url} tipo="clinica" slug={enlaces.clinica.slug} />
+            ) : esAdmin ? (
               <>
                 {enlaces.clinica && <Compartir principal titulo={enlaces.clinica.nombre} url={enlaces.clinica.url} tipo="clinica" slug={enlaces.clinica.slug} />}
                 {enlaces.medicos.length > 0 && (
