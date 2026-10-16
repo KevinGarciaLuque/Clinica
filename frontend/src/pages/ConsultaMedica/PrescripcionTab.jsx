@@ -199,8 +199,41 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
   const setItem = (idx, field, val) =>
     setItems(prev => prev.map((it, i) => i === idx ? { ...it, [field]: val } : it));
 
+  // ── Alertas de alergia: se revisa la receta contra las alergias del paciente ──
+  const [alergiaInfo, setAlergiaInfo] = useState({ alergias: [], conflictos: [] });
+  const [confirmarAlergia, setConfirmarAlergia] = useState(null); // conflictos pendientes de confirmar
+  const [motivoAlergia, setMotivoAlergia] = useState("");
+  const claveMeds = items.map(it => `${it.medicamento_id || ""}|${it.medicamento_texto || ""}`).join("~");
+  const verificarAlergias = async (lista) => {
+    const r = await api.post("/prescripciones/verificar-alergias", {
+      paciente_id: pacienteId,
+      items: lista.map(it => ({ medicamento_id: it.medicamento_id, medicamento_texto: it.medicamento_texto })),
+    });
+    return r.data.data || { alergias: [], conflictos: [] };
+  };
+  useEffect(() => {
+    if (!showForm || !pacienteId) return;
+    let vivo = true;
+    const t = setTimeout(() => {
+      verificarAlergias(items).then(d => { if (vivo) setAlergiaInfo(d); }).catch(() => {});
+    }, 350);
+    return () => { vivo = false; clearTimeout(t); };
+  }, [showForm, pacienteId, claveMeds]); // eslint-disable-line react-hooks/exhaustive-deps
+
   const handleSubmit = async () => {
     if (!pacienteId) { setAlertMsg({ type: "danger", msg: "Falta paciente_id" }); return; }
+    // Antes de guardar se vuelve a revisar (por si se cambió algo hace un instante)
+    const validos = items.filter(it => it.medicamento_texto || it.medicamento_id);
+    try {
+      const d = await verificarAlergias(validos);
+      setAlergiaInfo(d);
+      if (d.conflictos.length) { setMotivoAlergia(""); setConfirmarAlergia(d.conflictos); return; }
+    } catch { /* si la verificación falla no se bloquea la receta */ }
+    await guardarReceta();
+  };
+
+  const guardarReceta = async (motivo = "") => {
+    setConfirmarAlergia(null);
     setSaving(true);
     try {
       const creada = await api.post("/prescripciones", {
@@ -210,6 +243,7 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
         notas,
         firma_digital_url: firmaDigitalUrl || null,
         items: items.filter(it => it.medicamento_texto || it.medicamento_id),
+        motivo_alergia: motivo || undefined,
       });
       const params = historiaId ? { historia_id: historiaId } : { paciente_id: pacienteId };
       const r = await api.get("/prescripciones", { params });
@@ -324,6 +358,46 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
 
       {waRxId && createPortal(<ModalWhatsappReceta rxId={waRxId} onClose={() => setWaRxId(null)} />, document.body)}
 
+      {/* ⚠️ Confirmación: la receta incluye un medicamento al que el paciente es alérgico */}
+      {confirmarAlergia && createPortal(
+        <div onMouseDown={(e) => { if (e.target === e.currentTarget) setConfirmarAlergia(null); }}
+          style={{ position: "fixed", inset: 0, zIndex: 99999, background: "rgba(0,0,0,.5)", display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
+          <div role="alertdialog" aria-label="Alerta de alergia" style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 480, maxHeight: "calc(100dvh - 24px)", overflowY: "auto", boxShadow: "0 20px 60px rgba(0,0,0,.3)" }}>
+            <div style={{ background: "linear-gradient(135deg,#dc2626,#991b1b)", color: "#fff", padding: "16px 18px", display: "flex", gap: 12, alignItems: "center", borderRadius: "16px 16px 0 0" }}>
+              <i className="bi bi-exclamation-octagon-fill" style={{ fontSize: 28 }}></i>
+              <div>
+                <div style={{ fontWeight: 800, fontSize: "1.05rem" }}>Alerta de alergia</div>
+                <div style={{ fontSize: "0.8rem", opacity: .9 }}>Revisa antes de crear la receta</div>
+              </div>
+            </div>
+            <div style={{ padding: 18 }}>
+              {confirmarAlergia.map((c, i) => (
+                <div key={i} style={{ background: c.tipo === "cruzada" ? "#fffbeb" : "#fef2f2", border: `1px solid ${c.tipo === "cruzada" ? "#fde68a" : "#fecaca"}`, borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
+                  <div style={{ fontWeight: 700, color: c.tipo === "cruzada" ? "#92400e" : "#b91c1c" }}>
+                    <i className="bi bi-capsule me-1"></i>{c.medicamento}
+                  </div>
+                  <div style={{ fontSize: "0.85rem", color: "#1f2937" }}>{c.mensaje}</div>
+                  {c.reaccion && <div style={{ fontSize: "0.78rem", color: "#6b7280" }}>Reacción registrada: {c.reaccion}</div>}
+                </div>
+              ))}
+              <label className="form-label small fw-semibold mt-2 mb-1">Si decides recetarlo, indica el motivo (opcional)</label>
+              <textarea className="form-control form-control-sm" rows={2} value={motivoAlergia} onChange={e => setMotivoAlergia(e.target.value)}
+                placeholder="Ej.: tolera el medicamento en tratamientos anteriores" />
+              <div style={{ fontSize: "0.74rem", color: "#6b7280", marginTop: 4 }}>Queda registrado en el sistema que la receta se emitió con esta alerta.</div>
+            </div>
+            <div style={{ padding: "12px 18px", borderTop: "1px solid #e5e7eb", display: "flex", gap: 8, justifyContent: "flex-end", flexWrap: "wrap" }}>
+              <button className="btn btn-sm btn-primary fw-semibold" onClick={() => setConfirmarAlergia(null)} autoFocus>
+                <i className="bi bi-arrow-left me-1"></i>Cambiar medicamento
+              </button>
+              <button className="btn btn-sm btn-outline-danger" onClick={() => guardarReceta(motivoAlergia)} disabled={saving}>
+                Recetar de todos modos
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {alertMsg && (
         <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
           {alertMsg.msg} <button className="btn-close" onClick={() => setAlertMsg(null)} />
@@ -396,6 +470,15 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
           )}
 
           <div style={{ padding: "18px" }}>
+            {alergiaInfo.alergias.length > 0 && (
+              <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "8px 12px", marginBottom: 12, fontSize: "0.82rem", color: "#991b1b", display: "flex", gap: 8, alignItems: "flex-start" }}>
+                <i className="bi bi-exclamation-triangle-fill" style={{ marginTop: 2 }}></i>
+                <span>
+                  <strong>Alergias del paciente: </strong>
+                  {alergiaInfo.alergias.map(a => `${a.agente}${a.severidad ? ` (${a.severidad.toLowerCase()})` : ""}`).join(", ")}
+                </span>
+              </div>
+            )}
             {items.map((item, idx) => (
               <div key={idx} style={{ background: "#f8fafc", borderRadius: 10, border: "1px solid #e5e7eb", padding: "14px", marginBottom: 12, position: "relative" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -444,6 +527,11 @@ function SubRecetaActual({ historiaId, pacienteId, citaId, firmada, pendingSugIt
                         })}
                       </ul>
                     )}
+                    {alergiaInfo.conflictos.filter(c => c.indice === idx).map((c, k) => (
+                      <div key={k} role="alert" style={{ marginTop: 6, background: c.tipo === "cruzada" ? "#fffbeb" : "#fee2e2", border: `1px solid ${c.tipo === "cruzada" ? "#fcd34d" : "#fca5a5"}`, color: c.tipo === "cruzada" ? "#92400e" : "#b91c1c", borderRadius: 8, padding: "6px 10px", fontSize: "0.8rem", fontWeight: 600 }}>
+                        <i className={`bi ${c.tipo === "cruzada" ? "bi-exclamation-triangle-fill" : "bi-exclamation-octagon-fill"} me-1`}></i>{c.mensaje}
+                      </div>
+                    ))}
                   </div>
                   <div className="col-md-3">
                     <label className="form-label small mb-1" style={{ fontWeight: 600, color: "#374151" }}>Dosis</label>

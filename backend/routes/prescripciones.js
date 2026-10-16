@@ -14,6 +14,7 @@ const QRCode  = require("qrcode");
 const sse     = require("../utils/sseManager");
 const webPush = require("../utils/webPush");
 const { notificarRecepcionistas } = require("../utils/notificarRecepcion");
+const { buscarConflictos } = require("../utils/alergiasMedicamentos");
 const { urlPublica } = require("../utils/urlPublica");
 
 const clinicaOf = (req) =>
@@ -260,6 +261,80 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
  * POST /api/prescripciones
  * Body: { historia_id?, cita_id?, paciente_id, notas?, firma_digital_url?, items: [{medicamento_id?, medicamento_texto?, dosis, duracion, cantidad, instrucciones}] }
  */
+// ─────────────────────────────────────────────────────────────────────────────
+// Alertas de alergia al recetar
+// ─────────────────────────────────────────────────────────────────────────────
+// Registro de recetas emitidas aunque el sistema avisó de una alergia (auditoría)
+let tablaAlertasLista = false;
+async function asegurarTablaAlertas() {
+  if (tablaAlertasLista) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS prescripcion_alertas_alergia (
+      id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id INT UNSIGNED NOT NULL,
+      prescripcion_id INT UNSIGNED NOT NULL,
+      paciente_id INT UNSIGNED NOT NULL,
+      medico_id INT UNSIGNED NULL,
+      medicamento VARCHAR(250) NOT NULL,
+      alergia VARCHAR(150) NOT NULL,
+      severidad VARCHAR(20) NULL,
+      tipo VARCHAR(20) NOT NULL,
+      motivo VARCHAR(500) NULL,
+      creado_en DATETIME DEFAULT CURRENT_TIMESTAMP,
+      INDEX idx_paa_presc (prescripcion_id),
+      INDEX idx_paa_clinica (clinica_id, creado_en)
+    ) ENGINE=InnoDB`);
+  tablaAlertasLista = true;
+}
+
+// Texto con el que se compara cada medicamento: genérico + comercial del catálogo + lo escrito
+async function textosDeItems(items) {
+  const ids = [...new Set(items.map((it) => Number(it.medicamento_id)).filter(Boolean))];
+  const catalogo = new Map();
+  if (ids.length) {
+    const [rows] = await pool.query(
+      "SELECT id, nombre_generico, nombre_comercial, presentacion FROM medicamentos WHERE id IN (?)", [ids]);
+    for (const m of rows) catalogo.set(m.id, m);
+  }
+  return items.map((it, indice) => {
+    const m = catalogo.get(Number(it.medicamento_id));
+    const nombre = (it.medicamento_texto || (m ? `${m.nombre_generico}${m.presentacion ? ` (${m.presentacion})` : ""}` : "")).trim();
+    return { indice, nombre, texto: [it.medicamento_texto, m?.nombre_generico, m?.nombre_comercial].filter(Boolean).join(" ") };
+  });
+}
+
+async function conflictosDeAlergia(pacienteId, clinicaId, items) {
+  const [alergias] = await pool.query(
+    `SELECT agente, tipo, severidad, reaccion FROM alergias_paciente
+     WHERE paciente_id = ? AND clinica_id = ? AND activo = 1
+     ORDER BY FIELD(severidad,'MORTAL','SEVERA','MODERADA','LEVE'), agente`, [pacienteId, clinicaId]);
+  const conflictos = items.length ? buscarConflictos(alergias, await textosDeItems(items)) : [];
+  return { alergias, conflictos };
+}
+
+/**
+ * POST /api/prescripciones/verificar-alergias  { paciente_id, items:[{medicamento_id, medicamento_texto}] }
+ * Devuelve las alergias del paciente y los medicamentos de la receta que chocan con ellas.
+ * Solo lectura.
+ */
+router.post("/verificar-alergias", auth("MEDICO","ADMIN","PSICOLOGO","ENFERMERA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    let cid = clinicaOf(req);
+    const pacienteId = Number(req.body?.paciente_id);
+    if (!pacienteId) return res.status(400).json({ ok: false, msg: "paciente_id requerido" });
+    const [[pac]] = await pool.query("SELECT id, clinica_id FROM pacientes WHERE id = ? LIMIT 1", [pacienteId]);
+    if (!pac || (cid && pac.clinica_id !== cid)) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    cid = pac.clinica_id;
+    const items = (Array.isArray(req.body.items) ? req.body.items : []).slice(0, 40);
+    res.json({ ok: true, data: await conflictosDeAlergia(pacienteId, cid, items) });
+  } catch (e) {
+    // Sin tabla de alergias (clínica sin ese módulo) → sin avisos, nunca bloquea la receta
+    if (e.code === "ER_NO_SUCH_TABLE") return res.json({ ok: true, data: { alergias: [], conflictos: [] } });
+    console.error("[verificar-alergias]", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudieron verificar las alergias" });
+  }
+});
+
 router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
   const conn = await pool.getConnection();
   try {
@@ -311,6 +386,24 @@ router.post("/", auth("MEDICO","ADMIN","SUPER_ADMIN"), async (req, res) => {
 
     await conn.commit();
     res.json({ ok: true, id: prescId, codigo_qr });
+
+    // Auditoría: si la receta incluye medicamentos que chocan con una alergia registrada,
+    // queda constancia (con el motivo que haya indicado el médico). Nunca afecta la receta.
+    if (items.length) {
+      (async () => {
+        const { conflictos } = await conflictosDeAlergia(paciente_id, cid, items);
+        if (!conflictos.length) return;
+        await asegurarTablaAlertas();
+        const motivo = String(req.body.motivo_alergia || "").trim().slice(0, 500) || null;
+        for (const c of conflictos) {
+          await pool.query(
+            `INSERT INTO prescripcion_alertas_alergia
+               (clinica_id, prescripcion_id, paciente_id, medico_id, medicamento, alergia, severidad, tipo, motivo)
+             VALUES (?,?,?,?,?,?,?,?,?)`,
+            [cid, prescId, paciente_id, req.user.id, String(c.medicamento).slice(0, 250), String(c.alergia).slice(0, 150), c.severidad, c.tipo, motivo]);
+        }
+      })().catch((e) => { if (e.code !== "ER_NO_SUCH_TABLE") console.error("[prescripciones] alertas alergia", e.message); });
+    }
   } catch (e) {
     await conn.rollback();
     res.status(500).json({ ok: false, msg: e.message });

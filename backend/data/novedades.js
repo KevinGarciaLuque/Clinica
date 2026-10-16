@@ -123,4 +123,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "alertas-alergia-receta",
+    version: "1.22",
+    titulo: "Alertas de alergia al recetar",
+    descripcion: "Al hacer una receta, el sistema muestra las alergias del paciente y avisa en rojo si un medicamento choca con ellas, incluso por grupo (por ejemplo, alergia a Penicilina y se receta Amoxicilina) o por posible reacción cruzada. Antes de guardar pide confirmación y deja registrado el motivo.",
+    icono: "bi-shield-exclamation",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];
