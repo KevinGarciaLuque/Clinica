@@ -41,6 +41,7 @@ function asegurarTablas() {
           visto_en        DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
       await sembrarIniciales();
+      await sincronizarDesdeArchivo();
     })().catch((e) => { tablasListas = null; throw e; });
   }
   return tablasListas;
@@ -78,6 +79,24 @@ async function sembrarIniciales() {
       `INSERT INTO novedades (version, icono, audiencia, importante, titulo, descripcion, publicado_en)
        VALUES (?, ?, ?, ?, ?, ?, NOW() - INTERVAL ? MINUTE)`,
       [version, icono, audiencia, importante, titulo, descripcion, iniciales.length - i]);
+  }
+}
+
+// Publica las novedades de backend/data/novedades.js que aún no existan (por clave)
+async function sincronizarDesdeArchivo() {
+  const [col] = await pool.query("SHOW COLUMNS FROM novedades LIKE 'clave'");
+  if (!col.length) {
+    await pool.query("ALTER TABLE novedades ADD COLUMN clave VARCHAR(80) NULL UNIQUE AFTER id");
+  }
+  let lista = [];
+  try { lista = require("../data/novedades"); } catch { return; }
+  for (const n of lista) {
+    if (!n?.clave || !n.titulo || !n.descripcion) continue;
+    await pool.query(
+      `INSERT IGNORE INTO novedades (clave, version, titulo, descripcion, icono, audiencia, importante)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [String(n.clave).slice(0, 80), n.version || null, String(n.titulo).slice(0, 150), String(n.descripcion),
+       n.icono || "bi-stars", AUDIENCIAS.includes(n.audiencia) ? n.audiencia : "TODOS", n.importante ? 1 : 0]);
   }
 }
 
