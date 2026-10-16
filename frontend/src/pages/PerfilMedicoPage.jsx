@@ -8,6 +8,7 @@ import { useParams, Link } from "react-router-dom";
 import axios from "axios";
 import AgendarModal from "./AgendarModal";
 import { registrarEvento } from "../utils/perfilEventos";
+import OpinionesPublicas from "../components/OpinionesPublicas";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const DEFAULT_COLOR = "#213665";
@@ -163,6 +164,8 @@ export default function PerfilMedicoPage() {
               </div>
             </div>
           )}
+
+          <OpinionesPublicas medicoSlug={slug} />
 
           {clinica.slug && (
             <Link to={`/p/${clinica.slug}`} style={{ display: "block", textAlign: "center", fontSize: 13.5, color: "#64748b", marginTop: 10 }}>

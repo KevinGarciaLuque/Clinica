@@ -4,6 +4,7 @@ import dayjs from "dayjs";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/api";
 import PerfilPublicoPanel from "../components/PerfilPublicoPanel";
+import OpinionesPanel from "../components/OpinionesPanel";
 import { nombreMedico } from "../utils/medico";
 import { useAuth } from "../auth/AuthContext";
 
@@ -947,6 +948,9 @@ export default function Dashboard() {
             {/* Perfil público: enlace, QR y visitas (médico: el suyo; admin: toda la clínica) */}
             {["ADMIN", "MEDICO", "PSICOLOGO"].includes(user?.tipo) && user?.clinica_id && (
               <PerfilPublicoPanel isMobile={isMobile} />
+            )}
+            {["ADMIN", "MEDICO", "PSICOLOGO"].includes(user?.tipo) && user?.clinica_id && (
+              <OpinionesPanel isMobile={isMobile} />
             )}
 
             {/* Accesos rápidos según rol */}

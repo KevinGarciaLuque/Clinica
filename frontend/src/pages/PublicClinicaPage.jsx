@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import axios from "axios";
 import AgendarModal from "./AgendarModal";
 import { registrarEvento } from "../utils/perfilEventos";
+import OpinionesPublicas from "../components/OpinionesPublicas";
 
 const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 const DEFAULT_COLOR = "#213665";
@@ -288,6 +289,9 @@ export default function PublicClinicaPage() {
               </a>
             )}
           </div>
+
+          {/* Opiniones verificadas de pacientes (si la clínica ya tiene) */}
+          <OpinionesPublicas clinicaSlug={slug} />
 
           {/* Servicios */}
           {servicios.length > 0 && (
