@@ -9,6 +9,10 @@ import "bootstrap/dist/js/bootstrap.bundle.min.js";
 import "bootstrap-icons/font/bootstrap-icons.css";
 import "./index.css";
 import "./App.css";
+import { iniciarInstalacion } from "./utils/instalarApp";
+
+// 📲 App instalable (PWA): captura el aviso de instalación y registra el service worker
+iniciarInstalacion();
 
 // Tras un nuevo deploy, los chunks viejos dejan de existir en el servidor.
 // Si una pestaña ya abierta intenta cargar uno, recargamos una sola vez

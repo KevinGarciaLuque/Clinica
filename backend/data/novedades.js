@@ -78,4 +78,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "instalar-app",
+    version: "1.17",
+    titulo: "Instala Medic-KG como app",
+    descripcion: "Ahora puedes tener Medic-KG con su propio ícono en el celular o la computadora y abrirla en pantalla completa. Toca tu nombre arriba a la derecha y elige “Instalar app” (en iPhone te mostramos los pasos para agregarla a inicio desde Safari).",
+    icono: "bi-phone",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

@@ -1,3 +1,40 @@
+// Service worker de Medic-KG: notificaciones push, contador del ícono y página
+// "Sin conexión" cuando la app instalada se abre sin internet.
+// No guarda en caché las pantallas ni los datos: siempre se carga la versión actual.
+const CACHE_OFFLINE = "medickg-offline-v1";
+const PAGINA_OFFLINE = "/offline.html";
+
+self.addEventListener("install", (event) => {
+  event.waitUntil(
+    caches.open(CACHE_OFFLINE)
+      .then((c) => c.addAll([PAGINA_OFFLINE, "/icons/icon-192.png"]))
+      .catch(() => {})
+      .then(() => self.skipWaiting())
+  );
+});
+
+self.addEventListener("activate", (event) => {
+  event.waitUntil(
+    (async () => {
+      const claves = await caches.keys();
+      await Promise.all(claves.filter((k) => k.startsWith("medickg-offline-") && k !== CACHE_OFFLINE).map((k) => caches.delete(k)));
+      await self.clients.claim();
+    })()
+  );
+});
+
+// Solo se intervienen las navegaciones (abrir una pantalla) del propio sitio:
+// van siempre a internet y, si no hay conexión, se muestra la página "Sin conexión".
+self.addEventListener("fetch", (event) => {
+  const req = event.request;
+  if (req.mode !== "navigate" || new URL(req.url).origin !== self.location.origin) return;
+  event.respondWith(
+    // cache: "no-store" → sin internet falla de inmediato (en vez de mostrar una copia
+    // vieja de la página que luego queda en blanco) y se muestra la página "Sin conexión"
+    fetch(req, { cache: "no-store" }).catch(async () => (await caches.match(PAGINA_OFFLINE)) || Response.error())
+  );
+});
+
 const BADGE_DB = "medickg-badge";
 const BADGE_STORE = "state";
 const BADGE_KEY = "count";
@@ -26,6 +63,10 @@ async function getBadgeCount() {
 }
 
 async function setBadgeCount(count) {
+  // Si el contador ya estaba en cero no hay nada que limpiar: no se toca el ícono
+  // (la mayoría de usuarios sin notificaciones push nunca tienen contador).
+  const anterior = await getBadgeCount();
+  if (count === 0 && anterior === 0) return;
   try {
     const db = await badgeDb();
     await new Promise((resolve) => {

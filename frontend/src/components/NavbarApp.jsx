@@ -7,6 +7,8 @@ import ModalAyudaSoporte from "./ModalAyudaSoporte";
 import ModalResenaEncuesta from "./ModalResenaEncuesta";
 import NovedadesBoton from "./Novedades";
 import BuscadorRapido from "./BuscadorRapido";
+import { ModalInstalarApp } from "./InstalarApp";
+import useInstalable from "../utils/useInstalable";
 import { playNotificationSound } from "../utils/notificationSound";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
@@ -38,6 +40,8 @@ export default function NavbarApp({ onMenuClick }) {
 
   const salir = () => { logout(); navigate("/login"); };
   const initials = `${user?.nombres?.[0] ?? ""}${user?.apellidos?.[0] ?? ""}`;
+  const instalable = useInstalable();
+  const [showInstalar, setShowInstalar] = useState(false);
 
   // Mostrar badge de plan solo para usuarios de clínica (no SUPER_ADMIN)
   const planBadge = !user?.super && licenciaInfo ? PLAN_BADGE[licenciaInfo.plan_tipo] : null;
@@ -1327,6 +1331,24 @@ export default function NavbarApp({ onMenuClick }) {
                 </div>
               )}
 
+              {/* 📲 Instalar la app (solo si el navegador lo permite y aún no está instalada) */}
+              {instalable && (
+                <button
+                  onClick={() => { setShowUserMenu(false); setShowInstalar(true); }}
+                  style={{
+                    width: "100%", display: "flex", alignItems: "center", gap: 10,
+                    padding: "11px 16px", background: "transparent",
+                    border: "none", cursor: "pointer", color: "#93c5fd", fontSize: "0.84rem",
+                    textAlign: "left", fontWeight: 600,
+                  }}
+                  onMouseEnter={e => e.currentTarget.style.background = "rgba(255,255,255,.06)"}
+                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <i className="bi bi-phone" style={{ fontSize: 15, color: "#60a5fa", width: 18, textAlign: "center" }} />
+                  Instalar app
+                </button>
+              )}
+
               {/* Ayuda y Soporte */}
               <button
                 onClick={() => { setShowUserMenu(false); setShowAyuda(true); }}
@@ -1363,6 +1385,7 @@ export default function NavbarApp({ onMenuClick }) {
           )}
         </div>
       </div>
+      {showInstalar && <ModalInstalarApp onClose={() => setShowInstalar(false)} />}
     </nav>
 
     {mostrarBannerPush && (
