@@ -56,11 +56,16 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
     try { return localStorage.getItem(CLAVE_PLEGADO) === "1"; } catch { return false; }
   });
 
+  const [evo, setEvo] = useState([]); // puntos de atención de la Evolución del paciente
+
   useEffect(() => {
     if (!pacienteId) return;
     api.get(`/antes-de-entrar/${pacienteId}`, { params: excluirHistoria ? { excluir_historia: excluirHistoria } : {} })
       .then((r) => setD(r.data.data))
       .catch(() => setD(null));
+    api.get(`/evolucion/${pacienteId}`)
+      .then((r) => setEvo((r.data.data?.avisos || []).filter((a) => a.nivel !== "bueno" && a.icono !== "bi-calendar2-x").slice(0, 3)))
+      .catch(() => setEvo([]));
   }, [pacienteId, excluirHistoria]);
 
   if (!d) return null;
@@ -75,6 +80,8 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
   const avisos = [];
   if (asistencia?.falto) avisos.push({ icono: "bi-calendar-x", color: "#dc2626", texto: `Faltó a ${asistencia.falto} cita(s) en el último año` });
   if (control) avisos.push({ icono: "bi-arrow-repeat", color: "#0891b2", texto: `Control indicado para el ${fecha(control.fecha)}${control.motivo ? `: ${control.motivo}` : ""}` });
+  // Puntos de atención de la evolución (presión, laboratorios fuera de rango, peso…)
+  for (const a of evo) avisos.push({ icono: a.icono || "bi-graph-up-arrow", color: a.nivel === "alto" ? "#dc2626" : "#d97706", texto: a.texto });
   if (saldo) avisos.push({ icono: "bi-cash-coin", color: "#b45309", texto: `${saldo.facturas} factura(s) pendiente(s): ${saldo.moneda} ${saldo.total.toLocaleString("es-HN", { minimumFractionDigits: 2 })}` });
 
   const hayDetalle = antecedentes.length || v || medicamentos || estudios.length || avisos.length;
@@ -91,8 +98,13 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
         <span style={{ fontSize: "0.78rem", color: "#475569" }}>
           {[p.edad != null ? `${p.edad} años` : null, SEXO[p.sexo], p.grupo_sanguineo ? `Sangre ${p.grupo_sanguineo}` : null].filter(Boolean).join(" · ")}
         </span>
+        <a href={`/pacientes/${pacienteId}/perfil?tab=evolucion`} target="_blank" rel="noopener noreferrer"
+          className="ms-auto" style={{ fontSize: "0.76rem", textDecoration: "none", fontWeight: 600, color: "#4338ca" }}
+          title="Abre la evolución del paciente (gráficas) en otra pestaña, sin salir de la consulta">
+          <i className="bi bi-graph-up-arrow me-1" />Ver evolución
+        </a>
         {hayDetalle ? (
-          <button type="button" onClick={alternar} className="btn btn-link btn-sm ms-auto p-0" style={{ fontSize: "0.76rem", textDecoration: "none" }}>
+          <button type="button" onClick={alternar} className="btn btn-link btn-sm p-0" style={{ fontSize: "0.76rem", textDecoration: "none" }}>
             {plegado ? <>Ver resumen <i className="bi bi-chevron-down" /></> : <>Ocultar <i className="bi bi-chevron-up" /></>}
           </button>
         ) : null}

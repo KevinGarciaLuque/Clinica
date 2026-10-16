@@ -231,7 +231,8 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     const clinicaId = clinicaDe(req);
     const pid = Number(req.params.pacienteId);
     const [[p]] = await pool.query(
-      "SELECT id, fecha_nacimiento, sexo FROM pacientes WHERE id = ? AND clinica_id = ?", [pid, clinicaId]);
+      `SELECT id, nombres, apellidos, dni, fecha_nacimiento, sexo, grupo_sanguineo
+       FROM pacientes WHERE id = ? AND clinica_id = ?`, [pid, clinicaId]);
     if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
     const filas = await consultasDelPaciente(pid, clinicaId);
@@ -313,13 +314,33 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     const tratamiento = await opcional(() => cambiosTratamiento(pid, clinicaId));
     const avisos = calcularAvisos({ consultas, labs, asistencia12, diagnosticos });
 
+    // Para el resumen imprimible: datos de la clínica, alergias y antecedentes
+    const [[clinica]] = await pool.query(
+      "SELECT nombre, logo_url, telefono, direccion, ciudad, email FROM clinicas WHERE id = ?", [clinicaId]);
+    const alergias = await opcional(async () => (await pool.query(
+      `SELECT agente, severidad, reaccion FROM alergias_paciente
+       WHERE paciente_id = ? AND clinica_id = ? AND activo = 1
+       ORDER BY FIELD(severidad,'MORTAL','SEVERA','MODERADA','LEVE'), agente LIMIT 15`, [pid, clinicaId]))[0]);
+    const antecedentes = await opcional(async () => (await pool.query(
+      `SELECT tipo, descripcion FROM antecedentes_paciente
+       WHERE paciente_id = ? AND clinica_id = ? AND activo = 1
+       ORDER BY registrado_en DESC LIMIT 12`, [pid, clinicaId]))[0]);
+
     res.json({
       ok: true,
       data: {
         paciente: {
+          nombres: p.nombres,
+          apellidos: p.apellidos,
+          dni: p.dni,
+          fecha_nacimiento: p.fecha_nacimiento ? dayjs(p.fecha_nacimiento).format("YYYY-MM-DD") : null,
           edad: p.fecha_nacimiento ? dayjs().diff(dayjs(p.fecha_nacimiento), "year") : null,
           sexo: p.sexo,
+          grupo_sanguineo: p.grupo_sanguineo,
         },
+        clinica: clinica || null,
+        alergias,
+        antecedentes,
         consultas,
         diagnosticos,
         asistencia,

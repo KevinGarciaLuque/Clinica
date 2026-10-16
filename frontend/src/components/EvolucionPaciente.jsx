@@ -2,63 +2,24 @@
 // Tarjetas con el último valor de cada signo (en verde/amarillo/rojo según el rango
 // normal y con la tendencia respecto a la consulta anterior), gráficas en el tiempo
 // y la línea de tiempo de consultas con su diagnóstico. Solo lectura.
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import {
   ResponsiveContainer, LineChart, Line, CartesianGrid, XAxis, YAxis, Tooltip, Legend, ReferenceArea, ReferenceLine,
 } from "recharts";
 import api from "../api/api";
-
-const VERDE = { bg: "#dcfce7", fg: "#15803d" };
-const AMBAR = { bg: "#fef3c7", fg: "#b45309" };
-const NARANJA = { bg: "#ffedd5", fg: "#c2410c" };
-const ROJO = { bg: "#fee2e2", fg: "#b91c1c" };
-const GRIS = { bg: "#f1f5f9", fg: "#475569" };
-
-// Clasificación de cada signo (para el color de la tarjeta)
-const estadoPresion = (s, d) => {
-  if (s == null || d == null) return null;
-  if (s >= 140 || d >= 90) return { ...ROJO, txt: "Alta" };
-  if (s >= 130 || d >= 80) return { ...NARANJA, txt: "Alta etapa 1" };
-  if (s >= 120) return { ...AMBAR, txt: "Elevada" };
-  if (s < 90 || d < 60) return { ...AMBAR, txt: "Baja" };
-  return { ...VERDE, txt: "Normal" };
-};
-const estadoImc = (v) => v == null ? null
-  : v < 18.5 ? { ...AMBAR, txt: "Bajo peso" } : v < 25 ? { ...VERDE, txt: "Normal" }
-  : v < 30 ? { ...AMBAR, txt: "Sobrepeso" } : { ...ROJO, txt: "Obesidad" };
-const estadoFc = (v) => v == null ? null : v < 60 ? { ...AMBAR, txt: "Baja" } : v > 100 ? { ...AMBAR, txt: "Alta" } : { ...VERDE, txt: "Normal" };
-const estadoSpo2 = (v) => v == null ? null : v >= 95 ? { ...VERDE, txt: "Normal" } : v >= 90 ? { ...AMBAR, txt: "Baja" } : { ...ROJO, txt: "Muy baja" };
-const estadoTemp = (v) => v == null ? null : v > 38 ? { ...ROJO, txt: "Fiebre" } : v > 37.5 ? { ...AMBAR, txt: "Febrícula" } : v < 35.5 ? { ...AMBAR, txt: "Baja" } : { ...VERDE, txt: "Normal" };
-
-const OTROS = [
-  { key: "fc",   label: "Pulso",       unidad: "lpm", color: "#e11d48", rango: [60, 100] },
-  { key: "spo2", label: "Saturación",  unidad: "%",   color: "#0284c7", rango: [95, 100] },
-  { key: "temp", label: "Temperatura", unidad: "°C",  color: "#ea580c", rango: [36, 37.5] },
-  { key: "fr",   label: "Resp.",       unidad: "rpm", color: "#7c3aed", rango: [12, 20] },
-];
+import { useAuth } from "../auth/AuthContext";
+import EvolucionImprimible from "./EvolucionImprimible";
+import {
+  estadoPresion, estadoImc, estadoFc, estadoSpo2, estadoTemp, OTROS, fechaCorta, haceCuanto,
+  ultimos, NIVEL, textoCambio, conFechas,
+} from "../utils/evolucion";
 
 const PERIODOS = [
   { key: "6",  label: "6 meses" },
   { key: "12", label: "12 meses" },
   { key: "todo", label: "Todo" },
 ];
-
-const fechaCorta = (f) => dayjs(f).format("DD/MM/YY");
-const haceCuanto = (f) => {
-  const dias = dayjs().startOf("day").diff(dayjs(f), "day");
-  if (dias <= 0) return "hoy";
-  if (dias === 1) return "ayer";
-  if (dias < 31) return `hace ${dias} días`;
-  const meses = Math.round(dias / 30);
-  return meses < 12 ? `hace ${meses} ${meses === 1 ? "mes" : "meses"}` : `hace ${(dias / 365).toFixed(1).replace(".0", "")} años`;
-};
-
-// Último y penúltimo registro de un signo
-function ultimos(consultas, clave) {
-  const con = consultas.filter((c) => c.vitales[clave] != null);
-  return { ultimo: con[con.length - 1] || null, anterior: con[con.length - 2] || null };
-}
 
 /**
  * Tendencia respecto a la consulta anterior. `bajarEsMejor`: si el valor está fuera de
@@ -110,28 +71,6 @@ function Panel({ titulo, icono, color, extra, children }) {
   );
 }
 
-const NIVEL = {
-  alto:  { bg: "#fef2f2", borde: "#fecaca", fg: "#b91c1c", icono: "bi-exclamation-octagon-fill" },
-  medio: { bg: "#fffbeb", borde: "#fde68a", fg: "#92400e", icono: "bi-exclamation-triangle-fill" },
-  bueno: { bg: "#f0fdf4", borde: "#bbf7d0", fg: "#15803d", icono: "bi-check-circle-fill" },
-};
-
-// Texto corto de un cambio de tratamiento (para la leyenda al pasar el mouse)
-function textoCambio(c) {
-  const partes = [];
-  if (c.inicia.length) partes.push(`${c.primera ? "Tratamiento" : "Nuevo"}: ${c.inicia.join(", ")}`);
-  if (c.ajusta.length) partes.push(`Cambio de dosis: ${c.ajusta.map((a) => `${a.antes} → ${a.ahora}`).join(", ")}`);
-  if (c.no_incluye.length) partes.push(`No incluido: ${c.no_incluye.join(", ")}`);
-  return partes.join(" · ");
-}
-
-// Agrega a la serie las fechas de cambios de tratamiento (para poder marcarlas en el eje)
-function conFechas(serie, fechas) {
-  const existentes = new Set(serie.map((x) => x.fecha));
-  const extra = fechas.filter((f) => !existentes.has(f)).map((fecha) => ({ fecha }));
-  return [...serie, ...extra].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
-}
-
 // Punto de la gráfica de laboratorio: rojo si el resultado salió fuera de rango
 function PuntoLab({ cx, cy, payload }) {
   if (cx == null || cy == null || payload?.valor == null) return null;
@@ -151,6 +90,9 @@ export default function EvolucionPaciente({ pacienteId }) {
   const [verTodas, setVerTodas] = useState(false);
   const [examen, setExamen] = useState(null);
   const [verMarcas, setVerMarcas] = useState(true);
+  const [imprimiendo, setImprimiendo] = useState(false);
+  const { user } = useAuth();
+  const terminarImpresion = useCallback(() => setImprimiendo(false), []);
 
   useEffect(() => {
     if (!pacienteId) return;
@@ -263,6 +205,9 @@ export default function EvolucionPaciente({ pacienteId }) {
               💊 Cambios de receta
             </button>
           )}
+          <button type="button" className="evo-chip" onClick={() => setImprimiendo(true)} title="Imprimir o guardar como PDF (para referir al paciente o entregárselo)">
+            <i className="bi bi-printer me-1" />Imprimir / PDF
+          </button>
           {PERIODOS.map((p) => (
             <button key={p.key} type="button" className={`evo-chip ${periodo === p.key ? "on" : ""}`} onClick={() => setPeriodo(p.key)}>{p.label}</button>
           ))}
@@ -558,6 +503,16 @@ export default function EvolucionPaciente({ pacienteId }) {
           )}
         </Panel>
       </div>
+
+      {imprimiendo && (
+        <EvolucionImprimible
+          d={d}
+          desde={desdePeriodo}
+          periodoTxt={periodo === "todo" ? "Todo el historial" : `Últimos ${periodo} meses`}
+          usuario={[user?.nombres, user?.apellidos].filter(Boolean).join(" ")}
+          onListo={terminarImpresion}
+        />
+      )}
 
       <p style={{ fontSize: "0.72rem", color: "#94a3b8", marginTop: 10, marginBottom: 0 }}>
         <i className="bi bi-info-circle me-1" />Los rangos de color son orientativos (valores de referencia para adultos). La decisión clínica corresponde al médico.

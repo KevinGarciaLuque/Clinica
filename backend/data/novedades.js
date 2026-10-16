@@ -105,4 +105,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "evolucion-imprimible",
+    version: "1.20",
+    titulo: "Resumen de evolución en PDF",
+    descripcion: "En la pestaña “Evolución” del expediente, el botón “Imprimir / PDF” genera un resumen del paciente con sus gráficas, laboratorios, tratamiento y alergias, ideal para referirlo a un especialista o entregárselo. Además, “Antes de entrar” en la consulta ahora muestra los puntos de atención y un enlace a la evolución.",
+    icono: "bi-printer",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];
