@@ -1,11 +1,107 @@
 // Super Admin → Novedades: publicar las mejoras de la plataforma para las clínicas.
 import { useCallback, useEffect, useState } from "react";
 import api from "../../api/api";
+import { createPortal } from "react-dom";
 import { cargarNovedades } from "../../utils/novedades";
 
 const VACIO = { version: "", titulo: "", descripcion: "", icono: "bi-stars", imagen_url: "", audiencia: "TODOS", importante: false, publicada: true };
 const AUD = { TODOS: "Todos", MEDICOS: "Médicos", ADMIN: "Administradores" };
 const ICONOS = ["bi-stars", "bi-calendar-check", "bi-person-heart", "bi-graph-up-arrow", "bi-qr-code", "bi-star-fill", "bi-bell", "bi-shield-check", "bi-lightning-charge", "bi-phone", "bi-file-earmark-medical", "bi-cash-coin"];
+
+const ROL = { ADMIN: "Administrador", MEDICO: "Médico", PSICOLOGO: "Psicólogo", ENFERMERA: "Enfermería", RECEPCIONISTA: "Recepción" };
+const fechaHora = (t) => {
+  if (!t) return "";
+  const d = new Date(t.replace(" ", "T"));
+  return d.toLocaleString("es-HN", { day: "2-digit", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" });
+};
+
+// Quién vio una novedad (usuario, clínica, hora) y quién todavía no
+function ModalLecturas({ novedad, onClose }) {
+  const [d, setD] = useState(null);
+  const [error, setError] = useState("");
+  const [tab, setTab] = useState("vieron");
+  const [busq, setBusq] = useState("");
+
+  useEffect(() => {
+    api.get(`/novedades/${novedad.id}/lecturas`)
+      .then((r) => setD(r.data.data))
+      .catch((e) => setError(e?.response?.data?.msg || "No se pudo cargar."));
+  }, [novedad.id]);
+
+  const q = busq.trim().toLowerCase();
+  const lista = (d?.[tab] || []).filter((u) => !q || `${u.nombre} ${u.clinica} ${u.email}`.toLowerCase().includes(q));
+  const total = d ? d.vieron.length + d.pendientes.length : 0;
+  const clinicas = d ? new Set(d.vieron.map((u) => u.clinica)).size : 0;
+
+  return createPortal(
+    <div onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.55)", zIndex: 2000, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }}>
+      <div onClick={(e) => e.stopPropagation()} style={{ background: "#fff", borderRadius: 16, width: "100%", maxWidth: 760, maxHeight: "88vh", display: "flex", flexDirection: "column", overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.3)" }}>
+        <div style={{ padding: "16px 18px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: 10, alignItems: "flex-start" }}>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div className="fw-bold" style={{ fontSize: 16 }}>{novedad.version ? `v${novedad.version} · ` : ""}{novedad.titulo}</div>
+            {d && (
+              <div className="text-muted" style={{ fontSize: 13 }}>
+                Vista por <strong>{d.vieron.length}</strong> de {total} usuario(s){d.vieron.length ? ` en ${clinicas} clínica(s)` : ""}
+                {total ? ` · ${Math.round((d.vieron.length / total) * 100)}%` : ""}
+              </div>
+            )}
+          </div>
+          <button className="btn btn-sm btn-light" onClick={onClose} aria-label="Cerrar"><i className="bi bi-x-lg" /></button>
+        </div>
+
+        <div style={{ padding: "10px 18px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+          {[["vieron", `La vieron (${d?.vieron.length ?? "…"})`], ["pendientes", `No la han visto (${d?.pendientes.length ?? "…"})`]].map(([id, label]) => (
+            <button key={id} className="btn btn-sm" onClick={() => setTab(id)}
+              style={{ borderRadius: 999, fontWeight: 600, fontSize: 13, border: "1px solid #e5e7eb", background: tab === id ? "#0f172a" : "#fff", color: tab === id ? "#fff" : "#475569" }}>
+              {label}
+            </button>
+          ))}
+          <input className="form-control form-control-sm ms-auto" style={{ maxWidth: 240 }} placeholder="Buscar usuario o clínica…" value={busq} onChange={(e) => setBusq(e.target.value)} />
+        </div>
+
+        <div style={{ overflowY: "auto", padding: "0 18px 16px" }}>
+          {error && <div className="alert alert-danger py-2 small">{error}</div>}
+          {!d && !error && <div className="text-muted small py-3"><span className="spinner-border spinner-border-sm me-2" />Cargando…</div>}
+          {d && lista.length === 0 && <div className="text-muted text-center py-4" style={{ fontSize: 14 }}>{tab === "vieron" ? "Nadie la ha visto todavía." : "¡Todos la vieron! 🎉"}</div>}
+          {d && lista.length > 0 && (
+            <div className="table-responsive">
+              <style>{`
+                @media (max-width: 575.98px) {
+                  .lect-tabla thead { display: none; }
+                  .lect-tabla, .lect-tabla tbody, .lect-tabla tr, .lect-tabla td { display: block; width: 100%; }
+                  .lect-tabla tr { border-bottom: 1px solid #f1f5f9; padding: 8px 0; }
+                  .lect-tabla td { border: none !important; padding: 1px 0 !important; white-space: normal !important; }
+                  .lect-tabla td[data-label]::before { content: attr(data-label) ": "; color: #94a3b8; font-size: 12px; }
+                }
+              `}</style>
+              <table className="table table-sm align-middle mb-0 lect-tabla" style={{ fontSize: 13.5 }}>
+                <thead><tr className="text-muted small"><th>Usuario</th><th>Clínica</th>{tab === "vieron" && <th>La vio</th>}</tr></thead>
+                <tbody>
+                  {lista.map((u) => (
+                    <tr key={u.id}>
+                      <td>
+                        <div className="fw-semibold">{u.nombre}</div>
+                        <div className="text-muted small">{ROL[u.tipo] || u.tipo} · {u.email}</div>
+                      </td>
+                      <td data-label="Clínica">{u.clinica}</td>
+                      {tab === "vieron" && (
+                        <td className="text-nowrap" data-label="La vio">
+                          {fechaHora(u.visto_en)}
+                          {u.aproximado && <span className="text-muted small ms-1" title="Vista registrada antes de este control: la hora es aproximada">(aprox.)</span>}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>,
+    document.body
+  );
+}
 
 function siguienteVersion(v) {
   const [a, b] = String(v || "1.0").split(".").map((x) => Number(x) || 0);
@@ -18,6 +114,7 @@ export default function NovedadesAdmin() {
   const [editId, setEditId] = useState(null);
   const [msg, setMsg] = useState("");
   const [guardando, setGuardando] = useState(false);
+  const [lecturas, setLecturas] = useState(null);   // novedad cuyo detalle de vistas se muestra
 
   const cargar = useCallback(() => {
     api.get("/novedades/admin").then((r) => setData(r.data.data)).catch(() => setMsg("No se pudieron cargar las novedades."));
@@ -54,6 +151,7 @@ export default function NovedadesAdmin() {
 
   return (
     <div style={{ maxWidth: 980, margin: "0 auto" }}>
+      {lecturas && <ModalLecturas novedad={lecturas} onClose={() => setLecturas(null)} />}
       <div className="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
         <div>
           <h4 className="fw-bold mb-1">✨ Novedades de la plataforma</h4>
@@ -148,7 +246,12 @@ export default function NovedadesAdmin() {
                       </div>
                     </td>
                     <td className="small">{AUD[n.audiencia]}</td>
-                    <td className="text-center small">{n.vistas} usuario(s)</td>
+                    <td className="text-center small">
+                      <button className="btn btn-sm btn-outline-primary" style={{ borderRadius: 999, fontSize: 12.5, padding: "2px 10px", whiteSpace: "nowrap" }}
+                        onClick={() => setLecturas(n)} title="Ver quién la vio">
+                        <i className="bi bi-eye me-1" />{n.vistas} usuario(s)
+                      </button>
+                    </td>
                     <td className="small text-muted">{n.publicado_txt}</td>
                     <td className="text-end text-nowrap">
                       <button className="btn btn-sm btn-link" onClick={() => editar(n)}>Editar</button>

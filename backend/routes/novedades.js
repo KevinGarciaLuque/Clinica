@@ -40,8 +40,19 @@ function asegurarTablas() {
           ultima_vista_id INT UNSIGNED NOT NULL DEFAULT 0,
           visto_en        DATETIME DEFAULT CURRENT_TIMESTAMP
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+      // Quién vio cada novedad y cuándo (una fila por novedad y usuario)
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS novedades_lecturas (
+          novedad_id  INT UNSIGNED NOT NULL,
+          usuario_id  INT UNSIGNED NOT NULL,
+          visto_en    DATETIME DEFAULT CURRENT_TIMESTAMP,
+          aproximado  TINYINT(1) NOT NULL DEFAULT 0 COMMENT '1 = vista anterior a este registro; la hora es aproximada',
+          PRIMARY KEY (novedad_id, usuario_id),
+          INDEX idx_nl_usuario (usuario_id)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
       await sembrarIniciales();
       await sincronizarDesdeArchivo();
+      await respaldarLecturasAnteriores();
     })().catch((e) => { tablasListas = null; throw e; });
   }
   return tablasListas;
@@ -100,6 +111,22 @@ async function sincronizarDesdeArchivo() {
   }
 }
 
+// Las vistas registradas antes de existir novedades_lecturas solo guardaban "hasta qué
+// novedad llegó" y la última hora: se pasan una vez, marcadas como aproximadas.
+async function respaldarLecturasAnteriores() {
+  const [m] = await pool.query("INSERT IGNORE INTO migraciones_unicas (clave) VALUES ('novedades_lecturas_respaldo')");
+  if (!m.affectedRows) return;
+  await pool.query(
+    `INSERT IGNORE INTO novedades_lecturas (novedad_id, usuario_id, visto_en, aproximado)
+     SELECT n.id, v.usuario_id, v.visto_en, 1
+     FROM novedades_vistas v
+     JOIN usuarios u ON u.id = v.usuario_id
+     JOIN novedades n ON n.id <= v.ultima_vista_id AND n.publicada = 1
+       AND (n.audiencia = 'TODOS'
+            OR (n.audiencia = 'MEDICOS' AND u.tipo IN ('MEDICO','PSICOLOGO','ADMIN'))
+            OR (n.audiencia = 'ADMIN' AND u.tipo = 'ADMIN'))`);
+}
+
 // Qué audiencias ve cada rol
 function audienciasDe(tipo) {
   if (tipo === "SUPER_ADMIN") return AUDIENCIAS;
@@ -156,6 +183,12 @@ router.post("/vistas", auth(), async (req, res) => {
       `INSERT INTO novedades_vistas (usuario_id, ultima_vista_id) VALUES (?, ?)
        ON DUPLICATE KEY UPDATE ultima_vista_id = GREATEST(ultima_vista_id, VALUES(ultima_vista_id)), visto_en = NOW()`,
       [uid, m.maxid]);
+    // Una fila por cada novedad visible para este usuario que aún no había visto
+    await pool.query(
+      `INSERT IGNORE INTO novedades_lecturas (novedad_id, usuario_id)
+       SELECT id, ? FROM novedades
+       WHERE publicada = 1 AND publicado_en <= NOW() AND audiencia IN (?)`,
+      [uid, audienciasDe(req.user.tipo)]);
     res.json({ ok: true });
   } catch (e) {
     console.error("[novedades] vistas:", e.message);
@@ -191,12 +224,53 @@ router.get("/admin", auth("SUPER_ADMIN"), async (req, res) => {
     await asegurarTablas();
     const [rows] = await pool.query(
       `SELECT n.*, DATE_FORMAT(n.publicado_en, '%Y-%m-%d %H:%i') AS publicado_txt,
-              (SELECT COUNT(*) FROM novedades_vistas v WHERE v.ultima_vista_id >= n.id) AS vistas
+              (SELECT COUNT(*) FROM novedades_lecturas l JOIN usuarios u ON u.id = l.usuario_id
+                WHERE l.novedad_id = n.id AND u.tipo <> 'SUPER_ADMIN') AS vistas
        FROM novedades n ORDER BY n.publicado_en DESC, n.id DESC LIMIT 200`);
     res.json({ ok: true, data: { novedades: rows, version: await versionActual() } });
   } catch (e) {
     console.error("[novedades] admin:", e.message);
     res.status(500).json({ ok: false, msg: "No se pudieron cargar" });
+  }
+});
+
+// GET /api/novedades/:id/lecturas → quién la vio (usuario, clínica, hora) y quién falta
+router.get("/:id/lecturas", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await asegurarTablas();
+    const [[n]] = await pool.query("SELECT id, titulo, version, audiencia FROM novedades WHERE id=?", [req.params.id]);
+    if (!n) return res.status(404).json({ ok: false, msg: "No encontrada" });
+    // A quién va dirigida (usuarios activos de clínicas, sin SUPER_ADMIN)
+    const roles = n.audiencia === "ADMIN" ? ["ADMIN"]
+      : n.audiencia === "MEDICOS" ? ["MEDICO", "PSICOLOGO", "ADMIN"] : null;
+    const filtroRol = roles ? "AND u.tipo IN (?)" : "";
+    const params = roles ? [n.id, roles] : [n.id];
+    const [usuarios] = await pool.query(
+      `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo,
+              c.id AS clinica_id, c.nombre AS clinica,
+              DATE_FORMAT(l.visto_en, '%Y-%m-%d %H:%i') AS visto_en, l.aproximado
+       FROM usuarios u
+       LEFT JOIN clinicas c ON c.id = u.clinica_id
+       LEFT JOIN novedades_lecturas l ON l.usuario_id = u.id AND l.novedad_id = ?
+       WHERE u.activo = 1 AND u.tipo <> 'SUPER_ADMIN' AND (c.id IS NULL OR c.activo = 1) ${filtroRol}
+       ORDER BY l.visto_en IS NULL, l.visto_en DESC, c.nombre, u.nombres`, params);
+    const fila = (u) => ({
+      id: u.id,
+      nombre: (u.nombre_display || `${u.nombres} ${u.apellidos}`).trim(),
+      email: u.email, tipo: u.tipo, clinica: u.clinica || "—",
+      visto_en: u.visto_en, aproximado: Boolean(u.aproximado),
+    });
+    res.json({
+      ok: true,
+      data: {
+        novedad: n,
+        vieron: usuarios.filter((u) => u.visto_en).map(fila),
+        pendientes: usuarios.filter((u) => !u.visto_en).map(fila),
+      },
+    });
+  } catch (e) {
+    console.error("[novedades] lecturas:", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo cargar quién la vio" });
   }
 });
 
