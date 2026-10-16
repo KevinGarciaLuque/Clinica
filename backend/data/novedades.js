@@ -42,4 +42,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "antes-de-entrar",
+    version: "1.13",
+    titulo: "Resumen “Antes de entrar”",
+    descripcion: "Al abrir la consulta ves de un vistazo las alergias del paciente, sus antecedentes, los últimos signos vitales (con el cambio de peso), su última receta, sus estudios pendientes o con resultado, y avisos como citas a las que faltó o facturas pendientes.",
+    icono: "bi-clipboard2-pulse",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

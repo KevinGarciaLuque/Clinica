@@ -10,6 +10,7 @@ import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import { calcIMC, calcSC, parseDerma } from "./helpers";
 import PacienteResumenCard from "./PacienteResumenCard";
+import AntesDeEntrar from "./AntesDeEntrar";
 import ModalHistoriaFirmada from "./ModalHistoriaFirmada";
 import ModalCobroConsulta from "./ModalCobroConsulta";
 import ModalConfirmarEdicionFirmada from "./ModalConfirmarEdicionFirmada";
@@ -406,6 +407,11 @@ export default function Consulta() {
               <i className="bi bi-plus-lg"></i> Nueva Consulta
             </button>
           </div>
+        )}
+
+        {/* ── Antes de entrar: alergias, signos, receta, estudios, avisos ── */}
+        {(paciente?.id || pacId) && (
+          <AntesDeEntrar pacienteId={paciente?.id || pacId} excluirHistoria={hid} />
         )}
 
         {/* ── Tarjeta nuevo / subsecuente ── */}

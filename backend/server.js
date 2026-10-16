@@ -206,6 +206,7 @@ app.use("/api/perfil-publico", require("./routes/perfilPublico"));
 app.use("/api/opiniones",      require("./routes/opiniones"));
 app.use("/api/controles",      require("./routes/controles"));
 app.use("/api/novedades",      require("./routes/novedades"));
+app.use("/api/antes-de-entrar", require("./routes/antesDeEntrar"));
 
 // ===== 404 =====
 app.use((req, res) => {
