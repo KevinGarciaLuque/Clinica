@@ -14,6 +14,7 @@ const QRCode  = require("qrcode");
 const sse     = require("../utils/sseManager");
 const webPush = require("../utils/webPush");
 const { notificarRecepcionistas } = require("../utils/notificarRecepcion");
+const { urlPublica } = require("../utils/urlPublica");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
@@ -468,7 +469,7 @@ router.get("/:id/whatsapp", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEP
     });
     if (pr.notas) { lineas.push(""); lineas.push(`📝 ${pr.notas}`); }
     if (pr.codigo_qr) {
-      const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+      const frontendUrl = urlPublica();
       lineas.push("");
       lineas.push(`📄 Su receta digital (puede mostrarla en la farmacia): ${frontendUrl}/rx/${pr.codigo_qr}`);
     }
@@ -809,7 +810,7 @@ router.get("/:id/pdf", auth(), async (req, res) => {
     let qrBuffer = null;
     if (pr.codigo_qr) {
       try {
-        const frontendUrl = (process.env.FRONTEND_URL || "http://localhost:5173").replace(/\/$/, "");
+        const frontendUrl = urlPublica();
         const qrUrl = `${frontendUrl}/rx/${pr.codigo_qr}`;
         const qrDataUrl = await QRCode.toDataURL(qrUrl, { width: 200, margin: 1 });
         qrBuffer = Buffer.from(qrDataUrl.split(",")[1], "base64");

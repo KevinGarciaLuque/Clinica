@@ -11,6 +11,7 @@ const argon2 = require("argon2");
 const crypto = require("crypto");
 const auth   = require("../middlewares/auth");
 const { enviarEmail, templateCredenciales } = require("../utils/mailer");
+const { urlPublica } = require("../utils/urlPublica");
 
 function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -393,7 +394,7 @@ router.post("/:id/reenviar-credenciales", auth("SUPER_ADMIN","ADMIN"), async (re
     const hash = await argon2.hash(password);
     await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, usuario.id]);
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = urlPublica();
     await enviarEmail({
       to: usuario.email,
       subject: "Tus credenciales de acceso a Medic-KG",

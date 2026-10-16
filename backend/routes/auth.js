@@ -11,6 +11,7 @@ const streamifier  = require("streamifier");
 const fs           = require("fs");
 const path         = require("path");
 const { enviarEmail, templateCodigo2FA, templateResetPassword } = require("../utils/mailer");
+const { urlPublica } = require("../utils/urlPublica");
 
 // Límite de intentos para los flujos públicos sensibles (2FA de login y
 // recuperación de contraseña) — evita fuerza bruta sobre códigos/tokens.
@@ -698,7 +699,7 @@ router.post("/forgot-password", limiterSensible, async (req, res) => {
       const [[c]] = await pool.query("SELECT nombre FROM clinicas WHERE id=?", [user.clinica_id]);
       clinicaNombre = c?.nombre || null;
     }
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = urlPublica();
     const link = `${frontendUrl}/restablecer-password?token=${tokenRaw}`;
     enviarEmail({
       to: user.email,

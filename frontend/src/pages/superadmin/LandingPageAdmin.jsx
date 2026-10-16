@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../../api/api";
 import { MONEDAS } from "../../utils/monedas";
+import { origenPublico } from "../../utils/origenPublico";
 
 const TABS = [
   { id: "hero",       label: "Hero",       icon: "bi-house-heart-fill" },
@@ -849,7 +850,7 @@ export default function LandingPageAdmin() {
               <input
                 className="form-control"
                 readOnly
-                value={`${window.location.origin}/links`}
+                value={`${origenPublico()}/links`}
                 style={{ background: "#f8fafc", fontWeight: 600 }}
               />
               <button
@@ -857,7 +858,7 @@ export default function LandingPageAdmin() {
                 className="btn btn-primary btn-sm"
                 style={{ borderRadius: 8, fontWeight: 600, whiteSpace: "nowrap" }}
                 onClick={() => {
-                  navigator.clipboard.writeText(`${window.location.origin}/links`);
+                  navigator.clipboard.writeText(`${origenPublico()}/links`);
                   setCopiado(true);
                   setTimeout(() => setCopiado(false), 2000);
                 }}

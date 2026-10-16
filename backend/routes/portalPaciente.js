@@ -22,6 +22,7 @@ dayjs.extend(require("dayjs/plugin/timezone"));
 const pool      = require("../db");
 const { enviarEmail } = require("../utils/mailer");
 const { obtenerToken } = require("../utils/citaEnlace");
+const { urlPublica } = require("../utils/urlPublica");
 
 const ACCESO_MINUTOS = 15;
 const SESION = "7d";
@@ -142,7 +143,7 @@ router.post("/acceso", limiterAcceso, async (req, res) => {
       [email, sha256(token), String(req.ip || "").slice(0, 45)]
     );
 
-    const link = `${process.env.FRONTEND_URL.replace(/\/+$/, "")}/portal/entrar/${token}`;
+    const link = `${urlPublica()}/portal/entrar/${token}`;
     await enviarEmail({
       to: email,
       subject: "Tu enlace para entrar al portal de paciente",

@@ -26,6 +26,7 @@ dayjs.extend(require("dayjs/plugin/timezone"));
 const pool      = require("../db");
 const auth      = require("../middlewares/auth");
 const { tituloMedico } = require("../utils/tituloMedico");
+const { urlPublica } = require("../utils/urlPublica");
 
 const TIPOS   = ["VISTA", "WHATSAPP", "AGENDAR_CLIC", "CITA"];
 const ORIGENES = ["DIRECTO", "QR", "GOOGLE", "FACEBOOK", "INSTAGRAM", "WHATSAPP", "TIKTOK", "OTRO"];
@@ -89,7 +90,7 @@ async function slugDeMedico(medico) {
   throw new Error("No se pudo generar el enlace del médico");
 }
 
-const frontendUrl = () => (process.env.FRONTEND_URL || "https://medickg.com").replace(/\/+$/, "");
+const frontendUrl = () => urlPublica("https://medickg.com");
 
 // ── Rate limits ──────────────────────────────────────────────────────────────
 const limiterPublico = rateLimit({

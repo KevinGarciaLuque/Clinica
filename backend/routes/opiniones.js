@@ -24,6 +24,7 @@ const auth      = require("../middlewares/auth");
 const sse       = require("../utils/sseManager");
 const { enviarEmail } = require("../utils/mailer");
 const { tituloMedico } = require("../utils/tituloMedico");
+const { urlPublica } = require("../utils/urlPublica");
 
 const DIAS_ENTRE_ENCUESTAS = 60; // no preguntar al mismo paciente más de una vez cada 60 días
 
@@ -70,7 +71,7 @@ async function enviarEncuestas() {
   try {
     await asegurarTabla();
     if (!process.env.FRONTEND_URL) return { enviadas: 0 };
-    const base = process.env.FRONTEND_URL.replace(/\/+$/, "");
+    const base = urlPublica();
     const ayer = dayjs().tz("America/Tegucigalpa").subtract(1, "day").format("YYYY-MM-DD");
 
     // Consultas completadas ayer, en clínicas que activaron las opiniones

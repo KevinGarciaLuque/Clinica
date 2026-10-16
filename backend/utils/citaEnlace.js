@@ -8,6 +8,7 @@
  */
 const crypto = require("crypto");
 const pool = require("../db");
+const { urlPublica } = require("./urlPublica");
 
 let tablaLista = null;
 
@@ -38,7 +39,7 @@ async function obtenerToken(citaId, conn = pool) {
 
 /** URL pública de la cita, o null si no hay FRONTEND_URL configurada. */
 async function enlaceCita(citaId, conn = pool) {
-  const base = (process.env.FRONTEND_URL || "").replace(/\/+$/, "");
+  const base = (process.env.FRONTEND_URL ? urlPublica() : "");
   if (!base) return null;
   const token = await obtenerToken(citaId, conn);
   return `${base}/mi-cita/${token}`;

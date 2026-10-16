@@ -11,6 +11,7 @@ import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import CompartirLink from "../components/CompartirLink";
+import { origenPublico } from "../utils/origenPublico";
 
 dayjs.locale("es");
 
@@ -441,7 +442,7 @@ export default function Pacientes() {
           <CompartirLink
             texto="Link de registro"
             icon="bi-person-plus-fill"
-            url={`${window.location.origin}/registro?clinica_id=${user?.clinica_id || ""}&modo=nuevo`}
+            url={`${origenPublico()}/registro?clinica_id=${user?.clinica_id || ""}&modo=nuevo`}
             mensaje="Regístrate como paciente nuevo y crea tu ficha médica en línea:"
           />
           <button

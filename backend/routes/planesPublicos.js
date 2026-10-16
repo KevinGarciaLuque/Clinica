@@ -34,6 +34,7 @@ const {
   planCompletoLabel,
 } = require("../utils/mailer");
 const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+const { urlPublica } = require("../utils/urlPublica");
 
 const solicitarLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -307,7 +308,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
       [clinicaId, usuarioId, req.user.id, montoFinal, moneda || "HNL", id]
     );
     // ── Facturación: snapshot + contrato de servicio ──
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = urlPublica();
     const emailErrors = [];
 
     try {
@@ -423,7 +424,7 @@ router.post("/solicitudes/:id/reenviar-credenciales", auth("SUPER_ADMIN"), async
     const hash = await argon2.hash(password);
     await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, solicitud.usuario_id]);
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = urlPublica();
     await enviarEmail({
       to: solicitud.email,
       subject: "Tus credenciales de acceso a Medic-KG",

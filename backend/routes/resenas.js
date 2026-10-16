@@ -20,6 +20,7 @@ const rateLimit = require("express-rate-limit");
 const sse       = require("../utils/sseManager");
 const webPush   = require("../utils/webPush");
 const { enviarEmail, templateSolicitudResena } = require("../utils/mailer");
+const { urlPublica } = require("../utils/urlPublica");
 
 const responderLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
@@ -66,7 +67,7 @@ router.post("/solicitar", auth("SUPER_ADMIN"), async (req, res) => {
 
     // ── Envío por correo ──
     if (canal === "correo" || canal === "ambos") {
-      const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+      const frontendUrl = urlPublica();
       try {
         await enviarEmail({
           to: medico.email,

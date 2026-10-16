@@ -15,6 +15,7 @@ dayjs.extend(require("dayjs/plugin/timezone"));
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const { enviarEmail } = require("../utils/mailer");
+const { urlPublica } = require("../utils/urlPublica");
 
 const DIAS_ANTES_AVISO = 7;
 const ROLES = ["ADMIN", "MEDICO", "PSICOLOGO", "ENFERMERA", "RECEPCIONISTA", "SUPER_ADMIN"];
@@ -74,7 +75,7 @@ async function enviarAvisosControl() {
     await asegurarTabla();
     if (!process.env.FRONTEND_URL) return { enviados: 0 };
     await sincronizarAgendados();
-    const base = process.env.FRONTEND_URL.replace(/\/+$/, "");
+    const base = urlPublica();
     const hoy = dayjs().tz("America/Tegucigalpa");
     const limite = hoy.add(DIAS_ANTES_AVISO, "day").format("YYYY-MM-DD");
     const desde = hoy.subtract(30, "day").format("YYYY-MM-DD"); // no avisar controles muy vencidos

@@ -40,6 +40,7 @@ const sse     = require("../utils/sseManager");
 const webPush = require("../utils/webPush");
 
 const { titleCaseNombre } = require("../utils/pacientesDuplicados");
+const { urlPublica } = require("../utils/urlPublica");
 // ── Rate limiters ─────────────────────────────────────────
 const limiterStrict = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutos
@@ -193,7 +194,7 @@ async function crearYEnviarToken(pacienteId, clinicaId, email, nombres, apellido
     [clinicaId]
   );
 
-  const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+  const frontendUrl = urlPublica();
   const link = `${frontendUrl}/verificar-email?token=${token}`;
 
   await enviarEmail({

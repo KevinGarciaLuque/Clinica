@@ -16,6 +16,7 @@ dayjs.extend(require("dayjs/plugin/utc"));
 dayjs.extend(require("dayjs/plugin/timezone"));
 const pool = require("../db");
 const { enviarEmail } = require("./mailer");
+const { urlPublica } = require("./urlPublica");
 
 const OFERTAS_POR_ESPACIO = 3;
 const HORAS_MINIMAS = 2; // no se ofrecen espacios que empiezan en menos de 2 horas
@@ -142,7 +143,7 @@ async function ofrecerEspacio(citaId) {
       [cita.clinica_id, cita.medico_id, fechaCita, fechaCita, cita.paciente_id, cita.fin, cita.inicio, OFERTAS_POR_ESPACIO]
     );
 
-    const base = process.env.FRONTEND_URL.replace(/\/+$/, "");
+    const base = urlPublica();
     for (const c of candidatos) {
       const token = crypto.randomBytes(32).toString("hex");
       const [o] = await pool.query(

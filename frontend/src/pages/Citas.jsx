@@ -17,6 +17,7 @@ import ControlesPanel, { ModalProgramarControl } from "../components/Controles";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { TIPOS_AUSENCIA } from "../components/AusenciasMedico";
 import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
+import { origenPublico } from "../utils/origenPublico";
 
 dayjs.locale("es");
 const localizer = dayjsLocalizer(dayjs);
@@ -947,7 +948,7 @@ export default function Citas() {
           <CompartirLink
             texto="Link para agendar cita"
             icon="bi-calendar-plus-fill"
-            url={`${window.location.origin}/registro?clinica_id=${user?.clinica_id || ""}&modo=cita`}
+            url={`${origenPublico()}/registro?clinica_id=${user?.clinica_id || ""}&modo=cita`}
             mensaje="Agenda tu cita en línea. Si ya eres paciente, solo necesitas tu DNI:"
           />
           <button

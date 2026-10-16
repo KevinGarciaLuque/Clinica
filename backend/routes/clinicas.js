@@ -10,6 +10,7 @@ const streamifier = require("streamifier");
 const fs          = require("fs");
 const path        = require("path");
 const { enviarEmail, templateCredenciales } = require("../utils/mailer");
+const { urlPublica } = require("../utils/urlPublica");
 
 function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -884,7 +885,7 @@ router.post("/:id/reenviar-credenciales", auth("SUPER_ADMIN"), async (req, res) 
     const hash = await argon2.hash(password);
     await pool.query("UPDATE usuarios SET password_hash=? WHERE id=?", [hash, admin.id]);
 
-    const frontendUrl = process.env.FRONTEND_URL || "http://localhost:5173";
+    const frontendUrl = urlPublica();
     await enviarEmail({
       to: admin.email,
       subject: "Tus credenciales de acceso a Medic-KG",

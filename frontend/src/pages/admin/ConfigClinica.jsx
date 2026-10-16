@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import api from "../../api/api";
 import { DEPARTAMENTOS_HONDURAS, MUNICIPIOS_POR_DEPARTAMENTO } from "../../utils/departamentosHonduras";
 import { useAuth } from "../../auth/AuthContext";
+import { origenPublico } from "../../utils/origenPublico";
 
 function pct(value) {
   const n = Number(value || 0);
@@ -510,7 +511,7 @@ export default function ConfigClinica() {
                       LINK PÚBLICO DE TU CLÍNICA
                     </div>
                     <div style={{ fontFamily: "monospace", fontSize: 14, color: "#4c1d95", wordBreak: "break-all" }}>
-                      {window.location.origin}/p/{clinica.slug}
+                      {origenPublico()}/p/{clinica.slug}
                     </div>
                   </div>
                   <button
@@ -518,7 +519,7 @@ export default function ConfigClinica() {
                     className="btn btn-sm"
                     style={{ background: "#7c3aed", color: "#fff", borderRadius: 8 }}
                     onClick={() => {
-                      navigator.clipboard.writeText(`${window.location.origin}/p/${clinica.slug}`);
+                      navigator.clipboard.writeText(`${origenPublico()}/p/${clinica.slug}`);
                       setMsg({ tipo: "success", texto: "Link copiado al portapapeles" });
                     }}
                   >
