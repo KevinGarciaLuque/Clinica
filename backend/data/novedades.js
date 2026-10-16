@@ -96,4 +96,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "evolucion-laboratorio-tratamiento",
+    version: "1.19",
+    titulo: "Evolución: laboratorio, tratamiento y avisos",
+    descripcion: "La pestaña “Evolución” del expediente ahora grafica los resultados de laboratorio con su rango normal (en rojo los fuera de rango), marca en las gráficas los días en que cambió la receta y muestra “Puntos de atención”, como presión alta en las últimas consultas o glucosa fuera de rango.",
+    icono: "bi-clipboard2-data",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

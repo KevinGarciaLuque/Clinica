@@ -110,9 +110,38 @@ function Panel({ titulo, icono, color, extra, children }) {
   );
 }
 
+const NIVEL = {
+  alto:  { bg: "#fef2f2", borde: "#fecaca", fg: "#b91c1c", icono: "bi-exclamation-octagon-fill" },
+  medio: { bg: "#fffbeb", borde: "#fde68a", fg: "#92400e", icono: "bi-exclamation-triangle-fill" },
+  bueno: { bg: "#f0fdf4", borde: "#bbf7d0", fg: "#15803d", icono: "bi-check-circle-fill" },
+};
+
+// Texto corto de un cambio de tratamiento (para la leyenda al pasar el mouse)
+function textoCambio(c) {
+  const partes = [];
+  if (c.inicia.length) partes.push(`${c.primera ? "Tratamiento" : "Nuevo"}: ${c.inicia.join(", ")}`);
+  if (c.ajusta.length) partes.push(`Cambio de dosis: ${c.ajusta.map((a) => `${a.antes} → ${a.ahora}`).join(", ")}`);
+  if (c.no_incluye.length) partes.push(`No incluido: ${c.no_incluye.join(", ")}`);
+  return partes.join(" · ");
+}
+
+// Agrega a la serie las fechas de cambios de tratamiento (para poder marcarlas en el eje)
+function conFechas(serie, fechas) {
+  const existentes = new Set(serie.map((x) => x.fecha));
+  const extra = fechas.filter((f) => !existentes.has(f)).map((fecha) => ({ fecha }));
+  return [...serie, ...extra].sort((a, b) => (a.fecha < b.fecha ? -1 : a.fecha > b.fecha ? 1 : 0));
+}
+
+// Punto de la gráfica de laboratorio: rojo si el resultado salió fuera de rango
+function PuntoLab({ cx, cy, payload }) {
+  if (cx == null || cy == null || payload?.valor == null) return null;
+  const malo = payload.anormal;
+  return <circle cx={cx} cy={cy} r={malo ? 5 : 4} fill={malo ? "#dc2626" : "#fff"} stroke={malo ? "#dc2626" : "#059669"} strokeWidth={2} />;
+}
+
 const ejeX = { dataKey: "fecha", tickFormatter: fechaCorta, tick: { fontSize: 10.5, fill: "#64748b" }, axisLine: false, tickLine: false, minTickGap: 18 };
 const ejeY = { tick: { fontSize: 10.5, fill: "#64748b" }, axisLine: false, tickLine: false, width: 36 };
-const tooltip = { contentStyle: { fontSize: 12, borderRadius: 8 }, labelFormatter: (f) => dayjs(f).format("DD/MM/YYYY") };
+const tooltipBase = { contentStyle: { fontSize: 12, borderRadius: 8, maxWidth: 280, whiteSpace: "normal" } };
 
 export default function EvolucionPaciente({ pacienteId }) {
   const [d, setD] = useState(null);
@@ -120,6 +149,8 @@ export default function EvolucionPaciente({ pacienteId }) {
   const [periodo, setPeriodo] = useState("12");
   const [otro, setOtro] = useState("fc");
   const [verTodas, setVerTodas] = useState(false);
+  const [examen, setExamen] = useState(null);
+  const [verMarcas, setVerMarcas] = useState(true);
 
   useEffect(() => {
     if (!pacienteId) return;
@@ -136,7 +167,14 @@ export default function EvolucionPaciente({ pacienteId }) {
     const desde = dayjs().subtract(Number(periodo), "month").format("YYYY-MM-DD");
     return consultas.filter((c) => c.fecha >= desde);
   }, [consultas, periodo]);
-  const puntos = useMemo(() => enPeriodo.map((c) => ({ fecha: c.fecha, diagnostico: c.diagnostico, ...c.vitales })), [enPeriodo]);
+  const desdePeriodo = periodo === "todo" ? "" : dayjs().subtract(Number(periodo), "month").format("YYYY-MM-DD");
+  const cambios = useMemo(() => (d?.tratamiento || []).filter((c) => c.fecha >= desdePeriodo), [d, desdePeriodo]);
+  const fechasCambio = useMemo(() => (verMarcas ? cambios.map((c) => c.fecha) : []), [cambios, verMarcas]);
+  const cambioPorFecha = useMemo(() => new Map(cambios.map((c) => [c.fecha, c])), [cambios]);
+  const puntos = useMemo(
+    () => conFechas(enPeriodo.map((c) => ({ fecha: c.fecha, diagnostico: c.diagnostico, ...c.vitales })), fechasCambio),
+    [enPeriodo, fechasCambio]
+  );
 
   if (error) return <div className="alert alert-danger">{error}</div>;
   if (!d) return <div className="text-center py-5 text-muted"><span className="spinner-border spinner-border-sm me-2" />Cargando evolución…</div>;
@@ -151,6 +189,34 @@ export default function EvolucionPaciente({ pacienteId }) {
       </div>
     );
   }
+
+  // Leyenda al pasar el mouse: fecha y, si ese día hubo cambio de receta, cuál fue
+  const tooltip = {
+    ...tooltipBase,
+    labelFormatter: (f) => {
+      const c = cambioPorFecha.get(f);
+      return (
+        <span>
+          {dayjs(f).format("DD/MM/YYYY")}
+          {c && <span style={{ display: "block", color: "#7c3aed", fontWeight: 600, marginTop: 2 }}>💊 {textoCambio(c)}</span>}
+        </span>
+      );
+    },
+  };
+  const marcas = fechasCambio.map((f) => (
+    <ReferenceLine key={`rx-${f}`} x={f} stroke="#a78bfa" strokeDasharray="3 3" label={{ value: "Rx", position: "insideTop", fill: "#7c3aed", fontSize: 10, fontWeight: 700 }} />
+  ));
+
+  // Laboratorio: exámenes con resultados numéricos en el periodo
+  const labs = (d.laboratorios || [])
+    .map((g) => ({ ...g, valores: g.valores.filter((v) => v.fecha >= desdePeriodo) }))
+    .filter((g) => g.valores.length);
+  // Por defecto: el examen que requiere atención (último resultado fuera de rango y con historial)
+  const labSel = labs.find((g) => g.clave === examen)
+    || labs.find((g) => g.valores.length >= 2 && g.valores[g.valores.length - 1].anormal)
+    || labs.find((g) => g.valores.length >= 2) || labs[0];
+  const serieLab = labSel ? conFechas(labSel.valores.map((v) => ({ ...v })), fechasCambio.filter((f) => f >= labSel.valores[0].fecha)) : [];
+  const avisos = d.avisos || [];
 
   const pa = ultimos(consultas, "sis");
   const peso = ultimos(consultas, "peso");
@@ -177,6 +243,9 @@ export default function EvolucionPaciente({ pacienteId }) {
         .evo-graficas { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 10px; margin-top: 10px; }
         .evo-chip { border: 1px solid #e2e8f0; background: #fff; color: #475569; border-radius: 999px; padding: 3px 11px; font-size: 0.76rem; font-weight: 600; cursor: pointer; }
         .evo-chip.on { background: #1e3a8a; border-color: #1e3a8a; color: #fff; }
+        .evo-lab { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+        @media (max-width: 767.98px) { .evo-lab { grid-template-columns: minmax(0, 1fr); } }
+        .evo-chip.on-rx { background: #f5f3ff; border-color: #c4b5fd; color: #6d28d9; }
       `}</style>
 
       {/* Encabezado + periodo */}
@@ -187,12 +256,38 @@ export default function EvolucionPaciente({ pacienteId }) {
             {consultas.length} consulta(s){conSignos.length !== consultas.length ? `, ${conSignos.length} con signos vitales` : ""} · última {haceCuanto(ultimaConsulta.fecha)}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+          {(d.tratamiento || []).length > 0 && (
+            <button type="button" className={`evo-chip ${verMarcas ? "on-rx" : ""}`} onClick={() => setVerMarcas((x) => !x)}
+              title="Marca en las gráficas los días en que cambió la receta">
+              💊 Cambios de receta
+            </button>
+          )}
           {PERIODOS.map((p) => (
             <button key={p.key} type="button" className={`evo-chip ${periodo === p.key ? "on" : ""}`} onClick={() => setPeriodo(p.key)}>{p.label}</button>
           ))}
         </div>
       </div>
+
+      {/* Puntos de atención (avisos automáticos) */}
+      {avisos.length > 0 && (
+        <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "10px 14px", marginBottom: 10 }}>
+          <div style={{ fontWeight: 700, fontSize: "0.85rem", color: "#1e293b", marginBottom: 6 }}>
+            <i className="bi bi-lightbulb me-2" style={{ color: "#f59e0b" }} />Puntos de atención
+          </div>
+          <div style={{ display: "grid", gap: 6 }}>
+            {avisos.map((a, i) => {
+              const n = NIVEL[a.nivel] || NIVEL.medio;
+              return (
+                <div key={i} style={{ display: "flex", gap: 8, alignItems: "flex-start", background: n.bg, border: `1px solid ${n.borde}`, borderRadius: 8, padding: "6px 10px", fontSize: "0.83rem", color: n.fg }}>
+                  <i className={`bi ${n.icono}`} style={{ marginTop: 2 }} />
+                  <span style={{ color: "#1e293b" }}>{a.texto}</span>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Tarjetas de resumen */}
       {conSignos.length > 0 ? (
@@ -248,6 +343,7 @@ export default function EvolucionPaciente({ pacienteId }) {
                   <Tooltip {...tooltip} />
                   <Legend wrapperStyle={{ fontSize: 12 }} iconType="circle" />
                   <ReferenceLine y={130} stroke="#f87171" strokeDasharray="4 4" />
+                  {marcas}
                   <ReferenceLine y={80} stroke="#fb923c" strokeDasharray="4 4" />
                   <Line type="monotone" dataKey="sis" name="Sistólica" stroke="#dc2626" strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
                   <Line type="monotone" dataKey="dia" name="Diastólica" stroke="#2563eb" strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
@@ -264,6 +360,7 @@ export default function EvolucionPaciente({ pacienteId }) {
                   <XAxis {...ejeX} />
                   <YAxis {...ejeY} domain={[(min) => Math.floor(min - 3), (max) => Math.ceil(max + 3)]} />
                   <Tooltip {...tooltip} formatter={(v) => [`${v} kg`, "Peso"]} />
+                  {marcas}
                   <Line type="monotone" dataKey="peso" name="Peso" stroke="#0284c7" strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
@@ -281,6 +378,7 @@ export default function EvolucionPaciente({ pacienteId }) {
                   <Tooltip {...tooltip} formatter={(v) => [v, "IMC"]} />
                   <ReferenceArea y1={18.5} y2={24.9} fill="#22c55e" fillOpacity={0.1} />
                   <ReferenceLine y={30} stroke="#f87171" strokeDasharray="4 4" />
+                  {marcas}
                   <Line type="monotone" dataKey="imc" name="IMC" stroke="#4f46e5" strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
@@ -303,12 +401,77 @@ export default function EvolucionPaciente({ pacienteId }) {
                   <YAxis {...ejeY} domain={[(min) => Math.floor(Math.min(min, otroSel.rango[0]) - 2), (max) => Math.ceil(Math.max(max, otroSel.rango[1]) + 2)]} />
                   <Tooltip {...tooltip} formatter={(v) => [`${v} ${otroSel.unidad}`, otroSel.label]} />
                   <ReferenceArea y1={otroSel.rango[0]} y2={otroSel.rango[1]} fill="#22c55e" fillOpacity={0.1} />
+                  {marcas}
                   <Line type="monotone" dataKey={otroSel.key} name={otroSel.label} stroke={otroSel.color} strokeWidth={2.2} dot={{ r: 3.5 }} connectNulls />
                 </LineChart>
               </ResponsiveContainer>
               <div style={{ fontSize: "0.72rem", color: "#15803d" }}>▬ rango normal {otroSel.rango[0]}–{otroSel.rango[1]} {otroSel.unidad}</div>
             </Panel>
           )}
+        </div>
+      )}
+
+      {/* Laboratorio */}
+      {labSel && (
+        <div style={{ marginTop: 10 }}>
+          <Panel titulo="Laboratorio" icono="bi-droplet-half" color="#059669"
+            extra={
+              <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                {labs.map((g) => (
+                  <button key={g.clave} type="button" className={`evo-chip ${labSel.clave === g.clave ? "on" : ""}`} onClick={() => setExamen(g.clave)}
+                    title={`${g.valores.length} resultado(s)`} style={{ maxWidth: "100%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    {g.nombre}
+                    {g.valores[g.valores.length - 1].anormal && <span style={{ color: "#dc2626", marginLeft: 4 }} title="Último resultado fuera de rango">●</span>}
+                  </button>
+                ))}
+              </div>
+            }>
+            <div className="evo-lab">
+              <div style={{ minWidth: 0 }}>
+                {labSel.valores.length >= 2 ? (
+                  <ResponsiveContainer width="100%" height={230}>
+                    <LineChart data={serieLab} margin={{ top: 10, right: 10, left: -4, bottom: 0 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
+                      <XAxis {...ejeX} />
+                      <YAxis {...ejeY} width={40} domain={[
+                        (min) => Math.floor(Math.min(min, labSel.min ?? min) * 0.9),
+                        (max) => Math.ceil(Math.max(max, labSel.max ?? max) * 1.08),
+                      ]} />
+                      <Tooltip {...tooltip} formatter={(v) => [`${v} ${labSel.unidad}`, labSel.nombre]} />
+                      {(labSel.min != null || labSel.max != null) && (
+                        <ReferenceArea y1={labSel.min ?? 0} y2={labSel.max ?? undefined} fill="#22c55e" fillOpacity={0.1} />
+                      )}
+                      {marcas.filter((m) => m.props.x >= labSel.valores[0].fecha)}
+                      <Line type="monotone" dataKey="valor" name={labSel.nombre} stroke="#059669" strokeWidth={2.2} dot={<PuntoLab />} activeDot={{ r: 6 }} connectNulls isAnimationActive={false} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="text-muted small py-4 text-center">Solo hay un resultado de {labSel.nombre}: la gráfica aparecerá cuando haya dos o más.</div>
+                )}
+                <div style={{ fontSize: "0.72rem", color: "#64748b", display: "flex", gap: 12, flexWrap: "wrap" }}>
+                  {(labSel.min != null || labSel.max != null) && (
+                    <span style={{ color: "#15803d" }}>▬ rango normal {labSel.min ?? "—"}–{labSel.max ?? "—"} {labSel.unidad}</span>
+                  )}
+                  <span><span style={{ color: "#dc2626" }}>●</span> fuera de rango</span>
+                </div>
+              </div>
+              <div style={{ minWidth: 0 }}>
+                <table className="table table-sm mb-0" style={{ fontSize: "0.8rem" }}>
+                  <thead><tr><th style={{ fontWeight: 600, color: "#64748b" }}>Fecha</th><th style={{ fontWeight: 600, color: "#64748b", textAlign: "right" }}>Resultado</th></tr></thead>
+                  <tbody>
+                    {[...labSel.valores].reverse().slice(0, 6).map((v, i) => (
+                      <tr key={i}>
+                        <td>{dayjs(v.fecha).format("DD/MM/YYYY")}</td>
+                        <td style={{ textAlign: "right", fontWeight: 700, color: v.anormal ? "#dc2626" : "#0f172a", whiteSpace: "nowrap" }}>
+                          {v.valor} <span style={{ fontWeight: 500, color: "#64748b" }}>{labSel.unidad}</span>{v.anormal && <i className="bi bi-exclamation-circle-fill ms-1" />}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </Panel>
         </div>
       )}
 
@@ -322,6 +485,19 @@ export default function EvolucionPaciente({ pacienteId }) {
                   {x.cie && <span style={{ fontFamily: "monospace", fontSize: "0.72rem", background: "#ecfeff", color: "#0e7490", borderRadius: 5, padding: "1px 6px" }}>{x.cie}</span>}
                   <span style={{ flex: 1, minWidth: 0 }} className="text-truncate" title={x.nombre}>{x.nombre}</span>
                   <span style={{ fontWeight: 700, color: "#0f172a", whiteSpace: "nowrap" }}>{x.veces} {x.veces === 1 ? "vez" : "veces"}</span>
+                </div>
+              ))}
+            </Panel>
+          )}
+
+          {cambios.length > 0 && (
+            <Panel titulo="Cambios de tratamiento" icono="bi-capsule" color="#7c3aed">
+              {[...cambios].reverse().slice(0, 6).map((c, i) => (
+                <div key={i} style={{ padding: "6px 0", borderTop: i ? "1px solid #f1f5f9" : "none", fontSize: "0.8rem" }}>
+                  <strong style={{ color: "#1e293b" }}>{dayjs(c.fecha).format("DD/MM/YYYY")}</strong>
+                  {c.inicia.length > 0 && <div><span style={{ color: "#15803d", fontWeight: 600 }}>{c.primera ? "Tratamiento:" : "Nuevo:"}</span> {c.inicia.join(", ")}</div>}
+                  {c.ajusta.map((a, j) => <div key={j}><span style={{ color: "#b45309", fontWeight: 600 }}>Cambio de dosis:</span> {a.antes} → {a.ahora}</div>)}
+                  {c.no_incluye.length > 0 && <div style={{ color: "#64748b" }}><span style={{ fontWeight: 600 }}>No incluido en esta receta:</span> {c.no_incluye.join(", ")}</div>}
                 </div>
               ))}
             </Panel>
