@@ -154,6 +154,7 @@ app.use("/api/horarios", require("./routes/horarios"));
 app.use("/api/ausencias", require("./routes/ausencias"));
 app.use("/api/servicios", require("./routes/servicios"));
 app.use("/api/pacientes", require("./routes/pacientes"));
+app.use("/api/pacientes-importar", require("./routes/importarPacientes"));
 app.use("/api/pacientes/:pacienteId/documentos", require("./routes/documentos"));
 app.use("/api/documentos", require("./routes/documentosPdf"));
 app.use("/api/citas", require("./routes/citas"));
