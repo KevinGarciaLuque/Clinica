@@ -620,7 +620,7 @@ export default function Dashboard() {
             animate="visible"
           >
             {/* KPIs */}
-            <div className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'}`} style={{ paddingTop: isMobile ? 8 : 20, marginBottom: isMobile ? 8 : 16 }}>
+            <div className={`row ${isMobile ? 'g-1 px-1 mx-0' : 'g-3 px-3'}`} style={{ paddingTop: isMobile ? 8 : 20, marginBottom: isMobile ? 8 : 16 }}>
               <KpiCard 
                 label="Total Pacientes" 
                 value={stats.total_pacientes} 
@@ -712,7 +712,7 @@ export default function Dashboard() {
               </motion.div>
             )}
 
-            <div className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'}`}>
+            <div className={`row ${isMobile ? 'g-1 px-1 mx-0' : 'g-3 px-3'}`}>
               {/* Sala de espera */}
               <motion.div 
                 className="col-lg-8"
@@ -958,7 +958,7 @@ export default function Dashboard() {
             {(user?.tipo === "ADMIN" || user?.tipo === "SUPER_ADMIN") && (
               <motion.div
                 variants={itemVariants}
-                className={`row ${isMobile ? 'g-1 px-1' : 'g-3 px-3'}`}
+                className={`row ${isMobile ? 'g-1 px-1 mx-0' : 'g-3 px-3'}`}
                 style={{ marginTop: isMobile ? 8 : 16, paddingBottom: isMobile ? 8 : 24 }}
               >
                 {[

@@ -174,14 +174,23 @@ export default function AppLayout() {
               margin-left: 0 !important;
             }
           }
+          /* En el teléfono el relleno del contenido es 1rem (no 1.5rem): los fondos
+             de página a todo lo ancho se ajustan para no salirse de la pantalla */
+          @media (max-width: 767.98px) {
+            .app-main [style*="calc(100% + 3rem)"], .app-main .cat-root, .app-main .inv-root {
+              margin: -1rem !important;
+              width: calc(100% + 2rem) !important;
+            }
+          }
         `}</style>
 
         {/* ── Contenido principal ── */}
         <main
           ref={mainRef}
-          className={pathname.startsWith("/psicologia") ? "flex-grow-1" : "flex-grow-1 p-3 p-md-4"}
+          className={pathname.startsWith("/psicologia") ? "app-main flex-grow-1" : "app-main flex-grow-1 p-3 p-md-4"}
           style={{
             overflowY: "auto",
+            overflowX: "hidden", // la página nunca se desliza hacia los lados
             background: pathname.startsWith("/psicologia") ? "#f1f5f9" : "#f1f5f9",
             minWidth: 0,
             height: "100%",

@@ -325,7 +325,7 @@ export default function ConfigClinica() {
           </div>
         </div>
 
-        <div style={{ display: "flex", gap: 4 }}>
+        <div style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none", whiteSpace: "nowrap" }}>
           {tabsVisibles.map(({ key, label, icon }) => (
             <button
               key={key}

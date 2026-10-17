@@ -195,7 +195,7 @@ export default function Estadisticas() {
       {!loading && resumen && (
         <motion.div variants={containerVariants} initial="hidden" animate="visible">
           {/* KPIs */}
-          <div className={`row ${isMobile ? "g-1 px-1" : "g-3 px-3"}`} style={{ paddingTop: isMobile ? 12 : 20, marginBottom: isMobile ? 8 : 16 }}>
+          <div className={`row ${isMobile ? "g-1 px-1 mx-0" : "g-3 px-3"}`} style={{ paddingTop: isMobile ? 12 : 20, marginBottom: isMobile ? 8 : 16 }}>
             <KpiCard label="Consultas atendidas" value={resumen.consultas_atendidas} icon="🩺"
               gradient="linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)" isMobile={isMobile} delay={0} />
             <KpiCard label="Pacientes nuevos" value={resumen.pacientes_nuevos} icon="🆕"
@@ -209,7 +209,7 @@ export default function Estadisticas() {
 
           {/* Ingresos — solo ADMIN/SUPER_ADMIN */}
           {resumen.ingresos && (
-            <div className={`row ${isMobile ? "g-1 px-1" : "g-3 px-3"}`} style={{ marginBottom: isMobile ? 8 : 16 }}>
+            <div className={`row ${isMobile ? "g-1 px-1 mx-0" : "g-3 px-3"}`} style={{ marginBottom: isMobile ? 8 : 16 }}>
               <KpiCard label="Ingresos cobrados" value={fmtMoneda(resumen.ingresos.pagado)} icon="💰"
                 gradient="linear-gradient(135deg, #22c55e 0%, #16a34a 100%)" isMobile={isMobile} delay={0.2} />
               <KpiCard label="Por cobrar" value={fmtMoneda(resumen.ingresos.pendiente)} icon="⏳"
@@ -217,7 +217,7 @@ export default function Estadisticas() {
             </div>
           )}
 
-          <div className={`row ${isMobile ? "g-1 px-1" : "g-3 px-3"}`}>
+          <div className={`row ${isMobile ? "g-1 px-1 mx-0" : "g-3 px-3"}`}>
             {/* Gráfico de citas por día */}
             <motion.div className="col-lg-8" variants={itemVariants}>
               <div style={{ background: "#fff", borderRadius: 12, padding: isMobile ? 12 : 20, border: "1px solid #e5e7eb", boxShadow: "0 2px 8px rgba(0,0,0,.06)", height: "100%" }}>
