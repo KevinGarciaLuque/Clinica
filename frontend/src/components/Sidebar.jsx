@@ -56,7 +56,7 @@ const ADMIN_ROUTES = new Set([
 
 // Sección "Gestión": lo administrativo del día a día (estadísticas, cobros, caja, inventario,
 // recordatorios y cumpleañeros) sale de "Clínica" para que ahí quede solo lo clínico.
-const GESTION_ORDEN = ["/estadisticas", "/facturacion", "/caja", "/inventario", "/recordatorios", "/cumpleaneros"];
+const GESTION_ORDEN = ["/estadisticas", "/facturacion", "/caja", "/finanzas", "/inventario", "/recordatorios", "/cumpleaneros"];
 
 const superItems = [
   { to: "/superadmin/clinicas",        label: "Clínicas",        icon: "bi-building-fill" },

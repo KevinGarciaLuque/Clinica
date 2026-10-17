@@ -12,6 +12,7 @@ const path        = require("path");
 const { enviarEmail, templateCredenciales } = require("../utils/mailer");
 const { urlPublica } = require("../utils/urlPublica");
 const { zonaClinica, olvidarZona, ahoraClinica, offsetMin } = require("../utils/zonaHoraria");
+const { puedeVerFinanzas } = require("../utils/permisoFinanzas");
 
 function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -277,7 +278,12 @@ router.get("/modulos", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIO
       return true;
     });
 
-    res.json({ ok: true, data: efectivos });
+    // Finanzas: solo para quien puede ver el dinero de la clínica (ver utils/permisoFinanzas.js)
+    const conFinanzas = efectivos.some((m) => m.clave === "finanzas") && !(await puedeVerFinanzas(req.user))
+      ? efectivos.filter((m) => m.clave !== "finanzas")
+      : efectivos;
+
+    res.json({ ok: true, data: conFinanzas });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

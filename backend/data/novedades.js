@@ -159,4 +159,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "finanzas-gastos-ganancias",
+    version: "1.26",
+    titulo: "Finanzas: gastos y ganancias de la clínica",
+    descripcion: "Nuevo módulo Gestión → Finanzas: registra los gastos de la clínica (alquiler, sueldos, insumos…) y mira cada mes cuánto entró, cuánto salió y cuánto ganaste, con gráfica de los últimos 6 meses. También muestra quién tiene facturas pendientes para cobrarle por WhatsApp. Lo ve el administrador o el médico dueño de la clínica.",
+    icono: "bi-wallet2",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

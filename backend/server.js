@@ -164,6 +164,7 @@ app.use("/api/dashboard", require("./routes/dashboard"));
 app.use("/api/estadisticas", require("./routes/estadisticas"));
 app.use("/api/facturacion", require("./routes/facturacion"));
 app.use("/api/caja", require("./routes/caja"));
+app.use("/api/finanzas", require("./routes/finanzas"));
 app.use("/api/historias", require("./routes/historias"));
 app.use("/api/prescripciones", require("./routes/prescripciones"));
 app.use("/api/estudios", require("./routes/estudios"));
@@ -927,6 +928,22 @@ const pool = require("./db");
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     `);
     console.log("✅ [auto-migrate] usuario_password_reset OK");
+
+    // Módulo Finanzas (gastos y ganancias): visible en el menú de todas las clínicas.
+    // Quién lo ve dentro de cada clínica lo decide utils/permisoFinanzas.js.
+    try {
+      await pool.query(
+        `INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, disponible, orden, descripcion, para_normal, para_pediatrica)
+         VALUES ('finanzas', 'Finanzas', 'bi-wallet2', '/finanzas', 1, 37, 'Gastos, ganancias y cuentas por cobrar', 1, 1)`
+      );
+      await pool.query(
+        `INSERT IGNORE INTO tipo_clinica_modulos (tipo_id, modulo_id)
+         SELECT tc.id, ms.id FROM tipos_clinica tc, modulos_sistema ms WHERE ms.clave = 'finanzas'`
+      );
+      console.log("✅ [auto-migrate] módulo finanzas OK");
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] módulo finanzas:", e.message);
+    }
 
   } catch (e) {
     console.warn("⚠️  [auto-migrate]:", e.message);

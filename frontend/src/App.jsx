@@ -9,6 +9,7 @@ const Dashboard       = lazy(() => import("./pages/Dashboard"));
 const Estadisticas    = lazy(() => import("./pages/Estadisticas"));
 const Facturacion     = lazy(() => import("./pages/Facturacion"));
 const Caja            = lazy(() => import("./pages/Caja"));
+const Finanzas        = lazy(() => import("./pages/Finanzas"));
 const Pacientes       = lazy(() => import("./pages/Pacientes"));
 const ExportarPacientes = lazy(() => import("./pages/ExportarPacientes"));
 const ImportarPacientes = lazy(() => import("./pages/ImportarPacientes"));
@@ -170,6 +171,7 @@ export default function App() {
         <Route path="/citas"                  element={<Citas />} />
         <Route path="/facturacion"            element={<Facturacion />} />
         <Route path="/caja"                   element={<Caja />} />
+        <Route path="/finanzas"               element={<Finanzas />} />
         <Route path="/chat-ia"                element={<ChatIA />} />
         <Route path="/consulta"               element={<Consulta />} />
         <Route path="/consulta-medica"        element={<Suspense fallback={<PageSkeleton />}><ConsultaMedica /></Suspense>} />
