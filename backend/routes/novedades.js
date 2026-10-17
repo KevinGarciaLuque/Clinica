@@ -13,6 +13,13 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 
+// Las fechas se guardan con la hora del servidor de base de datos (en Railway, UTC).
+// Para mostrarlas se pasan a hora de Honduras (UTC-6, sin horario de verano):
+// así una novedad publicada el 16 a las 7 p. m. no aparece como del 17.
+// Funciona sea cual sea la zona horaria de la base de datos.
+const enHonduras = (col) =>
+  `DATE_ADD(${col}, INTERVAL (-360 - ROUND(TIMESTAMPDIFF(SECOND, UTC_TIMESTAMP(), NOW()) / 60)) MINUTE)`;
+
 const AUDIENCIAS = ["TODOS", "MEDICOS", "ADMIN"];
 
 let tablasListas = null;
@@ -148,7 +155,7 @@ router.get("/", auth(), async (req, res) => {
     const uid = req.user.uid ?? req.user.id;
     const [rows] = await pool.query(
       `SELECT id, version, titulo, descripcion, icono, imagen_url, importante,
-              DATE_FORMAT(publicado_en, '%Y-%m-%d') AS fecha
+              DATE_FORMAT(${enHonduras("publicado_en")}, '%Y-%m-%d') AS fecha
        FROM novedades
        WHERE publicada = 1 AND publicado_en <= NOW() AND audiencia IN (?)
        ORDER BY publicado_en DESC, id DESC
@@ -223,7 +230,7 @@ router.get("/admin", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     await asegurarTablas();
     const [rows] = await pool.query(
-      `SELECT n.*, DATE_FORMAT(n.publicado_en, '%Y-%m-%d %H:%i') AS publicado_txt,
+      `SELECT n.*, DATE_FORMAT(${enHonduras("n.publicado_en")}, '%Y-%m-%d %H:%i') AS publicado_txt,
               (SELECT COUNT(*) FROM novedades_lecturas l JOIN usuarios u ON u.id = l.usuario_id
                 WHERE l.novedad_id = n.id AND u.tipo <> 'SUPER_ADMIN') AS vistas
        FROM novedades n ORDER BY n.publicado_en DESC, n.id DESC LIMIT 200`);
@@ -248,7 +255,7 @@ router.get("/:id/lecturas", auth("SUPER_ADMIN"), async (req, res) => {
     const [usuarios] = await pool.query(
       `SELECT u.id, u.nombres, u.apellidos, u.nombre_display, u.email, u.tipo,
               c.id AS clinica_id, c.nombre AS clinica,
-              DATE_FORMAT(l.visto_en, '%Y-%m-%d %H:%i') AS visto_en, l.aproximado
+              DATE_FORMAT(${enHonduras("l.visto_en")}, '%Y-%m-%d %H:%i') AS visto_en, l.aproximado
        FROM usuarios u
        LEFT JOIN clinicas c ON c.id = u.clinica_id
        LEFT JOIN novedades_lecturas l ON l.usuario_id = u.id AND l.novedad_id = ?
