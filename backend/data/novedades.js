@@ -132,4 +132,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "documentos-word",
+    version: "1.23",
+    titulo: "Tus documentos de Word, con datos del paciente",
+    descripcion: "En Documentos Clínicos → Mis documentos puedes subir el Word que ya usas (constancias, consentimientos, informes) o crear uno nuevo, editarlo con negritas, tablas y listas, y agregar datos automáticos como nombre, DNI o edad. Al elegir un paciente se llenan solos y puedes imprimir, descargar en PDF o Word, o guardarlo en su expediente.",
+    icono: "bi-file-earmark-word",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

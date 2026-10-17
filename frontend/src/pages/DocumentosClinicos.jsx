@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import mammoth from "mammoth/mammoth.browser";
+import { useSearchParams } from "react-router-dom";
+import api from "../api/api";
+import DocumentosWord from "../components/DocumentosWord";
 
 const STORAGE_KEY = "documentos_clinicos_archivos";
 
@@ -61,6 +64,16 @@ const fileToDataUrl = (file) => new Promise((resolve, reject) => {
 });
 
 export default function DocumentosClinicos() {
+  // Pestañas: "Mis documentos" (Word editables con datos del paciente) y
+  // "Archivos guardados" (lo que ya existía: archivos guardados en este navegador)
+  const [searchParams] = useSearchParams();
+  const [pestana, setPestana] = useState(searchParams.get("vista") === "archivos" ? "archivos" : "word");
+  const [pacienteInicial, setPacienteInicial] = useState(null);
+  useEffect(() => {
+    const pid = searchParams.get("paciente_id");
+    if (!pid) return;
+    api.get(`/pacientes/${pid}`).then((r) => setPacienteInicial(r.data.data || null)).catch(() => {});
+  }, [searchParams]);
   const fileInputRef = useRef(null);
   const [documentos, setDocumentos] = useState([]);
   const [uploadCategoria, setUploadCategoria] = useState("todos");
@@ -332,12 +345,28 @@ export default function DocumentosClinicos() {
           <i className="bi bi-folder2-open" />
         </div>
         <div style={{ flex: 1 }}>
-          <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#0f172a" }}>Documentos Clinicos</div>
-          <div style={{ fontSize: ".83rem", color: "#64748b" }}>Guarda archivos para descargarlos, modificarlos e imprimirlos fuera del sistema</div>
+          <div style={{ fontSize: "1.05rem", fontWeight: 700, color: "#0f172a" }}>Documentos Clínicos</div>
+          <div style={{ fontSize: ".83rem", color: "#64748b" }}>
+            {pestana === "word"
+              ? "Sube tus Word o créalos aquí, edítalos y llénalos con los datos del paciente"
+              : "Guarda archivos para descargarlos, modificarlos e imprimirlos fuera del sistema"}
+          </div>
         </div>
-        {msg && <span className="doc-clinicos-toast" style={{ fontSize: ".8rem", color: "#166534", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 8, padding: "6px 10px" }}>{msg}</span>}
+        {msg && pestana === "archivos" && <span className="doc-clinicos-toast" style={{ fontSize: ".8rem", color: "#166534", background: "#dcfce7", border: "1px solid #86efac", borderRadius: 8, padding: "6px 10px" }}>{msg}</span>}
       </div>
 
+      <div style={{ display: "flex", gap: 6, marginBottom: 14, flexWrap: "wrap" }}>
+        {[["word", "bi-file-earmark-word-fill", "Mis documentos"], ["archivos", "bi-folder2-open", "Archivos guardados"]].map(([k, ic, t]) => (
+          <button key={k} type="button" onClick={() => setPestana(k)}
+            className={`btn btn-sm ${pestana === k ? "btn-primary" : "btn-outline-secondary"}`} style={{ borderRadius: 999, fontWeight: 600 }}>
+            <i className={`bi ${ic} me-1`} />{t}
+          </button>
+        ))}
+      </div>
+
+      {pestana === "word" && <DocumentosWord pacienteInicial={pacienteInicial} />}
+
+      {pestana === "archivos" && (
       <div className="doc-clinicos-layout">
         <div className="doc-clinicos-panel doc-clinicos-uploader">
           <div style={{ fontWeight: 700, marginBottom: 12, color: "#0f172a", fontSize: ".95rem" }}>Guardar documento</div>
@@ -437,6 +466,8 @@ export default function DocumentosClinicos() {
           </div>
         </div>
       </div>
+
+      )}
 
       {previewDoc && createPortal(
         <div className="modal d-block" style={{ background: "rgba(15,23,42,.55)", zIndex: 9999, overflowY: "auto" }}>

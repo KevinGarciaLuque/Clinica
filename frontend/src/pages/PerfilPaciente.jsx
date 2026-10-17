@@ -2113,6 +2113,20 @@ export default function PerfilPaciente() {
       {/* ─────────────────────────────────────────────────────── */}
       {tab === "examenes" && (
         <div className="row g-4">
+          {/* Crear un documento (constancia, consentimiento…) ya llenado con los datos de este paciente */}
+          {["MEDICO", "ADMIN", "SUPER_ADMIN"].includes(user?.tipo) && (
+            <div className="col-12">
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap", background: "#eef2ff", border: "1px solid #c7d2fe", borderRadius: 10, padding: "10px 14px" }}>
+                <i className="bi bi-file-earmark-word-fill" style={{ color: "#4338ca", fontSize: 20 }} />
+                <div style={{ flex: 1, minWidth: 200, fontSize: "0.86rem", color: "#312e81" }}>
+                  <strong>Crear un documento para este paciente</strong> — usa tus plantillas de Word (constancias, consentimientos, informes) con sus datos ya llenados.
+                </div>
+                <Link to={`/documentos-clinicos?paciente_id=${id}`} className="btn btn-sm btn-primary">
+                  <i className="bi bi-file-earmark-plus me-1" />Crear documento
+                </Link>
+              </div>
+            </div>
+          )}
           {/* Subir nuevo documento */}
           <div className="col-md-4">
             <div className="card shadow-sm h-100">

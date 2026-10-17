@@ -208,6 +208,7 @@ app.use("/api/controles",      require("./routes/controles"));
 app.use("/api/novedades",      require("./routes/novedades"));
 app.use("/api/antes-de-entrar", require("./routes/antesDeEntrar"));
 app.use("/api/evolucion",       require("./routes/evolucion"));
+app.use("/api/documentos-word", require("./routes/documentosWord"));
 
 // ===== 404 =====
 app.use((req, res) => {
