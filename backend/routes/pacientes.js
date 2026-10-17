@@ -8,6 +8,10 @@ const fs          = require("fs");
 const path        = require("path");
 const ExcelJS     = require("exceljs");
 const archiver    = require("archiver");
+const { zonaClinica, ahoraLocalSql } = require("../utils/zonaHoraria");
+// Fecha de hoy de la clínica como expresión SQL, para calcular la edad
+// (CURDATE() es la fecha del servidor en UTC: de noche ya es "mañana")
+const hoySql = async (clinicaId) => `DATE(${ahoraLocalSql(await zonaClinica(clinicaId))})`;
 const { requireModulo } = require("../middlewares/moduloPermiso");
 const { titleCaseNombre, buscarDuplicados } = require("../utils/pacientesDuplicados");
 
@@ -261,6 +265,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     }
 
     const q = (req.query.q || "").trim().slice(0, 100);
+    const HOY = await hoySql(clinicaId);
     let whereSql = "WHERE clinica_id=? ";
     const whereParams = [clinicaId];
 
@@ -287,7 +292,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
       const offset = (page - 1) * perPage;
 
       const [rows] = await pool.query(
-        `SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad
+        `SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${HOY}) AS edad
          FROM pacientes ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
         [...whereParams, perPage, offset]
       );
@@ -295,7 +300,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     }
 
     const [rows] = await pool.query(
-      `SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad
+      `SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${HOY}) AS edad
        FROM pacientes ${whereSql} ORDER BY id DESC LIMIT 200`,
       whereParams
     );
@@ -318,7 +323,7 @@ router.get("/export/excel", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEP
     }
 
     let sql =
-      "SELECT id, nombres, apellidos, dni, fecha_nacimiento, TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad, sexo, telefono, email, direccion, ciudad, departamento, pais, grupo_sanguineo, contacto_emergencia_nombre, contacto_emergencia_telefono, notas, activo, creado_en FROM pacientes WHERE clinica_id=? ";
+      `SELECT id, nombres, apellidos, dni, fecha_nacimiento, TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${await hoySql(clinicaId)}) AS edad, sexo, telefono, email, direccion, ciudad, departamento, pais, grupo_sanguineo, contacto_emergencia_nombre, contacto_emergencia_telefono, notas, activo, creado_en FROM pacientes WHERE clinica_id=? `;
     const params = [clinicaId];
     sql += "ORDER BY apellidos, nombres";
 
@@ -362,7 +367,7 @@ router.get("/:id/export/excel", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","R
     if (!paciente) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
 
     const [[edadRow]] = await pool.query(
-      "SELECT TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes WHERE id = ?",
+      `SELECT TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${await hoySql(paciente.clinica_id)}) AS edad FROM pacientes WHERE id = ?`,
       [paciente.id]
     );
     const resumen = await getResumenClinico(paciente.id);
@@ -381,7 +386,7 @@ router.get("/:id/export/excel", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","R
 /** Agrega el excel + adjuntos (documentos/estudios/imágenes) de un paciente al archive, bajo folderPrefix (si se da). */
 async function appendPacienteToArchive(archive, paciente, folderPrefix = "") {
   const [[edadRow]] = await pool.query(
-    "SELECT TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad FROM pacientes WHERE id = ?",
+    `SELECT TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${await hoySql(paciente.clinica_id)}) AS edad FROM pacientes WHERE id = ?`,
     [paciente.id]
   );
   const [documentos] = await pool.query(
@@ -504,10 +509,10 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
     // SUPER_ADMIN puede ver todos los pacientes, otros solo de su clínica
     let query, params;
     if (isSuperAdmin) {
-      query = "SELECT p.*, TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) AS edad FROM pacientes p WHERE p.id = ?";
+      query = `SELECT p.*, TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, ${await hoySql(clinicaId)}) AS edad FROM pacientes p WHERE p.id = ?`;
       params = [req.params.id];
     } else {
-      query = "SELECT p.*, TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, CURDATE()) AS edad FROM pacientes p WHERE p.id = ? AND p.clinica_id = ?";
+      query = `SELECT p.*, TIMESTAMPDIFF(YEAR, p.fecha_nacimiento, ${await hoySql(clinicaId)}) AS edad FROM pacientes p WHERE p.id = ? AND p.clinica_id = ?`;
       params = [req.params.id, clinicaId];
     }
 

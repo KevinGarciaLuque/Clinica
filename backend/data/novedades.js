@@ -141,4 +141,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "hora-de-la-clinica",
+    version: "1.24",
+    titulo: "Hora de la clínica a la vista",
+    descripcion: "En Configuración, junto a la zona horaria, ahora ves la hora actual de la clínica para confirmar que está bien, y al cambiar el país se sugiere su zona automáticamente. Si la hora de tu computadora o celular no coincide con la de la clínica, el sistema te avisa.",
+    icono: "bi-clock-history",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];

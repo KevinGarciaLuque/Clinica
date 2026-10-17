@@ -11,6 +11,7 @@ const fs          = require("fs");
 const path        = require("path");
 const { enviarEmail, templateCredenciales } = require("../utils/mailer");
 const { urlPublica } = require("../utils/urlPublica");
+const { zonaClinica, olvidarZona, ahoraClinica, offsetMin } = require("../utils/zonaHoraria");
 
 function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -141,6 +142,20 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
     );
   }
 }
+
+// ──────────────────────────────────────────────
+//  GET /api/clinicas/zona-horaria  → zona y hora actual de la clínica del usuario
+//  (el navegador lo usa para calcular "hoy" y avisar si el reloj del equipo no coincide)
+// ──────────────────────────────────────────────
+router.get("/zona-horaria", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA"), async (req, res) => {
+  try {
+    const clinicaId = req.query.clinica_id && req.user.super ? Number(req.query.clinica_id) : req.user.clinica_id;
+    const tz = await zonaClinica(clinicaId);
+    res.json({ ok: true, timezone: tz, offset_min: offsetMin(tz), hoy: ahoraClinica(tz).format("YYYY-MM-DD"), ahora_servidor: Date.now() });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
 
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/tipos  → catálogo de tipos de clínica
@@ -1003,6 +1018,7 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), async (req,
        activo !== undefined ? activo : null, timezone||null,
        titulo_medico !== undefined ? (titulo_medico ? 1 : 0) : null, id]
     );
+    olvidarZona(id);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

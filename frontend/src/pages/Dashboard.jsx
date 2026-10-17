@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import { hoyClinica } from "../utils/zonaClinica";
 import { motion, AnimatePresence } from "framer-motion";
 import api from "../api/api";
 import PerfilPublicoPanel from "../components/PerfilPublicoPanel";
@@ -377,8 +378,8 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      api.get("/dashboard/stats", { params: { fecha: dayjs().format("YYYY-MM-DD") } }),
-      api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } }),
+      api.get("/dashboard/stats", { params: { fecha: hoyClinica() } }),
+      api.get("/dashboard/sala-espera", { params: { fecha: hoyClinica() } }),
     ])
     .then(([s, e]) => {
       setStats(s.data.data);
@@ -387,7 +388,7 @@ export default function Dashboard() {
     .catch(() => {})
     .finally(() => setLoading(false));
 
-    api.get("/eventos-festivos/activo", { params: { fecha: dayjs().format("YYYY-MM-DD") } })
+    api.get("/eventos-festivos/activo", { params: { fecha: hoyClinica() } })
       .then(r => setEventoFestivo(r.data.data || null))
       .catch(() => setEventoFestivo(null));
   }, []);

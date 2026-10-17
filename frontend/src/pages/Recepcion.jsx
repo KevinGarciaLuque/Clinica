@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
+import { hoyClinica } from "../utils/zonaClinica";
 import api from "../api/api";
 import { tituloMedicoActivo, prefijoDr } from "../utils/medico";
 
@@ -193,7 +194,7 @@ export default function Recepcion() {
   const cargarCitasHoy = useCallback(async () => {
     setCargando(true);
     try {
-      const r = await api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } });
+      const r = await api.get("/dashboard/sala-espera", { params: { fecha: hoyClinica() } });
       setCitasHoy(r.data.data || []);
     } catch { /* noop */ }
     finally { setCargando(false); }

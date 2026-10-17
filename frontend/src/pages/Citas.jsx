@@ -5,6 +5,7 @@ import { Calendar, dayjsLocalizer, Views } from "react-big-calendar";
 import { useAuth } from "../auth/AuthContext";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import dayjs from "dayjs";
+import { hoyClinica } from "../utils/zonaClinica";
 import "dayjs/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -519,7 +520,7 @@ export default function Citas() {
   }, [loadCitas]);
 
   const loadSalaEspera = useCallback(() => {
-    api.get("/dashboard/sala-espera", { params: { fecha: dayjs().format("YYYY-MM-DD") } })
+    api.get("/dashboard/sala-espera", { params: { fecha: hoyClinica() } })
       .then(r => setSala(r.data.data || []))
       .catch(() => setSala([]));
   }, []);

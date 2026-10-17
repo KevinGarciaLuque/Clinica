@@ -5,6 +5,7 @@
 const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
+const { zonaClinica, localSql } = require("../utils/zonaHoraria");
 
 const ROLES = ["RECEPCIONISTA", "MEDICO", "ADMIN", "SUPER_ADMIN"];
 
@@ -148,8 +149,10 @@ router.get("/historial", auth(...ROLES), async (req, res) => {
       LEFT JOIN usuarios uc ON uc.id = ct.usuario_cierre_id
       WHERE ct.clinica_id=? AND ct.estado='CERRADO'`;
     const params = [clinicaId];
-    if (desde) { sql += " AND DATE(ct.cerrado_en) >= ?"; params.push(desde); }
-    if (hasta) { sql += " AND DATE(ct.cerrado_en) <= ?"; params.push(hasta); }
+    // Fecha del cierre en hora de la clínica (un cierre a las 7 p. m. es de ese día, no del siguiente)
+    const CL = localSql("ct.cerrado_en", await zonaClinica(clinicaId));
+    if (desde) { sql += ` AND DATE(${CL}) >= ?`; params.push(desde); }
+    if (hasta) { sql += ` AND DATE(${CL}) <= ?`; params.push(hasta); }
     sql += " ORDER BY ct.cerrado_en DESC LIMIT ? OFFSET ?";
     params.push(limit, offset);
 

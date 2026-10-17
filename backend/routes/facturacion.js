@@ -14,6 +14,12 @@ const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const ExcelJS = require("exceljs");
 const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+// Fechas en hora de la clínica (la BD guarda en UTC: sin esto, lo facturado
+// después de las 6 p. m. en Honduras contaba como del día siguiente)
+const { zonaClinica, hoyClinica, ahoraClinica, localSql, ahoraLocalSql } = require("../utils/zonaHoraria");
+const dayjsTz = require("dayjs");
+dayjsTz.extend(require("dayjs/plugin/utc"));
+dayjsTz.extend(require("dayjs/plugin/timezone"));
 
 function escHtml(s) {
   if (s === null || s === undefined) return "";
@@ -104,6 +110,7 @@ router.get("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (
   try {
     const clinicaId = req.user.clinica_id;
     const { estado, desde, hasta, paciente_id, q } = req.query;
+    const FL = localSql("f.creado_en", await zonaClinica(clinicaId));
 
     let whereSql = " WHERE f.clinica_id = ? ";
     const whereParams = [clinicaId];
@@ -113,8 +120,8 @@ router.get("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (
       whereParams.push(req.user.id);
     }
     if (estado) { whereSql += " AND f.estado = ? "; whereParams.push(estado); }
-    if (desde)  { whereSql += " AND DATE(f.creado_en) >= ? "; whereParams.push(desde); }
-    if (hasta)  { whereSql += " AND DATE(f.creado_en) <= ? "; whereParams.push(hasta); }
+    if (desde)  { whereSql += ` AND DATE(${FL}) >= ? `; whereParams.push(desde); }
+    if (hasta)  { whereSql += ` AND DATE(${FL}) <= ? `; whereParams.push(hasta); }
     if (paciente_id) { whereSql += " AND f.paciente_id = ? "; whereParams.push(paciente_id); }
     if (q) {
       const like = `%${String(q).trim().slice(0, 100)}%`;
@@ -185,7 +192,7 @@ router.get("/prefill", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
     const [[pac]] = await pool.query(
       `SELECT id, nombres, apellidos, dni, direccion, fecha_nacimiento,
               responsable_nombre, responsable_dni, responsable_direccion, responsable_parentesco,
-              TIMESTAMPDIFF(YEAR, fecha_nacimiento, CURDATE()) AS edad
+              TIMESTAMPDIFF(YEAR, fecha_nacimiento, DATE(${ahoraLocalSql(await zonaClinica(clinicaId))})) AS edad
        FROM pacientes WHERE id=? AND clinica_id=?`,
       [paciente_id, clinicaId]
     );
@@ -250,13 +257,15 @@ router.get("/kpis", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), asy
     const filtroMedico = soloPropio ? " AND f.medico_id = ? " : "";
     const paramsBase = soloPropio ? [clinicaId, req.user.id] : [clinicaId];
 
+    const tz = await zonaClinica(clinicaId);
+    const FL = localSql("f.creado_en", tz);
     let { desde, hasta } = req.query;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || "") || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || "")) {
-      const hoy = new Date();
-      desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
-      hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10);
+      const hoy = ahoraClinica(tz);
+      desde = hoy.startOf("month").format("YYYY-MM-DD");
+      hasta = hoy.endOf("month").format("YYYY-MM-DD");
     }
-    const rangoSql = " AND DATE(f.creado_en) BETWEEN ? AND ? ";
+    const rangoSql = ` AND DATE(${FL}) BETWEEN ? AND ? `;
     const paramsRango = [...paramsBase, desde, hasta];
 
     const [
@@ -281,8 +290,8 @@ router.get("/kpis", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), asy
       ),
       pool.query(
         `SELECT COALESCE(SUM(total),0) AS total
-         FROM facturas f WHERE f.clinica_id=? ${filtroMedico} AND f.estado='PAGADA' AND DATE(f.creado_en) = CURDATE()`,
-        paramsBase
+         FROM facturas f WHERE f.clinica_id=? ${filtroMedico} AND f.estado='PAGADA' AND DATE(${FL}) = ?`,
+        [...paramsBase, hoyClinica(tz)]
       ),
     ]);
 
@@ -313,18 +322,20 @@ router.get("/serie", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), as
     const paramsBase = soloPropio ? [clinicaId, req.user.id] : [clinicaId];
 
     let { desde, hasta } = req.query;
+    const tz = await zonaClinica(clinicaId);
+    const FL = localSql("f.creado_en", tz);
     if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || "") || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || "")) {
-      hasta = new Date().toISOString().slice(0, 10);
-      desde = new Date(Date.now() - 13 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+      hasta = hoyClinica(tz);
+      desde = ahoraClinica(tz).subtract(13, "day").format("YYYY-MM-DD");
     }
 
     const [rows] = await pool.query(
-      `SELECT DATE(f.creado_en) AS fecha,
+      `SELECT DATE_FORMAT(${FL}, '%Y-%m-%d') AS fecha,
               COALESCE(SUM(f.total), 0) AS facturado,
               COALESCE(SUM(CASE WHEN f.estado='PAGADA' THEN f.total ELSE 0 END), 0) AS cobrado
        FROM facturas f
-       WHERE f.clinica_id=? ${filtroMedico} AND f.estado != 'ANULADA' AND DATE(f.creado_en) BETWEEN ? AND ?
-       GROUP BY DATE(f.creado_en)
+       WHERE f.clinica_id=? ${filtroMedico} AND f.estado != 'ANULADA' AND DATE(${FL}) BETWEEN ? AND ?
+       GROUP BY DATE_FORMAT(${FL}, '%Y-%m-%d')
        ORDER BY fecha ASC`,
       [...paramsBase, desde, hasta]
     );
@@ -379,11 +390,13 @@ router.get("/cai-status", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"
 router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
+    const tz = await zonaClinica(clinicaId);
+    const FL = localSql("f.creado_en", tz);
     let { desde, hasta } = req.query;
     if (!/^\d{4}-\d{2}-\d{2}$/.test(desde || "") || !/^\d{4}-\d{2}-\d{2}$/.test(hasta || "")) {
-      const hoy = new Date();
-      desde = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
-      hasta = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10);
+      const hoy = ahoraClinica(tz);
+      desde = hoy.startOf("month").format("YYYY-MM-DD");
+      hasta = hoy.endOf("month").format("YYYY-MM-DD");
     }
 
     const [rows] = await pool.query(
@@ -393,7 +406,7 @@ router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
               COALESCE(SUM(CASE WHEN f.estado='PENDIENTE' THEN f.total ELSE 0 END), 0) AS pendiente
        FROM facturas f
        JOIN usuarios u ON u.id = f.medico_id
-       WHERE f.clinica_id=? AND f.estado != 'ANULADA' AND DATE(f.creado_en) BETWEEN ? AND ?
+       WHERE f.clinica_id=? AND f.estado != 'ANULADA' AND DATE(${FL}) BETWEEN ? AND ?
        GROUP BY u.id, u.nombres, u.apellidos
        ORDER BY cobrado DESC`,
       [clinicaId, desde, hasta]
@@ -425,8 +438,10 @@ router.get("/exportar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"),
     const params = [clinicaId];
     if (req.user.tipo === "MEDICO") { sql += " AND f.medico_id = ? "; params.push(req.user.id); }
     if (estado) { sql += " AND f.estado = ? "; params.push(estado); }
-    if (desde)  { sql += " AND DATE(f.creado_en) >= ? "; params.push(desde); }
-    if (hasta)  { sql += " AND DATE(f.creado_en) <= ? "; params.push(hasta); }
+    const tz = await zonaClinica(clinicaId);
+    const FL = localSql("f.creado_en", tz);
+    if (desde)  { sql += ` AND DATE(${FL}) >= ? `; params.push(desde); }
+    if (hasta)  { sql += ` AND DATE(${FL}) <= ? `; params.push(hasta); }
     sql += " ORDER BY f.creado_en DESC LIMIT 5000";
 
     const [rows] = await pool.query(sql, params);
@@ -456,7 +471,7 @@ router.get("/exportar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"),
       sheet.addRow({
         numero: f.numero_completo || f.numero,
         tipo: f.tipo_comprobante,
-        fecha: new Date(f.creado_en).toISOString().slice(0, 10),
+        fecha: dayjsTz(f.creado_en).tz(tz).format("YYYY-MM-DD"),
         paciente: `${f.paciente_nombres} ${f.paciente_apellidos}`,
         cliente: f.nombre_cliente || "",
         rtn: f.rtn_cliente || "",
@@ -474,7 +489,7 @@ router.get("/exportar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"),
     });
 
     res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="facturacion_${new Date().toISOString().slice(0, 10)}.xlsx"`);
+    res.setHeader("Content-Disposition", `attachment; filename="facturacion_${hoyClinica(tz)}.xlsx"`);
     await workbook.xlsx.write(res);
     res.end();
   } catch (e) {
@@ -850,7 +865,8 @@ router.get("/:id/pdf", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
       ? `${estab}-${punto}-${tipoDoc}-${String(rangoInicio).padStart(8, "0")} AL ${estab}-${punto}-${tipoDoc}-${String(rangoFin).padStart(8, "0")}`
       : "";
 
-    const fecha = new Date(factura.creado_en).toLocaleDateString("es-HN", { day: "2-digit", month: "long", year: "numeric" });
+    const fecha = new Date(factura.creado_en)
+      .toLocaleDateString("es-HN", { day: "2-digit", month: "long", year: "numeric", timeZone: await zonaClinica(clinicaId) });
     const lugar = factura.clinica_ciudad || "Honduras";
 
     // Desglose fiscal

@@ -12,11 +12,13 @@ const auth   = require("../middlewares/auth");
 const dayjs  = require("dayjs");
 dayjs.extend(require("dayjs/plugin/utc"));
 dayjs.extend(require("dayjs/plugin/timezone"));
+const { zonaClinica, ahoraClinica, localSql } = require("../utils/zonaHoraria");
 
-function rangoFechas(req) {
-  const hoy = new Date();
-  const inicioMes = new Date(hoy.getFullYear(), hoy.getMonth(), 1).toISOString().slice(0, 10);
-  const finMes     = new Date(hoy.getFullYear(), hoy.getMonth() + 1, 0).toISOString().slice(0, 10);
+// Mes actual según la hora de la clínica (no la del servidor, que está en UTC)
+function rangoFechas(req, tz) {
+  const hoy = ahoraClinica(tz);
+  const inicioMes = hoy.startOf("month").format("YYYY-MM-DD");
+  const finMes     = hoy.endOf("month").format("YYYY-MM-DD");
   const desde = /^\d{4}-\d{2}-\d{2}$/.test(req.query.desde || "") ? req.query.desde : inicioMes;
   const hasta = /^\d{4}-\d{2}-\d{2}$/.test(req.query.hasta || "") ? req.query.hasta : finMes;
   return { desde, hasta };
@@ -27,7 +29,8 @@ router.get("/resumen", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
   try {
     const clinicaId = req.user.clinica_id;
     const esMedico  = req.user.tipo === "MEDICO";
-    const { desde, hasta } = rangoFechas(req);
+    const tz = await zonaClinica(clinicaId);
+    const { desde, hasta } = rangoFechas(req, tz);
 
     const filtroMedico = esMedico ? " AND medico_id = ? " : "";
     const paramsMedico = esMedico ? [req.user.id] : [];
@@ -46,17 +49,17 @@ router.get("/resumen", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
         [clinicaId, desde, hasta, ...paramsMedico]
       ),
       pool.query(
-        "SELECT COUNT(*) AS total FROM pacientes WHERE clinica_id=? AND DATE(creado_en) BETWEEN ? AND ?",
+        `SELECT COUNT(*) AS total FROM pacientes WHERE clinica_id=? AND DATE(${localSql("creado_en", tz)}) BETWEEN ? AND ?`,
         [clinicaId, desde, hasta]
       ),
       pool.query(
         `SELECT COUNT(*) AS total FROM citas
-         WHERE clinica_id=? AND DATE(creado_en) BETWEEN ? AND ? ${filtroMedico}`,
+         WHERE clinica_id=? AND DATE(${localSql("creado_en", tz)}) BETWEEN ? AND ? ${filtroMedico}`,
         [clinicaId, desde, hasta, ...paramsMedico]
       ),
       pool.query(
         `SELECT canal, COUNT(*) AS total FROM citas
-         WHERE clinica_id=? AND DATE(creado_en) BETWEEN ? AND ? ${filtroMedico}
+         WHERE clinica_id=? AND DATE(${localSql("creado_en", tz)}) BETWEEN ? AND ? ${filtroMedico}
          GROUP BY canal`,
         [clinicaId, desde, hasta, ...paramsMedico]
       ),
@@ -74,7 +77,7 @@ router.get("/resumen", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
                COALESCE(SUM(CASE WHEN estado='PAGADA' THEN total ELSE 0 END), 0) AS total_pagado,
                COALESCE(SUM(CASE WHEN estado='PENDIENTE' THEN total ELSE 0 END), 0) AS total_pendiente
              FROM facturas
-             WHERE clinica_id=? AND estado != 'ANULADA' AND DATE(creado_en) BETWEEN ? AND ?`,
+             WHERE clinica_id=? AND estado != 'ANULADA' AND DATE(${localSql("creado_en", tz)}) BETWEEN ? AND ?`,
             [clinicaId, desde, hasta]
           ),
     ]);
@@ -104,7 +107,8 @@ router.get("/serie-citas", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA
   try {
     const clinicaId = req.user.clinica_id;
     const esMedico  = req.user.tipo === "MEDICO";
-    const { desde, hasta } = rangoFechas(req);
+    const tz = await zonaClinica(clinicaId);
+    const { desde, hasta } = rangoFechas(req, tz);
     const filtroMedico = esMedico ? " AND medico_id = ? " : "";
     const paramsMedico = esMedico ? [req.user.id] : [];
 
@@ -128,7 +132,8 @@ router.get("/serie-citas", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA
 router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
-    const { desde, hasta } = rangoFechas(req);
+    const tz = await zonaClinica(clinicaId);
+    const { desde, hasta } = rangoFechas(req, tz);
 
     const [rows] = await pool.query(
       `SELECT u.id AS medico_id, u.nombres, u.apellidos, u.sexo,
@@ -157,7 +162,8 @@ router.get("/asistencia", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"
   try {
     const clinicaId = req.user.clinica_id;
     const esMedico  = req.user.tipo === "MEDICO";
-    const { desde, hasta } = rangoFechas(req);
+    const tz = await zonaClinica(clinicaId);
+    const { desde, hasta } = rangoFechas(req, tz);
     const fm = esMedico ? " AND c.medico_id = ? " : "";
     const pm = esMedico ? [req.user.id] : [];
 

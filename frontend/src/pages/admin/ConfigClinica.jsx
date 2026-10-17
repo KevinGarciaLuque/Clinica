@@ -5,6 +5,22 @@ import api from "../../api/api";
 import { DEPARTAMENTOS_HONDURAS, MUNICIPIOS_POR_DEPARTAMENTO } from "../../utils/departamentosHonduras";
 import { useAuth } from "../../auth/AuthContext";
 import { origenPublico } from "../../utils/origenPublico";
+import { ZONAS_POR_PAIS, cargarZonaClinica, horaEnZona, fechaEnZona } from "../../utils/zonaClinica";
+
+/** Reloj en vivo de la zona elegida, para comprobar que es la hora correcta */
+function RelojZona({ tz }) {
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => setTick((n) => n + 1), 15000);
+    return () => clearInterval(t);
+  }, []);
+  return (
+    <div className="d-flex align-items-center gap-2 mt-2 px-2 py-1 rounded-3" style={{ background: "#eef6ff", color: "#0b4a8b", fontSize: ".9rem" }}>
+      <i className="bi bi-clock" />
+      <span>Hora actual de la clínica: <strong>{horaEnZona(tz)}</strong> <span className="text-muted">({fechaEnZona(tz)})</span></span>
+    </div>
+  );
+}
 
 function pct(value) {
   const n = Number(value || 0);
@@ -126,6 +142,7 @@ export default function ConfigClinica() {
     setMsg({ tipo: "", texto: "" });
     try {
       await api.put(`/clinicas/${clinicaId}`, form);
+      cargarZonaClinica(true);
       setMsg({ tipo: "success", texto: "Datos guardados correctamente" });
     } catch (e) {
       setMsg({ tipo: "danger", texto: e.response?.data?.msg || e.message });
@@ -412,7 +429,15 @@ export default function ConfigClinica() {
                 </div>
                 <div className="col-md-6">
                   <label className="form-label">Pais</label>
-                  <select className="form-select" value={form.pais || "HN"} onChange={(e) => setForm({ ...form, pais: e.target.value })}>
+                  <select
+                    className="form-select"
+                    value={form.pais || "HN"}
+                    onChange={(e) => {
+                      const pais = e.target.value;
+                      // Al cambiar el país se sugiere su zona horaria (se puede cambiar después)
+                      setForm({ ...form, pais, ...(ZONAS_POR_PAIS[pais] ? { timezone: ZONAS_POR_PAIS[pais] } : {}) });
+                    }}
+                  >
                     {[
                       ["HN", "Honduras"],
                       ["PE", "Peru"],
@@ -459,8 +484,10 @@ export default function ConfigClinica() {
                       <option key={v} value={v}>{l}</option>
                     ))}
                   </select>
+                  <RelojZona tz={form.timezone || "America/Tegucigalpa"} />
                   <div className="form-text">
-                    Se usa para calcular "hoy" en recordatorios de citas y cumpleaños.
+                    Se usa para calcular "hoy" en citas, recordatorios, cumpleaños, facturación y reportes.
+                    Si la hora de arriba no es la correcta, elija otra zona.
                   </div>
                 </div>
 

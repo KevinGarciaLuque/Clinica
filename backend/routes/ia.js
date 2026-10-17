@@ -18,6 +18,8 @@ const auth   = require("../middlewares/auth");
 const rateLimit = require("express-rate-limit");
 const gcal   = require("../utils/googleCalendar");
 const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
+// "Hoy" y "mañana" según la hora de la clínica (el servidor está en UTC)
+const { zonaClinica, ahoraClinica } = require("../utils/zonaHoraria");
 
 // El chat es público (sin auth) y cada mensaje puede disparar varias llamadas
 // a OpenAI y hasta crear/cancelar citas reales — limitar por IP evita que un
@@ -170,11 +172,9 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
 
     case "buscar_disponibilidad": {
       let fechaReal = args.fecha;
-      if (fechaReal === "hoy")    fechaReal = new Date().toISOString().slice(0,10);
-      if (fechaReal === "mañana") {
-        const d = new Date(); d.setDate(d.getDate()+1);
-        fechaReal = d.toISOString().slice(0,10);
-      }
+      const ahoraCl = ahoraClinica(await zonaClinica(clinicaId));
+      if (fechaReal === "hoy")    fechaReal = ahoraCl.format("YYYY-MM-DD");
+      if (fechaReal === "mañana") fechaReal = ahoraCl.add(1, "day").format("YYYY-MM-DD");
       const diaSemana = new Date(fechaReal).getDay();
       const diaLunes  = diaSemana === 0 ? 6 : diaSemana - 1;
 
@@ -283,7 +283,7 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
     }
 
     case "listar_citas_paciente": {
-      const desde = args.desde || new Date().toISOString().slice(0, 10);
+      const desde = args.desde || ahoraClinica(await zonaClinica(clinicaId)).format("YYYY-MM-DD");
       const [rows] = await pool.query(
         `SELECT c.id,
                 DATE_FORMAT(c.inicio, '%Y-%m-%dT%H:%i:%s') AS inicio,
@@ -348,9 +348,10 @@ router.post("/chat", limiterChat, async (req, res) => {
 
     const [[clinica]] = await pool.query("SELECT nombre, telefono FROM clinicas WHERE id=?", [clinicaId]);
 
-    const hoy = new Date().toLocaleDateString("es-PE", {
+    const hoy = new Date().toLocaleDateString("es-HN", {
       weekday: "long", year: "numeric", month: "long", day: "numeric",
-    });
+      timeZone: await zonaClinica(clinicaId),
+    }) + ` (hora actual: ${ahoraClinica(await zonaClinica(clinicaId)).format("h:mm A")})`;
 
     const systemPrompt = `Eres el asistente virtual de "${clinica?.nombre || "la clínica"}". Hoy es ${hoy}.
 Puedes ayudar a los pacientes y personal a:
