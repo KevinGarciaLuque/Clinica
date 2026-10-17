@@ -22,7 +22,14 @@ function descargarBlob(blob, nombre) {
 const nombreArchivo = (t) => String(t || "documento").normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/[^a-zA-Z0-9 _-]+/g, "").trim().slice(0, 80) || "documento";
 
 const CSS = `
-  .dw-bar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; position: sticky; top: 0; z-index: 5; }
+  .dw-bar { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; padding: 8px 10px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; }
+  /* Encabezado del editor + barra de herramientas fijos al desplazarse (debajo del título de la página) */
+  .dw-fijo { position: sticky; top: calc(var(--dc-cab-h, 0px) - 1.5rem); z-index: 15; background: #fff; box-shadow: 0 4px 10px -8px rgba(15,23,42,.35); }
+  @media (max-width: 767.98px) {
+    /* En el teléfono solo queda fija la barra de herramientas (el encabezado completo ocuparía media pantalla) */
+    .dw-fijo { display: contents; }
+    .dw-fijo .dw-bar { position: sticky; top: -1rem; z-index: 15; }
+  }
   .dw-bar .dw-sep { width: 1px; height: 22px; background: #e2e8f0; margin: 0 3px; }
   .dw-btn { border: 1px solid #d1d5db; background: #fff; border-radius: 6px; min-width: 32px; height: 32px; padding: 0 7px; font-size: 14px; color: #1f2937; display: inline-flex; align-items: center; justify-content: center; gap: 4px; cursor: pointer; }
   .dw-btn:hover { background: #eef2ff; }
@@ -394,9 +401,10 @@ function EditorWord({ doc, importado, onCerrar, onUsar }) {
   };
 
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #dbe4ef", overflow: "hidden" }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #dbe4ef", overflow: "clip" }}>
       <style>{CSS}</style>
-      <div style={{ padding: "12px 14px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid #e2e8f0" }}>
+      <div className="dw-fijo">
+      <div style={{ padding: "12px 14px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
         <button className="btn btn-sm btn-light" onClick={() => onCerrar(false)} title="Volver sin guardar"><i className="bi bi-arrow-left" /></button>
         <input className="form-control form-control-sm" style={{ flex: "1 1 220px", fontWeight: 600 }} placeholder="Nombre del documento (ej. Constancia médica)" value={nombre} onChange={(e) => setNombre(e.target.value)} data-sin-dictado />
         <select className="form-select form-select-sm" style={{ width: "auto" }} value={categoria} onChange={(e) => setCategoria(e.target.value)} title="Categoría">
@@ -417,6 +425,7 @@ function EditorWord({ doc, importado, onCerrar, onUsar }) {
         </div>
       )}
       <BarraWord editorRef={editorRef} />
+      </div>
       <div className="dw-hoja-wrap">
         <div ref={editorRef} className="dw-hoja" contentEditable suppressContentEditableWarning spellCheck
           style={{ width: papelInfo(papel).ancho, minHeight: papelInfo(papel).alto }} />
@@ -508,9 +517,10 @@ function GenerarDocumento({ doc, pacienteInicial, onCerrar }) {
   };
 
   return (
-    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #dbe4ef", overflow: "hidden" }}>
+    <div style={{ background: "#fff", borderRadius: 12, border: "1px solid #dbe4ef", overflow: "clip" }}>
       <style>{CSS}</style>
-      <div style={{ padding: "12px 14px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid #e2e8f0" }}>
+      <div className="dw-fijo">
+      <div style={{ padding: "12px 14px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center", borderBottom: "1px solid #e2e8f0", background: "#fff" }}>
         <button className="btn btn-sm btn-light" onClick={onCerrar} title="Volver"><i className="bi bi-arrow-left" /></button>
         <div style={{ flex: "1 1 200px", minWidth: 0 }}>
           <div style={{ fontWeight: 700 }} className="text-truncate">{doc.nombre}</div>
@@ -520,6 +530,8 @@ function GenerarDocumento({ doc, pacienteInicial, onCerrar }) {
         <BotonAccion t="pdf" i="bi-file-earmark-pdf" txt="PDF" trabajando={trabajando} onAccion={accion} />
         <BotonAccion t="word" i="bi-file-earmark-word" txt="Word" trabajando={trabajando} onAccion={accion} />
         <BotonAccion t="expediente" i="bi-folder-plus" txt="Guardar en expediente" cls="btn-success" disabled={!paciente} trabajando={trabajando} onAccion={accion} />
+      </div>
+      <BarraWord editorRef={hojaRef} conDatos={false} />
       </div>
 
       {/* Paciente */}
@@ -558,7 +570,6 @@ function GenerarDocumento({ doc, pacienteInicial, onCerrar }) {
         </div>
       )}
 
-      <BarraWord editorRef={hojaRef} conDatos={false} />
       <div className="dw-hoja-wrap">
         {!valores && <div className="text-center text-muted py-4"><span className="spinner-border spinner-border-sm me-2" />Llenando datos…</div>}
         <div ref={hojaRef} className="dw-hoja" contentEditable suppressContentEditableWarning spellCheck

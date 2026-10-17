@@ -74,6 +74,17 @@ export default function DocumentosClinicos() {
     if (!pid) return;
     api.get(`/pacientes/${pid}`).then((r) => setPacienteInicial(r.data.data || null)).catch(() => {});
   }, [searchParams]);
+  // Encabezado fijo (título + pestañas): su alto se comparte con el editor para que
+  // la barra de herramientas quede fija justo debajo al desplazarse
+  const raizRef = useRef(null);
+  const cabRef = useRef(null);
+  useEffect(() => {
+    const cab = cabRef.current; const raiz = raizRef.current;
+    if (!cab || !raiz || typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(() => raiz.style.setProperty("--dc-cab-h", `${cab.offsetHeight}px`));
+    ro.observe(cab);
+    return () => ro.disconnect();
+  }, []);
   const fileInputRef = useRef(null);
   const [documentos, setDocumentos] = useState([]);
   const [uploadCategoria, setUploadCategoria] = useState("todos");
@@ -185,7 +196,7 @@ export default function DocumentosClinicos() {
   );
 
   return (
-    <div className="doc-clinicos-page">
+    <div className="doc-clinicos-page" ref={raizRef}>
       <style>{`
         .doc-clinicos-page {
           background: #eef3f9;
@@ -194,6 +205,9 @@ export default function DocumentosClinicos() {
           width: calc(100% + 3rem);
           padding: 20px 24px;
         }
+        /* top negativo = el relleno (padding) del contenedor que hace scroll: así se pega justo arriba */
+        .dc-cabecera { position: sticky; top: -1.5rem; z-index: 20; background: #eef3f9; margin: -20px -24px 0; padding: 14px 24px 2px; }
+        @media (max-width: 767.98px) { .dc-cabecera { position: static; margin: 0; padding: 0; } .doc-clinicos-page { --dc-cab-h: 0px !important; } }
         .doc-clinicos-header {
           display: flex;
           gap: 16px;
@@ -340,6 +354,7 @@ export default function DocumentosClinicos() {
         }
       `}</style>
 
+      <div className="dc-cabecera" ref={cabRef}>
       <div className="doc-clinicos-header">
         <div style={{ width: 38, height: 38, borderRadius: 10, background: "#0f3d7a", color: "#fff", display: "grid", placeItems: "center" }}>
           <i className="bi bi-folder2-open" />
@@ -362,6 +377,8 @@ export default function DocumentosClinicos() {
             <i className={`bi ${ic} me-1`} />{t}
           </button>
         ))}
+      </div>
+
       </div>
 
       {pestana === "word" && <DocumentosWord pacienteInicial={pacienteInicial} />}
