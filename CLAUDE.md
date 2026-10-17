@@ -21,6 +21,7 @@ Sistema de gestión clínica multi-clínica (medickg.com). **Está en producció
   - Las correcciones de datos se hacen **una sola vez**, con marca en `migraciones_unicas`.
 - **Probar antes de subir:** levantar backend y frontend en local (MariaDB de prueba) y verificar con Playwright, también en el ancho de un teléfono (390px). Luego correr `npx eslint` sobre los archivos tocados (no agregar errores nuevos) y `npx vite build`.
 - **Responsivo:** toda pantalla nueva debe verse bien en el teléfono, sin desbordar horizontalmente.
+- **Producción usa Node 18 (Railway).** Si se agrega o actualiza una dependencia del backend, probar que el servidor arranque con Node 18 antes de subir (`npx -y node@18.20.5 server.js`): algunas librerías nuevas solo funcionan en Node 20+ y tumban el servidor al arrancar. Las librerías opcionales se cargan con `require` dentro de la función que las usa, no al inicio del archivo.
 
 ## ⭐ Siempre publicar una novedad
 
