@@ -11,6 +11,7 @@ const Facturacion     = lazy(() => import("./pages/Facturacion"));
 const Caja            = lazy(() => import("./pages/Caja"));
 const Pacientes       = lazy(() => import("./pages/Pacientes"));
 const ExportarPacientes = lazy(() => import("./pages/ExportarPacientes"));
+const ImportarPacientes = lazy(() => import("./pages/ImportarPacientes"));
 const Citas           = lazy(() => import("./pages/Citas"));
 const ChatIA          = lazy(() => import("./pages/ChatIA"));
 const Consulta        = lazy(() => import("./pages/Consulta"));
@@ -164,6 +165,7 @@ export default function App() {
         <Route path="/estadisticas"           element={<Estadisticas />} />
         <Route path="/pacientes"              element={<Pacientes />} />
         <Route path="/pacientes/exportar"     element={<Suspense fallback={<PageSkeleton />}><ExportarPacientes /></Suspense>} />
+        <Route path="/pacientes/importar"     element={<Suspense fallback={<PageSkeleton />}><ImportarPacientes /></Suspense>} />
         <Route path="/pacientes/:id/perfil"   element={<Suspense fallback={<PageSkeleton />}><PerfilPaciente /></Suspense>} />
         <Route path="/citas"                  element={<Citas />} />
         <Route path="/facturacion"            element={<Facturacion />} />

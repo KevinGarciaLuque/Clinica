@@ -445,6 +445,19 @@ export default function Pacientes() {
             url={`${origenPublico()}/registro?clinica_id=${user?.clinica_id || ""}&modo=nuevo`}
             mensaje="Regístrate como paciente nuevo y crea tu ficha médica en línea:"
           />
+          {["ADMIN", "MEDICO", "PSICOLOGO", "RECEPCIONISTA"].includes(user?.tipo) && (
+            <Link
+              to="/pacientes/importar"
+              title="Agregar muchos pacientes a la vez desde un Excel"
+              style={{
+                background: "rgba(255,255,255,.1)", border: "1px solid rgba(255,255,255,.22)",
+                borderRadius: 8, padding: "6px 14px", color: "#e2e8f0", fontWeight: 500, fontSize: "0.8rem",
+                display: "flex", alignItems: "center", gap: 6, textDecoration: "none",
+              }}
+            >
+              <i className="bi bi-file-earmark-arrow-up" /> Importar Excel
+            </Link>
+          )}
           <button
             onClick={() => {
               if (showForm) {

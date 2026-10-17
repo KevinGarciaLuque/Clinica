@@ -150,4 +150,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "importar-pacientes-excel",
+    version: "1.25",
+    titulo: "Importa tus pacientes desde Excel",
+    descripcion: "En Pacientes → Importar Excel puedes subir tu lista de pacientes (o llenar nuestra plantilla) y agregarlos todos de una vez. Antes de guardar verás una vista previa; los pacientes que ya existen no se tocan, y si te equivocas puedes deshacer la importación.",
+    icono: "bi-file-earmark-arrow-up",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

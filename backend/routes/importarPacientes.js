@@ -70,7 +70,7 @@ const SINONIMOS = {
   apellidos: ["apellido", "apellidos", "primerapellido"],
   apellidos2: ["segundoapellido"],
   dni: ["dni", "identidad", "numerodeidentidad", "noidentidad", "nodeidentidad", "numeroidentidad", "tarjetadeidentidad", "cedula", "ceduladeidentidad", "documento", "nodocumento", "numerodedocumento", "numerodocumento", "dniidentidad", "pasaporte"],
-  fecha_nacimiento: ["fechadenacimiento", "fechanacimiento", "fnac", "fechanac", "nacimiento", "fdenacimiento", "fechadenac"],
+  fecha_nacimiento: ["fechadenacimiento", "fechanacimiento", "fnac", "fechanac", "nacimiento", "fdenacimiento", "fechadenac", "fnacimiento", "fecnac", "fechanacim", "cumpleanos"],
   sexo: ["sexo", "genero"],
   telefono: ["telefono", "celular", "tel", "movil", "whatsapp", "telefonocelular", "numerodetelefono", "telefonomovil", "cel", "contacto"],
   email: ["email", "correo", "correoelectronico", "mail", "emailcorreo"],
@@ -453,6 +453,7 @@ router.post("/analizar", auth(...ROLES), (req, res, next) => {
       return { fila: idxCab + i + 2, ...limpiarFila(crudo, { paisClinica }) };
     }).filter((f) => Object.values(f.datos).some((v) => v)); // filas vacías fuera
 
+    if (!filas.length) return res.status(400).json({ ok: false, msg: "El archivo no tiene pacientes debajo de los títulos." });
     clasificar(filas, await indicesExistentes(clinicaId));
     res.json({
       ok: true,
