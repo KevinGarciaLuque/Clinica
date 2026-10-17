@@ -34,7 +34,7 @@
         "pdfkit": "^0.17.2",
         "puppeteer-core": "^25.3.0",
         "qrcode": "^1.5.4",
-        "sanitize-html": "^2.18.1",
+        "sanitize-html": "2.13.1",
         "streamifier": "^0.1.1",
         "twilio": "^5.13.0",
         "uuid": "^9.0.1",

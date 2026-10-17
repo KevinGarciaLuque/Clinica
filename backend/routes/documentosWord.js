@@ -20,7 +20,13 @@ const router = require("express").Router();
 const dayjs = require("dayjs");
 dayjs.extend(require("dayjs/plugin/utc"));
 dayjs.extend(require("dayjs/plugin/timezone"));
-const sanitizeHtml = require("sanitize-html");
+// Se carga al usarse (no al arrancar): si esta librería fallara, solo esta
+// función queda sin servicio y el resto del servidor sigue funcionando.
+let sanitizeHtmlLib = null;
+function sanitizeHtml(html, opciones) {
+  if (!sanitizeHtmlLib) sanitizeHtmlLib = require("sanitize-html");
+  return sanitizeHtmlLib(html, opciones);
+}
 const pool = require("../db");
 const auth = require("../middlewares/auth");
 const { tituloMedico } = require("../utils/tituloMedico");
