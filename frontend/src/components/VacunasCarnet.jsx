@@ -6,6 +6,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { createPortal } from "react-dom";
 import api from "../api/api";
+import { fechaLocal } from "../utils/fechaNacimiento";
 
 // ══════════════════════════════════════════════════════════
 // COLORES PAI Honduras (Pantone)
@@ -710,7 +711,7 @@ function imprimirCarnet(paciente, registros, vitaminaRegistros, pal = PAI) {
   const calcEdad = () => {
     if (!paciente?.fecha_nacimiento) return "";
     const hoy = new Date();
-    const nac = new Date(paciente.fecha_nacimiento);
+    const nac = fechaLocal(paciente.fecha_nacimiento);
     const anos = hoy.getFullYear() - nac.getFullYear();
     const meses = hoy.getMonth() - nac.getMonth();
     return meses < 0 ? `${anos - 1} años ${meses + 12} meses` : `${anos} años ${meses} meses`;
@@ -989,7 +990,7 @@ export default function VacunasCarnet({ paciente, pacienteId }) {
   const calcEdad = () => {
     if (!paciente?.fecha_nacimiento) return "";
     const hoy = new Date();
-    const nac = new Date(paciente.fecha_nacimiento);
+    const nac = fechaLocal(paciente.fecha_nacimiento);
     let anos = hoy.getFullYear() - nac.getFullYear();
     let meses = hoy.getMonth() - nac.getMonth();
     if (meses < 0) { anos--; meses += 12; }

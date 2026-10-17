@@ -2,6 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
+import { fechaLocal } from "../../utils/fechaNacimiento";
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -336,7 +337,7 @@ export default function GaleriaEstetica() {
                           {p.dni && `DNI: ${p.dni}`}
                           {p.dni && p.fecha_nacimiento && " • "}
                           {p.fecha_nacimiento &&
-                            `${new Date().getFullYear() - new Date(p.fecha_nacimiento).getFullYear()} años`}
+                            `${new Date().getFullYear() - fechaLocal(p.fecha_nacimiento).getFullYear()} años`}
                         </div>
                       </div>
                     </div>
@@ -394,7 +395,7 @@ export default function GaleriaEstetica() {
               {pacSeleccionado.dni && `DNI: ${pacSeleccionado.dni}`}
               {pacSeleccionado.dni && pacSeleccionado.fecha_nacimiento && " • "}
               {pacSeleccionado.fecha_nacimiento &&
-                `${new Date().getFullYear() - new Date(pacSeleccionado.fecha_nacimiento).getFullYear()} años`}
+                `${new Date().getFullYear() - fechaLocal(pacSeleccionado.fecha_nacimiento).getFullYear()} años`}
             </div>
           </div>
           <button
@@ -818,7 +819,7 @@ export default function GaleriaEstetica() {
                             </div>
                             {pac.paciente_fecha_nacimiento && (
                               <div style={{ fontSize: 12, color: C.muted }}>
-                                {new Date().getFullYear() - new Date(pac.paciente_fecha_nacimiento).getFullYear()} años
+                                {new Date().getFullYear() - fechaLocal(pac.paciente_fecha_nacimiento).getFullYear()} años
                               </div>
                             )}
                           </div>

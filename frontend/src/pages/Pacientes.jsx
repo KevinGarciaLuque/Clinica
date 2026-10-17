@@ -12,6 +12,7 @@ import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import CompartirLink from "../components/CompartirLink";
 import { origenPublico } from "../utils/origenPublico";
+import { fechaLocal } from "../utils/fechaNacimiento";
 
 dayjs.locale("es");
 
@@ -884,7 +885,7 @@ export default function Pacientes() {
                           </div>
                           {p.fecha_nacimiento && (
                             <div style={{ fontSize: 12, color: C.muted }}>
-                              {new Date(p.fecha_nacimiento).toLocaleDateString("es-PE")}
+                              {fechaLocal(p.fecha_nacimiento).toLocaleDateString("es-PE")}
                             </div>
                           )}
                         </div>

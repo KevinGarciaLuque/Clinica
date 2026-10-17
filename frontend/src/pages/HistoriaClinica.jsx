@@ -11,6 +11,7 @@ import { tituloMedicoActivo, nombreMedico } from "../utils/medico";
 import AntecedentesClinico from "../components/AntecedentesClinico";
 import HistorialPsicologico from "../components/HistorialPsicologico";
 import { useAuth } from "../auth/AuthContext";
+import { fechaLocal } from "../utils/fechaNacimiento";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 const ESTADO_BADGE = { BORRADOR: "warning text-dark", FIRMADA: "success" };
@@ -448,7 +449,7 @@ export default function HistoriaClinica() {
                               </div>
                               {p.fecha_nacimiento && (
                                 <div style={{ fontSize: 12, color: C.muted }}>
-                                  {new Date(p.fecha_nacimiento).toLocaleDateString("es-PE")}
+                                  {fechaLocal(p.fecha_nacimiento).toLocaleDateString("es-PE")}
                                 </div>
                               )}
                             </div>

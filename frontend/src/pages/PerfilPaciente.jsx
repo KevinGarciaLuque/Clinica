@@ -28,6 +28,7 @@ import ModalConsultaSinCita from "../components/ModalConsultaSinCita";
 import EvolucionPaciente from "../components/EvolucionPaciente";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/constantes_odontologia";
+import { fechaLocal } from "../utils/fechaNacimiento";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -1014,7 +1015,7 @@ export default function PerfilPaciente() {
                 )}
                 {paciente.fecha_nacimiento && (() => {
                   const hoy = new Date();
-                  const nac = new Date(paciente.fecha_nacimiento);
+                  const nac = fechaLocal(paciente.fecha_nacimiento);
                   let e = hoy.getFullYear() - nac.getFullYear();
                   if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
                   return e >= 0 ? (
@@ -1527,10 +1528,10 @@ export default function PerfilPaciente() {
                       label="Fecha de nacimiento"
                       value={paciente.fecha_nacimiento ? (() => {
                         const hoy = new Date();
-                        const nac = new Date(paciente.fecha_nacimiento);
+                        const nac = fechaLocal(paciente.fecha_nacimiento);
                         let e = hoy.getFullYear() - nac.getFullYear();
                         if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
-                        return `${nac.toLocaleDateString()} (${e} años)`;
+                        return `${nac.toLocaleDateString("es-HN")} (${e} años)`;
                       })() : ""}
                     />
                     <Dato

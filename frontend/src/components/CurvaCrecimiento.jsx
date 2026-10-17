@@ -8,6 +8,7 @@ import {
   ResponsiveContainer, ReferenceLine, Legend, Area, ComposedChart,
 } from "recharts";
 import api from "../api/api";
+import { fechaLocal } from "../utils/fechaNacimiento";
 
 // ═══════════════════════════════════════════════════════════
 // CONSTANTES
@@ -81,7 +82,7 @@ function interpretarZscore(indicador, z) {
 }
 
 function calcEdadMeses(fechaNac, fechaMedicion) {
-  const nac = new Date(fechaNac);
+  const nac = fechaLocal(fechaNac);
   const med = new Date(fechaMedicion);
   let meses = (med.getFullYear() - nac.getFullYear()) * 12;
   meses += med.getMonth() - nac.getMonth();
@@ -92,7 +93,7 @@ function calcEdadMeses(fechaNac, fechaMedicion) {
 
 function formatEdadTexto(fechaNac) {
   if (!fechaNac) return null;
-  const nac = new Date(fechaNac);
+  const nac = fechaLocal(fechaNac);
   const hoy = new Date();
   let anios = hoy.getFullYear() - nac.getFullYear();
   let meses = hoy.getMonth() - nac.getMonth();
@@ -108,7 +109,7 @@ function formatEdadTexto(fechaNac) {
 
 function formatFechaNac(fechaNac) {
   if (!fechaNac) return null;
-  return new Date(fechaNac).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
+  return fechaLocal(fechaNac).toLocaleDateString("es-PE", { day: "2-digit", month: "short", year: "numeric" });
 }
 
 // ═══════════════════════════════════════════════════════════

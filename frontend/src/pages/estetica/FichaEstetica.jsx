@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
+import { fechaLocal } from "../../utils/fechaNacimiento";
 
 const C = {
   bg:      "#f0f2f5",
@@ -372,7 +373,7 @@ export default function FichaEstetica() {
                           {p.dni && `DNI: ${p.dni}`}
                           {p.dni && p.fecha_nacimiento && " • "}
                           {p.fecha_nacimiento &&
-                            `${new Date().getFullYear() - new Date(p.fecha_nacimiento).getFullYear()} años`}
+                            `${new Date().getFullYear() - fechaLocal(p.fecha_nacimiento).getFullYear()} años`}
                         </div>
                       </div>
                     </div>
@@ -430,7 +431,7 @@ export default function FichaEstetica() {
               {pacSeleccionado.dni && `DNI: ${pacSeleccionado.dni}`}
               {pacSeleccionado.dni && pacSeleccionado.fecha_nacimiento && " · "}
               {pacSeleccionado.fecha_nacimiento &&
-                `${new Date().getFullYear() - new Date(pacSeleccionado.fecha_nacimiento).getFullYear()} años`}
+                `${new Date().getFullYear() - fechaLocal(pacSeleccionado.fecha_nacimiento).getFullYear()} años`}
             </div>
           </div>
         </div>
@@ -772,7 +773,7 @@ export default function FichaEstetica() {
                   </h3>
                   <div style={{ fontSize: 12, color: "rgba(255,255,255,.5)", marginTop: 2 }}>
                     DNI: {pacModal.dni || "N/A"} · {pacModal.fecha_nacimiento &&
-                      `${new Date().getFullYear() - new Date(pacModal.fecha_nacimiento).getFullYear()} años`}
+                      `${new Date().getFullYear() - fechaLocal(pacModal.fecha_nacimiento).getFullYear()} años`}
                   </div>
                 </div>
               </div>
@@ -943,7 +944,7 @@ function FilaFicha({ pac, onVer, onEditar, onEliminar }) {
             <div style={{ fontWeight: 600, color: C.text, fontSize: 14 }}>{pac.nombres} {pac.apellidos}</div>
             {pac.fecha_nacimiento && (
               <div style={{ fontSize: 12, color: C.mutedLt }}>
-                {new Date().getFullYear() - new Date(pac.fecha_nacimiento).getFullYear()} años
+                {new Date().getFullYear() - fechaLocal(pac.fecha_nacimiento).getFullYear()} años
               </div>
             )}
           </div>

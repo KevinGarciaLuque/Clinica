@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import api from "../api/api";
 import CurvaCrecimiento from "../components/CurvaCrecimiento";
+import { fechaLocal } from "../utils/fechaNacimiento";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -173,7 +174,7 @@ export default function CrecimientoPage() {
                                     </div>
                                     {p.fecha_nacimiento && (
                                       <div style={{ fontSize: 12, color: C.muted }}>
-                                        {new Date(p.fecha_nacimiento).toLocaleDateString("es-HN")}
+                                        {fechaLocal(p.fecha_nacimiento).toLocaleDateString("es-HN")}
                                       </div>
                                     )}
                                   </div>

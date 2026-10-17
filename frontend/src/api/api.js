@@ -1,5 +1,6 @@
 import axios from "axios";
 import { getClinicaActiva } from "../utils/clinicaActiva";
+import { normalizarFechasNacimiento } from "../utils/fechaNacimiento";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -38,7 +39,13 @@ api.interceptors.request.use(
 
 // Interceptor de respuesta
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Fechas de nacimiento sin hora (evita que se vean un día antes)
+    if (response.data && typeof response.data === "object" && !(response.data instanceof Blob)) {
+      normalizarFechasNacimiento(response.data);
+    }
+    return response;
+  },
   (error) => {
     if (error.response?.status === 401) {
       localStorage.removeItem("token");
