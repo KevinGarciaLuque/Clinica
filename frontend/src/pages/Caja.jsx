@@ -233,9 +233,10 @@ export default function Caja() {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [detalleId, setDetalleId] = useState(null);
+  const [sucursal, setSucursal] = useState(null); // nombre de la sucursal (solo con varias)
 
   const cargarActual = useCallback(() => {
-    api.get("/caja/actual").then(r => setTurno(r.data.data)).catch(() => setTurno(null));
+    api.get("/caja/actual").then(r => { setTurno(r.data.data); setSucursal(r.data.sucursal || null); }).catch(() => setTurno(null));
   }, []);
 
   const cargarHistorial = useCallback(() => {
@@ -261,6 +262,11 @@ export default function Caja() {
         <div>
           <h5 style={{ margin: 0, fontWeight: 700 }}>Caja</h5>
           <span style={{ fontSize: 13, color: "#64748b" }}>Apertura, arqueo y cierre de turno</span>
+          {sucursal && (
+            <div style={{ fontSize: 12.5, color: "#1e40af", fontWeight: 600, marginTop: 2 }}>
+              <i className="bi bi-shop me-1" />Caja de: {sucursal}
+            </div>
+          )}
         </div>
       </div>
 
@@ -345,7 +351,7 @@ export default function Caja() {
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
                   <thead>
                     <tr style={{ background: "#f8fafc" }}>
-                      {["Apertura", "Cierre", "Abrió", "Cerró", "Inicial", "Esperado", "Contado", "Diferencia"].map(h => (
+                      {[...(sucursal ? ["Sucursal"] : []), "Apertura", "Cierre", "Abrió", "Cerró", "Inicial", "Esperado", "Contado", "Diferencia"].map(h => (
                         <th key={h} style={{ padding: "9px 12px", fontSize: "0.7rem", fontWeight: 700, color: "#6b7280", textTransform: "uppercase", textAlign: "left", borderBottom: "1px solid #e2e8f0" }}>{h}</th>
                       ))}
                     </tr>
@@ -355,6 +361,7 @@ export default function Caja() {
                       <tr key={h.id} onClick={() => setDetalleId(h.id)} style={{ borderBottom: "1px solid #f3f4f6", cursor: "pointer" }}
                         onMouseEnter={e => e.currentTarget.style.background = "#fafafa"}
                         onMouseLeave={e => e.currentTarget.style.background = "transparent"}>
+                        {sucursal && <td style={{ padding: "10px 12px", fontSize: 12.5 }}>{h.sucursal_nombre || "—"}</td>}
                         <td style={{ padding: "10px 12px", fontSize: 12.5 }}>{dayjs(h.abierto_en).format("D/M/YYYY h:mm A")}</td>
                         <td style={{ padding: "10px 12px", fontSize: 12.5 }}>{dayjs(h.cerrado_en).format("D/M/YYYY h:mm A")}</td>
                         <td style={{ padding: "10px 12px", fontSize: 12.5 }}>{h.apertura_nombres} {h.apertura_apellidos}</td>

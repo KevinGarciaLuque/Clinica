@@ -388,6 +388,7 @@ router.post("/clinica/:slug/agendar", agendarLimiter, async (req, res) => {
       [clinicaId, pacienteId, medicoIdInt, inicio, fin,
        "CONSULTA", motivo?.trim() || null, "PORTAL", servicio_id || null, "PENDIENTE_APROBACION"]
     );
+    await require("../utils/sucursales").asignarSucursalPorHorario(citaRes.insertId, clinicaId, medicoIdInt, inicio);
 
     await notificarSolicitudCita({
       clinicaId,

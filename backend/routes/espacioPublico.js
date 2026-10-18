@@ -113,6 +113,11 @@ router.post("/:token/aceptar", limiter, async (req, res) => {
       "UPDATE lista_espera SET estado='AGENDADA', cita_id=?, actualizado_en=NOW() WHERE id=?",
       [cita.insertId, o.lista_espera_id]);
     await conn.commit();
+    // Misma sucursal de la cita que se liberó
+    await pool.query(
+      "UPDATE citas n JOIN citas o ON o.id = ? SET n.sucursal_id = o.sucursal_id WHERE n.id = ?",
+      [o.cita_origen_id, cita.insertId]
+    ).catch(() => {});
 
     avisarClinica(o, cita.insertId);
     gcal.crearEvento(o.medico_id, {

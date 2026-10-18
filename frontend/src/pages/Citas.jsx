@@ -9,6 +9,7 @@ import { hoyClinica } from "../utils/zonaClinica";
 import RecordatoriosWhatsapp from "../components/RecordatoriosWhatsapp";
 import BloqueVideoconsulta from "../components/BloqueVideoconsulta";
 import { videoActiva } from "../utils/videollamada";
+import { cargarSucursales, getSucursalActiva } from "../utils/sucursalActiva";
 import "dayjs/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -1493,7 +1494,10 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
   const [form, setForm] = useState({
     paciente_id: "", medico_id: "", inicio: "", fin: "",
     tipo_consulta: tiposConsulta[0], motivo: "", canal: "RECEPCION", videoconsulta: false,
+    sucursal_id: getSucursalActiva() ? String(getSucursalActiva()) : "",
   });
+  const [sucursales, setSucursales] = useState([]); // solo si la clínica tiene varias
+  useEffect(() => { cargarSucursales(api).then(d => setSucursales(d.multiple ? d.sucursales : [])); }, []);
   const [pacBusq,  setPacBusq]  = useState("");
   const [pacList,  setPacList]  = useState([]);
   const [pacSel,   setPacSel]   = useState(null);
@@ -1553,10 +1557,10 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
 
   useEffect(() => {
     if (!form.medico_id || !fechaSel) { setSlots([]); return; }
-    api.get("/citas/slots", { params: { medico_id: form.medico_id, fecha: fechaSel } })
+    api.get("/citas/slots", { params: { medico_id: form.medico_id, fecha: fechaSel, sucursal_id: form.sucursal_id || undefined } })
       .then(r => setSlots(r.data.data || []))
       .catch(() => setSlots([]));
-  }, [form.medico_id, fechaSel]);
+  }, [form.medico_id, fechaSel, form.sucursal_id]);
 
   const selPaciente = (p) => {
     setPacSel(p);
@@ -1720,6 +1724,18 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
                   </div>
                 )}
               </div>
+
+              {/* Sucursal (solo clínicas con varias) */}
+              {sucursales.length > 1 && (
+                <div className="col-12">
+                  <label className="form-label fw-semibold small mb-1"><i className="bi bi-shop me-1" />Sucursal</label>
+                  <select className="form-select form-select-sm" value={form.sucursal_id}
+                    onChange={e => { setSlotSel(""); setForm(f => ({ ...f, sucursal_id: e.target.value })); }}>
+                    <option value="">Según el horario del médico</option>
+                    {sucursales.map(s => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                  </select>
+                </div>
+              )}
 
               {/* Médico + Fecha */}
               <div className="col-8">
@@ -2186,6 +2202,12 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
               <div className="dcm-card-label"><i className="bi bi-person-badge"></i> Médico</div>
               <div className="dcm-card-val">{nombreMedico(c)}</div>
             </div>
+            {c.sucursal_nombre && (
+              <div className="dcm-card full">
+                <div className="dcm-card-label"><i className="bi bi-shop"></i> Sucursal</div>
+                <div className="dcm-card-val">{c.sucursal_nombre}</div>
+              </div>
+            )}
             <div className="dcm-card full">
               <div className="dcm-card-label"><i className="bi bi-chat-text"></i> Motivo</div>
               <div className={`dcm-card-val${!c.motivo ? " muted" : ""}`}>

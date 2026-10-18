@@ -784,6 +784,7 @@ router.post("/cita", limiterModerate, async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?)`,
       [clinica_id, paciente_id, medico_id, inicio, fin, "CONTROL", motivo || null, "PORTAL"]
     );
+    await require("../utils/sucursales").asignarSucursalPorHorario(r.insertId, clinica_id, medico_id, inicio);
 
     const [[pac]] = await pool.query(
       "SELECT nombres, apellidos FROM pacientes WHERE id=?",

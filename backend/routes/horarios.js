@@ -10,6 +10,14 @@
 const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
+const { sucursalesDe, asegurarSucursales } = require("../utils/sucursales");
+
+// Sucursal de un bloque: un id válido de la clínica, o null = atiende en todas
+async function sucursalDeBloque(clinicaId, valor) {
+  const id = Number(valor) || null;
+  if (!id) return null;
+  return (await sucursalesDe(clinicaId)).some((s) => s.id === id) ? id : null;
+}
 
 const DIAS = ["Lunes","Martes","Miércoles","Jueves","Viernes","Sábado","Domingo"];
 
@@ -30,11 +38,13 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA",
       : req.user.clinica_id;
 
     const { medico_id } = req.query;
+    await asegurarSucursales();
     let sql = `SELECT h.id, h.medico_id, h.dia_semana, h.hora_inicio, h.hora_fin,
-                      h.slot_minutos, h.activo,
+                      h.slot_minutos, h.activo, h.sucursal_id, s.nombre AS sucursal_nombre,
                       u.nombres, u.apellidos
                FROM horarios_medico h
                LEFT JOIN usuarios u ON u.id = h.medico_id
+               LEFT JOIN sucursales s ON s.id = h.sucursal_id
                WHERE h.clinica_id=? AND h.activo=1`;
     const params = [clinicaId];
 
@@ -93,6 +103,8 @@ router.post("/", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA"), async (re
        VALUES (?,?,?,?,?,?)`,
       [clinicaId, medico_id, dia_semana, hora_inicio, hora_fin, slot_minutos||30]
     );
+    const sucursalId = await sucursalDeBloque(clinicaId, req.body.sucursal_id);
+    if (sucursalId) await pool.query("UPDATE horarios_medico SET sucursal_id=? WHERE id=?", [sucursalId, r.insertId]);
     res.status(201).json({ ok: true, id: r.insertId });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -161,6 +173,11 @@ router.put("/:id", auth("SUPER_ADMIN","ADMIN","MEDICO","RECEPCIONISTA"), async (
     ];
 
     await pool.query(sql, params);
+    if (req.body.sucursal_id !== undefined) {
+      await asegurarSucursales();
+      await pool.query("UPDATE horarios_medico SET sucursal_id=? WHERE id=? AND clinica_id=?",
+        [await sucursalDeBloque(actual.clinica_id, req.body.sucursal_id), req.params.id, actual.clinica_id]);
+    }
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

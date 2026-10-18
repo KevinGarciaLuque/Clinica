@@ -19,6 +19,7 @@
 const router = require("express").Router();
 const pool = require("../db");
 const auth = require("../middlewares/auth");
+const { filtroSucursal, sucursalParaGuardar } = require("../utils/sucursales");
 const { requireFinanzas } = require("../utils/permisoFinanzas");
 const { zonaClinica, ahoraClinica, hoyClinica, localSql } = require("../utils/zonaHoraria");
 
@@ -74,11 +75,23 @@ async function asegurarTablas() {
       anulado_por        INT UNSIGNED NULL,
       anulado_en         DATETIME NULL,
       motivo_anulacion   VARCHAR(250) NULL,
+      sucursal_id        INT UNSIGNED NULL,
       INDEX idx_g_clinica_fecha (clinica_id, fecha),
       INDEX idx_g_categoria (categoria_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   tablasListas = true;
 }
+
+const VACIO = { sql: "", params: [] };
+/** Filtros por la sucursal elegida arriba: facturas/pagos (f.) y gastos (g. / sin alias) */
+async function filtrosSucursal(req) {
+  return {
+    f: await filtroSucursal(req, "f.sucursal_id"),
+    g: await filtroSucursal(req, "g.sucursal_id"),
+    gs: await filtroSucursal(req, "sucursal_id"),
+  };
+}
+const SIN_FILTRO = { f: VACIO, g: VACIO, gs: VACIO };
 
 const clinicaDe = (req) => req.tenant?.clinica_id || req.user?.clinica_id;
 const esFecha = (s) => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ""));
@@ -137,7 +150,7 @@ async function leerGasto(body, clinicaId) {
 
 const SELECT_GASTO = `
   SELECT g.id, g.categoria_id, g.descripcion, g.monto, DATE_FORMAT(g.fecha, '%Y-%m-%d') AS fecha, g.metodo,
-         g.proveedor, g.comprobante, g.fijo, g.notas, g.anulado, g.motivo_anulacion,
+         g.proveedor, g.comprobante, g.fijo, g.notas, g.anulado, g.motivo_anulacion, g.sucursal_id,
          c.nombre AS categoria, c.icono AS categoria_icono, c.color AS categoria_color,
          TRIM(CONCAT(COALESCE(u.nombres,''),' ',COALESCE(u.apellidos,''))) AS registrado_por
   FROM gastos g
@@ -200,7 +213,8 @@ router.get("/gastos", ...base, async (req, res) => {
     if (categoria_id) { where.push("g.categoria_id = ?"); params.push(Number(categoria_id)); }
     if (q) { where.push("(g.descripcion LIKE ? OR g.proveedor LIKE ? OR g.comprobante LIKE ?)"); params.push(`%${q}%`, `%${q}%`, `%${q}%`); }
     if (incluir_anulados !== "1") where.push("g.anulado = 0");
-    const [rows] = await pool.query(`${SELECT_GASTO} WHERE ${where.join(" AND ")} ORDER BY g.fecha DESC, g.id DESC LIMIT 1000`, params);
+    const fs = await filtroSucursal(req, "g.sucursal_id");
+    const [rows] = await pool.query(`${SELECT_GASTO} WHERE ${where.join(" AND ")}${fs.sql} ORDER BY g.fecha DESC, g.id DESC LIMIT 1000`, [...params, ...fs.params]);
     const total = rows.filter((r) => !r.anulado).reduce((s, r) => s + Number(r.monto), 0);
     res.json({ ok: true, data: rows, total: num(total) });
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
@@ -217,6 +231,8 @@ router.post("/gastos", ...base, async (req, res) => {
        VALUES (?,?,?,?,?,?,?,?,?,?,?)`,
       [clinicaId, datos.categoria_id, datos.descripcion, datos.monto, datos.fecha, datos.metodo, datos.proveedor, datos.comprobante, datos.fijo, datos.notas, req.user.id]
     );
+    const sucursalId = await sucursalParaGuardar(req, req.body?.sucursal_id);
+    if (sucursalId) await pool.query("UPDATE gastos SET sucursal_id = ? WHERE id = ?", [sucursalId, r.insertId]);
     res.json({ ok: true, id: r.insertId });
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
 });
@@ -235,6 +251,10 @@ router.put("/gastos/:id", ...base, async (req, res) => {
        WHERE id = ? AND clinica_id = ?`,
       [datos.categoria_id, datos.descripcion, datos.monto, datos.fecha, datos.metodo, datos.proveedor, datos.comprobante, datos.fijo, datos.notas, g.id, clinicaId]
     );
+    if (req.body?.sucursal_id) {
+      const sucursalId = await sucursalParaGuardar(req, req.body.sucursal_id);
+      if (sucursalId) await pool.query("UPDATE gastos SET sucursal_id = ? WHERE id = ?", [sucursalId, g.id]);
+    }
     res.json({ ok: true });
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
 });
@@ -254,18 +274,18 @@ router.post("/gastos/:id/anular", ...base, async (req, res) => {
 });
 
 // ── Gastos fijos (alquiler, sueldos…): copiar los del mes anterior ───────────
-async function fijosPendientes(clinicaId, mes) {
+async function fijosPendientes(clinicaId, mes, suc = SIN_FILTRO) {
   const anterior = rangoMes(mesMas(mes, -1));
   const actual = rangoMes(mes);
   const [previos] = await pool.query(
-    `${SELECT_GASTO} WHERE g.clinica_id = ? AND g.fijo = 1 AND g.anulado = 0 AND g.fecha BETWEEN ? AND ? ORDER BY g.fecha, g.id`,
-    [clinicaId, anterior.desde, anterior.hasta]
+    `${SELECT_GASTO} WHERE g.clinica_id = ? AND g.fijo = 1 AND g.anulado = 0 AND g.fecha BETWEEN ? AND ?${suc.g.sql} ORDER BY g.fecha, g.id`,
+    [clinicaId, anterior.desde, anterior.hasta, ...suc.g.params]
   );
   const [yaEste] = await pool.query(
-    "SELECT categoria_id, descripcion FROM gastos WHERE clinica_id = ? AND anulado = 0 AND fecha BETWEEN ? AND ?",
-    [clinicaId, actual.desde, actual.hasta]
+    `SELECT categoria_id, descripcion, sucursal_id FROM gastos WHERE clinica_id = ? AND anulado = 0 AND fecha BETWEEN ? AND ?${suc.gs.sql}`,
+    [clinicaId, actual.desde, actual.hasta, ...suc.gs.params]
   );
-  const clave = (g) => `${g.categoria_id || 0}|${String(g.descripcion).toLowerCase().trim()}`;
+  const clave = (g) => `${g.categoria_id || 0}|${g.sucursal_id || 0}|${String(g.descripcion).toLowerCase().trim()}`;
   const hechos = new Set(yaEste.map(clave));
   const ultimoDia = Number(actual.hasta.slice(8, 10));
   return previos.filter((g) => !hechos.has(clave(g))).map((g) => ({
@@ -279,7 +299,7 @@ router.get("/fijos-pendientes", ...base, async (req, res) => {
     const clinicaId = clinicaDe(req);
     await asegurarTablas();
     const mes = esMes(req.query.mes) ? req.query.mes : ahoraClinica(await zonaClinica(clinicaId)).format("YYYY-MM");
-    res.json({ ok: true, mes, data: await fijosPendientes(clinicaId, mes) });
+    res.json({ ok: true, mes, data: await fijosPendientes(clinicaId, mes, await filtrosSucursal(req)) });
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
 });
 
@@ -290,12 +310,12 @@ router.post("/copiar-fijos", ...base, async (req, res) => {
     const mes = String(req.body?.mes || "");
     if (!esMes(mes)) return res.status(400).json({ ok: false, msg: "Mes no válido." });
     const elegidos = new Set((req.body?.ids || []).map(Number));
-    const pendientes = (await fijosPendientes(clinicaId, mes)).filter((g) => !elegidos.size || elegidos.has(g.id));
+    const pendientes = (await fijosPendientes(clinicaId, mes, await filtrosSucursal(req))).filter((g) => !elegidos.size || elegidos.has(g.id));
     for (const g of pendientes) {
       await pool.query(
-        `INSERT INTO gastos (clinica_id, categoria_id, descripcion, monto, fecha, metodo, proveedor, comprobante, fijo, notas, creado_por)
-         VALUES (?,?,?,?,?,?,?,NULL,1,?,?)`,
-        [clinicaId, g.categoria_id, g.descripcion, g.monto, g.fecha_nueva, g.metodo, g.proveedor, g.notas, req.user.id]
+        `INSERT INTO gastos (clinica_id, categoria_id, descripcion, monto, fecha, metodo, proveedor, comprobante, fijo, notas, creado_por, sucursal_id)
+         VALUES (?,?,?,?,?,?,?,NULL,1,?,?,?)`,
+        [clinicaId, g.categoria_id, g.descripcion, g.monto, g.fecha_nueva, g.metodo, g.proveedor, g.notas, req.user.id, g.sucursal_id || null]
       );
     }
     res.json({ ok: true, copiados: pendientes.length });
@@ -303,20 +323,20 @@ router.post("/copiar-fijos", ...base, async (req, res) => {
 });
 
 // ── Resumen ──────────────────────────────────────────────────────────────────
-async function ingresosEntre(clinicaId, tz, desde, hasta) {
+async function ingresosEntre(clinicaId, tz, desde, hasta, suc = SIN_FILTRO) {
   const PL = localSql("p.registrado_en", tz);
   const [[t]] = await pool.query(
     `SELECT COALESCE(SUM(p.monto),0) AS total, COUNT(*) AS cantidad
      FROM pagos p LEFT JOIN facturas f ON f.id = p.factura_id
-     WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?`,
-    [clinicaId, desde, hasta]
+     WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?${suc.f.sql}`,
+    [clinicaId, desde, hasta, ...suc.f.params]
   );
   return { total: num(t.total), cantidad: Number(t.cantidad) };
 }
-async function gastosEntre(clinicaId, desde, hasta) {
+async function gastosEntre(clinicaId, desde, hasta, suc = SIN_FILTRO) {
   const [[t]] = await pool.query(
-    "SELECT COALESCE(SUM(monto),0) AS total, COUNT(*) AS cantidad FROM gastos WHERE clinica_id = ? AND anulado = 0 AND fecha BETWEEN ? AND ?",
-    [clinicaId, desde, hasta]
+    `SELECT COALESCE(SUM(monto),0) AS total, COUNT(*) AS cantidad FROM gastos WHERE clinica_id = ? AND anulado = 0 AND fecha BETWEEN ? AND ?${suc.gs.sql}`,
+    [clinicaId, desde, hasta, ...suc.gs.params]
   );
   return { total: num(t.total), cantidad: Number(t.cantidad) };
 }
@@ -330,39 +350,40 @@ router.get("/resumen", ...base, async (req, res) => {
     const mes = esMes(req.query.mes) ? req.query.mes : hoy.format("YYYY-MM");
     const { desde, hasta } = rangoMes(mes);
     const ant = rangoMes(mesMas(mes, -1));
+    const suc = await filtrosSucursal(req);
 
     const [ingresos, gastos, ingAnt, gasAnt] = await Promise.all([
-      ingresosEntre(clinicaId, tz, desde, hasta), gastosEntre(clinicaId, desde, hasta),
-      ingresosEntre(clinicaId, tz, ant.desde, ant.hasta), gastosEntre(clinicaId, ant.desde, ant.hasta),
+      ingresosEntre(clinicaId, tz, desde, hasta, suc), gastosEntre(clinicaId, desde, hasta, suc),
+      ingresosEntre(clinicaId, tz, ant.desde, ant.hasta, suc), gastosEntre(clinicaId, ant.desde, ant.hasta, suc),
     ]);
 
     const PL = localSql("p.registrado_en", tz);
     const [porMetodo] = await pool.query(
       `SELECT p.metodo, COALESCE(SUM(p.monto),0) AS total FROM pagos p LEFT JOIN facturas f ON f.id = p.factura_id
-       WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?
+       WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?${suc.f.sql}
        GROUP BY p.metodo ORDER BY total DESC`,
-      [clinicaId, desde, hasta]
+      [clinicaId, desde, hasta, ...suc.f.params]
     );
     const [porCategoria] = await pool.query(
       `SELECT c.id, COALESCE(c.nombre, 'Sin categoría') AS categoria, c.icono, c.color, SUM(g.monto) AS total, COUNT(*) AS cantidad
        FROM gastos g LEFT JOIN gastos_categorias c ON c.id = g.categoria_id
-       WHERE g.clinica_id = ? AND g.anulado = 0 AND g.fecha BETWEEN ? AND ?
+       WHERE g.clinica_id = ? AND g.anulado = 0 AND g.fecha BETWEEN ? AND ?${suc.g.sql}
        GROUP BY c.id, c.nombre, c.icono, c.color ORDER BY total DESC`,
-      [clinicaId, desde, hasta]
+      [clinicaId, desde, hasta, ...suc.g.params]
     );
 
     // Últimos 6 meses (terminando en el mes elegido)
     const primerMes = mesMas(mes, -5);
     const [ingMes] = await pool.query(
       `SELECT DATE_FORMAT(${PL}, '%Y-%m') AS mes, SUM(p.monto) AS total FROM pagos p LEFT JOIN facturas f ON f.id = p.factura_id
-       WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?
+       WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?${suc.f.sql}
        GROUP BY DATE_FORMAT(${PL}, '%Y-%m')`,
-      [clinicaId, `${primerMes}-01`, hasta]
+      [clinicaId, `${primerMes}-01`, hasta, ...suc.f.params]
     );
     const [gasMes] = await pool.query(
       `SELECT DATE_FORMAT(fecha, '%Y-%m') AS mes, SUM(monto) AS total FROM gastos
-       WHERE clinica_id = ? AND anulado = 0 AND fecha BETWEEN ? AND ? GROUP BY DATE_FORMAT(fecha, '%Y-%m')`,
-      [clinicaId, `${primerMes}-01`, hasta]
+       WHERE clinica_id = ? AND anulado = 0 AND fecha BETWEEN ? AND ?${suc.gs.sql} GROUP BY DATE_FORMAT(fecha, '%Y-%m')`,
+      [clinicaId, `${primerMes}-01`, hasta, ...suc.gs.params]
     );
     const serie = [];
     for (let i = 0; i < 6; i++) {
@@ -372,7 +393,7 @@ router.get("/resumen", ...base, async (req, res) => {
       serie.push({ mes: m, ingresos: ing, gastos: gas, ganancia: num(ing - gas) });
     }
 
-    const porCobrar = await saldoPorCobrar(clinicaId);
+    const porCobrar = await saldoPorCobrar(clinicaId, suc);
 
     res.json({
       ok: true,
@@ -404,9 +425,9 @@ const SQL_POR_COBRAR = (FL) => `
   LEFT JOIN usuarios u ON u.id = f.medico_id
   WHERE f.clinica_id = ? AND f.estado = 'PENDIENTE'`;
 
-async function listaPorCobrar(clinicaId) {
+async function listaPorCobrar(clinicaId, suc = SIN_FILTRO) {
   const tz = await zonaClinica(clinicaId);
-  const [rows] = await pool.query(`${SQL_POR_COBRAR(localSql("f.creado_en", tz))} ORDER BY f.creado_en ASC`, [clinicaId]);
+  const [rows] = await pool.query(`${SQL_POR_COBRAR(localSql("f.creado_en", tz))}${suc.f.sql} ORDER BY f.creado_en ASC`, [clinicaId, ...suc.f.params]);
   const hoy = hoyClinica(tz);
   const dias = (f) => Math.max(0, Math.round((Date.parse(`${hoy}T00:00:00Z`) - Date.parse(`${f}T00:00:00Z`)) / 86400000));
   return rows
@@ -414,8 +435,8 @@ async function listaPorCobrar(clinicaId) {
     .filter((r) => r.saldo > 0);
 }
 
-async function saldoPorCobrar(clinicaId) {
-  const lista = await listaPorCobrar(clinicaId);
+async function saldoPorCobrar(clinicaId, suc = SIN_FILTRO) {
+  const lista = await listaPorCobrar(clinicaId, suc);
   const tramo = (min, max) => num(lista.filter((r) => r.dias >= min && r.dias <= max).reduce((s, r) => s + r.saldo, 0));
   return {
     total: num(lista.reduce((s, r) => s + r.saldo, 0)),
@@ -427,8 +448,9 @@ async function saldoPorCobrar(clinicaId) {
 router.get("/por-cobrar", ...base, async (req, res) => {
   try {
     const clinicaId = clinicaDe(req);
-    const lista = await listaPorCobrar(clinicaId);
-    res.json({ ok: true, data: lista, resumen: await saldoPorCobrar(clinicaId) });
+    const suc = await filtrosSucursal(req);
+    const lista = await listaPorCobrar(clinicaId, suc);
+    res.json({ ok: true, data: lista, resumen: await saldoPorCobrar(clinicaId, suc) });
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
 });
 
@@ -444,17 +466,18 @@ router.get("/exportar", ...base, async (req, res) => {
     if (!esFecha(desde) || !esFecha(hasta)) ({ desde, hasta } = rangoMes(hoy.format("YYYY-MM")));
 
     const PL = localSql("p.registrado_en", tz);
+    const suc = await filtrosSucursal(req);
     const [ingresos] = await pool.query(
       `SELECT DATE_FORMAT(${PL}, '%d/%m/%Y %H:%i') AS fecha, p.metodo, p.monto, p.referencia,
               COALESCE(f.numero_completo, f.numero, f.id) AS factura, TRIM(CONCAT(pa.nombres, ' ', pa.apellidos)) AS paciente
        FROM pagos p LEFT JOIN facturas f ON f.id = p.factura_id LEFT JOIN pacientes pa ON pa.id = f.paciente_id
-       WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?
+       WHERE p.clinica_id = ? AND (f.id IS NULL OR f.estado <> 'ANULADA') AND DATE(${PL}) BETWEEN ? AND ?${suc.f.sql}
        ORDER BY p.registrado_en`,
-      [clinicaId, desde, hasta]
+      [clinicaId, desde, hasta, ...suc.f.params]
     );
     const [gastos] = await pool.query(
-      `${SELECT_GASTO} WHERE g.clinica_id = ? AND g.anulado = 0 AND g.fecha BETWEEN ? AND ? ORDER BY g.fecha, g.id`,
-      [clinicaId, desde, hasta]
+      `${SELECT_GASTO} WHERE g.clinica_id = ? AND g.anulado = 0 AND g.fecha BETWEEN ? AND ?${suc.g.sql} ORDER BY g.fecha, g.id`,
+      [clinicaId, desde, hasta, ...suc.g.params]
     );
     const totalIng = num(ingresos.reduce((s, r) => s + Number(r.monto), 0));
     const totalGas = num(gastos.reduce((s, r) => s + Number(r.monto), 0));

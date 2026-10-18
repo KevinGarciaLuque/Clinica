@@ -9,6 +9,7 @@ const router = require("express").Router();
 const pool   = require("../db");
 const { DIA_SQL, RANGO_SQL } = require("../utils/rangoDias");
 const auth   = require("../middlewares/auth");
+const { filtroSucursal } = require("../utils/sucursales");
 
 let _ndReady = false;
 async function ensureNombreDisplayColumn() {
@@ -32,6 +33,7 @@ router.get("/stats", auth(), async (req, res) => {
     const hoy = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || "")
       ? req.query.fecha
       : new Date().toLocaleDateString('en-CA');
+    const fs = await filtroSucursal(req, "sucursal_id");
     const inicioSem = new Date();
     inicioSem.setDate(inicioSem.getDate() - inicioSem.getDay() + 1); // Lunes
     const finSem    = new Date(inicioSem);
@@ -49,18 +51,18 @@ router.get("/stats", auth(), async (req, res) => {
         [clinicaId]
       ),
       pool.query(
-        `SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND ${DIA_SQL("inicio")}`,
-        [clinicaId, hoy, hoy]
+        `SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND ${DIA_SQL("inicio")}${fs.sql}`,
+        [clinicaId, hoy, hoy, ...fs.params]
       ),
       pool.query(
-        `SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND ${RANGO_SQL("inicio")}`,
-        [clinicaId, inicioSem.toISOString().slice(0,10), finSem.toISOString().slice(0,10)]
+        `SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND ${RANGO_SQL("inicio")}${fs.sql}`,
+        [clinicaId, inicioSem.toISOString().slice(0,10), finSem.toISOString().slice(0,10), ...fs.params]
       ),
       pool.query(
         `SELECT estado, COUNT(*) AS total
-         FROM citas WHERE clinica_id=? AND ${DIA_SQL("inicio")}
+         FROM citas WHERE clinica_id=? AND ${DIA_SQL("inicio")}${fs.sql}
          GROUP BY estado`,
-        [clinicaId, hoy, hoy]
+        [clinicaId, hoy, hoy, ...fs.params]
       ),
       pool.query(
         `SELECT id, nombres, apellidos, telefono, creado_en
@@ -95,6 +97,7 @@ router.get("/sala-espera", auth(), async (req, res) => {
     const hoy = /^\d{4}-\d{2}-\d{2}$/.test(req.query.fecha || "")
       ? req.query.fecha
       : new Date().toLocaleDateString('en-CA');
+    const fs = await filtroSucursal(req, "c.sucursal_id");
 
     const [rows] = await pool.query(
       `SELECT c.id,
@@ -110,9 +113,9 @@ router.get("/sala-espera", auth(), async (req, res) => {
        JOIN usuarios  u  ON u.id = c.medico_id
        LEFT JOIN especialidades e ON e.id = u.especialidad_id
        WHERE c.clinica_id=? AND ${DIA_SQL("c.inicio")}
-         AND c.estado NOT IN ('CANCELADA','NO_ASISTIO')
+         AND c.estado NOT IN ('CANCELADA','NO_ASISTIO')${fs.sql}
        ORDER BY c.inicio ASC`,
-      [clinicaId, hoy, hoy]
+      [clinicaId, hoy, hoy, ...fs.params]
     );
 
     const [[{ total: totalRecepcionistas }]] = await pool.query(

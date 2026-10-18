@@ -39,6 +39,7 @@ const corsOptions = {
     "Authorization",
     "x-clinica-id",
     "x-clinica-slug",
+    "x-sucursal-id",
     "x-session-token",
   ],
   optionsSuccessStatus: 204,
@@ -165,6 +166,7 @@ app.use("/api/estadisticas", require("./routes/estadisticas"));
 app.use("/api/facturacion", require("./routes/facturacion"));
 app.use("/api/caja", require("./routes/caja"));
 app.use("/api/finanzas", require("./routes/finanzas"));
+app.use("/api/sucursales", require("./routes/sucursales"));
 app.use("/api/recordatorios-whatsapp", require("./routes/recordatoriosWhatsapp"));
 app.use("/api/videoconsultas", require("./routes/videoconsultas"));
 app.use("/api/superadmin/almacenamiento", require("./routes/almacenamientoAdmin"));
@@ -949,6 +951,14 @@ const pool = require("./db");
       } catch (e) {
         console.warn(`⚠️  [auto-migrate] índice ${nombre}:`, e.message);
       }
+    }
+
+    // Sucursales: tablas nuevas y columna opcional sucursal_id (NULL = sede principal)
+    try {
+      await require("./utils/sucursales").asegurarSucursales();
+      console.log("✅ [auto-migrate] sucursales OK");
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] sucursales:", e.message);
     }
 
     // Módulo Finanzas (gastos y ganancias): visible en el menú de todas las clínicas.

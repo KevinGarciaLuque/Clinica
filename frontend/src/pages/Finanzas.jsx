@@ -6,6 +6,7 @@ import {
 } from "recharts";
 import api from "../api/api";
 import { hoyClinica } from "../utils/zonaClinica";
+import { cargarSucursales, getSucursalActiva } from "../utils/sucursalActiva";
 
 // Finanzas: ingresos (pagos de Facturación), gastos de la clínica, ganancia y cuentas por cobrar.
 
@@ -95,6 +96,16 @@ function TooltipMes({ active, payload, label }) {
 // ── Formulario de gasto ──────────────────────────────────────────────────────
 function ModalGasto({ inicial, categorias, onCerrar, onGuardado, onNuevaCategoria }) {
   const [f, setF] = useState(() => inicial || { descripcion: "", monto: "", fecha: hoyClinica(), categoria_id: "", metodo: "EFECTIVO", proveedor: "", comprobante: "", fijo: false, notas: "" });
+  // Sucursal del gasto (solo clínicas con varias): la del gasto, la elegida arriba o la principal
+  const [sucursales, setSucursales] = useState([]);
+  useEffect(() => {
+    cargarSucursales(api).then((d) => {
+      if (!d.multiple) return;
+      setSucursales(d.sucursales);
+      setF((x) => (x.sucursal_id ? { ...x, sucursal_id: String(x.sucursal_id) }
+        : { ...x, sucursal_id: String(getSucursalActiva() || d.sucursales.find((s) => s.es_principal)?.id || d.sucursales[0]?.id || "") }));
+    });
+  }, []);
   const [guardando, setGuardando] = useState(false);
   const [error, setError] = useState("");
   const [nuevaCat, setNuevaCat] = useState(null);
@@ -173,6 +184,14 @@ function ModalGasto({ inicial, categorias, onCerrar, onGuardado, onNuevaCategori
                 {METODOS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
               </select>
             </div>
+            {sucursales.length > 1 && (
+              <div className="col-12">
+                <label className="form-label small fw-semibold mb-1"><i className="bi bi-shop me-1" />Sucursal</label>
+                <select className="form-select" value={f.sucursal_id || ""} onChange={cambiar("sucursal_id")}>
+                  {sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                </select>
+              </div>
+            )}
             <div className="col-7">
               <label className="form-label small fw-semibold mb-1">Proveedor</label>
               <input className="form-control" value={f.proveedor || ""} onChange={cambiar("proveedor")} maxLength={150} placeholder="Opcional" />

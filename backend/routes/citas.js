@@ -5,6 +5,7 @@ const auth = require("../middlewares/auth");
 const { marcarVideo, citasConVideo } = require("./videoconsultas");
 const gcal = require("../utils/googleCalendar");
 const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
+const { filtroSucursal, contextoSucursal, sucursalParaGuardar, sucursalPorHorario, nombrarPrincipal } = require("../utils/sucursales");
 
 async function obtenerTZ(clinicaId) {
   const [[tzRow]] = await pool.query(
@@ -52,9 +53,14 @@ router.get("/slots", auth(), async (req, res) => {
     const diaJS    = WD_MAP[nombreDia];           // 0=Dom, 1=Lun, ... 6=Sab
     const diaLunes = diaJS === 0 ? 6 : diaJS - 1; // 0=Lun, ..., 6=Dom
 
+    // Con sucursales: solo los bloques de la sucursal elegida (o los de "todas las sucursales")
+    const ctxSuc = await contextoSucursal(req);
+    const sucSlots = ctxSuc.multiple ? (Number(req.query.sucursal_id) || ctxSuc.unica) : null;
     const [horarios] = await pool.query(
-      "SELECT hora_inicio, hora_fin, slot_minutos FROM horarios_medico WHERE medico_id=? AND clinica_id=? AND dia_semana=? AND activo=1",
-      [medico_id, clinicaId, diaLunes]
+      `SELECT hora_inicio, hora_fin, slot_minutos, sucursal_id FROM horarios_medico
+       WHERE medico_id=? AND clinica_id=? AND dia_semana=? AND activo=1
+       ${sucSlots ? "AND (sucursal_id IS NULL OR sucursal_id = ?)" : ""}`,
+      sucSlots ? [medico_id, clinicaId, diaLunes, sucSlots] : [medico_id, clinicaId, diaLunes]
     );
     if (!horarios.length) return res.json({ ok: true, data: [] });
 
@@ -103,6 +109,7 @@ router.get("/slots", auth(), async (req, res) => {
             inicio: toLocalISO(cursor),
             fin:    toLocalISO(slotFin),
             label:  `${hhmmIni} - ${hhmmFin}`,
+            sucursal_id: h.sucursal_id || null,
           });
         }
         cursor = slotFin;
@@ -179,6 +186,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.status(400).json({ ok: false, msg: "Falta clinica_id" });
     await ensureNombreDisplayColumn();
+    await contextoSucursal(req); // garantiza la tabla de sucursales
 
     const { desde, hasta, medico_id, paciente_id, estado } = req.query;
     let sql = `SELECT c.id,
@@ -194,13 +202,21 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
                       p.foto_perfil AS paciente_foto_perfil,
                       u.nombres AS medico_nombres, u.apellidos AS medico_apellidos,
                       u.nombre_display AS medico_nombre_display, u.sexo AS medico_sexo,
-                      e.nombre AS especialidad
+                      e.nombre AS especialidad,
+                      c.sucursal_id, s.nombre AS sucursal_nombre
                FROM citas c
                JOIN pacientes p ON p.id = c.paciente_id
                JOIN usuarios  u ON u.id = c.medico_id
                LEFT JOIN especialidades e ON e.id = u.especialidad_id
+               LEFT JOIN sucursales s ON s.id = c.sucursal_id
                WHERE c.clinica_id = ?`;
     const params = [clinicaId];
+    // Sucursal elegida arriba (sin efecto si la clínica tiene una sola sede).
+    // Con paciente_id se muestran todas: es el historial del paciente.
+    if (!paciente_id) {
+      const fs = await filtroSucursal(req, "c.sucursal_id");
+      sql += fs.sql; params.push(...fs.params);
+    }
 
     if (desde)      { sql += " AND c.inicio >= ?";      params.push(desde); }
     if (hasta)      { sql += " AND c.inicio <= ?";      params.push(hasta + " 23:59:59"); }
@@ -217,6 +233,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     // Videoconsultas (tabla aparte): se marca cada cita con es_video
     const conVideo = await citasConVideo(rows.map((r) => r.id));
     for (const r of rows) r.es_video = conVideo.has(r.id) ? 1 : 0;
+    await nombrarPrincipal(req, rows);
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -283,6 +300,11 @@ router.put("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
       if (solap.length) {
         return res.status(409).json({ ok: false, msg: "Horario no disponible (solapamiento)" });
       }
+    }
+
+    if (req.body.sucursal_id !== undefined) {
+      const suc = await sucursalParaGuardar(req, req.body.sucursal_id);
+      if (suc) await pool.query("UPDATE citas SET sucursal_id=? WHERE id=? AND clinica_id=?", [suc, req.params.id, clinicaId]);
     }
 
     await pool.query(
@@ -364,6 +386,12 @@ router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","
       [clinicaId, paciente_id, medico_id, inicio, fin,
        tipo_consulta || "CONTROL", motivo || null, canal || "RECEPCION", servicio_id || null]
     );
+
+    // Sucursal: la elegida en el formulario, si no la del horario del médico, si no la activa
+    const sucursalId = await sucursalParaGuardar(
+      req, req.body.sucursal_id || await sucursalPorHorario(clinicaId, medico_id, inicio)
+    );
+    if (sucursalId) await pool.query("UPDATE citas SET sucursal_id=? WHERE id=?", [sucursalId, r.insertId]);
 
     if (req.body.videoconsulta) {
       try { await marcarVideo(r.insertId, clinicaId, req.user.id); }

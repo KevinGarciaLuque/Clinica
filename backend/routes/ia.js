@@ -238,6 +238,7 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
          VALUES (?,?,?,?,?,?,?,?)`,
         [clinicaId, paciente_id, medico_id, inicio, fin, tipo_consulta||"CONTROL", motivo||null, "IA"]
       );
+      await require("../utils/sucursales").asignarSucursalPorHorario(r.insertId, clinicaId, medico_id, inicio);
 
       // Sincronizar con Google Calendar del médico (si lo conectó) — no bloquea
       try {

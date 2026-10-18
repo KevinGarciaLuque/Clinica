@@ -6,6 +6,18 @@ const router = require("express").Router();
 const pool   = require("../db");
 const auth   = require("../middlewares/auth");
 const { zonaClinica, localSql } = require("../utils/zonaHoraria");
+const { contextoSucursal, sucursalUnica, condicionUna, filtroSucursal, nombrarPrincipal } = require("../utils/sucursales");
+
+/**
+ * Con varias sucursales cada una tiene su propia caja (la sucursal elegida arriba,
+ * o la principal si se eligió "todas"). Con una sola sede no cambia nada.
+ */
+async function cajaDeSucursal(req) {
+  const ctx = await contextoSucursal(req);
+  const id = await sucursalUnica(req);
+  const cond = condicionUna("ct.sucursal_id", id, ctx.principalId);
+  return { id, cond, nombre: ctx.lista.find((s) => s.id === id)?.nombre || null };
+}
 
 const ROLES = ["RECEPCIONISTA", "MEDICO", "ADMIN", "SUPER_ADMIN"];
 
@@ -24,20 +36,21 @@ async function desgloseTurno(conn, turnoId) {
 router.get("/actual", auth(...ROLES), async (req, res) => {
   try {
     const clinicaId = req.user.clinica_id;
+    const suc = await cajaDeSucursal(req);
     const [[turno]] = await pool.query(
       `SELECT ct.*, u.nombres AS apertura_nombres, u.apellidos AS apertura_apellidos
        FROM caja_turnos ct
        JOIN usuarios u ON u.id = ct.usuario_apertura_id
-       WHERE ct.clinica_id=? AND ct.estado='ABIERTO' LIMIT 1`,
-      [clinicaId]
+       WHERE ct.clinica_id=? AND ct.estado='ABIERTO'${suc.cond.sql} LIMIT 1`,
+      [clinicaId, ...suc.cond.params]
     );
-    if (!turno) return res.json({ ok: true, data: null });
+    if (!turno) return res.json({ ok: true, data: null, sucursal: suc.nombre });
 
     const porMetodo = await desgloseTurno(pool, turno.id);
     const efectivo = porMetodo.find(m => m.metodo === "EFECTIVO");
     const esperadoAhora = Number(turno.monto_inicial) + Number(efectivo?.total || 0);
 
-    res.json({ ok: true, data: { ...turno, por_metodo: porMetodo, esperado_ahora: esperadoAhora } });
+    res.json({ ok: true, data: { ...turno, por_metodo: porMetodo, esperado_ahora: esperadoAhora }, sucursal: suc.nombre });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -56,11 +69,12 @@ router.post("/abrir", auth(...ROLES), async (req, res) => {
       return res.status(400).json({ ok: false, msg: "Monto inicial inválido" });
     }
 
+    const suc = await cajaDeSucursal(req);
     await conn.beginTransaction();
 
     const [[existente]] = await conn.query(
-      "SELECT id FROM caja_turnos WHERE clinica_id=? AND estado='ABIERTO' FOR UPDATE",
-      [clinicaId]
+      `SELECT ct.id FROM caja_turnos ct WHERE ct.clinica_id=? AND ct.estado='ABIERTO'${suc.cond.sql} FOR UPDATE`,
+      [clinicaId, ...suc.cond.params]
     );
     if (existente) {
       await conn.rollback();
@@ -72,6 +86,7 @@ router.post("/abrir", auth(...ROLES), async (req, res) => {
        VALUES (?,?,?,?)`,
       [clinicaId, montoInicial, notas, req.user.id]
     );
+    if (suc.id) await conn.query("UPDATE caja_turnos SET sucursal_id=? WHERE id=?", [suc.id, r.insertId]);
 
     await conn.commit();
     res.status(201).json({ ok: true, id: r.insertId });
@@ -141,14 +156,17 @@ router.get("/historial", auth(...ROLES), async (req, res) => {
     const offset = (page - 1) * limit;
 
     let sql = `
-      SELECT ct.*,
+      SELECT ct.*, s.nombre AS sucursal_nombre,
              ua.nombres AS apertura_nombres, ua.apellidos AS apertura_apellidos,
              uc.nombres AS cierre_nombres, uc.apellidos AS cierre_apellidos
       FROM caja_turnos ct
       JOIN usuarios ua ON ua.id = ct.usuario_apertura_id
       LEFT JOIN usuarios uc ON uc.id = ct.usuario_cierre_id
+      LEFT JOIN sucursales s ON s.id = ct.sucursal_id
       WHERE ct.clinica_id=? AND ct.estado='CERRADO'`;
     const params = [clinicaId];
+    const fs = await filtroSucursal(req, "ct.sucursal_id");
+    sql += fs.sql; params.push(...fs.params);
     // Fecha del cierre en hora de la clínica (un cierre a las 7 p. m. es de ese día, no del siguiente)
     const CL = localSql("ct.cerrado_en", await zonaClinica(clinicaId));
     if (desde) { sql += ` AND DATE(${CL}) >= ?`; params.push(desde); }
@@ -157,6 +175,7 @@ router.get("/historial", auth(...ROLES), async (req, res) => {
     params.push(limit, offset);
 
     const [rows] = await pool.query(sql, params);
+    await nombrarPrincipal(req, rows);
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

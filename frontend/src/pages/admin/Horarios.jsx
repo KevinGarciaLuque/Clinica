@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import api from "../../api/api";
 import { tituloMedicoActivo, nombreMedico } from "../../utils/medico";
 import AusenciasMedico from "../../components/AusenciasMedico";
+import { cargarSucursales } from "../../utils/sucursalActiva";
 
 const DIAS = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
 const SLOTS = [15, 20, 30, 45, 60];
@@ -80,6 +81,8 @@ export default function Horarios() {
   const [error, setError]           = useState("");
   const [showModal, setShowModal]   = useState(false);
   const [vista, setVista]           = useState("semanal"); // "semanal" | "ausencias"
+  const [sucursales, setSucursales] = useState([]); // solo si la clínica tiene varias
+  useEffect(() => { cargarSucursales(api).then((d) => setSucursales(d.multiple ? d.sucursales : [])); }, []);
 
   const cargar = useCallback(async () => {
     setCargando(true);
@@ -112,7 +115,7 @@ export default function Horarios() {
 
   const abrirNuevo = (diaIdx = 0) => {
     setEditandoId(null);
-    setForm({ ...EMPTY, medico_id: medicoSel, dia_semana: diaIdx });
+    setForm({ ...EMPTY, medico_id: medicoSel, dia_semana: diaIdx, ...(sucursales.length > 1 ? { sucursal_id: "" } : {}) });
     setError("");
     setShowModal(true);
   };
@@ -126,6 +129,7 @@ export default function Horarios() {
       hora_inicio: toHHmm(bloque.hora_inicio),
       hora_fin: toHHmm(bloque.hora_fin),
       slot_minutos: bloque.slot_minutos,
+      ...(sucursales.length > 1 ? { sucursal_id: bloque.sucursal_id ? String(bloque.sucursal_id) : "" } : {}),
     });
     setError("");
     setShowModal(true);
@@ -355,6 +359,11 @@ export default function Horarios() {
                           <span style={{ fontSize: "0.75rem", color: "#6b7280", marginLeft: 8 }}>
                             ({b.slot_minutos} min/turno)
                           </span>
+                          {sucursales.length > 1 && (
+                            <div style={{ fontSize: "0.74rem", color: "#475569", marginTop: 2 }}>
+                              <i className="bi bi-shop me-1" />{b.sucursal_nombre || "Todas las sucursales"}
+                            </div>
+                          )}
                         </div>
                         <div style={{ display: "flex", gap: 5 }}>
                           <button
@@ -442,6 +451,21 @@ export default function Horarios() {
                   <TimePicker12h label="Hora fin" value={form.hora_fin}
                     onChange={(v) => setForm({ ...form, hora_fin: v })} required />
                 </div>
+                {sucursales.length > 1 && (
+                  <div>
+                    <label style={{ fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 }}>
+                      <i className="bi bi-shop me-1" />Sucursal donde atiende
+                    </label>
+                    <select
+                      value={form.sucursal_id || ""}
+                      onChange={(e) => setForm({ ...form, sucursal_id: e.target.value })}
+                      style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid #e5e7eb", fontSize: "0.87rem" }}
+                    >
+                      <option value="">Todas las sucursales</option>
+                      {sucursales.map((s) => <option key={s.id} value={s.id}>{s.nombre}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div>
                   <label style={{ fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 }}>Duración de cada turno</label>
                   <select

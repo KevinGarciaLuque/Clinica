@@ -6,6 +6,8 @@ import { DEPARTAMENTOS_HONDURAS, MUNICIPIOS_POR_DEPARTAMENTO } from "../../utils
 import { useAuth } from "../../auth/AuthContext";
 import { origenPublico } from "../../utils/origenPublico";
 import { ZONAS_POR_PAIS, cargarZonaClinica, horaEnZona, fechaEnZona } from "../../utils/zonaClinica";
+import SucursalesConfig from "../../components/SucursalesConfig";
+import { cargarSucursales } from "../../utils/sucursalActiva";
 
 /** Reloj en vivo de la zona elegida, para comprobar que es la hora correcta */
 function RelojZona({ tz }) {
@@ -51,6 +53,8 @@ export default function ConfigClinica() {
   const [showEspacioModal, setShowEspacioModal] = useState(false);
   const [gbSolicitados, setGbSolicitados] = useState(10);
   const [solicitandoEspacio, setSolicitandoEspacio] = useState(false);
+  const [puedeSucursales, setPuedeSucursales] = useState(false);
+  useEffect(() => { cargarSucursales(api).then((d) => setPuedeSucursales(!!d.puede_administrar)); }, []);
 
   useEffect(() => {
     const cargar = async () => {
@@ -273,6 +277,7 @@ export default function ConfigClinica() {
     { key: "perfil_publico", label: "Perfil público",   icon: "bi-link-45deg"     },
     { key: "facturacion",   label: "Facturación",      icon: "bi-receipt-cutoff" },
     { key: "almacenamiento", label: "Almacenamiento",   icon: "bi-hdd-stack"      },
+    ...(puedeSucursales ? [{ key: "sucursales", label: "Sucursales", icon: "bi-shop" }] : []),
   ];
 
   const usoPct = useMemo(() => pct(storage?.uso_pct), [storage]);
@@ -1040,6 +1045,8 @@ export default function ConfigClinica() {
               </button>
             </form>
           )}
+
+          {tab === "sucursales" && puedeSucursales && <SucursalesConfig />}
 
           {tab === "almacenamiento" && (
             <div>

@@ -18,6 +18,23 @@ const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
 // después de las 6 p. m. en Honduras contaba como del día siguiente)
 const { zonaClinica, hoyClinica, ahoraClinica, localSql, ahoraLocalSql } = require("../utils/zonaHoraria");
 const dayjsTz = require("dayjs");
+const { contextoSucursal, filtroSucursal, sucursalParaGuardar, condicionUna } = require("../utils/sucursales");
+
+/** Turno de caja abierto donde cae un pago: el de la sucursal activa, o el de la sucursal de la factura */
+async function turnoAbiertoPara(conn, req, clinicaId, facturaId) {
+  const ctx = await contextoSucursal(req);
+  let cond = { sql: "", params: [] };
+  if (ctx.multiple) {
+    const [[f]] = await conn.query("SELECT sucursal_id FROM facturas WHERE id=?", [facturaId]);
+    const suc = ctx.unica || f?.sucursal_id || ctx.principalId;
+    cond = condicionUna("sucursal_id", suc, ctx.principalId);
+  }
+  const [[t]] = await conn.query(
+    `SELECT id FROM caja_turnos WHERE clinica_id=? AND estado='ABIERTO'${cond.sql} LIMIT 1`,
+    [clinicaId, ...cond.params]
+  );
+  return t?.id || null;
+}
 dayjsTz.extend(require("dayjs/plugin/utc"));
 dayjsTz.extend(require("dayjs/plugin/timezone"));
 
@@ -123,6 +140,11 @@ router.get("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async (
     if (desde)  { whereSql += ` AND DATE(${FL}) >= ? `; whereParams.push(desde); }
     if (hasta)  { whereSql += ` AND DATE(${FL}) <= ? `; whereParams.push(hasta); }
     if (paciente_id) { whereSql += " AND f.paciente_id = ? "; whereParams.push(paciente_id); }
+    else {
+      // Sucursal elegida arriba (el estado de cuenta de un paciente muestra todas)
+      const fs = await filtroSucursal(req, "f.sucursal_id");
+      whereSql += fs.sql; whereParams.push(...fs.params);
+    }
     if (q) {
       const like = `%${String(q).trim().slice(0, 100)}%`;
       whereSql += " AND (f.numero LIKE ? OR f.numero_completo LIKE ? OR p.nombres LIKE ? OR p.apellidos LIKE ?) ";
@@ -254,8 +276,9 @@ router.get("/kpis", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), asy
   try {
     const clinicaId = req.user.clinica_id;
     const soloPropio = req.user.tipo === "MEDICO";
-    const filtroMedico = soloPropio ? " AND f.medico_id = ? " : "";
-    const paramsBase = soloPropio ? [clinicaId, req.user.id] : [clinicaId];
+    const fs = await filtroSucursal(req, "f.sucursal_id");
+    const filtroMedico = (soloPropio ? " AND f.medico_id = ? " : "") + fs.sql;
+    const paramsBase = soloPropio ? [clinicaId, req.user.id, ...fs.params] : [clinicaId, ...fs.params];
 
     const tz = await zonaClinica(clinicaId);
     const FL = localSql("f.creado_en", tz);
@@ -318,8 +341,9 @@ router.get("/serie", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), as
   try {
     const clinicaId = req.user.clinica_id;
     const soloPropio = req.user.tipo === "MEDICO";
-    const filtroMedico = soloPropio ? " AND f.medico_id = ? " : "";
-    const paramsBase = soloPropio ? [clinicaId, req.user.id] : [clinicaId];
+    const fs = await filtroSucursal(req, "f.sucursal_id");
+    const filtroMedico = (soloPropio ? " AND f.medico_id = ? " : "") + fs.sql;
+    const paramsBase = soloPropio ? [clinicaId, req.user.id, ...fs.params] : [clinicaId, ...fs.params];
 
     let { desde, hasta } = req.query;
     const tz = await zonaClinica(clinicaId);
@@ -398,6 +422,7 @@ router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
       desde = hoy.startOf("month").format("YYYY-MM-DD");
       hasta = hoy.endOf("month").format("YYYY-MM-DD");
     }
+    const fs = await filtroSucursal(req, "f.sucursal_id");
 
     const [rows] = await pool.query(
       `SELECT u.id AS medico_id, u.nombres, u.apellidos,
@@ -406,10 +431,10 @@ router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
               COALESCE(SUM(CASE WHEN f.estado='PENDIENTE' THEN f.total ELSE 0 END), 0) AS pendiente
        FROM facturas f
        JOIN usuarios u ON u.id = f.medico_id
-       WHERE f.clinica_id=? AND f.estado != 'ANULADA' AND DATE(${FL}) BETWEEN ? AND ?
+       WHERE f.clinica_id=? AND f.estado != 'ANULADA' AND DATE(${FL}) BETWEEN ? AND ?${fs.sql}
        GROUP BY u.id, u.nombres, u.apellidos
        ORDER BY cobrado DESC`,
-      [clinicaId, desde, hasta]
+      [clinicaId, desde, hasta, ...fs.params]
     );
 
     res.json({ ok: true, data: rows.map(r => ({ ...r, cobrado: Number(r.cobrado), pendiente: Number(r.pendiente) })) });
@@ -438,6 +463,8 @@ router.get("/exportar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"),
     const params = [clinicaId];
     if (req.user.tipo === "MEDICO") { sql += " AND f.medico_id = ? "; params.push(req.user.id); }
     if (estado) { sql += " AND f.estado = ? "; params.push(estado); }
+    const fs = await filtroSucursal(req, "f.sucursal_id");
+    sql += fs.sql; params.push(...fs.params);
     const tz = await zonaClinica(clinicaId);
     const FL = localSql("f.creado_en", tz);
     if (desde)  { sql += ` AND DATE(${FL}) >= ? `; params.push(desde); }
@@ -615,6 +642,15 @@ router.post("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async 
     );
     const facturaId = r.insertId;
 
+    // Sucursal: la de la cita (si viene de una), si no la sucursal activa
+    let sucursalId = null;
+    if (cita_id) {
+      const [[c]] = await conn.query("SELECT sucursal_id FROM citas WHERE id=? AND clinica_id=?", [cita_id, clinicaId]);
+      sucursalId = c?.sucursal_id || null;
+    }
+    sucursalId = await sucursalParaGuardar(req, sucursalId || req.body.sucursal_id);
+    if (sucursalId) await conn.query("UPDATE facturas SET sucursal_id=? WHERE id=?", [sucursalId, facturaId]);
+
     for (const it of items) {
       const cantidad = Number(it.cantidad || 1);
       const precioUnit = Number(it.precio_unit);
@@ -718,11 +754,7 @@ router.post("/:id/pagos", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"
 
     await conn.beginTransaction();
 
-    const [[turnoAbierto]] = await conn.query(
-      "SELECT id FROM caja_turnos WHERE clinica_id=? AND estado='ABIERTO' LIMIT 1",
-      [clinicaId]
-    );
-    const cajaTurnoId = turnoAbierto?.id || null;
+    const cajaTurnoId = await turnoAbiertoPara(conn, req, clinicaId, req.params.id);
 
     await conn.query(
       "INSERT INTO pagos (clinica_id, factura_id, metodo, monto, referencia, registrado_por, caja_turno_id) VALUES (?,?,?,?,?,?,?)",
@@ -779,11 +811,7 @@ router.post("/:id/cobrar", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA
 
     await conn.beginTransaction();
 
-    const [[turnoAbierto]] = await conn.query(
-      "SELECT id FROM caja_turnos WHERE clinica_id=? AND estado='ABIERTO' LIMIT 1",
-      [clinicaId]
-    );
-    const cajaTurnoId = turnoAbierto?.id || null;
+    const cajaTurnoId = await turnoAbiertoPara(conn, req, clinicaId, req.params.id);
 
     for (const p of limpios) {
       await conn.query(

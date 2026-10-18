@@ -177,4 +177,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "sucursales-varios-locales",
+    version: "1.28",
+    titulo: "Sucursales: una clínica con varios locales",
+    descripcion: "¿Su clínica tiene más de un local? En Configuración → Sucursales agregue cada sucursal y elija en cuál trabaja cada persona. Arriba aparecerá un selector para ver la agenda, la caja, la facturación y las finanzas de cada sucursal o de todas juntas. Los pacientes y sus expedientes se comparten entre todas.",
+    icono: "bi-shop",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

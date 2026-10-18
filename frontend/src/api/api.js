@@ -1,6 +1,7 @@
 import axios from "axios";
 import { getClinicaActiva } from "../utils/clinicaActiva";
 import { normalizarFechasNacimiento } from "../utils/fechaNacimiento";
+import { getSucursalActiva } from "../utils/sucursalActiva";
 
 const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
@@ -30,6 +31,12 @@ api.interceptors.request.use(
 
     if (clinicaId) {
       config.headers["x-clinica-id"] = String(clinicaId);
+    }
+
+    // Sucursal elegida arriba (solo existe si la clínica tiene varias sucursales)
+    const sucursalId = getSucursalActiva();
+    if (sucursalId) {
+      config.headers["x-sucursal-id"] = String(sucursalId);
     }
 
     return config;

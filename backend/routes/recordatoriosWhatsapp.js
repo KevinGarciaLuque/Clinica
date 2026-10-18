@@ -16,6 +16,7 @@ const { zonaClinica, ahoraClinica } = require("../utils/zonaHoraria");
 const { tituloMedico } = require("../utils/tituloMedico");
 const { enlaceCita, asegurarTabla: asegurarEnlaces } = require("../utils/citaEnlace");
 const { citasConVideo } = require("./videoconsultas");
+const { filtroSucursal } = require("../utils/sucursales");
 
 const ROLES = ["ADMIN", "MEDICO", "PSICOLOGO", "RECEPCIONISTA", "ENFERMERA", "SUPER_ADMIN"];
 const ESTADOS_ACTIVOS = ["PENDIENTE", "CONFIRMADA", "PENDIENTE_APROBACION"];
@@ -90,6 +91,7 @@ router.get("/", auth(...ROLES), async (req, res) => {
       : ahoraClinica(tz).add(1, "day").format("YYYY-MM-DD");
 
     const [[clinica]] = await pool.query("SELECT nombre, pais FROM clinicas WHERE id = ?", [clinicaId]);
+    const fs = await filtroSucursal(req, "c.sucursal_id");
     const [citas] = await pool.query(
       `SELECT c.id, c.estado, DATE_FORMAT(c.inicio, '%Y-%m-%d %H:%i') AS inicio, c.tipo_consulta,
               p.id AS paciente_id, p.nombres, p.apellidos, p.telefono,
@@ -101,9 +103,9 @@ router.get("/", auth(...ROLES), async (req, res) => {
        JOIN usuarios u ON u.id = c.medico_id
        LEFT JOIN cita_enlaces e ON e.cita_id = c.id
        LEFT JOIN whatsapp_recordatorios_manuales w ON w.cita_id = c.id
-       WHERE c.clinica_id = ? AND ${DIA_SQL("c.inicio")} AND c.estado IN (?)
+       WHERE c.clinica_id = ? AND ${DIA_SQL("c.inicio")} AND c.estado IN (?)${fs.sql}
        ORDER BY c.inicio ASC`,
-      [clinicaId, fecha, fecha, ESTADOS_ACTIVOS]
+      [clinicaId, fecha, fecha, ESTADOS_ACTIVOS, ...fs.params]
     );
 
     const plantilla = (await plantillaClinica(clinicaId)) || MENSAJE_BASE;

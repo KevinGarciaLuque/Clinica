@@ -7,6 +7,7 @@ import ModalAyudaSoporte from "./ModalAyudaSoporte";
 import ModalResenaEncuesta from "./ModalResenaEncuesta";
 import NovedadesBoton from "./Novedades";
 import BuscadorRapido from "./BuscadorRapido";
+import SelectorSucursal from "./SelectorSucursal";
 import { ModalInstalarApp } from "./InstalarApp";
 import useInstalable from "../utils/useInstalable";
 import { playNotificationSound } from "../utils/notificationSound";
@@ -480,10 +481,15 @@ export default function NavbarApp({ onMenuClick }) {
       <style>{`@media (max-width: 575.98px) {
         .nav-marca { width: auto !important; min-width: 0 !important; gap: 6px !important; justify-content: flex-start !important; padding-left: 6px; }
         .nav-centro { gap: 4px !important; }
+        /* Teléfono: el selector de sucursal queda como un botón con ícono que abre la lista */
+        .selector-sucursal { position: relative; width: 36px; height: 36px; flex-shrink: 0 !important; justify-content: center; padding: 0 !important; }
+        .selector-sucursal select { position: absolute; inset: 0; width: 100% !important; max-width: none !important; opacity: 0; }
         .nav-marca .nav-sub { display: none; }
         .nav-marca .nav-logo { width: 36px !important; height: 36px !important; border-radius: 10px !important; }
       }
-      @media (max-width: 379.98px) { .nav-marca .nav-texto { display: none; } }`}</style>
+      @media (max-width: 379.98px) { .nav-marca .nav-texto { display: none; } }
+      /* Con selector de sucursal no cabe el nombre de la marca en teléfonos */
+      @media (max-width: 439.98px) { body:has(.selector-sucursal) .nav-marca .nav-texto { display: none; } }`}</style>
       <div className="nav-marca" style={{
         width: 240, minWidth: 240, flexShrink: 0,
         display: "flex", alignItems: "center", justifyContent: "center", gap: 10,
@@ -538,6 +544,7 @@ export default function NavbarApp({ onMenuClick }) {
       {/* Centro: ✨ Novedades de la plataforma */}
       <div className="nav-centro" style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, minWidth: 0 }}>
         {/* 🔎 Búsqueda rápida (Ctrl+K) */}
+        <SelectorSucursal />
         <BuscadorRapido />
         <NovedadesBoton />
       </div>
