@@ -985,6 +985,10 @@ cron.schedule("5 10 * * *", () => { require("./routes/opiniones").enviarEncuesta
 cron.schedule("5 9 * * *", () => { require("./routes/controles").enviarAvisosControl(); },
   { timezone: "America/Tegucigalpa" });
 
+// ===== CRON: Aviso de almacenamiento al 80% / 100% (diario 08:15) =====
+cron.schedule("15 8 * * *", () => { require("./utils/almacenamiento").revisarTodas().catch((e) => console.error("❌ [CRON] almacenamiento:", e.message)); },
+  { timezone: "America/Tegucigalpa" });
+
 // ===== CRON: Facturación mensual de licencias (diario 06:10) =====
 const correrFacturacionMensual = require("./scripts/facturacion-mensual");
 cron.schedule("10 6 * * *", async () => {

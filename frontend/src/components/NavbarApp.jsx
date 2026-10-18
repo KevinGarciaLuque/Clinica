@@ -879,6 +879,7 @@ export default function NavbarApp({ onMenuClick }) {
                     {notifsPortal.map((n) => {
                       const esSolicitud = n.tipo === "CITA_SOLICITUD_PORTAL";
                       const esRecepcion = n.tipo === "RECETA_ENVIADA_RECEPCION" || n.tipo === "ESTUDIO_ENVIADO_RECEPCION";
+                      const esEspacio   = n.tipo === "ESPACIO_ALMACENAMIENTO";
                       const cargando    = accionandoNotif === n.id;
                       return (
                         <div key={n.id} style={{ padding: "12px 16px", borderBottom: "1px solid rgba(255,255,255,.05)" }}>
@@ -890,7 +891,7 @@ export default function NavbarApp({ onMenuClick }) {
                               display: "flex", alignItems: "center", justifyContent: "center",
                             }}>
                               <i
-                                className={`bi ${esSolicitud ? "bi-calendar2-plus-fill" : esRecepcion ? "bi-send-check-fill" : n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`}
+                                className={`bi ${esSolicitud ? "bi-calendar2-plus-fill" : esRecepcion ? "bi-send-check-fill" : esEspacio ? "bi-hdd-fill" : n.tipo === "CITA_AGENDADA_PORTAL" ? "bi-calendar-check-fill" : "bi-person-plus-fill"}`}
                                 style={{ color: esSolicitud ? "#fbbf24" : "#7dd3fc", fontSize: 14 }}
                               />
                             </div>
@@ -932,6 +933,18 @@ export default function NavbarApp({ onMenuClick }) {
                                     Rechazar
                                   </button>
                                 </div>
+                              ) : esEspacio ? (
+                                <button
+                                  onClick={() => { marcarNotifPortalLeida(n.id); setShowRespuestasDD(false); navigate("/admin/config?tab=almacenamiento"); }}
+                                  style={{
+                                    background: "rgba(251,191,36,.15)", border: "1px solid rgba(251,191,36,.35)",
+                                    borderRadius: 6, padding: "4px 10px", color: "#fbbf24",
+                                    fontSize: 10, fontWeight: 700, cursor: "pointer",
+                                    display: "flex", alignItems: "center", gap: 4,
+                                  }}
+                                >
+                                  <i className="bi bi-hdd" />Ver espacio
+                                </button>
                               ) : esRecepcion ? (
                                 <button
                                   onClick={() => { marcarNotifPortalLeida(n.id); setShowRespuestasDD(false); navigate("/recepcion"); }}
