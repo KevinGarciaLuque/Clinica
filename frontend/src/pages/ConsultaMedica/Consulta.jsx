@@ -11,6 +11,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { calcIMC, calcSC, parseDerma } from "./helpers";
 import PacienteResumenCard from "./PacienteResumenCard";
 import AntesDeEntrar from "./AntesDeEntrar";
+import { abrirVideollamada } from "../../utils/videollamada";
 import ModalHistoriaFirmada from "./ModalHistoriaFirmada";
 import ModalCobroConsulta from "./ModalCobroConsulta";
 import ModalConfirmarEdicionFirmada from "./ModalConfirmarEdicionFirmada";
@@ -32,6 +33,14 @@ export default function Consulta() {
   const { modulos, user } = useAuth();
   const pacId      = params.get("paciente_id");
   const citaId     = params.get("cita_id");
+  // Si la cita es videoconsulta se muestra el botón para abrir la videollamada
+  const [esVideo, setEsVideo] = useState(false);
+  useEffect(() => {
+    if (!citaId) return undefined;
+    let vivo = true;
+    api.get(`/videoconsultas/${citaId}`).then((r) => { if (vivo) setEsVideo(!!r.data?.es_video); }).catch(() => {});
+    return () => { vivo = false; };
+  }, [citaId]);
   const historiaId = params.get("historia_id");
   const editMode   = params.get("editar") === "1";
 
@@ -406,6 +415,19 @@ export default function Consulta() {
               }}>
               <i className="bi bi-plus-lg"></i> Nueva Consulta
             </button>
+            {esVideo && (
+              <button
+                onClick={() => abrirVideollamada(citaId)}
+                title="Abrir la videollamada con el paciente en una ventana aparte"
+                style={{
+                  background: "linear-gradient(135deg, #0d9488, #0f766e)",
+                  border: "none", borderRadius: 8, color: "#fff",
+                  padding: "6px 14px", fontSize: "0.8rem", cursor: "pointer",
+                  fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+                }}>
+                <i className="bi bi-camera-video-fill"></i> Videollamada
+              </button>
+            )}
           </div>
         )}
 

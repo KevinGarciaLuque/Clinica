@@ -1,6 +1,7 @@
 const router = require("express").Router();
 const pool = require("../db");
 const auth = require("../middlewares/auth");
+const { marcarVideo, citasConVideo } = require("./videoconsultas");
 const gcal = require("../utils/googleCalendar");
 const { ausenciasEnFecha, ausenteTodoElDia, turnoBloqueado } = require("../utils/ausencias");
 
@@ -212,6 +213,9 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     const limite = (desde && hasta) ? 2000 : 500;
     sql += ` ORDER BY c.inicio ASC LIMIT ${limite}`;
     const [rows] = await pool.query(sql, params);
+    // Videoconsultas (tabla aparte): se marca cada cita con es_video
+    const conVideo = await citasConVideo(rows.map((r) => r.id));
+    for (const r of rows) r.es_video = conVideo.has(r.id) ? 1 : 0;
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -359,6 +363,11 @@ router.post("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","
       [clinicaId, paciente_id, medico_id, inicio, fin,
        tipo_consulta || "CONTROL", motivo || null, canal || "RECEPCION", servicio_id || null]
     );
+
+    if (req.body.videoconsulta) {
+      try { await marcarVideo(r.insertId, clinicaId, req.user.id); }
+      catch (e) { console.error("[citas] no se pudo marcar como videoconsulta:", e.message); }
+    }
 
     // Sincronizar con Google Calendar del médico (si está conectado) — no debe bloquear la creación de la cita
     try {

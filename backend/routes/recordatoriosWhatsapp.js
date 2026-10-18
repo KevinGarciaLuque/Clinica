@@ -14,6 +14,7 @@ const auth = require("../middlewares/auth");
 const { zonaClinica, ahoraClinica } = require("../utils/zonaHoraria");
 const { tituloMedico } = require("../utils/tituloMedico");
 const { enlaceCita, asegurarTabla: asegurarEnlaces } = require("../utils/citaEnlace");
+const { citasConVideo } = require("./videoconsultas");
 
 const ROLES = ["ADMIN", "MEDICO", "PSICOLOGO", "RECEPCIONISTA", "ENFERMERA", "SUPER_ADMIN"];
 const ESTADOS_ACTIVOS = ["PENDIENTE", "CONFIRMADA", "PENDIENTE_APROBACION"];
@@ -107,6 +108,7 @@ router.get("/", auth(...ROLES), async (req, res) => {
     const plantilla = (await plantillaClinica(clinicaId)) || MENSAJE_BASE;
     const dia = new Date(`${fecha}T12:00:00Z`).toLocaleDateString("es-HN", { weekday: "long", day: "numeric", month: "long", timeZone: "UTC" });
 
+    const conVideo = await citasConVideo(citas.map((c) => c.id));
     const data = [];
     for (const c of citas) {
       const [h, m] = c.inicio.slice(11, 16).split(":").map(Number);
@@ -114,13 +116,16 @@ router.get("/", auth(...ROLES), async (req, res) => {
       const medico = `${tituloMedico(c.med_sexo, { tipo: c.med_tipo })}${c.med_nombres} ${c.med_apellidos}`.trim();
       const enlace = await enlaceCita(c.id);
       const nombre = String(c.nombres || "").split(" ")[0];
-      const mensaje = rellenar(plantilla, {
+      let mensaje = rellenar(plantilla, {
         nombre, paciente: `${c.nombres} ${c.apellidos}`.trim(), clinica: clinica?.nombre || "la clínica",
         medico, fecha: dia, hora, enlace_cita: enlace || "",
       });
+      if (conVideo.has(c.id) && enlace) {
+        mensaje += `\n\n📹 *Es una videoconsulta:* a la hora de su cita entre desde el mismo enlace y toque «Entrar a la videoconsulta». No necesita instalar nada.`;
+      }
       const tel = telefonoWhatsapp(c.telefono, clinica?.pais);
       data.push({
-        cita_id: c.id, inicio: c.inicio, hora, estado: c.estado, tipo_consulta: c.tipo_consulta,
+        cita_id: c.id, inicio: c.inicio, hora, es_video: conVideo.has(c.id), estado: c.estado, tipo_consulta: c.tipo_consulta,
         paciente_id: c.paciente_id, paciente: `${c.nombres} ${c.apellidos}`.trim(), telefono: c.telefono || null,
         medico, respuesta: c.estado === "CONFIRMADA" && !c.respuesta ? "CONFIRMADA" : c.respuesta || null,
         respuesta_en: c.respuesta_en, enviado_en: c.enviado_en || null, veces: c.veces || 0,

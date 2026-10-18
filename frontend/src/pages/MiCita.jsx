@@ -4,7 +4,7 @@
  * URL: /mi-cita/:token
  */
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import axios from "axios";
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
@@ -47,11 +47,15 @@ export default function MiCita() {
   const [aviso, setAviso] = useState("");
   const [accion, setAccion] = useState(null);       // "confirmar" | "cancelar" mientras se envía
   const [confirmarCancelar, setConfirmarCancelar] = useState(false);
+  const [video, setVideo] = useState(null);         // datos de la videoconsulta, si la cita lo es
 
   useEffect(() => {
     axios.get(`${BASE}/cita-publica/${token}`)
       .then((r) => setCita(r.data.data))
       .catch((e) => setError(e?.response?.data?.msg || "No se pudo cargar la cita."));
+    axios.get(`${BASE}/videoconsultas/publico/${token}`)
+      .then((r) => setVideo(r.data?.es_video ? r.data : null))
+      .catch(() => setVideo(null));
   }, [token]);
 
   const ejecutar = async (tipo) => {
@@ -108,6 +112,18 @@ export default function MiCita() {
         <i className={`bi ${est.icon}`} /> {est.label}
       </div>
 
+      {video && cita.estado !== "CANCELADA" && !video.pasada && (
+        <div className="rounded-3 p-3 mb-3" style={{ background: "#ecfdf5", border: "1px solid #86efac" }}>
+          <div className="fw-semibold mb-1" style={{ color: "#065f46" }}><i className="bi bi-camera-video-fill me-2" />Es una videoconsulta</div>
+          <div className="text-muted mb-2" style={{ fontSize: "0.85rem" }}>
+            A la hora de tu cita entra desde aquí. Funciona en el celular o la computadora, sin instalar nada.
+          </div>
+          <Link to={`/video/${token}`} className="btn btn-success w-100 fw-semibold" style={{ borderRadius: 10 }}>
+            <i className="bi bi-camera-video-fill me-1" />Entrar a la videoconsulta
+          </Link>
+        </div>
+      )}
+
       {aviso && <div className="alert alert-warning py-2" style={{ fontSize: "0.85rem" }}>{aviso}</div>}
 
       {cita.puede_confirmar && !confirmarCancelar && (
@@ -140,7 +156,7 @@ export default function MiCita() {
       )}
 
       {cita.estado === "CONFIRMADA" && (
-        <p className="text-muted mt-3 mb-0" style={{ fontSize: "0.85rem" }}>¡Gracias! Te esperamos. Te recomendamos llegar 10 minutos antes.</p>
+        <p className="text-muted mt-3 mb-0" style={{ fontSize: "0.85rem" }}>{video ? "¡Gracias! A la hora de tu cita entra a la videoconsulta desde este mismo enlace." : "¡Gracias! Te esperamos. Te recomendamos llegar 10 minutos antes."}</p>
       )}
       {cita.estado === "CANCELADA" && (
         <p className="text-muted mt-3 mb-0" style={{ fontSize: "0.85rem" }}>

@@ -7,6 +7,8 @@ import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import dayjs from "dayjs";
 import { hoyClinica } from "../utils/zonaClinica";
 import RecordatoriosWhatsapp from "../components/RecordatoriosWhatsapp";
+import BloqueVideoconsulta from "../components/BloqueVideoconsulta";
+import { videoActiva } from "../utils/videollamada";
 import "dayjs/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -141,7 +143,7 @@ function buildEvents(citas) {
     .filter(c => c.estado !== "CANCELADA" && c.estado !== "NO_ASISTIO")
     .map(c => ({
       id: c.id,
-      title: `${c.paciente_nombres} ${c.paciente_apellidos}`,
+      title: `${c.es_video ? "📹 " : ""}${c.paciente_nombres} ${c.paciente_apellidos}`,
       start: new Date(c.inicio),
       end:   new Date(c.fin),
       resource: c,
@@ -1490,7 +1492,7 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
   const tiposConsulta = tiposCita.length > 0 ? tiposCita.map(t => t.nombre) : getTiposConsulta(tipoClinica);
   const [form, setForm] = useState({
     paciente_id: "", medico_id: "", inicio: "", fin: "",
-    tipo_consulta: tiposConsulta[0], motivo: "", canal: "RECEPCION",
+    tipo_consulta: tiposConsulta[0], motivo: "", canal: "RECEPCION", videoconsulta: false,
   });
   const [pacBusq,  setPacBusq]  = useState("");
   const [pacList,  setPacList]  = useState([]);
@@ -1503,6 +1505,8 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
   const [saving,   setSaving]   = useState(false);
   const [err,      setErr]      = useState("");
   const [repetir,  setRepetir]  = useState("NO");
+  const [videoOk,  setVideoOk]  = useState(false);
+  useEffect(() => { videoActiva(api).then(setVideoOk); }, []);
   const [veces,    setVeces]    = useState(4);
   const [resultado, setResultado] = useState(null); // { creadas, fallidas: [{fecha, msg}] }
 
@@ -1781,6 +1785,18 @@ function ModalNuevaCita({ slotInfo, medicos, tipoClinica, tiposCita = [], onClos
               <div className="col-6">
                 <TimePicker12h label="Hora fin" value={horaFin} onChange={setHoraFin} required />
               </div>
+
+              {/* Videoconsulta (solo si está activada en el servidor) */}
+              {videoOk && <div className="col-12">
+                <label className="d-flex align-items-start gap-2 p-2 rounded-3 mb-0" style={{ cursor: "pointer", background: form.videoconsulta ? "#ecfdf5" : "#f8fafc", border: `1px solid ${form.videoconsulta ? "#86efac" : "#e2e8f0"}` }}>
+                  <input type="checkbox" className="form-check-input mt-1" checked={!!form.videoconsulta}
+                    onChange={e => setForm(f => ({ ...f, videoconsulta: e.target.checked }))} />
+                  <span className="small">
+                    <strong><i className="bi bi-camera-video-fill me-1 text-success" />Videoconsulta</strong>
+                    <span className="d-block text-muted">El paciente entra desde el enlace de su recordatorio, sin instalar nada.</span>
+                  </span>
+                </label>
+              </div>}
 
               {/* Repetición */}
               <div className={repetir === "NO" ? "col-12" : "col-8"}>
@@ -2177,6 +2193,8 @@ function ModalDetalle({ event, onClose, onEstado, onCancelar, onMostrarConfirmDe
               </div>
             </div>
           </div>
+
+          <BloqueVideoconsulta cita={c} />
 
           {/* Cambiar estado */}
           {acciones.length > 0 && (
