@@ -262,6 +262,19 @@ async function getResumenClinicoBatch(pacienteIds) {
   return resultado;
 }
 
+// ¿Existe el índice de búsqueda? (lo crea el auto-migrate de server.js; se revisa una vez)
+let indiceBusqueda = null;
+async function tieneIndiceBusqueda() {
+  if (indiceBusqueda === null) {
+    try {
+      const [r] = await pool.query("SHOW INDEX FROM pacientes WHERE Key_name = 'idx_pacientes_busqueda'");
+      indiceBusqueda = r.length > 0;
+    } catch { indiceBusqueda = false; }
+    if (!indiceBusqueda) setTimeout(() => { indiceBusqueda = null; }, 10 * 60 * 1000); // reintenta luego
+  }
+  return indiceBusqueda;
+}
+
 // GET /api/pacientes
 router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"), async (req, res) => {
   try {
@@ -283,6 +296,10 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
       whereSql += "AND (nombres LIKE ? OR apellidos LIKE ? OR dni LIKE ? OR telefono LIKE ?) ";
       whereParams.push(`%${q}%`, `%${q}%`, `%${q}%`, `%${q}%`);
     }
+    // Búsquedas con números (DNI, teléfono) casi siempre dan pocos resultados: conviene recorrer el
+    // índice "delgado" (nombre, DNI, teléfono). Con nombres comunes es mejor dejar que la base elija.
+    // El resultado es el mismo en ambos casos; solo cambia la velocidad.
+    const indice = q && /\d{3,}/.test(q) && await tieneIndiceBusqueda() ? "FORCE INDEX (idx_pacientes_busqueda)" : "";
 
     // Paginación real: solo se activa si el cliente manda ?page=. Sin ese
     // parámetro se mantiene el comportamiento anterior (top 200 por id) para
@@ -303,7 +320,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
 
       const [rows] = await pool.query(
         `SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${HOY}) AS edad
-         FROM pacientes ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
+         FROM pacientes ${indice} ${whereSql} ORDER BY id DESC LIMIT ? OFFSET ?`,
         [...whereParams, perPage, offset]
       );
       return res.json({ ok: true, data: rows, total, page, pages, per_page: perPage });
@@ -311,7 +328,7 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
 
     const [rows] = await pool.query(
       `SELECT id, nombres, apellidos, dni, telefono, email, fecha_nacimiento, direccion, ciudad, departamento, foto_perfil, activo, creado_en, clinica_id, TIMESTAMPDIFF(YEAR, fecha_nacimiento, ${HOY}) AS edad
-       FROM pacientes ${whereSql} ORDER BY id DESC LIMIT 200`,
+       FROM pacientes ${indice} ${whereSql} ORDER BY id DESC LIMIT 200`,
       whereParams
     );
     res.json({ ok: true, data: rows });

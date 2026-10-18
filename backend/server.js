@@ -932,6 +932,25 @@ const pool = require("./db");
     `);
     console.log("✅ [auto-migrate] usuario_password_reset OK");
 
+    // Índices de rendimiento (solo se agregan; ver análisis de carga, Fase B):
+    //  - lista de pacientes por clínica ordenada por id (página 1 instantánea)
+    //  - búsqueda por nombre/DNI/teléfono recorriendo un índice delgado
+    for (const [nombre, columnas] of [
+      ["idx_pacientes_clinica_id", "(clinica_id, id)"],
+      ["idx_pacientes_busqueda", "(clinica_id, apellidos, nombres, dni, telefono)"],
+    ]) {
+      try {
+        const [ya] = await pool.query("SHOW INDEX FROM pacientes WHERE Key_name = ?", [nombre]);
+        if (!ya.length) {
+          await pool.query(`ALTER TABLE pacientes ADD INDEX ${nombre} ${columnas}, ALGORITHM=INPLACE, LOCK=NONE`)
+            .catch(() => pool.query(`ALTER TABLE pacientes ADD INDEX ${nombre} ${columnas}`));
+        }
+        console.log(`✅ [auto-migrate] índice ${nombre} OK`);
+      } catch (e) {
+        console.warn(`⚠️  [auto-migrate] índice ${nombre}:`, e.message);
+      }
+    }
+
     // Módulo Finanzas (gastos y ganancias): visible en el menú de todas las clínicas.
     // Quién lo ve dentro de cada clínica lo decide utils/permisoFinanzas.js.
     try {
@@ -984,6 +1003,10 @@ cron.schedule("5 10 * * *", () => { require("./routes/opiniones").enviarEncuesta
 
 // ===== CRON: Avisos de control (diario 09:05): 7 días antes de la fecha indicada =====
 cron.schedule("5 9 * * *", () => { require("./routes/controles").enviarAvisosControl(); },
+  { timezone: "America/Tegucigalpa" });
+
+// ===== CRON: Limpieza de datos vencidos (diario 03:30): códigos temporales y notificaciones leídas viejas =====
+cron.schedule("30 3 * * *", () => { require("./utils/limpiezaDatos").limpiarDatosVencidos().catch((e) => console.error("❌ [CRON] limpieza:", e.message)); },
   { timezone: "America/Tegucigalpa" });
 
 // ===== CRON: Aviso de almacenamiento al 80% / 100% (diario 08:15) =====
