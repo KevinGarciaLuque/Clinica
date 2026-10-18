@@ -16,6 +16,7 @@
 
 const router  = require("express").Router();
 const pool    = require("../db");
+const { DIA_SQL } = require("../utils/rangoDias");
 const { v4: uuidv4 } = require("uuid");
 const jwt     = require("jsonwebtoken");
 const crypto  = require("crypto");
@@ -678,9 +679,9 @@ router.get("/slots", async (req, res) => {
 
     const [ocupadas] = await pool.query(
       `SELECT inicio, fin FROM citas
-       WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
+       WHERE clinica_id=? AND medico_id=? AND ${DIA_SQL("inicio")}
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
-      [clinica_id, medico_id, fecha]
+      [clinica_id, medico_id, fecha, fecha]
     );
 
     // Convierte "HH:MM:SS" local de la clínica → Date UTC correcto

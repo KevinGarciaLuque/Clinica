@@ -13,6 +13,7 @@
 
 const router = require("express").Router();
 const pool   = require("../db");
+const { DIA_SQL, DESDE_SQL } = require("../utils/rangoDias");
 const OpenAI = require("openai");
 const auth   = require("../middlewares/auth");
 const rateLimit = require("express-rate-limit");
@@ -188,9 +189,9 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
       if (ausenteTodoElDia(ausencias)) return { disponible: false, mensaje: "El médico está ausente ese día (vacaciones/permiso)." };
 
       const [ocupadas] = await pool.query(
-        `SELECT inicio, fin FROM citas WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
+        `SELECT inicio, fin FROM citas WHERE clinica_id=? AND medico_id=? AND ${DIA_SQL("inicio")}
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
-        [clinicaId, args.medico_id, fechaReal]
+        [clinicaId, args.medico_id, fechaReal, fechaReal]
       );
 
       const toLocalISO = d => {
@@ -294,7 +295,7 @@ async function ejecutarHerramienta(nombre, args, clinicaId) {
          JOIN usuarios u ON u.id = c.medico_id
          LEFT JOIN especialidades e ON e.id = u.especialidad_id
          WHERE c.clinica_id = ? AND c.paciente_id = ?
-           AND DATE(c.inicio) >= ?
+           AND ${DESDE_SQL("c.inicio")}
            AND c.estado NOT IN ('CANCELADA','COMPLETADA')
          ORDER BY c.inicio ASC
          LIMIT 10`,

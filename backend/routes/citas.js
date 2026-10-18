@@ -1,5 +1,6 @@
 const router = require("express").Router();
 const pool = require("../db");
+const { DIA_SQL, RANGO_SQL } = require("../utils/rangoDias");
 const auth = require("../middlewares/auth");
 const { marcarVideo, citasConVideo } = require("./videoconsultas");
 const gcal = require("../utils/googleCalendar");
@@ -63,9 +64,9 @@ router.get("/slots", auth(), async (req, res) => {
 
     const [ocupadasDb] = await pool.query(
       `SELECT inicio, fin FROM citas
-       WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
+       WHERE clinica_id=? AND medico_id=? AND ${DIA_SQL("inicio")}
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')`,
-      [clinicaId, medico_id, fecha]
+      [clinicaId, medico_id, fecha, fecha]
     );
 
     // Bloques ocupados por reuniones/eventos en el Google Calendar del médico (si está conectado)
@@ -140,7 +141,7 @@ router.get("/google-externos", auth("ADMIN", "MEDICO", "PSICOLOGO", "RECEPCIONIS
     const [propias] = await pool.query(
       `SELECT google_event_id FROM citas
        WHERE clinica_id=? AND google_event_id IS NOT NULL
-         AND DATE(inicio) BETWEEN ? AND ?`,
+         AND ${RANGO_SQL("inicio")}`,
       [clinicaId, desde, hasta]
     );
     const setPropias = new Set(propias.map(p => p.google_event_id));

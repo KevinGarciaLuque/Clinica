@@ -10,6 +10,7 @@
  */
 const router = require("express").Router();
 const pool = require("../db");
+const { DIA_SQL } = require("../utils/rangoDias");
 const auth = require("../middlewares/auth");
 const { zonaClinica, ahoraClinica } = require("../utils/zonaHoraria");
 const { tituloMedico } = require("../utils/tituloMedico");
@@ -100,9 +101,9 @@ router.get("/", auth(...ROLES), async (req, res) => {
        JOIN usuarios u ON u.id = c.medico_id
        LEFT JOIN cita_enlaces e ON e.cita_id = c.id
        LEFT JOIN whatsapp_recordatorios_manuales w ON w.cita_id = c.id
-       WHERE c.clinica_id = ? AND DATE(c.inicio) = ? AND c.estado IN (?)
+       WHERE c.clinica_id = ? AND ${DIA_SQL("c.inicio")} AND c.estado IN (?)
        ORDER BY c.inicio ASC`,
-      [clinicaId, fecha, ESTADOS_ACTIVOS]
+      [clinicaId, fecha, fecha, ESTADOS_ACTIVOS]
     );
 
     const plantilla = (await plantillaClinica(clinicaId)) || MENSAJE_BASE;

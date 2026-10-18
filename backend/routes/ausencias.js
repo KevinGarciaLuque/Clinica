@@ -11,6 +11,7 @@
  */
 const router = require("express").Router();
 const pool   = require("../db");
+const { RANGO_SQL } = require("../utils/rangoDias");
 const auth   = require("../middlewares/auth");
 
 const TIPOS = ["vacaciones", "permiso", "incapacidad", "capacitacion", "otro"];
@@ -86,7 +87,7 @@ router.get("/conflictos", auth("SUPER_ADMIN", "ADMIN", "MEDICO", "PSICOLOGO"), a
                JOIN pacientes p ON p.id = c.paciente_id
                WHERE c.clinica_id = ? AND c.medico_id = ?
                  AND c.estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION')
-                 AND DATE(c.inicio) BETWEEN ? AND ?`;
+                 AND ${RANGO_SQL("c.inicio")}`;
     const params = [clinicaId, medico_id, fecha_inicio, fecha_fin];
     if (hora_inicio && hora_fin) {
       sql += " AND TIME(c.inicio) < ? AND TIME(c.fin) > ?";

@@ -1,5 +1,6 @@
 const router    = require("express").Router();
 const pool      = require("../db");
+const { DIA_SQL } = require("../utils/rangoDias");
 const rateLimit = require("express-rate-limit");
 const sse       = require("../utils/sseManager");
 const webPush   = require("../utils/webPush");
@@ -248,9 +249,9 @@ router.get("/clinica/:slug/slots", publicLimiter, async (req, res) => {
 
     const [ocupadasDb] = await pool.query(
       `SELECT inicio, fin FROM citas
-       WHERE clinica_id=? AND medico_id=? AND DATE(inicio)=?
+       WHERE clinica_id=? AND medico_id=? AND ${DIA_SQL("inicio")}
          AND estado IN ('PENDIENTE','CONFIRMADA','EN_ESPERA','EN_ATENCION','PENDIENTE_APROBACION')`,
-      [clinicaId, medicoIdInt, fecha]
+      [clinicaId, medicoIdInt, fecha, fecha]
     );
 
     let ocupadasGoogle = [];

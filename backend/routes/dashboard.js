@@ -7,6 +7,7 @@
 
 const router = require("express").Router();
 const pool   = require("../db");
+const { DIA_SQL, RANGO_SQL } = require("../utils/rangoDias");
 const auth   = require("../middlewares/auth");
 
 let _ndReady = false;
@@ -48,18 +49,18 @@ router.get("/stats", auth(), async (req, res) => {
         [clinicaId]
       ),
       pool.query(
-        "SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND DATE(inicio)=?",
-        [clinicaId, hoy]
+        `SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND ${DIA_SQL("inicio")}`,
+        [clinicaId, hoy, hoy]
       ),
       pool.query(
-        "SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND DATE(inicio) BETWEEN ? AND ?",
+        `SELECT COUNT(*) AS total FROM citas WHERE clinica_id=? AND ${RANGO_SQL("inicio")}`,
         [clinicaId, inicioSem.toISOString().slice(0,10), finSem.toISOString().slice(0,10)]
       ),
       pool.query(
         `SELECT estado, COUNT(*) AS total
-         FROM citas WHERE clinica_id=? AND DATE(inicio)=?
+         FROM citas WHERE clinica_id=? AND ${DIA_SQL("inicio")}
          GROUP BY estado`,
-        [clinicaId, hoy]
+        [clinicaId, hoy, hoy]
       ),
       pool.query(
         `SELECT id, nombres, apellidos, telefono, creado_en
@@ -108,10 +109,10 @@ router.get("/sala-espera", auth(), async (req, res) => {
        JOIN pacientes p  ON p.id = c.paciente_id
        JOIN usuarios  u  ON u.id = c.medico_id
        LEFT JOIN especialidades e ON e.id = u.especialidad_id
-       WHERE c.clinica_id=? AND DATE(c.inicio)=?
+       WHERE c.clinica_id=? AND ${DIA_SQL("c.inicio")}
          AND c.estado NOT IN ('CANCELADA','NO_ASISTIO')
        ORDER BY c.inicio ASC`,
-      [clinicaId, hoy]
+      [clinicaId, hoy, hoy]
     );
 
     const [[{ total: totalRecepcionistas }]] = await pool.query(

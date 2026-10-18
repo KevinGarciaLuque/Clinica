@@ -48,18 +48,27 @@ const PACIENTE_EXPORT_COLUMNS = [
   { header: "Registrado el",          key: "creado_en",                     width: 18 },
 ];
 
+// Exportación de todos los pacientes: por lotes y con límite de exportaciones simultáneas
+const EXPORT_LOTE = 1000;
+const EXPORT_MAX = 2;
+let exportacionesActivas = 0;
+
+function filaExportPaciente(p) {
+  return {
+    ...p,
+    fecha_nacimiento: p.fecha_nacimiento ? new Date(p.fecha_nacimiento).toISOString().slice(0, 10) : "",
+    creado_en: p.creado_en ? new Date(p.creado_en).toISOString().slice(0, 10) : "",
+    activo: p.activo ? "Sí" : "No",
+  };
+}
+
 function buildPacientesWorkbook(pacientes) {
   const workbook = new ExcelJS.Workbook();
   const sheet = workbook.addWorksheet("Pacientes");
   sheet.columns = PACIENTE_EXPORT_COLUMNS;
   sheet.getRow(1).font = { bold: true };
   for (const p of pacientes) {
-    const row = sheet.addRow({
-      ...p,
-      fecha_nacimiento: p.fecha_nacimiento ? new Date(p.fecha_nacimiento).toISOString().slice(0, 10) : "",
-      creado_en: p.creado_en ? new Date(p.creado_en).toISOString().slice(0, 10) : "",
-      activo: p.activo ? "Sí" : "No",
-    });
+    const row = sheet.addRow(filaExportPaciente(p));
     row.alignment = { wrapText: true, vertical: "top" };
   }
   return workbook;
@@ -328,20 +337,46 @@ router.get("/export/excel", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEP
     const params = [clinicaId];
     sql += "ORDER BY apellidos, nombres";
 
-    const [pacientes] = await pool.query(sql, params);
-    const resumenes = await getResumenClinicoBatch(pacientes.map(p => p.id));
-    for (const p of pacientes) {
-      Object.assign(p, resumenes.get(p.id));
+    // Exportaciones grandes simultáneas: como máximo EXPORT_MAX a la vez en todo el servidor
+    if (exportacionesActivas >= EXPORT_MAX) {
+      return res.status(429).json({ ok: false, msg: "Hay otras exportaciones grandes en curso. Intente de nuevo en un minuto." });
     }
-    const workbook = buildPacientesWorkbook(pacientes);
+    exportacionesActivas++;
+    let cancelado = false;
+    res.on("close", () => { if (!res.writableFinished) cancelado = true; });
+    try {
+      const [pacientes] = await pool.query(sql, params);
 
-    res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
-    res.setHeader("Content-Disposition", `attachment; filename="pacientes_clinica_${clinicaId}.xlsx"`);
-    await workbook.xlsx.write(res);
-    res.end();
+      // El Excel se escribe directo a la descarga, por lotes: no se arma entero en
+      // memoria y entre lote y lote el servidor atiende a los demás usuarios.
+      res.setHeader("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet");
+      res.setHeader("Content-Disposition", `attachment; filename="pacientes_clinica_${clinicaId}.xlsx"`);
+      const workbook = new ExcelJS.stream.xlsx.WorkbookWriter({ stream: res, useStyles: true });
+      const sheet = workbook.addWorksheet("Pacientes");
+      sheet.columns = PACIENTE_EXPORT_COLUMNS;
+      sheet.getRow(1).font = { bold: true };
+      sheet.getRow(1).commit();
+
+      for (let i = 0; i < pacientes.length && !cancelado; i += EXPORT_LOTE) {
+        const lote = pacientes.slice(i, i + EXPORT_LOTE);
+        const resumenes = await getResumenClinicoBatch(lote.map(p => p.id));
+        for (const p of lote) {
+          const row = sheet.addRow(filaExportPaciente({ ...p, ...resumenes.get(p.id) }));
+          row.alignment = { wrapText: true, vertical: "top" };
+          row.commit();
+        }
+        await new Promise((r) => setImmediate(r)); // deja pasar las solicitudes de otros usuarios
+      }
+      if (cancelado) { res.destroy(); return; }
+      sheet.commit();
+      await workbook.commit();
+    } finally {
+      exportacionesActivas--;
+    }
   } catch (e) {
     console.error("[GET /pacientes/export/excel] ERROR:", e.message, e.stack);
-    res.status(500).json({ ok: false, msg: e.message });
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: e.message });
+    else res.destroy();
   }
 });
 
@@ -487,11 +522,21 @@ router.get("/export/zip-todos", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","R
     });
     archive.pipe(res);
 
+    // Si la persona cancela la descarga (cierra la página), se deja de armar el ZIP
+    let cancelado = false;
+    res.on("close", () => { if (!res.writableFinished) cancelado = true; });
+
     for (const paciente of pacientes) {
+      if (cancelado) break;
       const folderName = safeFileName(`${paciente.id}_${paciente.nombres}_${paciente.apellidos}`, `paciente_${paciente.id}`);
       await appendPacienteToArchive(archive, paciente, `${folderName}/`);
     }
 
+    if (cancelado) {
+      archive.abort();
+      console.log(`[zip-todos] cancelado por el usuario (clínica ${clinicaId})`);
+      return;
+    }
     await archive.finalize();
   } catch (e) {
     console.error("[GET /pacientes/export/zip-todos] ERROR:", e.message, e.stack);

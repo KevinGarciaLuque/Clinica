@@ -8,6 +8,7 @@
  */
 const router = require("express").Router();
 const pool   = require("../db");
+const { RANGO_SQL } = require("../utils/rangoDias");
 const auth   = require("../middlewares/auth");
 const dayjs  = require("dayjs");
 dayjs.extend(require("dayjs/plugin/utc"));
@@ -45,7 +46,7 @@ router.get("/resumen", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
     ] = await Promise.all([
       pool.query(
         `SELECT COUNT(*) AS total FROM citas
-         WHERE clinica_id=? AND estado='COMPLETADA' AND DATE(inicio) BETWEEN ? AND ? ${filtroMedico}`,
+         WHERE clinica_id=? AND estado='COMPLETADA' AND ${RANGO_SQL("inicio")} ${filtroMedico}`,
         [clinicaId, desde, hasta, ...paramsMedico]
       ),
       pool.query(
@@ -65,7 +66,7 @@ router.get("/resumen", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
       ),
       pool.query(
         `SELECT estado, COUNT(*) AS total FROM citas
-         WHERE clinica_id=? AND estado IN ('CANCELADA','NO_ASISTIO') AND DATE(inicio) BETWEEN ? AND ? ${filtroMedico}
+         WHERE clinica_id=? AND estado IN ('CANCELADA','NO_ASISTIO') AND ${RANGO_SQL("inicio")} ${filtroMedico}
          GROUP BY estado`,
         [clinicaId, desde, hasta, ...paramsMedico]
       ),
@@ -116,7 +117,7 @@ router.get("/serie-citas", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA
       `SELECT DATE(inicio) AS fecha, COUNT(*) AS total,
               SUM(CASE WHEN estado='COMPLETADA' THEN 1 ELSE 0 END) AS completadas
        FROM citas
-       WHERE clinica_id=? AND DATE(inicio) BETWEEN ? AND ? ${filtroMedico}
+       WHERE clinica_id=? AND ${RANGO_SQL("inicio")} ${filtroMedico}
        GROUP BY DATE(inicio)
        ORDER BY fecha ASC`,
       [clinicaId, desde, hasta, ...paramsMedico]
@@ -142,7 +143,7 @@ router.get("/por-medico", auth("ADMIN", "SUPER_ADMIN"), async (req, res) => {
               SUM(CASE WHEN c.estado IN ('CANCELADA','NO_ASISTIO') THEN 1 ELSE 0 END) AS canceladas_no_asistio
        FROM citas c
        JOIN usuarios u ON u.id = c.medico_id
-       WHERE c.clinica_id=? AND DATE(c.inicio) BETWEEN ? AND ?
+       WHERE c.clinica_id=? AND ${RANGO_SQL("c.inicio")}
        GROUP BY u.id, u.nombres, u.apellidos, u.sexo
        ORDER BY consultas_atendidas DESC`,
       [clinicaId, desde, hasta]
