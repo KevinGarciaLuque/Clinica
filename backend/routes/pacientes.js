@@ -2,6 +2,7 @@ const router      = require("express").Router();
 const pool        = require("../db");
 const auth        = require("../middlewares/auth");
 const upload      = require("../middlewares/upload");
+const { verificarEspacio } = require("../utils/almacenamiento");
 const cloudinary  = require("../utils/cloudinary");
 const streamifier = require("streamifier");
 const fs          = require("fs");
@@ -715,6 +716,7 @@ router.post(
   "/:id/foto",
   auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
   upload.single("foto"),
+  verificarEspacio(),
   async (req, res) => {
     try {
       if (!req.file) return res.status(400).json({ ok: false, msg: "No se recibió archivo" });

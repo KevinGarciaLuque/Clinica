@@ -37,7 +37,8 @@ export default function ConfigClinica() {
   const [form, setForm] = useState({});
   const [formPerfil, setFormPerfil] = useState({});
   const [servicios, setServicios] = useState([]);
-  const [tab, setTab] = useState("general");
+  // ?tab=almacenamiento abre directamente esa pestaña (desde el aviso de espacio)
+  const [tab, setTab] = useState(() => new URLSearchParams(window.location.search).get("tab") || "general");
   const [cargando, setCargando] = useState(true);
   const [guardando, setGuardando] = useState(false);
   const [guardandoPerfil, setGuardandoPerfil] = useState(false);

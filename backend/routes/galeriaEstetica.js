@@ -7,6 +7,16 @@ const db          = require("../db");
 const auth        = require("../middlewares/auth");
 const cloudinary  = require("../utils/cloudinary");
 const streamifier = require("streamifier");
+const { verificarEspacio, asegurarColumnaGaleria } = require("../utils/almacenamiento");
+
+/** Guarda el tamaño real de la foto (para medir bien el espacio usado) */
+async function guardarTamano(id, bytes) {
+  if (!bytes) return;
+  try {
+    await asegurarColumnaGaleria();
+    await db.query("UPDATE galeria_fotos SET tamano_bytes=? WHERE id=?", [bytes, id]);
+  } catch { /* la columna es opcional */ }
+}
 
 const ROLES           = ["SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA"];
 const ROLES_ESCRITURA = ["SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA"];
@@ -167,7 +177,7 @@ router.get("/fotos", auth(...ROLES), async (req, res) => {
 });
 
 // POST subir foto
-router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), async (req, res) => {
+router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), verificarEspacio(), async (req, res) => {
   try {
     const cid = req.user.clinica_id;
     const { sesion_id, paciente_id, momento, pose } = req.body;
@@ -188,6 +198,7 @@ router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), async 
         "UPDATE galeria_fotos SET archivo_nombre=?, cloudinary_public_id=?, creado_en=NOW() WHERE id=?",
         [archivo_nombre, cloudinary_public_id, existe[0].id]
       );
+      await guardarTamano(existe[0].id, req.file?.size);
       const [rows] = await db.query("SELECT * FROM galeria_fotos WHERE id=?", [existe[0].id]);
       const f = rows[0];
       f.archivo_url = urlDeFoto(f, req);
@@ -197,6 +208,7 @@ router.post("/fotos", auth(...ROLES_ESCRITURA), upload.single("archivo"), async 
       "INSERT INTO galeria_fotos (clinica_id, sesion_id, paciente_id, momento, pose, archivo_nombre, cloudinary_public_id) VALUES (?,?,?,?,?,?,?)",
       [cid, sesion_id, paciente_id, momento, pose, archivo_nombre, cloudinary_public_id]
     );
+    await guardarTamano(r.insertId, req.file?.size);
     const [rows] = await db.query("SELECT * FROM galeria_fotos WHERE id=?", [r.insertId]);
     const f = rows[0];
     f.archivo_url = urlDeFoto(f, req);

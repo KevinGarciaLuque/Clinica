@@ -10,6 +10,7 @@ const router       = require("express").Router({ mergeParams: true });
 const pool         = require("../db");
 const auth         = require("../middlewares/auth");
 const upload       = require("../middlewares/upload");
+const { verificarEspacio } = require("../utils/almacenamiento");
 const cloudinary   = require("../utils/cloudinary");
 const streamifier  = require("streamifier");
 const fs           = require("fs");
@@ -117,6 +118,7 @@ router.post(
       next();
     });
   },
+  verificarEspacio(),
   async (req, res) => {
     try {
       const clinicaId   = req.tenant?.clinica_id;

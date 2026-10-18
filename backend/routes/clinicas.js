@@ -13,6 +13,7 @@ const { enviarEmail, templateCredenciales } = require("../utils/mailer");
 const { urlPublica } = require("../utils/urlPublica");
 const { zonaClinica, olvidarZona, ahoraClinica, offsetMin } = require("../utils/zonaHoraria");
 const { puedeVerFinanzas } = require("../utils/permisoFinanzas");
+const { usoClinica } = require("../utils/almacenamiento");
 
 function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -143,6 +144,20 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
     );
   }
 }
+
+// ──────────────────────────────────────────────
+//  GET /api/clinicas/almacenamiento/estado  → uso del espacio (para el aviso de 80% / 100%)
+// ──────────────────────────────────────────────
+router.get("/almacenamiento/estado", auth("ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA","ENFERMERA","SUPER_ADMIN"), async (req, res) => {
+  try {
+    const clinicaId = req.tenant?.clinica_id || req.user.clinica_id;
+    if (!clinicaId) return res.json({ ok: true, data: null });
+    const { almacenamiento: a } = await usoClinica(clinicaId);
+    res.json({ ok: true, data: { uso_pct: a.uso_pct, lleno: a.lleno, espacio_legible: a.espacio_legible, cuota_legible: a.cuota_legible } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
 
 // ──────────────────────────────────────────────
 //  GET /api/clinicas/zona-horaria  → zona y hora actual de la clínica del usuario
@@ -750,34 +765,8 @@ router.get("/:id/detalles", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), as
       ),
     ]);
 
-    // ── Estimación de almacenamiento en nube ─────────────────
-    // Pesos promedio (KB): galería ~900, perfil paciente ~350, perfil usuario ~200, doc ~400
-    const KB_GALERIA   = 900;
-    const KB_PERF_PAC  = 350;
-    const KB_PERF_USR  = 200;
-    const KB_DOC       = 400;
-
-    const total_archivos_nube =
-      Number(fotos_galeria) +
-      Number(fotos_perfil_pacientes) +
-      Number(fotos_perfil_usuarios) +
-      Number(total_documentos);
-
-    const espacio_kb =
-      Number(fotos_galeria)          * KB_GALERIA  +
-      Number(fotos_perfil_pacientes) * KB_PERF_PAC +
-      Number(fotos_perfil_usuarios)  * KB_PERF_USR +
-      Number(total_documentos)       * KB_DOC;
-    const cuota_gb = getQuotaFromConfigRows(cfgStorage);
-    const precio_por_gb_lps = getPricePerGbFromConfigRows(cfgStorage);
-    const cuota_kb = cuota_gb * 1024 * 1024;
-    const uso_pct = cuota_kb > 0 ? Math.min((espacio_kb / cuota_kb) * 100, 999.99) : 0;
-
-    const formatBytes = (kb) => {
-      if (kb < 1024)       return `${kb.toFixed(0)} KB`;
-      if (kb < 1048576)    return `${(kb / 1024).toFixed(2)} MB`;
-      return                      `${(kb / 1048576).toFixed(2)} GB`;
-    };
+    // ── Almacenamiento: tamaños reales de los archivos (utils/almacenamiento.js) ──
+    const uso = await usoClinica(id);
 
     res.json({
       ok: true,
@@ -787,27 +776,10 @@ router.get("/:id/detalles", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO"), as
           total_pacientes:        Number(total_pacientes),
           total_usuarios:         Number(total_usuarios),
           total_citas:            Number(total_citas),
-          fotos_galeria:          Number(fotos_galeria),
-          fotos_perfil_pacientes: Number(fotos_perfil_pacientes),
-          fotos_perfil_usuarios:  Number(fotos_perfil_usuarios),
-          total_documentos:       Number(total_documentos),
-          total_archivos_nube,
+          ...uso.conteos,
+          total_archivos_nube: Object.values(uso.conteos).reduce((x, y) => x + y, 0),
         },
-        almacenamiento: {
-          espacio_kb,
-          espacio_legible:  formatBytes(espacio_kb),
-          cuota_gb,
-          cuota_kb,
-          cuota_legible: formatBytes(cuota_kb),
-          uso_pct: Number(uso_pct.toFixed(2)),
-          precio_por_gb_lps,
-          desglose: {
-            galeria_fotos:    { cantidad: Number(fotos_galeria),          kb: Number(fotos_galeria) * KB_GALERIA },
-            perfil_pacientes: { cantidad: Number(fotos_perfil_pacientes), kb: Number(fotos_perfil_pacientes) * KB_PERF_PAC },
-            perfil_usuarios:  { cantidad: Number(fotos_perfil_usuarios),  kb: Number(fotos_perfil_usuarios)  * KB_PERF_USR },
-            documentos:       { cantidad: Number(total_documentos),       kb: Number(total_documentos) * KB_DOC },
-          },
-        },
+        almacenamiento: uso.almacenamiento,
         ultima_cita:  ultima_cita || null,
         top_usuarios: top_usuarios || [],
       },

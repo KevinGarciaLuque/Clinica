@@ -5,6 +5,7 @@ import Sidebar from "./Sidebar";
 import LicenciaVencidaModal from "./LicenciaVencidaModal";
 import DictadoVoz from "./DictadoVoz";
 import AvisoReloj from "./AvisoReloj";
+import AvisoAlmacenamiento from "./AvisoAlmacenamiento";
 import useClinicaActiva from "../utils/useClinicaActiva";
 import { limpiarClinicaActiva } from "../utils/clinicaActiva";
 
@@ -203,6 +204,7 @@ export default function AppLayout() {
             style={pathname.startsWith("/psicologia") ? { height: "100%" } : {}}
           >
             {!pathname.startsWith("/psicologia") && <AvisoReloj />}
+            {!pathname.startsWith("/psicologia") && <AvisoAlmacenamiento />}
             <Outlet />
           </div>
         </main>
