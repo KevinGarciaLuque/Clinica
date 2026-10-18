@@ -168,4 +168,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "recordatorios-whatsapp-un-clic",
+    version: "1.27",
+    titulo: "Recordatorios por WhatsApp con un clic",
+    descripcion: "En Citas o Recepción, toca el botón verde «Recordatorios»: verás las citas de mañana y con un clic se abre WhatsApp con el mensaje listo, incluido el enlace para que el paciente confirme o cancele. Cuando responde, la cita se actualiza sola y ahí mismo ves quién confirmó.",
+    icono: "bi-whatsapp",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

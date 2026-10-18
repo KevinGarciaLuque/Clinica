@@ -165,6 +165,7 @@ app.use("/api/estadisticas", require("./routes/estadisticas"));
 app.use("/api/facturacion", require("./routes/facturacion"));
 app.use("/api/caja", require("./routes/caja"));
 app.use("/api/finanzas", require("./routes/finanzas"));
+app.use("/api/recordatorios-whatsapp", require("./routes/recordatoriosWhatsapp"));
 app.use("/api/historias", require("./routes/historias"));
 app.use("/api/prescripciones", require("./routes/prescripciones"));
 app.use("/api/estudios", require("./routes/estudios"));

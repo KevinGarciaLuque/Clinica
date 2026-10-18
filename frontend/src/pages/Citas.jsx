@@ -6,6 +6,7 @@ import { useAuth } from "../auth/AuthContext";
 import withDragAndDrop from "react-big-calendar/lib/addons/dragAndDrop";
 import dayjs from "dayjs";
 import { hoyClinica } from "../utils/zonaClinica";
+import RecordatoriosWhatsapp from "../components/RecordatoriosWhatsapp";
 import "dayjs/locale/es";
 import "react-big-calendar/lib/css/react-big-calendar.css";
 import "react-big-calendar/lib/addons/dragAndDrop/styles.css";
@@ -417,6 +418,7 @@ export default function Citas() {
   const [date,      setDate]        = useState(new Date());
   const [loading,   setLoading]     = useState(false);
   const [showNew,   setShowNew]     = useState(false);
+  const [showWhatsapp, setShowWhatsapp] = useState(false);
   const [slotInfo,  setSlotInfo]    = useState(null);
   const [showDet,   setShowDet]     = useState(false);
   const [showControl, setShowControl] = useState(false);
@@ -953,6 +955,17 @@ export default function Citas() {
             mensaje="Agenda tu cita en línea. Si ya eres paciente, solo necesitas tu DNI:"
           />
           <button
+            type="button"
+            onClick={() => setShowWhatsapp(true)}
+            title="Enviar recordatorios de citas por WhatsApp"
+            style={{
+              background: "#16a34a", border: "none", borderRadius: 8, color: "#fff",
+              padding: "7px 14px", fontSize: "0.83rem", cursor: "pointer",
+              fontWeight: 600, display: "flex", alignItems: "center", gap: 6,
+            }}>
+            <i className="bi bi-whatsapp"></i> Recordatorios
+          </button>
+          <button
             onClick={() => { setSlotInfo(null); setShowNew(true); }}
             style={{
               background: "linear-gradient(135deg, #3b82f6, #2563eb)",
@@ -1123,6 +1136,8 @@ export default function Citas() {
           )}
         </div>
       </div>
+
+      {showWhatsapp && <RecordatoriosWhatsapp onCerrar={() => setShowWhatsapp(false)} />}
 
       {showNew && (
         <ModalNuevaCita

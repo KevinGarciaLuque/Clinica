@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import dayjs from "dayjs";
 import { hoyClinica } from "../utils/zonaClinica";
+import RecordatoriosWhatsapp from "../components/RecordatoriosWhatsapp";
 import api from "../api/api";
 import { tituloMedicoActivo, prefijoDr } from "../utils/medico";
 
@@ -184,6 +185,7 @@ function FilaCita({ cita, envios, admitiendo, onAdmitir, aceptando, onAceptar })
 
 export default function Recepcion() {
   const [tab, setTab] = useState("citas");
+  const [showWhatsapp, setShowWhatsapp] = useState(false);
   const [citasHoy, setCitasHoy]     = useState([]);
   const [admitiendo, setAdmitiendo] = useState(null);
   const [pendientes, setPendientes] = useState({ recetas: [], estudios: [] });
@@ -287,7 +289,12 @@ export default function Recepcion() {
           <h5 style={{ margin: 0, fontWeight: 700 }}>Recepción</h5>
           <span style={{ fontSize: 13, color: "#64748b" }}>Admisión de pacientes, recetas y estudios enviados desde consulta</span>
         </div>
+        <button type="button" className="btn btn-success btn-sm ms-auto fw-semibold" onClick={() => setShowWhatsapp(true)}
+          title="Enviar recordatorios de citas por WhatsApp">
+          <i className="bi bi-whatsapp me-1" />Recordatorios
+        </button>
       </div>
+      {showWhatsapp && <RecordatoriosWhatsapp onCerrar={() => setShowWhatsapp(false)} />}
 
       <ul className="nav nav-tabs mb-3">
         {TABS.map(t => (
