@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo } from "react";
+import { Link } from "react-router-dom";
 import api from "../../api/api";
 
 /* ── Paleta (igual que las demás páginas super admin) ── */
@@ -79,6 +80,31 @@ function KpiCard({ label, value, icon, color = C.accent, sub }) {
       <div style={{ fontSize: "1.9rem", fontWeight: 700, color: C.text, lineHeight: 1 }}>{value}</div>
       {sub && <div style={{ fontSize: "0.72rem", color: C.muted }}>{sub}</div>}
     </div>
+  );
+}
+
+/* ── Resumen de almacenamiento (el detalle está en Super Admin → Almacenamiento) ── */
+function ResumenAlmacenamiento() {
+  const [t, setT] = useState(null);
+  useEffect(() => {
+    api.get("/superadmin/almacenamiento").then((r) => setT(r.data.data?.totales || null)).catch(() => {});
+  }, []);
+  if (!t) return null;
+  const alerta = t.llenas > 0 || t.sobre_80 > 0;
+  return (
+    <Link to="/superadmin/almacenamiento" style={{
+      display: "flex", flexWrap: "wrap", alignItems: "center", gap: 12, textDecoration: "none", marginBottom: 28,
+      background: C.card, border: `1px solid ${alerta ? C.warning + "66" : C.border}`, borderRadius: 12, padding: "14px 18px", color: C.text,
+    }}>
+      <i className="bi bi-hdd-stack-fill" style={{ color: alerta ? C.warning : C.accent, fontSize: "1.3rem" }} />
+      <div style={{ flex: 1, minWidth: 200 }}>
+        <div style={{ fontWeight: 700 }}>Almacenamiento: {t.usado_legible} usados de {t.asignado_legible}</div>
+        <div style={{ color: C.muted, fontSize: "0.8rem" }}>
+          {t.sobre_80} {t.sobre_80 === 1 ? "clínica" : "clínicas"} con más de 80% · {t.llenas} {t.llenas === 1 ? "llena" : "llenas"}
+        </div>
+      </div>
+      <span style={{ color: C.accent, fontSize: "0.82rem", fontWeight: 600 }}>Ver detalle <i className="bi bi-arrow-right" /></span>
+    </Link>
   );
 }
 
@@ -191,6 +217,8 @@ export default function Reportes() {
         <KpiCard label="Consultas realizadas" value={kpis.total_consultas.toLocaleString("es")}   icon="bi-journal-medical"       color={C.warning} />
         <KpiCard label="Licencias vencidas"   value={kpis.licVencidas}       icon="bi-shield-exclamation"    color={C.danger}  sub="revisar renovación" />
       </div>
+
+      <ResumenAlmacenamiento />
 
       {/* ── Dos columnas: Top crecimiento + Barra de ordenado ── */}
       <div className="reportes-2col">

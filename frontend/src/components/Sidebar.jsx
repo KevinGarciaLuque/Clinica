@@ -63,6 +63,7 @@ const superItems = [
   { to: "/superadmin/solicitudes-plan", label: "Solicitudes de Plan", icon: "bi-credit-card-fill" },
   { to: "/superadmin/resenas",         label: "Reseñas",          icon: "bi-star-fill" },
   { to: "/superadmin/reportes",        label: "Reportes",         icon: "bi-bar-chart-line-fill" },
+  { to: "/superadmin/almacenamiento",  label: "Almacenamiento",   icon: "bi-hdd-stack-fill" },
   { to: "/superadmin/database",        label: "Base de Datos",   icon: "bi-database-fill-gear" },
   { to: "/superadmin/personalizacion", label: "Personalización", icon: "bi-palette-fill" },
   { to: "/superadmin/landing",         label: "Página Pública",  icon: "bi-globe2" },

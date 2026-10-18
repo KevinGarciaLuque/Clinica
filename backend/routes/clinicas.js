@@ -13,7 +13,7 @@ const { enviarEmail, templateCredenciales } = require("../utils/mailer");
 const { urlPublica } = require("../utils/urlPublica");
 const { zonaClinica, olvidarZona, ahoraClinica, offsetMin } = require("../utils/zonaHoraria");
 const { puedeVerFinanzas } = require("../utils/permisoFinanzas");
-const { usoClinica } = require("../utils/almacenamiento");
+const { usoClinica, revisarAviso } = require("../utils/almacenamiento");
 
 function generarPassword() {
   return crypto.randomBytes(9).toString("base64url");
@@ -825,6 +825,7 @@ router.put("/:id/storage-quota", auth("SUPER_ADMIN"), async (req, res) => {
        ON DUPLICATE KEY UPDATE valor = VALUES(valor)`,
       [id, String(normalized)]
     );
+    revisarAviso(id); // si bajó del 80% se reinicia el aviso
     res.json({ ok: true, data: { storage_quota_gb: normalized } });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });

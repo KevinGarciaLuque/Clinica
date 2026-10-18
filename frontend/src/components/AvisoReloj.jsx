@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { cargarZonaClinica, horaEnZona, offsetZona } from "../utils/zonaClinica";
+import { useAuth } from "../auth/AuthContext";
 
 const CLAVE_OCULTO = "aviso_reloj_oculto";
 
@@ -10,8 +11,11 @@ const CLAVE_OCULTO = "aviso_reloj_oculto";
  */
 export default function AvisoReloj() {
   const [aviso, setAviso] = useState(null);
+  const { user } = useAuth();
+  const esSuper = user?.tipo === "SUPER_ADMIN"; // no pertenece a una clínica: el aviso no aplica
 
   useEffect(() => {
+    if (esSuper) return undefined;
     let vivo = true;
     cargarZonaClinica().then((r) => {
       if (!vivo || !r?.timezone) return;
@@ -27,7 +31,7 @@ export default function AvisoReloj() {
       setAviso({ tipo, tz: r.timezone, minDesfase, marca });
     });
     return () => { vivo = false; };
-  }, []);
+  }, [esSuper]);
 
   if (!aviso) return null;
 
