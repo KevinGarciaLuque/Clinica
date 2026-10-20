@@ -186,4 +186,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "curvas-crecimiento-edad-automatica",
+    version: "1.29",
+    titulo: "Curvas de crecimiento: edad exacta y tabla automática",
+    descripcion: "La edad del paciente ahora se muestra con años y meses en la consulta y en su perfil. En Curvas de Crecimiento se elige sola la tabla de la OMS: 0–5 años para los más pequeños y 5–19 años para los mayores. El interruptor «Registrar curva de crecimiento» de la consulta ya guarda la medición en la curva.",
+    icono: "bi-graph-up-arrow",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

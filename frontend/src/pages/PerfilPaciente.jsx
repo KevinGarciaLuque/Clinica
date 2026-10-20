@@ -29,6 +29,7 @@ import EvolucionPaciente from "../components/EvolucionPaciente";
 import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/constantes_odontologia";
 import { fechaLocal } from "../utils/fechaNacimiento";
+import { edadDetallada } from "../utils/edadDetallada";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -1013,17 +1014,11 @@ export default function PerfilPaciente() {
                     <i className="bi bi-credit-card me-1" />{paciente.dni}
                   </span>
                 )}
-                {paciente.fecha_nacimiento && (() => {
-                  const hoy = new Date();
-                  const nac = fechaLocal(paciente.fecha_nacimiento);
-                  let e = hoy.getFullYear() - nac.getFullYear();
-                  if (hoy.getMonth() < nac.getMonth() || (hoy.getMonth() === nac.getMonth() && hoy.getDate() < nac.getDate())) e--;
-                  return e >= 0 ? (
-                    <span style={{ background: "rgba(255,255,255,.12)", color: "rgba(255,255,255,.85)", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem" }}>
-                      <i className="bi bi-calendar3 me-1" />{e} años
-                    </span>
-                  ) : null;
-                })()}
+                {edadDetallada(paciente.fecha_nacimiento) && (
+                  <span style={{ background: "rgba(255,255,255,.18)", color: "#fff", borderRadius: 20, padding: "2px 10px", fontSize: "0.8rem", fontWeight: 600 }}>
+                    <i className="bi bi-calendar3 me-1" />{edadDetallada(paciente.fecha_nacimiento)}
+                  </span>
+                )}
                 {paciente.grupo_sanguineo && (
                   <span style={{ background: "rgba(239,68,68,.4)", color: "#fff", borderRadius: 20, padding: "1px 9px", fontSize: "0.75rem", fontWeight: 600 }}>
                     <i className="bi bi-droplet-fill me-1" />{paciente.grupo_sanguineo}

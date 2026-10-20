@@ -953,6 +953,19 @@ const pool = require("./db");
       }
     }
 
+    // Curvas de crecimiento: recalcular UNA vez los percentiles de mediciones guardadas
+    // de niños mayores de 5 años (antes se comparaban contra la tabla OMS de 0-5 años).
+    try {
+      const [[ya]] = await pool.query("SELECT clave FROM migraciones_unicas WHERE clave = 'crecimiento_recalculo_oms_5_19'");
+      if (!ya) {
+        const n = await require("./routes/crecimiento").recalcularMedicionesGuardadas();
+        await pool.query("INSERT IGNORE INTO migraciones_unicas (clave) VALUES ('crecimiento_recalculo_oms_5_19')");
+        console.log(`✅ [auto-migrate] curvas de crecimiento recalculadas (${n} medición(es), una sola vez)`);
+      }
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] recálculo de curvas:", e.message);
+    }
+
     // Sucursales: tablas nuevas y columna opcional sucursal_id (NULL = sede principal)
     try {
       await require("./utils/sucursales").asegurarSucursales();

@@ -131,7 +131,7 @@ router.get("/:pacienteId", auth(...ROLES), async (req, res) => {
     res.json({
       ok: true,
       data: {
-        paciente: { nombres: p.nombres, apellidos: p.apellidos, edad, sexo: p.sexo, grupo_sanguineo: p.grupo_sanguineo },
+        paciente: { nombres: p.nombres, apellidos: p.apellidos, edad, sexo: p.sexo, grupo_sanguineo: p.grupo_sanguineo, fecha_nacimiento: p.fecha_nacimiento ? dayjs(p.fecha_nacimiento).format("YYYY-MM-DD") : null },
         alergias, antecedentes, vitales, medicamentos, estudios, asistencia, control, saldo,
       },
     });

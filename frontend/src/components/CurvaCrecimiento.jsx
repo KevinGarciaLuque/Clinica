@@ -9,6 +9,7 @@ import {
 } from "recharts";
 import api from "../api/api";
 import { fechaLocal } from "../utils/fechaNacimiento";
+import { hoyClinica } from "../utils/zonaClinica";
 
 // ═══════════════════════════════════════════════════════════
 // CONSTANTES
@@ -81,9 +82,26 @@ function interpretarZscore(indicador, z) {
   return "—";
 }
 
+// Indicadores sin datos OMS para 5-19 años
+const INDICADORES_SIN_519 = ["pc-edad", "peso-talla"];
+
+// Edad en meses cumplidos a hoy (null si no hay fecha de nacimiento)
+function edadMesesHoy(fechaNac) {
+  if (!fechaNac) return null;
+  return calcEdadMeses(fechaNac, hoyClinica());
+}
+function rangoPorEdad(fechaNac) {
+  const edad = edadMesesHoy(fechaNac);
+  return edad != null && edad > 60 ? "5_19" : "0_5";
+}
+function indicadorInicial(fechaNac) {
+  const edad = edadMesesHoy(fechaNac);
+  return edad != null && edad > 120 ? "imc-edad" : "peso-edad";
+}
+
 function calcEdadMeses(fechaNac, fechaMedicion) {
   const nac = fechaLocal(fechaNac);
-  const med = new Date(fechaMedicion);
+  const med = fechaLocal(fechaMedicion); // "YYYY-MM-DD" como día local (no UTC)
   let meses = (med.getFullYear() - nac.getFullYear()) * 12;
   meses += med.getMonth() - nac.getMonth();
   const diasDif = med.getDate() - nac.getDate();
@@ -158,6 +176,9 @@ function buildChartData(indKey, meds, curvasRef) {
     } else {
       const valor = m[indInf.campo];
       if (valor === null || valor === undefined) return;
+      // Solo las mediciones dentro del rango de edad de la gráfica (0-5 o 5-19 años)
+      const edadM = Number(m.edad_meses);
+      if (puntosRef.length && (edadM < puntosRef[0].mes || edadM > puntosRef[puntosRef.length - 1].mes)) return;
       const idx = data.findIndex(d => d.mes >= m.edad_meses);
       const newPt = { mes: m.edad_meses, paciente: parseFloat(valor) };
       [-3, -2, -1, 0, 1, 2, 3].forEach(z => {
@@ -348,7 +369,7 @@ function generateConsolidadoHTML(svgSections, mediciones, sexoPaciente, fechaNac
 export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) {
   const [mediciones, setMediciones] = useState([]);
   const [curvasRef, setCurvasRef] = useState(null);
-  const [indicador, setIndicador] = useState("peso-edad");
+  const [indicador, setIndicador] = useState(() => indicadorInicial(fechaNacimiento));
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [guardando, setGuardando] = useState(false);
@@ -363,8 +384,17 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const [generandoConsolidado, setGenerandoConsolidado] = useState(false);
   const hiddenChartsRef = useRef({});
 
-  // rango OMS: "0_5" = Estándares 0-5 años | "5_19" = Referencia 5-19 años
-  const [rango, setRango] = useState("0_5");
+  // rango OMS: "0_5" = Estándares 0-5 años | "5_19" = Referencia 5-19 años.
+  // Se elige solo según la edad del paciente (mayor de 5 años → 5-19); el médico
+  // puede cambiarlo a mano con los botones.
+  const [rango, setRango] = useState(() => rangoPorEdad(fechaNacimiento));
+  const [fnacVista, setFnacVista] = useState(fechaNacimiento);
+  if (fnacVista !== fechaNacimiento) {
+    // La fecha de nacimiento llegó después (o cambió de paciente): volver a elegir
+    setFnacVista(fechaNacimiento);
+    setRango(rangoPorEdad(fechaNacimiento));
+    setIndicador(indicadorInicial(fechaNacimiento));
+  }
 
   useEffect(() => {
     const onResize = () => {
@@ -386,11 +416,11 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const indInfo = INDICADORES.find(i => i.key === indicador);
   const isPesoTalla = indicador === "peso-talla";
 
-  // Indicadores sin datos OMS para 5-19 años o con datos incompletos
-  const INDICADORES_SIN_519 = ["pc-edad", "peso-talla"];
   const handleRangoChange = (nuevoRango) => {
-    if (nuevoRango === "5_19" && (INDICADORES_SIN_519.includes(indicador) || indicador === "peso-edad")) {
-      setIndicador("talla-edad");
+    const edad = edadMesesHoy(fechaNacimiento);
+    // Peso/Edad de la OMS para 5-19 solo llega a los 10 años
+    if (nuevoRango === "5_19" && (INDICADORES_SIN_519.includes(indicador) || (indicador === "peso-edad" && edad != null && edad > 120))) {
+      setIndicador(edad != null && edad > 120 ? "imc-edad" : "peso-edad");
     }
     setRango(nuevoRango);
   };
@@ -398,7 +428,7 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
   const chartRef = useRef(null);
 
   const [form, setForm] = useState({
-    fecha_medicion: new Date().toISOString().split("T")[0],
+    fecha_medicion: hoyClinica(),
     peso_kg: "", talla_cm: "", perimetro_cefalico_cm: "", notas: "",
   });
 
@@ -431,12 +461,13 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
     const resultados = {};
     await Promise.all(INDICADORES.map(async (ind) => {
       try {
-        const res = await api.get(`/crecimiento/referencia/${ind.key}/${sexoPaciente}`);
+        if (rango === "5_19" && INDICADORES_SIN_519.includes(ind.key)) return;
+        const res = await api.get(`/crecimiento/referencia/${ind.key}/${sexoPaciente}${rango === "5_19" ? "?rango=5_19" : ""}`);
         resultados[ind.key] = res.data.data;
       } catch { /* silencio */ }
     }));
     setTodasCurvas(resultados);
-  }, [sexoPaciente]);
+  }, [sexoPaciente, rango]);
 
   useEffect(() => {
     setLoading(true);
@@ -466,7 +497,7 @@ export default function CurvaCrecimiento({ pacienteId, sexo, fechaNacimiento }) 
       setMsg({ tipo: "success", texto: "Medición registrada correctamente" });
       setShowForm(false);
       setForm({
-        fecha_medicion: new Date().toISOString().split("T")[0],
+        fecha_medicion: hoyClinica(),
         peso_kg: "", talla_cm: "", perimetro_cefalico_cm: "", notas: "",
       });
       await Promise.all([cargarMediciones(), cargarCurvasRef()]);

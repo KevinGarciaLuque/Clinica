@@ -9,6 +9,8 @@ import dayjs from "dayjs";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import { calcIMC, calcSC, parseDerma } from "./helpers";
+import { hoyClinica } from "../../utils/zonaClinica";
+import { edadDetallada } from "../../utils/edadDetallada";
 import PacienteResumenCard from "./PacienteResumenCard";
 import AntesDeEntrar from "./AntesDeEntrar";
 import { abrirVideollamada } from "../../utils/videollamada";
@@ -150,6 +152,36 @@ export default function Consulta() {
       .catch(() => {});
   }, [paciente?.id, pacId, hid]);
 
+  // ── curva de crecimiento ─────────────────────────────────────────────────────
+  // Con el switch activo, el peso/talla/PC de la consulta se guarda como medición.
+  // Se registra una sola vez por consulta (si se vuelve a guardar con los mismos
+  // valores no se duplica).
+  const curvaRegistrada = useRef("");
+  const registrarEnCurva = useCallback(async () => {
+    if (!registrarCurva) return;
+    const pid  = paciente?.id || pacId;
+    const fnac = paciente?.fecha_nacimiento ? String(paciente.fecha_nacimiento).slice(0, 10) : null;
+    if (!pid || !fnac || !(vitals.peso || vitals.talla)) return;
+    const hoy = dayjs(hoyClinica());
+    const edadMeses = hoy.diff(dayjs(fnac), "month");
+    if (edadMeses < 0 || edadMeses >= 19 * 12) return;
+    const clave = `${pid}|${vitals.peso || ""}|${vitals.talla || ""}|${vitals.pc || ""}`;
+    if (curvaRegistrada.current === clave) return;
+    try {
+      await api.post(`/crecimiento/${pid}`, {
+        fecha_medicion:        hoy.format("YYYY-MM-DD"),
+        edad_meses:            edadMeses,
+        peso_kg:               vitals.peso  || null,
+        talla_cm:              vitals.talla || null,
+        perimetro_cefalico_cm: vitals.pc    || null,
+        notas:                 "Registrado desde consulta médica",
+      });
+      curvaRegistrada.current = clave;
+    } catch {
+      setAlertMsg({ type: "warning", msg: "La consulta se guardó, pero no se pudo registrar en la curva de crecimiento." });
+    }
+  }, [registrarCurva, paciente, pacId, vitals]);
+
   // ── guardar borrador ─────────────────────────────────────────────────────────
   const handleSave = useCallback(async (sign = false) => {
     setSaving(true);
@@ -199,37 +231,20 @@ export default function Consulta() {
         } else {
           setAlertMsg({ type: "success", msg: "Guardado como borrador." });
         }
+        await registrarEnCurva();
         return r.data.id;
       }
+      await registrarEnCurva();
       return hid;
-      // Registrar curva de crecimiento si el switch está activo
-      if (registrarCurva) {
-        const pid  = paciente?.id || pacId;
-        const fnac = paciente?.fecha_nacimiento;
-        const edadAnios = fnac ? dayjs().diff(dayjs(fnac), "year") : 99;
-        if (pid && fnac && edadAnios < 19 && (vitals.peso || vitals.talla)) {
-          const edadMeses = dayjs().diff(dayjs(fnac), "month");
-          await api.post(`/crecimiento/${pid}`, {
-            fecha_medicion:          dayjs().format("YYYY-MM-DD"),
-            edad_meses:              edadMeses,
-            peso_kg:                 vitals.peso  || null,
-            talla_cm:                vitals.talla || null,
-            perimetro_cefalico_cm:   vitals.pc    || null,
-            notas:                   "Registrado desde consulta médica",
-          }).catch(() => {}); // silencioso; no bloquea el guardado
-        }
-      }
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error al guardar" });
     } finally {
       setSaving(false);
     }
-  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarCurva]);
+  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva]);
 
   // ── UI ───────────────────────────────────────────────────────────────────────
-  const edad = paciente?.fecha_nacimiento
-    ? dayjs().diff(dayjs(paciente.fecha_nacimiento), "year") + " años"
-    : "";
+  const edad = edadDetallada(paciente?.fecha_nacimiento);
 
   const esDerma = modulos.some(m => m.ruta?.startsWith("/estetica/"));
   const esCardioEco = modulos.some(m => m.clave === "cardiologia_ecocardiograma");
@@ -380,6 +395,7 @@ export default function Consulta() {
             padding: "12px 18px",
             marginBottom: 16,
             display: "flex",
+            flexWrap: "wrap",
             alignItems: "center",
             gap: 14,
             boxShadow: "0 1px 6px rgba(0,0,0,.07)",
@@ -394,14 +410,24 @@ export default function Consulta() {
             }}>
               {paciente.nombres?.[0]}{paciente.apellidos?.[0]}
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: "1 1 180px", minWidth: 0 }}>
               <div style={{ fontWeight: 700, fontSize: "0.97rem", color: "#111827" }}>
                 {paciente.nombres} {paciente.apellidos}
               </div>
-              <div style={{ color: "#6b7280", fontSize: "0.78rem", marginTop: 2 }}>
-                {edad && <span>{edad}</span>}
-                {edad && paciente.fecha_nacimiento && <span style={{ margin: "0 5px", opacity: .5 }}>·</span>}
-                {paciente.fecha_nacimiento && <span>{dayjs(paciente.fecha_nacimiento).format("DD/MM/YYYY")}</span>}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 4 }}>
+                {edad && (
+                  <span style={{
+                    background: "#eff6ff", color: "#1d4ed8", border: "1px solid #bfdbfe",
+                    borderRadius: 999, padding: "2px 10px", fontWeight: 700, fontSize: "0.85rem", whiteSpace: "nowrap",
+                  }}>
+                    <i className="bi bi-calendar-heart me-1" />{edad}
+                  </span>
+                )}
+                {paciente.fecha_nacimiento && (
+                  <span style={{ color: "#4b5563", fontSize: "0.8rem" }}>
+                    Nació el {dayjs(String(paciente.fecha_nacimiento).slice(0, 10)).format("DD/MM/YYYY")}
+                  </span>
+                )}
               </div>
             </div>
             <button

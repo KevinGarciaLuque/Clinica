@@ -571,48 +571,86 @@ function obtenerTabla(indicador, sexo, rango = "0_5") {
 
 function calcularTodosZscores(edadMeses, sexo, peso, talla, imc, pc) {
   const result = {};
+  // Mayores de 5 años: referencia OMS 5-19 años (antes se usaba siempre la de 0-5,
+  // que para un niño de 8 años lo comparaba contra uno de 5 y salía "obesidad").
+  const rango = edadMeses > 60 ? "5_19" : "0_5";
 
-  // Peso para edad
-  const tPE = obtenerTabla("peso-edad", sexo);
-  if (tPE && peso) {
-    const lms = interpolarLMS(tPE, edadMeses);
-    result.zscore_peso_edad = calcZscore(peso, lms);
+  // Solo se calcula dentro del rango de edad que cubre cada tabla (sin estirar el último valor)
+  const lmsEdad = (indicador) => {
+    const tabla = obtenerTabla(indicador, sexo, rango);
+    if (!tabla) return null;
+    if (edadMeses < tabla[0].mes || edadMeses > tabla[tabla.length - 1].mes) return null;
+    return interpolarLMS(tabla, edadMeses);
+  };
+
+  const lmsPE = peso ? lmsEdad("peso-edad") : null; // 5-19: solo hasta los 10 años
+  if (lmsPE) {
+    result.zscore_peso_edad = calcZscore(peso, lmsPE);
     result.percentil_peso_edad = zscoreToPercentil(result.zscore_peso_edad);
   }
 
-  // Talla para edad
-  const tTE = obtenerTabla("talla-edad", sexo);
-  if (tTE && talla) {
-    const lms = interpolarLMS(tTE, edadMeses);
-    result.zscore_talla_edad = calcZscore(talla, lms);
+  const lmsTE = talla ? lmsEdad("talla-edad") : null;
+  if (lmsTE) {
+    result.zscore_talla_edad = calcZscore(talla, lmsTE);
     result.percentil_talla_edad = zscoreToPercentil(result.zscore_talla_edad);
   }
 
-  // IMC para edad
-  const tIE = obtenerTabla("imc-edad", sexo);
-  if (tIE && imc) {
-    const lms = interpolarLMS(tIE, edadMeses);
-    result.zscore_imc_edad = calcZscore(imc, lms);
+  const lmsIE = imc ? lmsEdad("imc-edad") : null;
+  if (lmsIE) {
+    result.zscore_imc_edad = calcZscore(imc, lmsIE);
     result.percentil_imc_edad = zscoreToPercentil(result.zscore_imc_edad);
   }
 
-  // PC para edad
-  const tPC = obtenerTabla("pc-edad", sexo);
-  if (tPC && pc) {
-    const lms = interpolarLMS(tPC, edadMeses);
-    result.zscore_pc_edad = calcZscore(pc, lms);
+  const lmsPC = pc ? lmsEdad("pc-edad") : null; // sin referencia OMS después de los 5 años
+  if (lmsPC) {
+    result.zscore_pc_edad = calcZscore(pc, lmsPC);
     result.percentil_pc_edad = zscoreToPercentil(result.zscore_pc_edad);
   }
 
-  // Peso para talla
-  const tPT = obtenerTabla("peso-talla", sexo);
-  if (tPT && peso && talla) {
+  // Peso para talla: solo menores de 5 años y dentro de las tallas de la tabla
+  const tPT = rango === "0_5" ? obtenerTabla("peso-talla", sexo) : null;
+  if (tPT && peso && talla && talla >= tPT[0].talla && talla <= tPT[tPT.length - 1].talla) {
     const lms = interpolarLMS(tPT, talla, "talla");
     result.zscore_peso_talla = calcZscore(peso, lms);
     result.percentil_peso_talla = zscoreToPercentil(result.zscore_peso_talla);
   }
 
   return result;
+}
+
+/**
+ * Corrección única: recalcula percentiles y z-scores de las mediciones ya guardadas
+ * (solo esos campos; peso, talla y fechas no se tocan).
+ */
+async function recalcularMedicionesGuardadas() {
+  const [rows] = await pool.query(
+    `SELECT m.id, m.edad_meses, m.peso_kg, m.talla_cm, m.perimetro_cefalico_cm, m.imc, p.sexo
+     FROM mediciones_crecimiento m JOIN pacientes p ON p.id = m.paciente_id`
+  );
+  for (const m of rows) {
+    const sexo = normalizarSexo(m.sexo);
+    const peso = m.peso_kg != null ? Number(m.peso_kg) : null;
+    const talla = m.talla_cm != null ? Number(m.talla_cm) : null;
+    const imc = m.imc != null ? Number(m.imc) : (peso && talla ? Math.round((peso / Math.pow(talla / 100, 2)) * 100) / 100 : null);
+    const sc = calcularTodosZscores(Number(m.edad_meses), sexo, peso, talla, imc,
+      m.perimetro_cefalico_cm != null ? Number(m.perimetro_cefalico_cm) : null);
+    await pool.query(
+      `UPDATE mediciones_crecimiento SET
+         zscore_peso_edad=?, zscore_talla_edad=?, zscore_peso_talla=?, zscore_imc_edad=?, zscore_pc_edad=?,
+         percentil_peso_edad=?, percentil_talla_edad=?, percentil_peso_talla=?, percentil_imc_edad=?, percentil_pc_edad=?
+       WHERE id=?`,
+      [sc.zscore_peso_edad ?? null, sc.zscore_talla_edad ?? null, sc.zscore_peso_talla ?? null, sc.zscore_imc_edad ?? null, sc.zscore_pc_edad ?? null,
+       sc.percentil_peso_edad ?? null, sc.percentil_talla_edad ?? null, sc.percentil_peso_talla ?? null, sc.percentil_imc_edad ?? null, sc.percentil_pc_edad ?? null,
+       m.id]
+    );
+  }
+  return rows.length;
+}
+
+// El sexo del paciente puede venir como M/F o como palabra
+function normalizarSexo(sexo) {
+  const s = String(sexo || "M").trim().toUpperCase();
+  return s.startsWith("F") ? "F" : "M";
 }
 
 // Generar curvas de referencia para un indicador (para la gráfica)
@@ -717,7 +755,7 @@ router.post("/:pacienteId", auth("ADMIN", "MEDICO", "SUPER_ADMIN"), async (req, 
       return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
     }
 
-    const sexo = pacRows[0].sexo || "M";
+    const sexo = normalizarSexo(pacRows[0].sexo);
     const peso = peso_kg ? parseFloat(peso_kg) : null;
     const talla = talla_cm ? parseFloat(talla_cm) : null;
     const pc = perimetro_cefalico_cm ? parseFloat(perimetro_cefalico_cm) : null;
@@ -796,3 +834,4 @@ router.delete("/:pacienteId/:id", auth("ADMIN", "MEDICO", "SUPER_ADMIN"), async 
 });
 
 module.exports = router;
+module.exports.recalcularMedicionesGuardadas = recalcularMedicionesGuardadas;

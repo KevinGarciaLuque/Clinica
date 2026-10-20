@@ -4,6 +4,7 @@
 import { useEffect, useState } from "react";
 import dayjs from "dayjs";
 import api from "../../api/api";
+import { edadDetallada } from "../../utils/edadDetallada";
 
 const SEVERIDAD = {
   MORTAL:   { bg: "#7f1d1d", fg: "#fff" },
@@ -96,7 +97,7 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
           <i className="bi bi-clipboard2-pulse me-1" />Antes de entrar
         </span>
         <span style={{ fontSize: "0.78rem", color: "#475569" }}>
-          {[p.edad != null ? `${p.edad} años` : null, SEXO[p.sexo], p.grupo_sanguineo ? `Sangre ${p.grupo_sanguineo}` : null].filter(Boolean).join(" · ")}
+          {[edadDetallada(p.fecha_nacimiento) || (p.edad != null ? `${p.edad} años` : null), SEXO[p.sexo], p.grupo_sanguineo ? `Sangre ${p.grupo_sanguineo}` : null].filter(Boolean).join(" · ")}
         </span>
         <a href={`/pacientes/${pacienteId}/perfil?tab=evolucion`} target="_blank" rel="noopener noreferrer"
           className="ms-auto" style={{ fontSize: "0.76rem", textDecoration: "none", fontWeight: 600, color: "#4338ca" }}
