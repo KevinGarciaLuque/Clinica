@@ -14,6 +14,16 @@ const SEG_POR_TARJETA = 7;   // velocidad: segundos que tarda cada tarjeta en pa
 const MIN_TARJETAS = 8;      // se repiten los médicos hasta llenar el ancho
 const SEG_POR_BURBUJA = 4;   // las burbujas son más angostas: pasan más rápido
 
+// Colores pastel de las burbujas: fondo suave + texto del mismo tono, más oscuro
+const PASTELES = [
+  { fondo: "#e9e3ff", texto: "#4c3a99" }, // lavanda
+  { fondo: "#dff5ec", texto: "#1f6b52" }, // menta
+  { fondo: "#ffe8dc", texto: "#9a4a25" }, // durazno
+  { fondo: "#dceffd", texto: "#1f5a8a" }, // celeste
+  { fondo: "#fde3ef", texto: "#93345f" }, // rosa
+  { fondo: "#fff4cf", texto: "#80621a" }, // vainilla
+];
+
 // Mensajes de las burbujas (se van turnando)
 const MENSAJES = [
   { icono: "bi-award-fill",        titulo: "Los mejores especialistas", texto: "en un solo lugar" },
@@ -37,14 +47,15 @@ const CSS = `
   .dc-item > .dm-card:hover { transform: translateY(-6px); box-shadow: 0 20px 48px rgba(0,0,0,.14) !important; }
   .dc-burbuja { flex: 0 0 auto; align-self: center; width: 190px; height: 190px; border-radius: 50%;
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-    text-align: center; padding: 22px; color: #fff; position: relative;
-    background-image: linear-gradient(135deg, rgba(255,255,255,.16), rgba(0,0,0,.14));
-    box-shadow: 0 14px 34px rgba(15,23,42,.16); animation: dcFlota 5s ease-in-out infinite; }
+    text-align: center; padding: 22px; position: relative;
+    background-image: radial-gradient(circle at 30% 25%, rgba(255,255,255,.75), rgba(255,255,255,0) 60%);
+    box-shadow: 0 12px 30px rgba(15,23,42,.08), inset 0 0 0 1px rgba(255,255,255,.6);
+    animation: dcFlota 5s ease-in-out infinite; }
   .dc-burbuja::after { content: ""; position: absolute; inset: -9px; border-radius: 50%;
-    border: 2px dashed currentColor; opacity: .18; }
+    border: 2px dashed currentColor; opacity: .22; }
   .dc-burbuja i { font-size: 30px; line-height: 1; margin-bottom: 6px; opacity: .95; }
   .dc-burbuja strong { font-size: 15.5px; font-weight: 800; line-height: 1.2; letter-spacing: -.2px; }
-  .dc-burbuja span { font-size: 12.5px; line-height: 1.3; opacity: .88; }
+  .dc-burbuja span { font-size: 12.5px; line-height: 1.3; opacity: .8; }
   @keyframes dcFlota { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
   @media (max-width: 640px) { .dc-item { width: 252px; } .dc-track { gap: 16px; }
     .dc-burbuja { width: 150px; height: 150px; padding: 16px; }
@@ -93,14 +104,13 @@ export default function DoctoresCarrusel({ id, style, cardColor, bandColor, onSe
           {pista.flatMap((m, i) => {
             const copia = i >= llenas.length;
             const msg = MENSAJES[(i % llenas.length) % MENSAJES.length];
-            // Se alternan dos tonos: el color de las tarjetas y un verde azulado
-            const fondo = i % 2 ? "#0d9488" : cardColor;
+            const color = PASTELES[i % PASTELES.length];
             return [
               <div key={`${m.slug}-${i}`} className="dc-item" aria-hidden={copia || undefined}>
                 <DoctorCard medico={m} index={0} fallbackColor={cardColor} bandColor={bandColor} onSelect={onSelect} />
               </div>,
               <div key={`msg-${i}`} className="dc-burbuja"
-                style={{ backgroundColor: fondo, animationDelay: `${-(i % 3) * 1.6}s` }} aria-hidden={copia || undefined}>
+                style={{ backgroundColor: color.fondo, color: color.texto, animationDelay: `${-(i % 3) * 1.6}s` }} aria-hidden={copia || undefined}>
                 <i className={`bi ${msg.icono}`} />
                 <strong>{msg.titulo}</strong>
                 <span>{msg.texto}</span>
