@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion, MotionConfig } from "framer-motion";
 
@@ -44,6 +44,64 @@ function videoInfo(url) {
 }
 
 // Tarjeta de post: parte de la proporción según el formato y la ajusta a la real de la imagen al cargar.
+/**
+ * Título + descripción de una tarjeta con alto fijo (todas las tarjetas quedan
+ * parejas). Si el texto no cabe aparece «Ver más» y se despliega completo.
+ */
+const LINEAS_TITULO = 3;
+const LINEAS_TEXTO = 4;
+function TextoTarjeta({ titulo, descripcion, color, tamTitulo = 15, tamTexto = 13 }) {
+  const [abierto, setAbierto] = useState(false);
+  const [cortado, setCortado] = useState(false);
+  const refTitulo = useRef(null);
+  const refTexto = useRef(null);
+
+  // ¿Algo del texto quedó escondido? (se vuelve a medir si cambia el ancho)
+  useEffect(() => {
+    const els = [refTitulo.current, refTexto.current].filter(Boolean);
+    if (!els.length || typeof ResizeObserver === "undefined") return undefined;
+    const ro = new ResizeObserver(() => {
+      setCortado(els.some((el) => el.scrollHeight > el.clientHeight + 1));
+    });
+    els.forEach((el) => ro.observe(el));
+    return () => ro.disconnect();
+  }, [titulo, descripcion]);
+
+  const recorte = (lineas, alto) => (abierto ? {} : {
+    display: "-webkit-box", WebkitLineClamp: lineas, WebkitBoxOrient: "vertical", overflow: "hidden",
+    height: `${lineas * alto}em`,
+  });
+
+  return (
+    <>
+      <div ref={refTitulo} style={{ fontWeight: 700, fontSize: tamTitulo, color: "#0f172a", lineHeight: 1.4, ...recorte(LINEAS_TITULO, 1.4) }}>
+        {titulo}
+      </div>
+      {descripcion && (
+        <div ref={refTexto} style={{ fontSize: tamTexto, color: "#64748b", marginTop: 6, lineHeight: 1.55, whiteSpace: "pre-line", ...recorte(LINEAS_TEXTO, 1.55) }}>
+          {descripcion}
+        </div>
+      )}
+      {/* El renglón del botón siempre ocupa su lugar: así todas las tarjetas miden igual */}
+      <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAbierto((a) => !a); }}
+          onKeyDown={(e) => e.stopPropagation()}
+          tabIndex={cortado || abierto ? 0 : -1}
+          aria-hidden={cortado || abierto ? undefined : true}
+          style={{
+            visibility: cortado || abierto ? "visible" : "hidden",
+            marginTop: 8, padding: 0, border: "none", background: "none", cursor: "pointer",
+            fontSize: 13, fontWeight: 700, color, display: "inline-flex", alignItems: "center", gap: 4,
+          }}
+        >
+          {abierto ? "Ver menos" : "Ver más"}
+          <i className={`bi ${abierto ? "bi-chevron-up" : "bi-chevron-down"}`} />
+        </button>
+    </>
+  );
+}
+
 function PostCard({ p, i, color }) {
   const vertical = p.formato === "vertical";
   const [ratio, setRatio] = useState(vertical ? "9 / 16" : "4 / 3");
@@ -65,8 +123,7 @@ function PostCard({ p, i, color }) {
         </div>
       )}
       <div style={{ padding: "18px 20px" }}>
-        <div style={{ fontWeight: 700, fontSize: 16, color: "#0f172a", marginBottom: 6 }}>{p.titulo}</div>
-        {p.descripcion && <div style={{ fontSize: 13.5, color: "#64748b", lineHeight: 1.6 }}>{p.descripcion}</div>}
+        <TextoTarjeta titulo={p.titulo} descripcion={p.descripcion} color={color} tamTitulo={16} tamTexto={13.5} />
         {p.enlace_url && <div style={{ marginTop: 10, fontSize: 13, fontWeight: 700, color }}>Ver caso <i className="bi bi-arrow-up-right" /></div>}
       </div>
     </>
@@ -130,8 +187,7 @@ function VideoCard({ v, i, color, onOpen }) {
         </div>
       </div>
       <div style={{ padding: "16px 18px", background: "#fff" }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: "#0f172a" }}>{v.titulo}</div>
-        {v.descripcion && <div style={{ fontSize: 13, color: "#64748b", marginTop: 4, lineHeight: 1.5 }}>{v.descripcion}</div>}
+        <TextoTarjeta titulo={v.titulo} descripcion={v.descripcion} color={color} />
       </div>
     </Reveal>
   );
