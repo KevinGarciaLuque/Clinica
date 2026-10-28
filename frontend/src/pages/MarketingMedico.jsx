@@ -443,8 +443,8 @@ export default function MarketingMedico() {
       {videosH.length > 0 && (
         <section style={{ background: videosV.length > 0 ? "#f8fafc" : "#fff", padding: "84px 24px" }}>
           <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-            <Encabezado color={color} kicker="Video" titulo="Videos de doctores"
-              texto="Testimonios y piezas audiovisuales que transmiten cercanía y profesionalismo." />
+            <Encabezado color={color} kicker="Video" titulo="Videos horizontales"
+              texto="Formato horizontal, ideal para YouTube, Facebook y la web: testimonios y piezas que transmiten cercanía y profesionalismo." />
             <div className="mm-grid" style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 22, alignItems: "start" }}>
               {videosH.map((v, i) => (
                 <VideoCard key={v.id} v={v} i={i} color={color} onOpen={(embed, ratio) => setVideoActivo({ embed, ratio })} />
