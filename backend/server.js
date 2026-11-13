@@ -953,6 +953,29 @@ const pool = require("./db");
       }
     }
 
+    // Especialidades de los médicos: la lista original tenía 16; se agregan las que
+    // faltaban (las de los tipos de clínica y otras comunes). Solo agrega, nunca borra
+    // ni duplica (el nombre es único).
+    try {
+      const nuevas = [
+        "Nutrición y Dietética", "Odontología", "Gastroenterología", "Nefrología", "Fisioterapia",
+        "Inmunología y Alergias", "Trabajo Social", "Cirugía Estética", "Cirugía Plástica",
+        "Medicina Interna", "Medicina Familiar", "Cirugía General", "Neurocirugía", "Oncología",
+        "Hematología", "Infectología", "Geriatría", "Anestesiología", "Medicina del Deporte",
+        "Neonatología", "Ortodoncia", "Odontopediatría", "Terapia del Lenguaje",
+        "Terapia Ocupacional", "Optometría", "Medicina Veterinaria",
+      ];
+      // Se compara sin mayúsculas ni tildes para no repetir una que ya exista escrita distinto
+      const clave = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+      const [existentes] = await pool.query("SELECT nombre FROM especialidades");
+      const ya = new Set(existentes.map((e) => clave(e.nombre)));
+      const faltan = nuevas.filter((n) => !ya.has(clave(n)));
+      if (faltan.length) await pool.query("INSERT INTO especialidades (nombre) VALUES ?", [faltan.map((n) => [n])]);
+      console.log(`✅ [auto-migrate] especialidades OK (${faltan.length} nueva(s))`);
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] especialidades:", e.message);
+    }
+
     // Curvas de crecimiento: recalcular UNA vez los percentiles de mediciones guardadas
     // de niños mayores de 5 años (antes se comparaban contra la tabla OMS de 0-5 años).
     try {
