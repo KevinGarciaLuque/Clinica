@@ -696,6 +696,8 @@ export default function Consulta() {
               firmada={soloLectura}
               generandoPdf={generandoPdfNutri}
               onPdf={descargarPlanNutricion}
+              registrarCurva={registrarCurva}
+              setRegistrarCurva={setRegistrarCurva}
             />
           )}
 

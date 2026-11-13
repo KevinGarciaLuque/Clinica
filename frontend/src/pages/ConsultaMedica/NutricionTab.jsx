@@ -128,7 +128,32 @@ function edadEnAnios(fnac) {
 }
 
 // ══════════════════════════════════════════════════════════════════════
-export default function NutricionTab({ datos, setDatos, vitals, setVitals, paciente, pacienteId, historiaId, anterior, firmada, onPdf, generandoPdf }) {
+// Mismo interruptor de «Registrar curva de crecimiento» de Signos vitales (comparten el valor)
+function SwitchCurva({ activo, onChange }) {
+  return (
+    <div className="d-flex align-items-center gap-2">
+      <i className="bi bi-graph-up-arrow" style={{ color: activo ? VERDE : "#9ca3af", fontSize: "0.82rem" }} />
+      <span style={{ fontSize: "0.75rem", color: activo ? "#15803d" : "#6b7280", fontWeight: activo ? 600 : 400, whiteSpace: "nowrap" }}>
+        Registrar curva de crecimiento
+      </span>
+      <button type="button" role="switch" aria-checked={activo}
+        title={activo ? "Desactivar registro en curva de crecimiento" : "Activar registro en curva de crecimiento"}
+        onClick={() => onChange(!activo)}
+        style={{
+          width: 44, height: 26, borderRadius: 13, flexShrink: 0, background: activo ? "#22c55e" : "#d1d5db",
+          border: "none", padding: 0, cursor: "pointer", position: "relative", boxShadow: "inset 0 1px 3px rgba(0,0,0,.15)",
+          transition: "background .22s",
+        }}>
+        <span style={{
+          width: 20, height: 20, borderRadius: "50%", background: "#fff", position: "absolute", top: 3,
+          left: activo ? 21 : 3, boxShadow: "0 1px 4px rgba(0,0,0,.28)", transition: "left .22s cubic-bezier(.4,0,.2,1)",
+        }} />
+      </button>
+    </div>
+  );
+}
+
+export default function NutricionTab({ datos, setDatos, vitals, setVitals, paciente, pacienteId, historiaId, anterior, firmada, onPdf, generandoPdf, registrarCurva, setRegistrarCurva }) {
   const [seccion, setSeccion] = useState("evaluacion");
   const [catalogo, setCatalogo] = useState({ grupos: [], tiempos: [], dias: [] });
   const [sexo, setSexo] = useState(paciente?.sexo || null);
@@ -404,11 +429,12 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
         <>
           {esMenor && (
             <div className="alert alert-warning py-2 small">
-              <i className="bi bi-graph-up me-1" />Paciente menor de 18 años: para ver percentiles de la OMS active
-              «Registrar curva de crecimiento» en <b>Signos vitales</b> (pestaña SOAP). Las clasificaciones de adulto no aplican.
+              <i className="bi bi-graph-up me-1" />Paciente menor de 18 años: para ver sus percentiles de la OMS active
+              «Registrar curva de crecimiento» aquí abajo. Las clasificaciones de adulto no aplican.
             </div>
           )}
-          <Tarjeta icono="bi-person-bounding-box" titulo="Peso y talla">
+          <Tarjeta icono="bi-person-bounding-box" titulo="Peso y talla"
+            extra={edad !== null && edad < 19 && !ro && setRegistrarCurva ? <SwitchCurva activo={!!registrarCurva} onChange={setRegistrarCurva} /> : null}>
             <div className="row g-3">
               <div className="col-6 col-md-3">
                 <Campo label="Peso" unidad="kg" value={vitals.peso} disabled={ro} onChange={(v) => setVitals((x) => ({ ...x, peso: v }))}
@@ -425,6 +451,11 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
               <div className="col-6 col-md-3">
                 <Campo label="Peso meta" unidad="kg" value={md.peso_meta} disabled={ro} onChange={(v) => setMd("peso_meta", v)} />
               </div>
+              {edad !== null && edad < 5 && (
+                <div className="col-6 col-md-3">
+                  <Campo label="Perímetro cefálico" unidad="cm" value={vitals.pc} disabled={ro} onChange={(v) => setVitals((x) => ({ ...x, pc: v }))} />
+                </div>
+              )}
             </div>
             {progreso !== null && (
               <div className="mt-3">
