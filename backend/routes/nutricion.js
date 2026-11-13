@@ -391,6 +391,54 @@ function htmlPlan({ clinica, logo, paciente, medico, fecha, req, plan, medidas }
   </div></body></html>`;
 }
 
+/**
+ * Logo de la clínica metido dentro del HTML (data:), para que el generador de PDF no
+ * tenga que descargarlo: si una imagen tarda, el PDF fallaba por tiempo de espera.
+ * Si no se puede leer en pocos segundos, el plan sale sin logo.
+ */
+async function logoEmbebido(url) {
+  if (!url) return null;
+  if (url.startsWith("data:image/")) return url;
+  const tipoPorExtension = (ruta) => ({ png: "image/png", jpg: "image/jpeg", jpeg: "image/jpeg", webp: "image/webp", gif: "image/gif", svg: "image/svg+xml" })[String(ruta).split("?")[0].split(".").pop().toLowerCase()];
+  try {
+    if (!/^https?:\/\//.test(url)) {
+      const path = require("path"), fs = require("fs");
+      const archivo = path.join(__dirname, "..", url.replace(/^\/+/, ""));
+      if (!archivo.startsWith(path.join(__dirname, "..", "uploads")) || !fs.existsSync(archivo)) return null;
+      const tipo = tipoPorExtension(archivo);
+      const datos = fs.readFileSync(archivo);
+      return tipo && datos.length < 3e6 ? `data:${tipo};base64,${datos.toString("base64")}` : null;
+    }
+    const ctrl = new AbortController();
+    const espera = setTimeout(() => ctrl.abort(), 4000);
+    const r = await fetch(url, { signal: ctrl.signal }).finally(() => clearTimeout(espera));
+    const tipo = (r.headers.get("content-type") || "").split(";")[0] || tipoPorExtension(url);
+    if (!r.ok || !String(tipo).startsWith("image/")) return null;
+    const datos = Buffer.from(await r.arrayBuffer());
+    return datos.length < 3e6 ? `data:${tipo};base64,${datos.toString("base64")}` : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * HTML y PDF del plan. Si el PDF falla con el logo, se intenta otra vez sin logo.
+ * Con { soloHtml: true } devuelve la página para imprimir desde el navegador.
+ */
+async function documentoPlan(datos, { soloHtml = false } = {}) {
+  const logo = await logoEmbebido(datos.logo);
+  const html = htmlPlan({ ...datos, logo });
+  if (soloHtml) return { html };
+  const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+  try {
+    return { pdf: await generarPdfDesdeHtml(html, { paper_size: "LETTER", orientacion: "portrait" }) };
+  } catch (e) {
+    if (!logo) throw e;
+    console.warn("[nutricion] pdf con logo falló, se intenta sin logo:", e.message);
+    return { pdf: await generarPdfDesdeHtml(htmlPlan({ ...datos, logo: null }), { paper_size: "LETTER", orientacion: "portrait" }) };
+  }
+}
+
 router.get("/historia/:hid(\\d+)/pdf", auth(...ROLES), async (req, res) => {
   try {
     await asegurarTablas();
@@ -409,28 +457,30 @@ router.get("/historia/:hid(\\d+)/pdf", auth(...ROLES), async (req, res) => {
       const { tituloMedico } = require("../utils/tituloMedico");
       medico = med.nombre_display || `${tituloMedico(med.sexo, { tipo: med.tipo })}${med.nombres} ${med.apellidos}`.trim();
     }
-    let logo = clinica?.logo_url || null;
-    if (logo && !/^https?:\/\//.test(logo)) logo = `${req.protocol}://${req.get("host")}${logo.startsWith("/") ? "" : "/"}${logo}`;
     const [a, m, d] = String(n.fecha).split("-");
-    const html = htmlPlan({
-      clinica: clinica || {}, logo, medico,
+    const datos = {
+      clinica: clinica || {}, logo: clinica?.logo_url || null, medico,
       paciente: `${pac?.nombres || ""} ${pac?.apellidos || ""}`.trim(),
       fecha: `${d}/${m}/${a}`, req: n.requerimiento || {}, plan: n.plan || {}, medidas: n.medidas || {},
-    });
-    const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
-    const pdf = await generarPdfDesdeHtml(html, { paper_size: "LETTER", orientacion: "portrait" });
+    };
+    if (req.query.formato === "html") {
+      const { html } = await documentoPlan(datos, { soloHtml: true });
+      return res.type("html").send(html);
+    }
+    const { pdf } = await documentoPlan(datos);
     const nombre = `plan_alimentacion_${String(pac?.nombres || "paciente").split(" ")[0]}`.normalize("NFD").replace(/[^a-zA-Z0-9_]/g, "");
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="${nombre}.pdf"`);
     res.send(pdf);
   } catch (e) {
     console.error("[nutricion] pdf:", e.message);
-    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF." });
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF.", detalle: String(e.message || "").slice(0, 200), imprimible: true });
   }
 });
 
 module.exports = router;
 module.exports.htmlPlan = htmlPlan;
+module.exports.documentoPlan = documentoPlan;
 module.exports.formatear = formatear;
 module.exports.SELECT = SELECT;
 module.exports.asegurarTablas = asegurarTablas;

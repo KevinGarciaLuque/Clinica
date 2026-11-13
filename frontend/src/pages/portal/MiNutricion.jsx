@@ -5,6 +5,7 @@
 import { useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, ResponsiveContainer, CartesianGrid } from "recharts";
 import { portalApi, fechaHora } from "./portalApi";
+import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
 
 const C = { verde: "#10b981", oscuro: "#0f172a", gris: "#64748b", borde: "#e2e8f0" };
 const fechaCorta = (f) => { const [, m, d] = String(f).split("-"); return `${d}/${m}`; };
@@ -100,16 +101,15 @@ function Plan({ perfil, grupos, tiempos, dias }) {
     setBajando(true);
     try {
       const r = await portalApi.get(`/nutricion/${perfil.paciente_id}/pdf`, { responseType: "blob" });
-      const archivo = new File([r.data], "Mi plan de alimentación.pdf", { type: "application/pdf" });
-      if (navigator.canShare?.({ files: [archivo] }) && window.matchMedia("(pointer: coarse)").matches) {
-        await navigator.share({ files: [archivo], title: "Mi plan de alimentación" }).catch(() => {});
-      } else {
-        const url = URL.createObjectURL(r.data);
-        const a = document.createElement("a");
-        a.href = url; a.download = "Mi plan de alimentación.pdf"; a.click();
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const blob = new Blob([r.data], { type: "application/pdf" });
+      if (!(await compartirEnTelefono(blob, "mi_plan_de_alimentacion.pdf"))) descargarBlob(blob, "mi_plan_de_alimentacion.pdf");
+    } catch (e) {
+      const info = await errorDeBlob(e);
+      if (info.imprimible) {
+        const h = await portalApi.get(`/nutricion/${perfil.paciente_id}/pdf?formato=html`, { responseType: "text" }).catch(() => null);
+        if (h) imprimirHtml(h.data);
       }
-    } catch { /* sin conexión */ } finally { setBajando(false); }
+    } finally { setBajando(false); }
   };
 
   return (

@@ -395,7 +395,7 @@ router.get("/nutricion/:pacienteId(\\d+)/pdf", limiterPortal, sesionPortal, asyn
   try {
     const p = req.portal.pacientes.find((x) => x.id === Number(req.params.pacienteId));
     if (!p) return res.status(403).json({ ok: false, msg: "Perfil no válido." });
-    const { asegurarTablas, formatear, SELECT, htmlPlan } = nutri();
+    const { asegurarTablas, formatear, SELECT, documentoPlan } = nutri();
     await asegurarTablas();
     const [[r]] = await pool.query(
       `${SELECT} WHERE n.paciente_id = ? AND n.clinica_id = ? AND n.plan IS NOT NULL AND n.plan NOT IN ('{}', '')
@@ -404,22 +404,23 @@ router.get("/nutricion/:pacienteId(\\d+)/pdf", limiterPortal, sesionPortal, asyn
     );
     if (!r) return res.status(404).json({ ok: false, msg: "Aún no tienes un plan de alimentación." });
     const n = formatear(r);
-    let logo = p.logo_url || null;
-    if (logo && !/^https?:\/\//.test(logo)) logo = `${req.protocol}://${req.get("host")}${logo.startsWith("/") ? "" : "/"}${logo}`;
     const [a, m, d] = String(n.fecha).split("-");
-    const html = htmlPlan({
-      clinica: { nombre: p.clinica, telefono: p.clinica_telefono }, logo, medico: "",
+    const datos = {
+      clinica: { nombre: p.clinica, telefono: p.clinica_telefono }, logo: p.logo_url || null, medico: "",
       paciente: `${p.nombres} ${p.apellidos}`.trim(), fecha: `${d}/${m}/${a}`,
       req: n.requerimiento || {}, plan: n.plan || {}, medidas: n.medidas || {},
-    });
-    const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
-    const pdf = await generarPdfDesdeHtml(html, { paper_size: "LETTER", orientacion: "portrait" });
+    };
+    if (req.query.formato === "html") {
+      const { html } = await documentoPlan(datos, { soloHtml: true });
+      return res.type("html").send(html);
+    }
+    const { pdf } = await documentoPlan(datos);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", 'inline; filename="mi_plan_de_alimentacion.pdf"');
     res.send(pdf);
   } catch (e) {
     console.error("[portal] pdf nutricion:", e.message);
-    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF." });
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF.", imprimible: true });
   }
 });
 

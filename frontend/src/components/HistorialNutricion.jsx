@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { ACTIVIDADES, FORMULAS, clasificarIMC } from "../utils/nutricion";
+import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../utils/descargarPdf";
 
 /**
  * Historial de consultas de nutrición del paciente: línea de tiempo con las fechas;
@@ -267,13 +268,19 @@ export default function HistorialNutricion({ pacienteId, excluirHistoriaId }) {
     setBajando(v.id); setError("");
     try {
       const r = await api.get(`/nutricion/historia/${v.historia_id}/pdf`, { responseType: "blob" });
-      const url = URL.createObjectURL(new Blob([r.data], { type: "application/pdf" }));
-      const a = document.createElement("a");
-      a.href = url; a.download = `plan_alimentacion_${v.fecha}.pdf`;
-      document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
-    } catch {
-      setError("No se pudo generar el PDF del plan.");
+      const blob = new Blob([r.data], { type: "application/pdf" });
+      const nombre = `plan_alimentacion_${v.fecha}.pdf`;
+      if (!(await compartirEnTelefono(blob, nombre))) descargarBlob(blob, nombre);
+    } catch (e) {
+      const info = await errorDeBlob(e);
+      if (info.imprimible) {
+        try {
+          const h = await api.get(`/nutricion/historia/${v.historia_id}/pdf`, { params: { formato: "html" }, responseType: "text" });
+          imprimirHtml(h.data);
+          return;
+        } catch { /* sigue al mensaje de error */ }
+      }
+      setError(info.msg || "No se pudo generar el PDF del plan.");
     } finally {
       setBajando(null);
     }

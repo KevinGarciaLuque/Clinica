@@ -28,6 +28,7 @@ import DermaTab from "./DermaTab";
 import DocumentosTab from "./DocumentosTab";
 import EcocardiogramaTab, { PrintEco } from "./EcocardiogramaTab";
 import NutricionTab from "./NutricionTab";
+import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Consulta() {
@@ -307,32 +308,29 @@ export default function Consulta() {
   // En el teléfono abre el menú de compartir (WhatsApp, correo…).
   const descargarPlanNutricion = async () => {
     setGenerandoPdfNutri(true);
+    let id = null;
     try {
-      const id = soloLectura ? hid : await handleSave(false);
+      id = soloLectura ? hid : await handleSave(false);
       if (!id) return;
       const r = await api.get(`/nutricion/historia/${id}/pdf`, { responseType: "blob" });
       const quien = [paciente?.nombres, paciente?.apellidos].filter(Boolean).join("_") || "paciente";
       const nombre = `plan_alimentacion_${quien}.pdf`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w.-]+/g, "_");
       const blob = new Blob([r.data], { type: "application/pdf" });
-      const archivo = new File([blob], nombre, { type: "application/pdf" });
-      if (window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [archivo] })) {
-        await navigator.share({ files: [archivo], title: nombre }).catch(() => {});
-        return;
-      }
-      // Descarga directa: no la bloquea el navegador aunque el PDF tarde unos segundos
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = nombre;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      if (await compartirEnTelefono(blob, nombre)) return;
+      descargarBlob(blob, nombre);
       setAlertMsg({ type: "success", msg: "PDF del plan descargado." });
     } catch (e) {
-      let msg = "No se pudo generar el PDF del plan.";
-      try { msg = JSON.parse(await e.response?.data?.text?.())?.msg || msg; } catch { /* respuesta sin texto */ }
-      setAlertMsg({ type: "danger", msg });
+      const info = await errorDeBlob(e);
+      // Plan B: si el servidor no pudo crear el PDF, se abre la versión para imprimir
+      if (info.imprimible && id) {
+        try {
+          const h = await api.get(`/nutricion/historia/${id}/pdf`, { params: { formato: "html" }, responseType: "text" });
+          imprimirHtml(h.data);
+          setAlertMsg({ type: "warning", msg: "No se pudo crear el PDF; se abrió el plan para imprimir. En «Destino» elija «Guardar como PDF»." });
+          return;
+        } catch { /* sigue al mensaje de error */ }
+      }
+      setAlertMsg({ type: "danger", msg: info.msg || "No se pudo generar el PDF del plan." });
     } finally {
       setGenerandoPdfNutri(false);
     }
