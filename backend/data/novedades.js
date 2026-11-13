@@ -204,4 +204,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "nutricion-portal-paciente",
+    version: "1.31",
+    titulo: "El paciente ve su plan de alimentación en su teléfono",
+    descripcion: "Los pacientes con plan de nutrición ahora tienen la pestaña «Mi nutrición» en su portal: ven sus porciones, el menú y las recomendaciones, descargan el PDF y anotan su peso en casa. Ese peso aparece en la gráfica de Evolución de la pestaña Nutrición de la consulta.",
+    icono: "bi-phone",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

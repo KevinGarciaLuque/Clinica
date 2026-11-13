@@ -1,11 +1,12 @@
 /**
  * Portal del paciente — /portal
  * Sin sesión: formulario para pedir el enlace de entrada por correo.
- * Con sesión: citas (confirmar/cancelar), recetas, estudios y datos personales.
+ * Con sesión: citas (confirmar/cancelar), recetas, estudios, nutrición (si tiene plan) y datos personales.
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { portalApi, leerSesion, cerrarSesion, fechaHora } from "./portalApi";
+import MiNutricion from "./MiNutricion";
 
 const C = { verde: "#10b981", oscuro: "#0f172a", gris: "#64748b", borde: "#e2e8f0" };
 
@@ -251,10 +252,16 @@ const TABS = [
 function Panel({ onSalir }) {
   const [yo, setYo] = useState(null);
   const [tab, setTab] = useState("citas");
+  const [nutricion, setNutricion] = useState(null); // solo si tiene consultas de nutrición
 
   useEffect(() => {
     portalApi.get("/yo").then((r) => setYo(r.data.data)).catch(() => onSalir());
   }, [onSalir]);
+  const cargarNutricion = useCallback(() => {
+    portalApi.get("/nutricion").then((r) => setNutricion(r.data.data?.perfiles?.length ? r.data.data : null)).catch(() => {});
+  }, []);
+  useEffect(() => { cargarNutricion(); }, [cargarNutricion]);
+  const tabs = nutricion ? [...TABS.slice(0, 3), { id: "nutricion", label: "Mi nutrición", icon: "bi-apple" }, TABS[3]] : TABS;
 
   if (!yo) return <div className="pp-wrap"><style>{CSS}</style><div className="pp-vacio pt-5"><span className="spinner-border spinner-border-sm me-2" />Cargando…</div></div>;
   const p0 = yo.perfiles[0];
@@ -279,7 +286,7 @@ function Panel({ onSalir }) {
         </div>
 
         <div className="pp-tabs" role="tablist">
-          {TABS.map((t) => (
+          {tabs.map((t) => (
             <button key={t.id} role="tab" aria-selected={tab === t.id} className={`pp-tab ${tab === t.id ? "on" : ""}`} onClick={() => setTab(t.id)}>
               <i className={`bi ${t.icon} me-1`} />{t.label}
             </button>
@@ -289,6 +296,7 @@ function Panel({ onSalir }) {
         {tab === "citas" && <Citas perfiles={yo.perfiles} />}
         {tab === "recetas" && <Recetas />}
         {tab === "estudios" && <Estudios />}
+        {tab === "nutricion" && nutricion && <MiNutricion data={nutricion} onRecargar={cargarNutricion} />}
         {tab === "datos" && <MisDatos yo={yo} />}
       </div>
     </div>

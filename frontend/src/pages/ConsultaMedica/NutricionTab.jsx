@@ -131,6 +131,7 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
   const [catalogo, setCatalogo] = useState({ grupos: [], tiempos: [], dias: [] });
   const [sexo, setSexo] = useState(paciente?.sexo || null);
   const [evolucion, setEvolucion] = useState([]);
+  const [pesoCasa, setPesoCasa] = useState([]); // lo que el paciente anota en el portal
   const [plantillas, setPlantillas] = useState([]);
   const [diaMenu, setDiaMenu] = useState("Lunes");
   const [medidaEvol, setMedidaEvol] = useState("peso");
@@ -147,7 +148,7 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
   useEffect(() => {
     if (!pacienteId) return;
     if (!paciente?.sexo) api.get(`/pacientes/${pacienteId}`).then((r) => setSexo(r.data.data?.sexo || null)).catch(() => {});
-    api.get(`/nutricion/paciente/${pacienteId}/evolucion`).then((r) => setEvolucion(r.data.data || [])).catch(() => {});
+    api.get(`/nutricion/paciente/${pacienteId}/evolucion`).then((r) => { setEvolucion(r.data.data || []); setPesoCasa(r.data.casa || []); }).catch(() => {});
   }, [pacienteId, paciente?.sexo]);
 
   const ev = datos.evaluacion || {};
@@ -728,9 +729,14 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
             </div>
             {(() => {
               const m = MEDIDAS_EVOL.find((x) => x.clave === medidaEvol);
-              const datosG = puntos.filter((p) => p[m.clave] !== null && p[m.clave] !== undefined);
+              let datosG = puntos.filter((p) => p[m.clave] !== null && p[m.clave] !== undefined);
+              // En el peso se suman los registros que el paciente hizo en su casa (portal)
+              if (m.clave === "peso" && pesoCasa.length) {
+                datosG = [...datosG, ...pesoCasa.map((c) => ({ fecha: c.fecha, etiqueta: fechaCorta(c.fecha), peso_casa: c.peso }))]
+                  .sort((a, b) => String(a.fecha).localeCompare(String(b.fecha)));
+              }
               if (!datosG.length) return <div className="text-center text-muted small py-4">Todavía no hay datos de {m.nombre.toLowerCase()}. Se van sumando en cada consulta.</div>;
-              const valores = datosG.map((p) => p[m.clave]).concat(m.clave === "peso" && pesoMeta ? [pesoMeta] : []);
+              const valores = datosG.map((p) => p[m.clave] ?? p.peso_casa).filter((v) => v != null).concat(m.clave === "peso" && pesoMeta ? [pesoMeta] : []);
               const min = Math.min(...valores), max = Math.max(...valores);
               const margen = Math.max((max - min) * 0.15, m.clave === "icc" ? 0.02 : 1);
               return (
@@ -740,9 +746,12 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
                       <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" />
                       <XAxis dataKey="etiqueta" tick={{ fontSize: 11 }} />
                       <YAxis tick={{ fontSize: 11 }} domain={[redondear(min - margen, 2), redondear(max + margen, 2)]} />
-                      <Tooltip formatter={(v) => [`${v} ${m.unidad}`, m.nombre]} />
+                      <Tooltip formatter={(v, n) => [`${v} ${m.unidad}`, n === "peso_casa" ? "Peso en casa (portal)" : m.nombre]} />
                       {m.clave === "peso" && pesoMeta && <ReferenceLine y={pesoMeta} stroke={VERDE} strokeDasharray="6 4" label={{ value: `Meta ${pesoMeta} kg`, fontSize: 11, fill: VERDE, position: "insideTopRight" }} />}
-                      <Line type="monotone" dataKey={m.clave} stroke={m.color} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} />
+                      <Line type="monotone" dataKey={m.clave} stroke={m.color} strokeWidth={3} dot={{ r: 4 }} activeDot={{ r: 6 }} connectNulls />
+                      {m.clave === "peso" && pesoCasa.length > 0 && (
+                        <Line type="monotone" dataKey="peso_casa" stroke="#94a3b8" strokeWidth={0} dot={{ r: 4, fill: "#94a3b8" }} />
+                      )}
                     </LineChart>
                   </ResponsiveContainer>
                 </div>

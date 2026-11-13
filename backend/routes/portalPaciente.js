@@ -323,5 +323,105 @@ router.get("/estudios", limiterPortal, sesionPortal, async (req, res) => {
   }
 });
 
+// ── Nutrición: plan de alimentación y peso en casa ─────────────────────────────
+// Solo aparece para pacientes con una hoja de nutrición en alguna consulta.
+const nutri = () => require("./nutricion");
+
+// GET /api/portal/nutricion → por perfil: último plan, meta y pesos (consultas + casa)
+router.get("/nutricion", limiterPortal, sesionPortal, async (req, res) => {
+  try {
+    const { asegurarTablas, formatear, SELECT } = nutri();
+    await asegurarTablas();
+    const { GRUPOS, TIEMPOS, DIAS } = require("../data/nutricionEquivalentes");
+    const perfiles = [];
+    for (const p of req.portal.pacientes) {
+      const [consultas] = await pool.query(
+        `SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, peso, peso_meta FROM nutricion_consultas
+         WHERE paciente_id = ? AND clinica_id = ? ORDER BY fecha ASC, id ASC`,
+        [p.id, p.clinica_id]
+      );
+      if (!consultas.length) continue;
+      const [[conPlan]] = await pool.query(
+        `${SELECT} WHERE n.paciente_id = ? AND n.clinica_id = ? AND n.plan IS NOT NULL AND n.plan NOT IN ('{}', '')
+         ORDER BY n.fecha DESC, n.id DESC LIMIT 1`,
+        [p.id, p.clinica_id]
+      );
+      const [casa] = await pool.query(
+        "SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, peso FROM nutricion_peso_casa WHERE paciente_id = ? ORDER BY fecha ASC",
+        [p.id]
+      );
+      const plan = formatear(conPlan);
+      const meta = [...consultas].reverse().find((c) => c.peso_meta)?.peso_meta;
+      perfiles.push({
+        paciente_id: p.id, nombre: `${p.nombres} ${p.apellidos}`.trim(), clinica: p.clinica,
+        plan: plan ? { fecha: plan.fecha, historia_id: plan.historia_id, plan: plan.plan, requerimiento: plan.requerimiento } : null,
+        peso_meta: meta ? Number(meta) : null,
+        pesos: [
+          ...consultas.filter((c) => c.peso).map((c) => ({ fecha: c.fecha, peso: Number(c.peso), origen: "consulta" })),
+          ...casa.map((c) => ({ fecha: c.fecha, peso: Number(c.peso), origen: "casa" })),
+        ].sort((a, b) => a.fecha.localeCompare(b.fecha)),
+      });
+    }
+    res.json({ ok: true, data: { perfiles, grupos: GRUPOS, tiempos: TIEMPOS, dias: DIAS } });
+  } catch (e) {
+    console.error("[portal] nutricion:", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo cargar tu plan de alimentación." });
+  }
+});
+
+// POST /api/portal/nutricion/peso { paciente_id, peso } → anota el peso de hoy (uno por día)
+router.post("/nutricion/peso", limiterPortal, sesionPortal, async (req, res) => {
+  try {
+    const p = req.portal.pacientes.find((x) => x.id === Number(req.body?.paciente_id));
+    if (!p) return res.status(403).json({ ok: false, msg: "Perfil no válido." });
+    const peso = Number(String(req.body?.peso ?? "").replace(",", "."));
+    if (!Number.isFinite(peso) || peso < 1 || peso > 400) return res.status(400).json({ ok: false, msg: "Escribe un peso válido en kilos." });
+    await nutri().asegurarTablas();
+    const hoy = dayjs().tz(p.tz).format("YYYY-MM-DD");
+    await pool.query(
+      `INSERT INTO nutricion_peso_casa (clinica_id, paciente_id, fecha, peso) VALUES (?,?,?,?)
+       ON DUPLICATE KEY UPDATE peso = VALUES(peso), creado_en = CURRENT_TIMESTAMP`,
+      [p.clinica_id, p.id, hoy, Math.round(peso * 10) / 10]
+    );
+    res.json({ ok: true, fecha: hoy });
+  } catch (e) {
+    console.error("[portal] peso:", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo guardar tu peso." });
+  }
+});
+
+// GET /api/portal/nutricion/:pacienteId/pdf → PDF del último plan
+router.get("/nutricion/:pacienteId(\\d+)/pdf", limiterPortal, sesionPortal, async (req, res) => {
+  try {
+    const p = req.portal.pacientes.find((x) => x.id === Number(req.params.pacienteId));
+    if (!p) return res.status(403).json({ ok: false, msg: "Perfil no válido." });
+    const { asegurarTablas, formatear, SELECT, htmlPlan } = nutri();
+    await asegurarTablas();
+    const [[r]] = await pool.query(
+      `${SELECT} WHERE n.paciente_id = ? AND n.clinica_id = ? AND n.plan IS NOT NULL AND n.plan NOT IN ('{}', '')
+       ORDER BY n.fecha DESC, n.id DESC LIMIT 1`,
+      [p.id, p.clinica_id]
+    );
+    if (!r) return res.status(404).json({ ok: false, msg: "Aún no tienes un plan de alimentación." });
+    const n = formatear(r);
+    let logo = p.logo_url || null;
+    if (logo && !/^https?:\/\//.test(logo)) logo = `${req.protocol}://${req.get("host")}${logo.startsWith("/") ? "" : "/"}${logo}`;
+    const [a, m, d] = String(n.fecha).split("-");
+    const html = htmlPlan({
+      clinica: { nombre: p.clinica, telefono: p.clinica_telefono }, logo, medico: "",
+      paciente: `${p.nombres} ${p.apellidos}`.trim(), fecha: `${d}/${m}/${a}`,
+      req: n.requerimiento || {}, plan: n.plan || {}, medidas: n.medidas || {},
+    });
+    const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+    const pdf = await generarPdfDesdeHtml(html, { paper_size: "LETTER", orientacion: "portrait" });
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", 'inline; filename="mi_plan_de_alimentacion.pdf"');
+    res.send(pdf);
+  } catch (e) {
+    console.error("[portal] pdf nutricion:", e.message);
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF." });
+  }
+});
+
 module.exports = router;
 module.exports.asegurarTabla = asegurarTabla;

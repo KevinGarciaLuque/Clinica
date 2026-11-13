@@ -74,6 +74,18 @@ async function asegurarTablas() {
       creado_en     DATETIME DEFAULT CURRENT_TIMESTAMP,
       INDEX idx_nplant_clinica (clinica_id)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  // Peso que el paciente anota en su casa desde el portal (uno por día)
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS nutricion_peso_casa (
+      id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id  INT UNSIGNED NOT NULL,
+      paciente_id INT UNSIGNED NOT NULL,
+      fecha       DATE NOT NULL,
+      peso        DECIMAL(6,2) NOT NULL,
+      creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE KEY uq_peso_casa (paciente_id, fecha),
+      INDEX idx_peso_casa_clinica (clinica_id, paciente_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
   tablasListas = true;
 }
 
@@ -220,7 +232,12 @@ router.get("/paciente/:pid(\\d+)/evolucion", auth(...ROLES), async (req, res) =>
       for (const m of MEDIDAS) o[m] = r[m] === null ? null : Number(r[m]);
       return o;
     });
-    res.json({ ok: true, data });
+    const [casa] = await pool.query(
+      `SELECT DATE_FORMAT(fecha, '%Y-%m-%d') AS fecha, peso FROM nutricion_peso_casa
+       WHERE paciente_id = ? AND clinica_id = ? ORDER BY fecha ASC LIMIT 500`,
+      [req.params.pid, clinicaDe(req)]
+    );
+    res.json({ ok: true, data, casa: casa.map((c) => ({ fecha: c.fecha, peso: Number(c.peso) })) });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -387,4 +404,6 @@ router.get("/historia/:hid(\\d+)/pdf", auth(...ROLES), async (req, res) => {
 
 module.exports = router;
 module.exports.htmlPlan = htmlPlan;
+module.exports.formatear = formatear;
+module.exports.SELECT = SELECT;
 module.exports.asegurarTablas = asegurarTablas;

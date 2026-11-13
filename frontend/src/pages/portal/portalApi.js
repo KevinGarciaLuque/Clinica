@@ -18,7 +18,8 @@ export function cerrarSesion() {
 export const portalApi = {
   pedirAcceso: (email) => axios.post(`${BASE}/acceso`, { email }),
   entrar: (token) => axios.post(`${BASE}/entrar`, { token }),
-  get: (ruta) => axios.get(`${BASE}${ruta}`, { headers: { Authorization: `Bearer ${leerSesion()}` } }),
+  get: (ruta, opciones = {}) => axios.get(`${BASE}${ruta}`, { ...opciones, headers: { Authorization: `Bearer ${leerSesion()}` } }),
+  post: (ruta, datos) => axios.post(`${BASE}${ruta}`, datos, { headers: { Authorization: `Bearer ${leerSesion()}` } }),
 };
 
 // "2026-10-20 15:30:00" es hora local de la clínica: se muestra tal cual
