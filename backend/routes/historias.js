@@ -63,6 +63,10 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
       cols.has("datos_cardio_eco")
         ? "(h.datos_cardio_eco IS NOT NULL) AS tiene_eco"
         : "0 AS tiene_eco",
+      cols.has("diagnostico_desc") ? "h.diagnostico_desc" : "NULL AS diagnostico_desc",
+      // Cuántas recetas y estudios tiene cada consulta (etiquetas del historial)
+      "(SELECT COUNT(*) FROM prescripciones pr WHERE pr.historia_id = h.id) AS n_recetas",
+      "(SELECT COUNT(*) FROM estudios_solicitudes es WHERE es.historia_id = h.id) AS n_estudios",
     ].filter(Boolean).join(", ");
 
     let sql = `
@@ -90,6 +94,19 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     res.status(500).json({ ok: false, msg: e.message });
   }
 });
+
+// Ítems de receta que vienen de GROUP_CONCAT(JSON_OBJECT(...)): "{...},{...}".
+// (Antes se partía el texto a mano y con un solo medicamento quedaba vacío.)
+function leerItems(texto) {
+  if (!texto) return [];
+  try { return JSON.parse(`[${texto}]`).filter((it) => it && it.id); }
+  catch {
+    return texto.split("},{").map((s, i, arr) => {
+      const t = (arr.length === 1 ? s : i === 0 ? s + "}" : i === arr.length - 1 ? "{" + s : "{" + s + "}");
+      try { return JSON.parse(t); } catch { return null; }
+    }).filter((it) => it && it.id);
+  }
+}
 
 /**
  * GET /api/historias/:id
@@ -153,12 +170,7 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
     // parse items_json
     const presc = prescripciones.map(p => ({
       ...p,
-      items: p.items_json
-        ? p.items_json.split("},{").map((s, i, arr) => {
-            try { return JSON.parse(i === 0 ? s + "}" : i === arr.length - 1 ? "{" + s : "{" + s + "}"); }
-            catch { return {}; }
-          })
-        : [],
+      items: leerItems(p.items_json),
     }));
 
     res.json({ ok: true, data: { ...hist, prescripciones: presc, estudios } });

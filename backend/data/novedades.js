@@ -222,4 +222,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "historial-consultas-nuevo-diseno",
+    version: "1.33",
+    titulo: "Nuevo diseño del Historial de Consultas",
+    descripcion: "En el perfil del paciente → Historial Clínico, cada consulta aparece con su fecha, etiquetas de lo que se hizo (signos vitales, diagnóstico, receta, estudios…) y un resumen. Al abrirla se ven tarjetas con todo: signos, subjetivo, examen, diagnóstico, plan, recetas, estudios y documentos. Use «Expandir todo» para verlas todas.",
+    icono: "bi-clock-history",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

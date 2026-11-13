@@ -6,7 +6,7 @@
  * 4. Curvas de Crecimiento OMS
  * 5. Eliminar Paciente
  */
-import { useEffect, useState, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import { createPortal } from "react-dom";
 import { useParams, Link, useNavigate, useSearchParams } from "react-router-dom";
 import dayjs from "dayjs";
@@ -16,7 +16,6 @@ import { useAuth } from "../auth/AuthContext";
 import AnimatedFeedbackModal from "../components/AnimatedFeedbackModal";
 
 const API_BASE_PP = (import.meta.env.VITE_API_URL || "http://localhost:5000");
-const ESTADO_BADGE_PP = { BORRADOR: "warning text-dark", FIRMADA: "success" };
 import CurvaCrecimiento from "../components/CurvaCrecimiento";
 import AntecedentesClinico from "../components/AntecedentesClinico";
 import VacunasCarnet from "../components/VacunasCarnet";
@@ -31,6 +30,7 @@ import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/con
 import { fechaLocal } from "../utils/fechaNacimiento";
 import { edadDetallada } from "../utils/edadDetallada";
 import HistorialNutricion from "../components/HistorialNutricion";
+import HistorialConsultas from "../components/HistorialConsultas";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -158,9 +158,6 @@ export default function PerfilPaciente() {
   const [subTabDocumentos, setSubTabDocumentos] = useState("todos");
 
   // Historial de consultas - filtros y expansión
-  const [filtroDesde,  setFiltroDesde]  = useState("");
-  const [filtroHasta,  setFiltroHasta]  = useState("");
-  const [expandId,     setExpandId]     = useState(null);
   const [detalle,      setDetalle]      = useState({});
   const [alergiasPac,  setAlergiasPac]  = useState([]);
   const [showConsultaModal, setShowConsultaModal] = useState(false);
@@ -345,16 +342,13 @@ export default function PerfilPaciente() {
   };
 
   // ── Expandir consulta → cargar detalle ──────────────────────────────────
-  const toggleExpandPP = async (hId) => {
-    if (expandId === hId) { setExpandId(null); return; }
-    setExpandId(hId);
-    if (!detalle[hId]) {
-      try {
-        const r = await api.get(`/historias/${hId}`);
-        setDetalle(d => ({ ...d, [hId]: r.data.data }));
-      } catch { /* silencio */ }
-    }
-  };
+  // Carga recetas y estudios de una consulta (historial de consultas)
+  const cargarDetallePP = useCallback(async (hId) => {
+    try {
+      const r = await api.get(`/historias/${hId}`);
+      setDetalle(d => ({ ...d, [hId]: r.data.data }));
+    } catch { /* silencio */ }
+  }, []);
 
   // ── Imprimir consulta ─────────────────────────────────────────────────────
   const imprimirConsultaPP = async (h) => {
@@ -1705,266 +1699,31 @@ export default function PerfilPaciente() {
 
           {/* Sub-tab: Historial de Consultas */}
           {subTabHistorial === "consultas" && (
-            <div className="card shadow-sm">
-              <div className="card-header bg-white">
-                <h5 className="mb-0">
-                  <i className="bi bi-journal-medical me-2 text-success" />
-                  Consultas
-                  <span className="badge bg-secondary ms-2" style={{ fontSize: "0.75rem" }}>{historias.length}</span>
-                </h5>
-              </div>
-              <div className="card-body">
-                {/* Filtro por fecha */}
-                <div className="d-flex align-items-center gap-2 mb-3 flex-wrap">
-                  <small className="text-muted fw-semibold">Filtrar por fecha:</small>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    style={{ width: 150 }}
-                    value={filtroDesde}
-                    onChange={e => setFiltroDesde(e.target.value)}
-                  />
-                  <span className="text-muted small">—</span>
-                  <input
-                    type="date"
-                    className="form-control form-control-sm"
-                    style={{ width: 150 }}
-                    value={filtroHasta}
-                    onChange={e => setFiltroHasta(e.target.value)}
-                  />
-                  {(filtroDesde || filtroHasta) && (
-                    <button
-                      className="btn btn-outline-secondary btn-sm"
-                      onClick={() => { setFiltroDesde(""); setFiltroHasta(""); }}
-                    >
-                      <i className="bi bi-x-lg me-1" />Limpiar
-                    </button>
-                  )}
-                  {historias.length > 0 && (
-                    <small className="text-muted ms-auto">
-                      {(() => {
-                        const n = historias.filter(h => {
-                          const f = dayjs(h.creado_en);
-                          if (filtroDesde && f.isBefore(dayjs(filtroDesde), "day")) return false;
-                          if (filtroHasta && f.isAfter(dayjs(filtroHasta), "day")) return false;
-                          return true;
-                        }).length;
-                        return `${n} de ${historias.length} consultas`;
-                      })()}
-                    </small>
-                  )}
+            <HistorialConsultas
+              historias={historias}
+              docsPorHistoria={docsPorHistoria}
+              detalle={detalle}
+              onCargarDetalle={cargarDetallePP}
+              nombreMedico={nombreMedico}
+              especialidadDe={(h) => (!h.med_nombre_display && tituloMedicoActivo() ? h.especialidad : null)}
+              onAbrir={(h) => navigate(`/consulta-medica?historia_id=${h.id}`)}
+              onEditar={(h) => navigate(`/consulta-medica?historia_id=${h.id}&editar=1`)}
+              onImprimir={imprimirConsultaPP}
+              onImprimirEco={(h) => navigate(`/consulta-medica?historia_id=${h.id}&print_eco=1`)}
+              onPdfReceta={printRxPP}
+              tiposDoc={TIPOS_DOC}
+              enlaceDocumento={(doc) => `${API_BASE}/api/pacientes/${id}/documentos/${doc.id}/view?auth_token=${localStorage.getItem("token") || ""}`}
+              vacio={
+                <div className="text-center py-5" style={{ background: "#fff", borderRadius: 12, border: "1px solid #e5e7eb" }}>
+                  <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
+                  <p className="text-muted mt-3">No hay consultas registradas</p>
+                  <button className="btn btn-success" onClick={() => handleConsultaClick(paciente)} disabled={checkingCita}>
+                    <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"} me-1`} />
+                    {checkingCita ? "Verificando..." : "Nueva Consulta"}
+                  </button>
                 </div>
-
-                {historias.length === 0 ? (
-                  <div className="text-center py-5">
-                    <i className="bi bi-inbox" style={{ fontSize: "3rem", color: "#ccc" }} />
-                    <p className="text-muted mt-3">No hay consultas registradas</p>
-                    <button
-                      className="btn btn-success"
-                      onClick={() => handleConsultaClick(paciente)}
-                      disabled={checkingCita}
-                    >
-                      <i className={`bi ${checkingCita ? "bi-hourglass-split" : "bi-plus-circle"} me-1`} />
-                      {checkingCita ? "Verificando..." : "Nueva Consulta"}
-                    </button>
-                  </div>
-                ) : (() => {
-                  const filtradas = historias.filter(h => {
-                    const f = dayjs(h.creado_en);
-                    if (filtroDesde && f.isBefore(dayjs(filtroDesde), "day")) return false;
-                    if (filtroHasta && f.isAfter(dayjs(filtroHasta), "day")) return false;
-                    return true;
-                  });
-                  return (
-                    <>
-                      {historias.length > 0 && filtradas.length === 0 && (
-                        <div className="alert alert-warning py-2">
-                          <i className="bi bi-search me-2" />
-                          No hay consultas en el rango de fechas seleccionado.
-                        </div>
-                      )}
-                      <div className="timeline" style={{ maxHeight: 520, overflowY: "auto", paddingRight: 4 }}>
-                        {filtradas.map((h, i) => {
-                          const det = detalle[h.id];
-                          const expanded = expandId === h.id;
-                          const vitals = h.objetivo
-                            ? (typeof h.objetivo === "string" ? JSON.parse(h.objetivo) : h.objetivo)
-                            : {};
-                          return (
-                            <div key={h.id} className="d-flex gap-3 mb-3">
-                              {/* Línea de tiempo */}
-                              <div className="d-flex flex-column align-items-center" style={{ minWidth: 24 }}>
-                                <div className={`rounded-circle border border-2 ${h.estado === "FIRMADA" ? "border-success bg-success" : "border-warning bg-warning"}`}
-                                  style={{ width: 12, height: 12, marginTop: 6, flexShrink: 0 }} />
-                                {i < filtradas.length - 1 && (
-                                  <div style={{ width: 2, flex: 1, background: "#dee2e6", minHeight: 40 }} />
-                                )}
-                              </div>
-                              {/* Tarjeta */}
-                              <div className="card border-0 shadow-sm flex-grow-1 mb-2">
-                                <div className="card-body py-2">
-                                  <div className="d-flex justify-content-between align-items-start flex-wrap gap-1">
-                                    <div>
-                                      <span className={`badge bg-${ESTADO_BADGE_PP[h.estado]?.split(" ")[0]} ${ESTADO_BADGE_PP[h.estado]?.split(" ")[1] || ""} me-1`}>
-                                        {h.estado}
-                                      </span>
-                                      {h.firma_digital_url && (
-                                        <span style={{ background: "#1a2744", color: "#fff", borderRadius: 4, padding: "2px 7px", fontSize: "0.68rem", fontWeight: 700, letterSpacing: ".04em", marginRight: 6 }}>
-                                          ✍ FIRMA DIGITAL
-                                        </span>
-                                      )}
-                                      <strong className="small">{nombreMedico(h)}</strong>
-                                      {!h.med_nombre_display && tituloMedicoActivo() && h.especialidad && <span className="text-muted small ms-1">({h.especialidad})</span>}
-                                    </div>
-                                    <small className="text-muted">{dayjs(h.creado_en).format("DD/MM/YYYY HH:mm")}</small>
-                                  </div>
-                                  {h.diagnostico_cie && (
-                                    <div className="small mt-1">
-                                      <span className="badge bg-light text-dark border me-1">CIE: {h.diagnostico_cie}</span>
-                                      {h.plan && <span className="text-muted">{h.plan.substring(0, 80)}{h.plan.length > 80 ? "…" : ""}</span>}
-                                    </div>
-                                  )}
-                                  {h.subjetivo && !h.diagnostico_cie && (
-                                    <div className="small text-muted mt-1">
-                                      {h.subjetivo.substring(0, 100)}{h.subjetivo.length > 100 ? "…" : ""}
-                                    </div>
-                                  )}
-                                  {(vitals.pa || vitals.fc || vitals.temp) && (
-                                    <div className="d-flex flex-wrap gap-2 mt-1">
-                                      {vitals.pa   && <small className="text-muted">P.A. {vitals.pa} mmHg</small>}
-                                      {vitals.fc   && <small className="text-muted">· FC {vitals.fc} bpm</small>}
-                                      {vitals.temp && <small className="text-muted">· T {vitals.temp}°C</small>}
-                                      {vitals.peso && <small className="text-muted">· Peso {vitals.peso} kg</small>}
-                                    </div>
-                                  )}
-                                  {/* Acciones */}
-                                  <div className="d-flex gap-2 mt-2 flex-wrap align-items-center">
-                                    <button className="btn btn-outline-secondary btn-sm"
-                                      onClick={() => toggleExpandPP(h.id)}>
-                                      {expanded ? "Ocultar detalle" : "Ver detalle"}
-                                    </button>
-                                    {h.estado === "BORRADOR" && (
-                                      <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-outline-primary btn-sm">
-                                        ✏ Editar
-                                      </Link>
-                                    )}
-                                    {h.estado === "FIRMADA" && (
-                                      <Link to={`/consulta-medica?historia_id=${h.id}`} className="btn btn-link btn-sm p-0">
-                                        Ver completa
-                                      </Link>
-                                    )}
-                                    {(() => {
-                                      const docs = docsPorHistoria[h.id];
-                                      if (!docs?.length) return null;
-                                      const chipStyle = {
-                                        display: "inline-flex", alignItems: "center", gap: 5,
-                                        background: "#eff6ff", color: "#1d4ed8",
-                                        border: "1px solid #bfdbfe", borderRadius: 6,
-                                        padding: "3px 10px", fontSize: "0.78rem", fontWeight: 600,
-                                        textDecoration: "none", cursor: "pointer",
-                                      };
-                                      if (docs.length === 1) {
-                                        const doc = docs[0];
-                                        const tipoLabel = TIPOS_DOC.find(t => t.value === doc.tipo)?.label || "Documento";
-                                        const tipoIcon = TIPOS_DOC.find(t => t.value === doc.tipo)?.icon || "bi-file-earmark";
-                                        const nombre = doc.nombre?.length > 28 ? doc.nombre.substring(0, 26) + "…" : doc.nombre;
-                                        const token = localStorage.getItem("token") || "";
-                                        const viewUrl = `${API_BASE}/api/pacientes/${id}/documentos/${doc.id}/view?auth_token=${token}`;
-                                        return (
-                                          <a href={viewUrl} target="_blank" rel="noreferrer" title={doc.nombre} style={chipStyle}>
-                                            <i className={`bi ${tipoIcon}`} />
-                                            <span style={{ color: "#6b7280", fontWeight: 400 }}>{tipoLabel}:</span>
-                                            {nombre}
-                                          </a>
-                                        );
-                                      }
-                                      return (
-                                        <Link to={`/consulta-medica?historia_id=${h.id}`} title="Ver documentos" style={chipStyle}>
-                                          <i className="bi bi-paperclip" />
-                                          {docs.length} documentos
-                                        </Link>
-                                      );
-                                    })()}
-                                    <button
-                                      className="btn btn-outline-primary btn-sm ms-auto"
-                                      title="Editar consulta"
-                                      onClick={() => navigate(`/consulta-medica?historia_id=${h.id}&editar=1`)}
-                                    >
-                                      <i className="bi bi-pencil-square me-1" />Editar
-                                    </button>
-                                    <button
-                                      className="btn btn-outline-secondary btn-sm"
-                                      title="Imprimir consulta"
-                                      onClick={() => imprimirConsultaPP(h)}
-                                    >
-                                      <i className="bi bi-printer me-1" />Imprimir
-                                    </button>
-                                    {Number(h.tiene_eco) === 1 && (
-                                      <button
-                                        className="btn btn-outline-danger btn-sm"
-                                        title="Imprimir hoja de ecocardiograma"
-                                        onClick={() => navigate(`/consulta-medica?historia_id=${h.id}&print_eco=1`)}
-                                      >
-                                        <i className="bi bi-heart-pulse me-1" />Imprimir eco
-                                      </button>
-                                    )}
-                                  </div>
-                                  {/* Detalle expandido */}
-                                  {expanded && det && (
-                                    <div className="border-top mt-2 pt-2">
-                                      {det.prescripciones?.length > 0 && (
-                                        <div className="mb-2">
-                                          <div className="small fw-semibold mb-1">💊 Prescripción(es):</div>
-                                          {det.prescripciones.map(p => (
-                                            <div key={p.id} className="small text-muted ps-2 mb-1">
-                                              <div className="d-flex align-items-center gap-2 mb-1">
-                                                <span>Receta #{p.id}</span>
-                                                <span className="badge bg-secondary">{p.estado}</span>
-                                                <button className="btn btn-outline-primary btn-sm py-0 px-1"
-                                                  style={{ fontSize: "0.72rem" }}
-                                                  onClick={() => printRxPP(p.id)}>
-                                                  <i className="bi bi-printer me-1" />PDF
-                                                </button>
-                                              </div>
-                                              {p.items?.filter(Boolean).map((it, idx) => (
-                                                <div key={idx} className="ps-2">• {it.medicamento_nombre || it.medicamento_texto}{it.dosis ? ` — ${it.dosis}` : ""}</div>
-                                              ))}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {det.estudios?.length > 0 && (
-                                        <div className="mb-2">
-                                          <div className="small fw-semibold mb-1">🧪 Estudios solicitados:</div>
-                                          {det.estudios.map(s => (
-                                            <div key={s.id} className="small text-muted ps-2">
-                                              [{s.tipo}] {s.descripcion} — {s.estado}
-                                            </div>
-                                          ))}
-                                        </div>
-                                      )}
-                                      {det.plan && (
-                                        <div>
-                                          <div className="small fw-semibold mb-1">Plan:</div>
-                                          <div className="small text-muted" style={{ whiteSpace: "pre-wrap" }}>{det.plan}</div>
-                                        </div>
-                                      )}
-                                    </div>
-                                  )}
-                                  {expanded && !det && (
-                                    <div className="mt-2 text-muted small">Cargando detalle…</div>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </>
-                  );
-                })()}
-              </div>
-            </div>
+              }
+            />
           )}
         </div>
       )}
