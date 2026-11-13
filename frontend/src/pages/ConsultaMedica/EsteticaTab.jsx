@@ -7,6 +7,7 @@ import { paquetesDe } from "../../utils/esteticaPaquetes";
 import { imprimirHtml } from "../../utils/descargarPdf";
 import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
 import ModalAgendarControles from "../../components/estetica/ModalAgendarControles";
+import ModalEnviarPaciente from "../../components/estetica/ModalEnviarPaciente";
 import {
   PLANTILLAS_CONSENTIMIENTO, FASES_CONTROL, EDEMA_OPC, CICATRIZ_OPC, RESULTADO_OPC,
   PROCEDIMIENTOS_COMUNES, UNIDADES, ANESTESIA_OPC, CONTRAINDICACIONES, ZONAS_CUERPO, nombreZona, MESES_MANTENIMIENTO,
@@ -56,6 +57,7 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
   const [modal, setModal] = useState(null); // "presupuesto" | "consentimiento" | "controles"
   const [firmar, setFirmar] = useState(null); // consentimiento que se va a firmar con el dedo
   const [recarga, setRecarga] = useState(0);
+  const [enviar, setEnviar] = useState(null); // { tipo: "firma", consentimiento } | { tipo: "indicaciones" }
   const [inventario, setInventario] = useState([]); // productos con lotes, para descontar al guardar
 
   useEffect(() => {
@@ -494,7 +496,20 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
               <div><Lbl>Complicaciones inmediatas</Lbl>
                 <textarea rows={2} style={inp} disabled={firmada} value={proc.complicaciones || ""} onChange={(e) => set("procedimiento", "complicaciones", e.target.value)} placeholder="Ninguna" /></div>
               <div><Lbl>Indicaciones para la casa</Lbl>
-                <textarea rows={2} style={inp} disabled={firmada} value={proc.indicaciones || ""} onChange={(e) => set("procedimiento", "indicaciones", e.target.value)} placeholder="Ej.: no acostarse 4 h, no masajear, no ejercicio 24 h" /></div>
+                <textarea rows={3} style={inp} disabled={firmada} value={proc.indicaciones || ""} onChange={(e) => set("procedimiento", "indicaciones", e.target.value)}
+                  placeholder={"Una por renglón. Ej.:\nNo acostarse en 4 horas\nNo masajear la zona\nNo hacer ejercicio en 24 horas"} />
+                {(proc.indicaciones || "").trim() && (
+                  <div className="d-flex align-items-center gap-2 flex-wrap mt-1">
+                    <button type="button" className="btn btn-sm" style={{ background: "#16a34a", color: "#fff", fontWeight: 700 }}
+                      onClick={() => setEnviar({ tipo: "indicaciones" })}>
+                      <i className="bi bi-send me-1" />Enviar indicaciones al paciente
+                    </button>
+                    {proc.indicaciones_enviadas_en && (
+                      <span style={{ fontSize: "0.76rem", color: "#15803d" }}><i className="bi bi-check2-all me-1" />Enviadas el {fechaCorta(proc.indicaciones_enviadas_en)}</span>
+                    )}
+                  </div>
+                )}
+              </div>
             </div>
           </Seccion>
         </>
@@ -543,7 +558,25 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
       )}
       {modal === "consentimiento" && (
         <ModalConsentimiento paciente={paciente} pacienteId={pacienteId} procedimiento={tipo === "procedimiento" ? proc.nombre : (val.sugeridos || [])[0]} onClose={() => setModal(null)}
-          onFirmar={(c) => { setModal(null); setFirmar(c); }} />
+          onFirmar={(c) => { setModal(null); setFirmar(c); }}
+          onEnviar={(c) => { setModal(null); setEnviar({ tipo: "firma", consentimiento: c }); }} />
+      )}
+      {enviar?.tipo === "firma" && (
+        <ModalEnviarPaciente titulo="Enviar para firmar en casa" onClose={() => setEnviar(null)}
+          descripcion={`El paciente recibe un enlace para leer el consentimiento de ${enviar.consentimiento.procedimiento} y firmarlo con el dedo desde su teléfono. Cuando firme, le llega un aviso a la clínica.`}
+          crear={async (enviarCorreo) => (await api.post(`/estetica-datos/${enviar.consentimiento.id}/enlace`, { enviar_correo: enviarCorreo })).data.data} />
+      )}
+      {enviar?.tipo === "indicaciones" && (
+        <ModalEnviarPaciente titulo="Enviar indicaciones" onClose={() => setEnviar(null)}
+          descripcion="Se guarda la consulta y el paciente recibe un enlace con sus indicaciones para la casa, las fechas de sus controles y su próximo mantenimiento."
+          crear={async (enviarCorreo) => {
+            // Se guarda primero para enviar lo último que se escribió (una consulta firmada ya está guardada)
+            const hid = firmada ? historiaId : await onGuardar?.();
+            if (!hid) throw new Error("No se pudo guardar la consulta.");
+            const d = (await api.post(`/estetica-datos/historia/${hid}/enlace`, { enviar_correo: enviarCorreo })).data.data;
+            if (!firmada) set("procedimiento", "indicaciones_enviadas_en", new Date().toISOString());
+            return d;
+          }} />
       )}
       {firmar && (
         <ModalFirmarConsentimiento consentimiento={firmar} onClose={() => setFirmar(null)}
@@ -652,7 +685,7 @@ function ModalPresupuesto({ paciente, pacienteId, sugeridos, onClose }) {
   );
 }
 
-function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose, onFirmar }) {
+function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose, onFirmar, onEnviar }) {
   const sugerida = PLANTILLAS_CONSENTIMIENTO.find((p) => procedimiento && String(procedimiento).toLowerCase().includes(p.procedimiento.toLowerCase().slice(0, 6)));
   const [plantillaId, setPlantillaId] = useState(sugerida ? String(sugerida.id) : "");
   const [otro, setOtro] = useState(sugerida ? "" : (procedimiento || ""));
@@ -681,9 +714,12 @@ function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose, onF
         <div className="text-center py-3">
           <i className="bi bi-check-circle-fill" style={{ fontSize: "2.2rem", color: "#16a34a" }} />
           <div className="fw-bold mt-2">Consentimiento creado</div>
-          <div className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>Pase el teléfono o la tablet al paciente para que lo lea y firme con el dedo.</div>
+          <div className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>Que el paciente lo firme aquí con el dedo, o envíeselo para que lo firme desde su teléfono.</div>
           <div className="d-flex gap-2 justify-content-center flex-wrap">
             <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Firmar después</button>
+            <button type="button" className="btn btn-sm" style={{ border: `1px solid ${ROSA}`, color: ROSA, fontWeight: 700 }} onClick={() => onEnviar?.(listo)}>
+              <i className="bi bi-send me-1" />Enviar para firmar en casa
+            </button>
             <button type="button" className="btn btn-sm" style={{ background: ROSA, color: "#fff", fontWeight: 700 }} onClick={() => onFirmar?.(listo)}>
               <i className="bi bi-pen me-1" />Firmar ahora
             </button>

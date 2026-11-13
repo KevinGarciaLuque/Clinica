@@ -176,6 +176,90 @@ router.get("/:id(\\d+)/pdf", auth(...ROLES), async (req, res) => {
   }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Enlaces para el paciente (firma del consentimiento / indicaciones)
+// ═════════════════════════════════════════════════════════════════════════════
+const escE = (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+function correoEnlace({ nombre, clinica, titulo, texto, boton, url, dias }) {
+  return `
+  <div style="font-family:'Segoe UI',Arial,sans-serif;background:#fdf2f8;padding:24px">
+    <div style="background:#fff;border-radius:14px;max-width:520px;margin:auto;padding:30px">
+      <h2 style="color:#be185d;margin:0 0 10px">${escE(titulo)}</h2>
+      <p style="color:#374151">Hola ${escE(nombre)} 👋</p>
+      <p style="color:#374151">${texto}</p>
+      <p style="text-align:center;margin:26px 0">
+        <a href="${escE(url)}" style="background:#db2777;color:#fff;text-decoration:none;padding:13px 26px;border-radius:10px;font-weight:700">${escE(boton)}</a>
+      </p>
+      <p style="color:#6b7280;font-size:12px">El enlace es personal y vence en ${dias} días. ${escE(clinica)}</p>
+    </div>
+  </div>`;
+}
+
+/**
+ * Crea el enlace y, si se pide y el paciente tiene correo, se lo envía.
+ * Devuelve también el texto para WhatsApp (la clínica lo envía desde su teléfono).
+ */
+async function enviarEnlacePaciente({ req, reg, tipo, enviarCorreo, procedimiento }) {
+  const clinicaId = clinicaDe(req);
+  const { crearEnlace } = require("./esteticaPublico");
+  const { url, dias } = await crearEnlace({ clinicaId, pacienteId: reg.paciente_id, registroId: reg.id, tipo, usuarioId: req.user.id });
+  const [[pac]] = await pool.query("SELECT nombres, apellidos, email, telefono FROM pacientes WHERE id = ?", [reg.paciente_id]);
+  const [[cl]] = await pool.query("SELECT nombre FROM clinicas WHERE id = ?", [clinicaId]);
+  const nombre = String(pac?.nombres || "").split(" ")[0];
+  const proc = procedimiento || "su procedimiento";
+  const textos = tipo === "firma"
+    ? { titulo: "Consentimiento informado", texto: `Antes de su cita de <strong>${escE(proc)}</strong>, le pedimos leer el consentimiento informado y firmarlo con el dedo desde su teléfono.`, boton: "Leer y firmar",
+        wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. Antes de su cita de ${proc}, por favor lea y firme su consentimiento desde este enlace: ${url}` }
+    : { titulo: "Sus indicaciones", texto: `Aquí tiene las indicaciones para su cuidado después de <strong>${escE(proc)}</strong> y las fechas de sus controles.`, boton: "Ver mis indicaciones",
+        wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. Aquí tiene sus indicaciones después de ${proc} y las fechas de sus controles: ${url}` };
+  let correoEnviado = false;
+  if (enviarCorreo && pac?.email) {
+    try {
+      const { enviarEmail } = require("../utils/mailer");
+      await enviarEmail({ to: pac.email, subject: `${textos.titulo} — ${cl?.nombre || "Medic-KG"}`, html: correoEnlace({ nombre, clinica: cl?.nombre || "", ...textos, url, dias }) });
+      correoEnviado = true;
+    } catch (e) {
+      console.error("[estetica] correo enlace:", e.message);
+    }
+  }
+  return { url, dias, correo_enviado: correoEnviado, tiene_email: !!pac?.email, telefono: pac?.telefono || null, whatsapp_texto: textos.wa };
+}
+
+// POST /:id/enlace  { enviar_correo } → enlace para firmar un consentimiento
+router.post("/:id(\\d+)/enlace", auth(...ROLES), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const [[reg]] = await pool.query(
+      "SELECT * FROM estetica_registros WHERE id = ? AND clinica_id = ? AND activo = 1 AND tipo = 'consentimiento'", [req.params.id, clinicaDe(req)]);
+    if (!reg) return res.status(404).json({ ok: false, msg: "Consentimiento no encontrado." });
+    const d = leer(reg.datos);
+    if (d.firmado) return res.status(400).json({ ok: false, msg: "Este consentimiento ya está firmado." });
+    res.json({ ok: true, data: await enviarEnlacePaciente({ req, reg, tipo: "firma", enviarCorreo: !!req.body?.enviar_correo, procedimiento: d.procedimiento }) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// POST /historia/:hid/enlace  { enviar_correo } → indicaciones del procedimiento de esa consulta
+router.post("/historia/:hid(\\d+)/enlace", auth(...ROLES), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const [[reg]] = await pool.query(
+      "SELECT * FROM estetica_registros WHERE historia_id = ? AND clinica_id = ? AND activo = 1 AND tipo = 'procedimiento' ORDER BY id DESC LIMIT 1",
+      [req.params.hid, clinicaDe(req)]);
+    if (!reg) return res.status(404).json({ ok: false, msg: "Guarde primero el procedimiento de esta consulta." });
+    const d = leer(reg.datos);
+    if (!String(d.indicaciones || "").trim() && !(d.controles_agendados || []).length)
+      return res.status(400).json({ ok: false, msg: "Escriba las indicaciones para la casa antes de enviarlas." });
+    const info = await enviarEnlacePaciente({ req, reg, tipo: "indicaciones", enviarCorreo: !!req.body?.enviar_correo, procedimiento: d.nombre });
+    // Se anota cuándo se enviaron (se ve en la consulta)
+    await pool.query("UPDATE estetica_registros SET datos = ? WHERE id = ?", [JSON.stringify({ ...d, indicaciones_enviadas_en: new Date().toISOString() }), reg.id]);
+    res.json({ ok: true, data: info });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 router.post("/", auth(...ROLES), async (req, res) => {
   try {
     await asegurarTabla();
@@ -470,8 +554,8 @@ router.put("/historia/:hid(\\d+)", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_A
     );
     // Si la pantalla no trae el mantenimiento ya programado, se conserva el que había
     const previo = ya ? leer(ya.datos) : {};
-    if (previo.mantenimiento_control_id && !datos?.mantenimiento_control_id && datos && typeof datos === "object") {
-      datos.mantenimiento_control_id = previo.mantenimiento_control_id;
+    for (const k of ["mantenimiento_control_id", "indicaciones_enviadas_en"]) {
+      if (previo[k] && !datos?.[k] && datos && typeof datos === "object") datos[k] = previo[k];
     }
     let id;
     if (ya) {

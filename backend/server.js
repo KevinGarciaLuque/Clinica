@@ -169,6 +169,7 @@ app.use("/api/finanzas", require("./routes/finanzas"));
 app.use("/api/sucursales", require("./routes/sucursales"));
 app.use("/api/nutricion", require("./routes/nutricion"));
 app.use("/api/estetica-datos", require("./routes/esteticaDatos"));
+app.use("/api/estetica-publico", require("./routes/esteticaPublico"));
 app.use("/api/recordatorios-whatsapp", require("./routes/recordatoriosWhatsapp"));
 app.use("/api/videoconsultas", require("./routes/videoconsultas"));
 app.use("/api/superadmin/almacenamiento", require("./routes/almacenamientoAdmin"));

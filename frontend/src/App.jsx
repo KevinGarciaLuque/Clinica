@@ -33,6 +33,7 @@ const DirectorioMedicos = lazy(() => import("./pages/DirectorioMedicos"));
 const SolicitarPlan     = lazy(() => import("./pages/SolicitarPlan"));
 const ResenaPublica     = lazy(() => import("./pages/ResenaPublica"));
 const MiCita            = lazy(() => import("./pages/MiCita"));
+const MiEstetica        = lazy(() => import("./pages/MiEstetica"));
 const EspacioLiberado   = lazy(() => import("./pages/EspacioLiberado"));
 const PerfilMedicoPage  = lazy(() => import("./pages/PerfilMedicoPage"));
 const OpinionPaciente   = lazy(() => import("./pages/OpinionPaciente"));
@@ -147,6 +148,7 @@ export default function App() {
       <Route path="/solicitar-plan"   element={<SolicitarPlan />} />
       <Route path="/resena/:token"    element={<ResenaPublica />} />
       <Route path="/mi-cita/:token"   element={<MiCita />} />
+      <Route path="/mi-estetica/:token" element={<MiEstetica />} />
       <Route path="/video/:token"     element={<VideollamadaPaciente />} />
       <Route path="/videollamada/:citaId" element={<PrivateRoute><VideollamadaMedico /></PrivateRoute>} />
       <Route path="/espacio/:token"   element={<EspacioLiberado />} />

@@ -4,6 +4,7 @@ import api from "../../api/api";
 import { listarEstetica, crearEstetica, actualizarEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 import { PLANTILLAS_CONSENTIMIENTO as PLANTILLAS } from "../../utils/esteticaCatalogos";
 import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
+import ModalEnviarPaciente from "../../components/estetica/ModalEnviarPaciente";
 import { consentimientoHtml } from "../../utils/consentimientoHtml";
 import { imprimirHtml } from "../../utils/descargarPdf";
 
@@ -74,6 +75,7 @@ export default function ConsentimientosEsteticos() {
   };
 
   const [firmarC, setFirmarC] = useState(null);
+  const [enviarC, setEnviarC] = useState(null); // consentimiento que se envía al paciente para firmar en casa
   const toggleFirma = async (id) => {
     const c = consentimientos.find(x => x.id === id);
     if (!c) return;
@@ -207,7 +209,7 @@ export default function ConsentimientosEsteticos() {
                     <>
                       <span style={{ margin: "0 8px", opacity: .4 }}>·</span>
                       <i className="bi bi-pen-fill me-1" style={{ color: "#10b981" }} />
-                      <span style={{ color: "#10b981" }}>Firmado el {new Date(c.firmado_en).toLocaleDateString("es-PE")}</span>
+                      <span style={{ color: "#10b981" }}>Firmado el {new Date(c.firmado_en).toLocaleDateString("es-PE")}{c.firma_remota ? " desde el teléfono del paciente" : ""}</span>
                     </>
                   )}
                 </div>
@@ -237,6 +239,13 @@ export default function ConsentimientosEsteticos() {
                   <i className={`bi bi-${c.firmado ? "x-circle" : "pen-fill"} me-1`} />
                   {c.firmado ? "Anular firma" : "Firmar"}
                 </button>
+                {!c.firmado && (
+                  <button onClick={() => setEnviarC(c)} title="Enviar al paciente para que firme desde su teléfono"
+                    style={{ background: "rgba(219,39,119,.08)", border: "1px solid rgba(219,39,119,.3)", borderRadius: 8,
+                               padding: "6px 12px", color: "#be185d", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    <i className="bi bi-send me-1" />Enviar para firmar
+                  </button>
+                )}
                 <button onClick={() => imprimirHtml(consentimientoHtml(c))} title="Imprimir"
                   style={{ background: "rgba(100,116,139,.08)", border: "1px solid rgba(100,116,139,.25)", borderRadius: 8,
                              padding: "6px 12px", color: "#475569", fontSize: 12, cursor: "pointer" }}>
@@ -303,7 +312,7 @@ export default function ConsentimientosEsteticos() {
                   <div style={{ fontSize: 13, color: C.textSub }}>
                     <strong>{consentimientoVer.firmante_nombre || consentimientoVer.paciente_nombre}</strong>
                     {consentimientoVer.firmante_relacion && consentimientoVer.firmante_relacion !== "Paciente" ? ` (${consentimientoVer.firmante_relacion})` : ""}
-                    {" · "}Firmado {consentimientoVer.firma_papel ? "en papel" : "en pantalla"} el {new Date(consentimientoVer.firmado_en).toLocaleString("es")}
+                    {" · "}Firmado {consentimientoVer.firma_papel ? "en papel" : consentimientoVer.firma_remota ? "desde el teléfono del paciente" : "en pantalla"} el {new Date(consentimientoVer.firmado_en).toLocaleString("es")}
                   </div>
                 </div>
               )}
@@ -319,6 +328,11 @@ export default function ConsentimientosEsteticos() {
 
       </div>{/* fin padding */}
 
+      {enviarC && (
+        <ModalEnviarPaciente titulo="Enviar para firmar" onClose={() => setEnviarC(null)}
+          descripcion={`El paciente recibe un enlace para leer el consentimiento de ${enviarC.procedimiento} y firmarlo con el dedo desde su teléfono. Cuando firme, la clínica recibe un aviso.`}
+          crear={async (enviarCorreo) => (await api.post(`/estetica-datos/${enviarC.id}/enlace`, { enviar_correo: enviarCorreo })).data.data} />
+      )}
       {firmarC && (
         <ModalFirmarConsentimiento consentimiento={firmarC} onClose={() => setFirmarC(null)}
           onFirmado={(nuevo) => { setConsentimientos(l => l.map(x => x.id === nuevo.id ? nuevo : x)); setFirmarC(null); }} />

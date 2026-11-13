@@ -276,4 +276,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "estetica-enlaces-paciente",
+    version: "1.39",
+    titulo: "El paciente firma desde su casa y recibe sus indicaciones",
+    descripcion: "En Consentimientos (o en la consulta, al crear uno) toque «Enviar para firmar»: el paciente recibe un enlace por correo o WhatsApp, lo lee y firma con el dedo desde su teléfono, y a la clínica le llega un aviso. En la consulta (Estética → Día del procedimiento), «Enviar indicaciones al paciente» le manda sus cuidados en casa, las fechas de sus controles y su próximo mantenimiento.",
+    icono: "bi-send",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];
