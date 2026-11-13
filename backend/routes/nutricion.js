@@ -9,6 +9,7 @@
  *  PUT  /api/nutricion/historia/:hid                → guardar (crea o actualiza) la hoja de esa consulta
  *  GET  /api/nutricion/paciente/:pid/anterior       → datos de consultas anteriores para continuar (?excluir=hid)
  *  GET  /api/nutricion/paciente/:pid/evolucion      → medidas de todas sus consultas (gráficas)
+ *  GET  /api/nutricion/paciente/:pid/historial      → todas sus consultas de nutrición completas
  *  GET  /api/nutricion/historia/:hid/pdf            → PDF del plan de alimentación para el paciente
  *  GET/POST/DELETE /api/nutricion/plantillas        → planes reutilizables de la clínica
  */
@@ -238,6 +239,32 @@ router.get("/paciente/:pid(\\d+)/evolucion", auth(...ROLES), async (req, res) =>
       [req.params.pid, clinicaDe(req)]
     );
     res.json({ ok: true, data, casa: casa.map((c) => ({ fecha: c.fecha, peso: Number(c.peso) })) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+/** Historial de nutrición del paciente: cada consulta completa (la más reciente primero) */
+router.get("/paciente/:pid(\\d+)/historial", auth(...ROLES), async (req, res) => {
+  try {
+    await asegurarTablas();
+    const [rows] = await pool.query(
+      `SELECT n.*, DATE_FORMAT(n.fecha, '%Y-%m-%d') AS fecha_txt, h.estado AS historia_estado,
+              u.nombres AS med_nombres, u.apellidos AS med_apellidos, u.sexo AS med_sexo, u.tipo AS med_tipo
+       FROM nutricion_consultas n
+       LEFT JOIN historias_clinicas h ON h.id = n.historia_id
+       LEFT JOIN usuarios u ON u.id = h.medico_id
+       WHERE n.paciente_id = ? AND n.clinica_id = ?
+       ORDER BY n.fecha DESC, n.id DESC LIMIT 200`,
+      [req.params.pid, clinicaDe(req)]
+    );
+    const { tituloMedico } = require("../utils/tituloMedico");
+    const data = rows.map((r) => ({
+      ...formatear(r),
+      estado: r.historia_estado || null,
+      medico: r.med_nombres ? `${tituloMedico(r.med_sexo, { tipo: r.med_tipo })}${r.med_nombres} ${r.med_apellidos}`.trim() : null,
+    }));
+    res.json({ ok: true, data });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

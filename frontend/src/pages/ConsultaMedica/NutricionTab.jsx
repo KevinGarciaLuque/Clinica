@@ -4,6 +4,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer,
 } from "recharts";
 import api from "../../api/api";
+import HistorialNutricion from "../../components/HistorialNutricion";
 import { hoyClinica } from "../../utils/zonaClinica";
 import {
   ACTIVIDADES, AJUSTES, FORMULAS, num, redondear, tasaMetabolica, macrosEnGramos,
@@ -21,6 +22,7 @@ const SECCIONES = [
   { id: "calorias", icono: "bi-fire", nombre: "Calorías" },
   { id: "plan", icono: "bi-egg-fried", nombre: "Plan de alimentación" },
   { id: "evolucion", icono: "bi-graph-up-arrow", nombre: "Evolución" },
+  { id: "historial", icono: "bi-clock-history", nombre: "Historial" },
 ];
 
 const OBJETIVOS = ["Bajar de peso", "Ganar masa muscular", "Mantener peso", "Controlar diabetes", "Controlar presión o colesterol",
@@ -694,6 +696,9 @@ export default function NutricionTab({ datos, setDatos, vitals, setVitals, pacie
           </div>
         </>
       )}
+
+      {/* ═══ HISTORIAL (consultas anteriores) ═══ */}
+      {seccion === "historial" && <HistorialNutricion pacienteId={pacienteId} excluirHistoriaId={historiaId} />}
 
       {/* ═══ EVOLUCIÓN ═══ */}
       {seccion === "evolucion" && (

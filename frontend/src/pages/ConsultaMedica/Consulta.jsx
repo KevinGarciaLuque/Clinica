@@ -303,29 +303,36 @@ export default function Consulta() {
     }
   }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion]);
 
-  // PDF del plan de alimentación: guarda primero (si se puede editar) y lo abre o comparte
+  // PDF del plan de alimentación: guarda primero (si se puede editar) y lo descarga.
+  // En el teléfono abre el menú de compartir (WhatsApp, correo…).
   const descargarPlanNutricion = async () => {
     setGenerandoPdfNutri(true);
-    const telefono = window.matchMedia("(pointer: coarse)").matches;
-    // La ventana se abre en el mismo clic (si se abre después, el navegador la bloquea)
-    const ventana = telefono ? null : window.open("", "_blank");
     try {
       const id = soloLectura ? hid : await handleSave(false);
-      if (!id) { ventana?.close(); return; }
+      if (!id) return;
       const r = await api.get(`/nutricion/historia/${id}/pdf`, { responseType: "blob" });
-      const nombre = `Plan de alimentación - ${paciente?.nombres || "paciente"}.pdf`;
-      const archivo = new File([r.data], nombre, { type: "application/pdf" });
-      // En el teléfono se abre el menú de compartir (WhatsApp, correo…); en la computadora se abre el PDF
-      if (telefono && navigator.canShare?.({ files: [archivo] })) {
+      const quien = [paciente?.nombres, paciente?.apellidos].filter(Boolean).join("_") || "paciente";
+      const nombre = `plan_alimentacion_${quien}.pdf`.normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^\w.-]+/g, "_");
+      const blob = new Blob([r.data], { type: "application/pdf" });
+      const archivo = new File([blob], nombre, { type: "application/pdf" });
+      if (window.matchMedia("(pointer: coarse)").matches && navigator.canShare?.({ files: [archivo] })) {
         await navigator.share({ files: [archivo], title: nombre }).catch(() => {});
-      } else {
-        const url = URL.createObjectURL(r.data);
-        if (ventana) ventana.location.href = url; else window.open(url, "_blank");
-        setTimeout(() => URL.revokeObjectURL(url), 60000);
+        return;
       }
-    } catch {
-      ventana?.close();
-      setAlertMsg({ type: "danger", msg: "No se pudo generar el PDF del plan." });
+      // Descarga directa: no la bloquea el navegador aunque el PDF tarde unos segundos
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = nombre;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      setAlertMsg({ type: "success", msg: "PDF del plan descargado." });
+    } catch (e) {
+      let msg = "No se pudo generar el PDF del plan.";
+      try { msg = JSON.parse(await e.response?.data?.text?.())?.msg || msg; } catch { /* respuesta sin texto */ }
+      setAlertMsg({ type: "danger", msg });
     } finally {
       setGenerandoPdfNutri(false);
     }

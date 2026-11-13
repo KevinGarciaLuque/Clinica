@@ -213,4 +213,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "historial-nutricion",
+    version: "1.32",
+    titulo: "Historial de consultas de nutrición",
+    descripcion: "En el perfil del paciente → Historial Clínico → «Historial de Nutrición» (y en la pestaña Nutrición de la consulta) ve cada visita por fecha: peso, cambio desde la anterior y todo lo que se registró ese día (medidas, calorías, plan, menú, hábitos). También puede descargar el PDF del plan de esa visita.",
+    icono: "bi-clock-history",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

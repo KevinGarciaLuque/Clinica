@@ -30,6 +30,7 @@ import { useFuncionClinica, rutaConsulta } from "../utils/funcionClinica";
 import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/constantes_odontologia";
 import { fechaLocal } from "../utils/fechaNacimiento";
 import { edadDetallada } from "../utils/edadDetallada";
+import HistorialNutricion from "../components/HistorialNutricion";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -1681,7 +1682,21 @@ export default function PerfilPaciente() {
                 Alergias y Antecedentes
               </button>
             </li>
+            {tieneModulo("nutricion_consulta") && (
+              <li className="nav-item">
+                <button
+                  className={`nav-link ${subTabHistorial === "nutricion" ? "active" : ""}`}
+                  onClick={() => setSubTabHistorial("nutricion")}
+                >
+                  <i className="bi bi-apple me-1" />
+                  Historial de Nutrición
+                </button>
+              </li>
+            )}
           </ul>
+
+          {/* Sub-tab: Historial de Nutrición (consultas con la hoja de nutrición) */}
+          {subTabHistorial === "nutricion" && <HistorialNutricion pacienteId={id} />}
 
           {/* Sub-tab: Alergias y Antecedentes */}
           {subTabHistorial === "antecedentes" && (
