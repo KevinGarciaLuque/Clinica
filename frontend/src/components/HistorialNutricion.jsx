@@ -230,6 +230,7 @@ export default function HistorialNutricion({ pacienteId, excluirHistoriaId }) {
   const [desde, setDesde] = useState("");
   const [hasta, setHasta] = useState("");
   const [bajando, setBajando] = useState(null);
+  const [montadas, setMontadas] = useState(() => new Set()); // visitas ya abiertas alguna vez
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -257,6 +258,7 @@ export default function HistorialNutricion({ pacienteId, excluirHistoriaId }) {
   const alternar = (id) => {
     const n = new Set(abiertasSet);
     if (n.has(id)) n.delete(id); else n.add(id);
+    setMontadas((m) => new Set([...m, ...abiertasSet, id])); // el contenido sigue mientras se cierra
     setAbiertas(n);
   };
   const abrirConsulta = (hid) => navigate(`/consulta-medica?historia_id=${hid}`);
@@ -282,6 +284,10 @@ export default function HistorialNutricion({ pacienteId, excluirHistoriaId }) {
 
   return (
     <div>
+      <style>{`
+        .hn-desplegable { display: grid; transition: grid-template-rows .35s ease, opacity .3s ease; }
+        @media (prefers-reduced-motion: reduce) { .hn-desplegable { transition: none; } }
+      `}</style>
       <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
         <div style={{ fontSize: "0.92rem" }}>
           <b>{lista.length} {lista.length === 1 ? "visita" : "visitas"}</b>
@@ -292,7 +298,7 @@ export default function HistorialNutricion({ pacienteId, excluirHistoriaId }) {
           <span className="text-muted">—</span>
           <input type="date" className="form-control form-control-sm" style={{ width: 150 }} value={hasta} onChange={(e) => setHasta(e.target.value)} aria-label="Hasta" />
           <button type="button" className="btn btn-sm btn-link fw-semibold text-decoration-none"
-            onClick={() => setAbiertas(todasAbiertas ? new Set() : new Set(lista.map((v) => v.id)))}>
+            onClick={() => { setMontadas(new Set(lista.map((v) => v.id))); setAbiertas(todasAbiertas ? new Set() : new Set(lista.map((v) => v.id))); }}>
             {todasAbiertas ? "Contraer todo" : "Expandir todo"}
           </button>
         </div>
@@ -342,13 +348,18 @@ export default function HistorialNutricion({ pacienteId, excluirHistoriaId }) {
                     )}
                     {v.medico && <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{v.medico}</div>}
                   </div>
-                  <i className={`bi bi-chevron-${abierta ? "up" : "down"}`} style={{ color: "#64748b" }} />
+                  <i className="bi bi-chevron-down" style={{ color: "#64748b", transition: "transform .35s ease", transform: abierta ? "rotate(180deg)" : "none" }} />
                 </button>
-                {abierta && (
-                  <div style={{ padding: "4px 16px 16px", borderTop: "1px solid #eef2ff" }} className="pt-3">
-                    <Detalle v={v} grupos={catalogo.grupos} tiempos={catalogo.tiempos} onAbrir={abrirConsulta} onPdf={descargarPdf} bajando={bajando === v.id} />
+                {/* Abre y cierra deslizándose (la fila de la cuadrícula pasa de 0 a su alto real) */}
+                <div className="hn-desplegable" style={{ gridTemplateRows: abierta ? "1fr" : "0fr", opacity: abierta ? 1 : 0 }} aria-hidden={!abierta}>
+                  <div style={{ overflow: "hidden", minHeight: 0 }}>
+                    {(abierta || montadas.has(v.id)) && (
+                      <div style={{ padding: "16px", borderTop: "1px solid #eef2ff" }}>
+                        <Detalle v={v} grupos={catalogo.grupos} tiempos={catalogo.tiempos} onAbrir={abrirConsulta} onPdf={descargarPdf} bajando={bajando === v.id} />
+                      </div>
+                    )}
                   </div>
-                )}
+                </div>
               </div>
             </div>
           );
