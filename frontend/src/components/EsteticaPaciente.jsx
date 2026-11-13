@@ -85,7 +85,11 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
     const fechaControl = (c) => soloFecha(c.creado_en || c._creado_en);
 
     const ultimoControl = [...controles].sort((a, b) => fechaControl(b).localeCompare(fechaControl(a)))[0] || null;
-    const proximas = controles.map((c) => soloFecha(c.proxima_cita)).filter(Boolean);
+    const proximas = [
+      ...controles.map((c) => soloFecha(c.proxima_cita)),
+      // Controles agendados desde la consulta (día del procedimiento)
+      ...de("procedimiento").flatMap((x) => (x.controles_agendados || []).map((c) => soloFecha(c.fecha))),
+    ].filter(Boolean);
     const proximo = proximas.filter((f) => f >= hoy).sort()[0] || null;
     // Vencido: la cita indicada en el último control ya pasó y no hay un control después
     const vencido = ultimoControl && soloFecha(ultimoControl.proxima_cita) && soloFecha(ultimoControl.proxima_cita) < hoy

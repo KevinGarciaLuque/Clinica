@@ -3,6 +3,8 @@ import { Link } from "react-router-dom";
 import MapaFacial from "../../components/MapaFacial";
 import { listarEstetica, crearEstetica } from "../../utils/esteticaDatos";
 import { imprimirHtml } from "../../utils/descargarPdf";
+import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
+import ModalAgendarControles from "../../components/estetica/ModalAgendarControles";
 import {
   PLANTILLAS_CONSENTIMIENTO, FASES_CONTROL, EDEMA_OPC, CICATRIZ_OPC, RESULTADO_OPC,
   PROCEDIMIENTOS_COMUNES, UNIDADES, ANESTESIA_OPC, CONTRAINDICACIONES, ZONAS_CUERPO, nombreZona,
@@ -44,9 +46,11 @@ const fechaCorta = (v) => (v ? new Date(String(v).length <= 10 ? `${v}T12:00:00`
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const unidadDe = (nombre) => PROCEDIMIENTOS_COMUNES.find((p) => p.nombre === nombre)?.unidad;
 
-export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacienteId, historiaId }) {
+export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacienteId, historiaId, onGuardar }) {
   const [previos, setPrevios] = useState({ cargado: false, ficha: null, ultimoProc: null, firmados: [], consentimientos: [] });
-  const [modal, setModal] = useState(null); // "presupuesto" | "consentimiento"
+  const [modal, setModal] = useState(null); // "presupuesto" | "consentimiento" | "controles"
+  const [firmar, setFirmar] = useState(null); // consentimiento que se va a firmar con el dedo
+  const [recarga, setRecarga] = useState(0);
   const tipo = datos.tipo_visita || "";
   const val = datos.valoracion || {};
   const proc = datos.procedimiento || {};
@@ -75,7 +79,7 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
       });
     }).catch(() => vivo && setPrevios((p) => ({ ...p, cargado: true })));
     return () => { vivo = false; };
-  }, [pacienteId, historiaId, modal]);
+  }, [pacienteId, historiaId, modal, recarga]);
 
   const elegirVisita = (id) => setDatos((d) => {
     const nuevo = { ...d, tipo_visita: id };
@@ -108,6 +112,11 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
     if (!n) return true;
     const sin = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\bbotox\b/g, "toxina botulinica");
     return previos.firmados.some((c) => { const a = sin(c.procedimiento), b = sin(nombre); return a && (a.includes(b) || b.includes(a)); });
+  };
+
+  const pendienteFirma = (nombre) => {
+    const sin = (t) => String(t || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\bbotox\b/g, "toxina botulinica");
+    return previos.consentimientos.find((c) => !c.firmado && (() => { const a = sin(c.procedimiento), b = sin(nombre); return a && b && (a.includes(b) || b.includes(a)); })()) || null;
   };
 
   const imprimir = () => imprimirHtml(htmlRegistro({ proc, paciente }));
@@ -257,7 +266,11 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                 {proc.nombre && previos.cargado && !firmadoPara(proc.nombre) && (
                   <div className="mt-1" style={{ color: "#b91c1c", fontSize: "0.78rem", fontWeight: 600 }}>
                     <i className="bi bi-exclamation-triangle-fill me-1" />No hay consentimiento firmado para este procedimiento.
-                    {!firmada && <button type="button" className="btn btn-link btn-sm p-0 ms-1" style={{ color: "#b91c1c", fontWeight: 700, fontSize: "0.78rem", verticalAlign: "baseline" }} onClick={() => setModal("consentimiento")}>Hacerlo ahora</button>}
+                    {!firmada && (pendienteFirma(proc.nombre) ? (
+                      <button type="button" className="btn btn-link btn-sm p-0 ms-1" style={{ color: "#b91c1c", fontWeight: 700, fontSize: "0.78rem", verticalAlign: "baseline" }} onClick={() => setFirmar(pendienteFirma(proc.nombre))}>Hay uno sin firmar: firmar ahora</button>
+                    ) : (
+                      <button type="button" className="btn btn-link btn-sm p-0 ms-1" style={{ color: "#b91c1c", fontWeight: 700, fontSize: "0.78rem", verticalAlign: "baseline" }} onClick={() => setModal("consentimiento")}>Hacerlo ahora</button>
+                    ))}
                   </div>
                 )}
               </div>
@@ -343,10 +356,35 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                 <div className="d-flex gap-1 flex-wrap">
                   {["Buena", "Regular", "Mala"].map((t) => <Chip key={t} disabled={firmada} activo={proc.tolerancia === t} onClick={() => set("procedimiento", "tolerancia", t)}>{t}</Chip>)}
                 </div></div>
-              <div><Lbl>Primer control</Lbl>
-                <select style={inp} disabled={firmada} value={proc.proximo_control || ""} onChange={(e) => set("procedimiento", "proximo_control", e.target.value)}>
-                  <option value="">—</option>{FASES_CONTROL.map((f) => <option key={f.key} value={f.key}>{f.label}</option>)}
-                </select></div>
+              <div><Lbl>Controles después del procedimiento</Lbl>
+                {(proc.controles_agendados || []).length > 0 && (
+                  <div className="mb-2">
+                    {proc.controles_agendados.map((c) => (
+                      <div key={`${c.fase}-${c.fecha}`} style={{ fontSize: "0.83rem", color: "#5b21b6" }}>
+                        <i className="bi bi-calendar-check me-1" />{c.label}: {fechaCorta(c.fecha)} a las {c.hora} <span className="text-muted">(en la agenda)</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {(() => {
+                  const ya = (proc.controles_agendados || []).map((c) => c.fase);
+                  const libres = FASES_CONTROL.filter((f) => !ya.includes(f.key));
+                  const elegidos = (proc.controles || []).filter((k) => !ya.includes(k));
+                  if (firmada) return (proc.controles_agendados || []).length ? null : <div className="text-muted" style={{ fontSize: "0.83rem" }}>Sin controles agendados.</div>;
+                  return (
+                    <>
+                      <div className="d-flex flex-wrap gap-1">
+                        {libres.map((f) => <Chip key={f.key} activo={elegidos.includes(f.key)} onClick={() => toggleLista("procedimiento", "controles", f.key)}>{f.label}</Chip>)}
+                      </div>
+                      {elegidos.length > 0 && (
+                        <button type="button" className="btn btn-sm mt-2" style={{ background: "#7c3aed", color: "#fff", fontWeight: 700 }} onClick={() => setModal("controles")}>
+                          <i className="bi bi-calendar-plus me-1" />Agendar {elegidos.length} control{elegidos.length === 1 ? "" : "es"} en la agenda
+                        </button>
+                      )}
+                    </>
+                  );
+                })()}
+              </div>
               <div><Lbl>Complicaciones inmediatas</Lbl>
                 <textarea rows={2} style={inp} disabled={firmada} value={proc.complicaciones || ""} onChange={(e) => set("procedimiento", "complicaciones", e.target.value)} placeholder="Ninguna" /></div>
               <div><Lbl>Indicaciones para la casa</Lbl>
@@ -398,7 +436,29 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
         <ModalPresupuesto paciente={paciente} pacienteId={pacienteId} sugeridos={tipo === "procedimiento" && proc.nombre ? [proc.nombre] : (val.sugeridos || [])} onClose={() => setModal(null)} />
       )}
       {modal === "consentimiento" && (
-        <ModalConsentimiento paciente={paciente} pacienteId={pacienteId} procedimiento={tipo === "procedimiento" ? proc.nombre : (val.sugeridos || [])[0]} onClose={() => setModal(null)} />
+        <ModalConsentimiento paciente={paciente} pacienteId={pacienteId} procedimiento={tipo === "procedimiento" ? proc.nombre : (val.sugeridos || [])[0]} onClose={() => setModal(null)}
+          onFirmar={(c) => { setModal(null); setFirmar(c); }} />
+      )}
+      {firmar && (
+        <ModalFirmarConsentimiento consentimiento={firmar} onClose={() => setFirmar(null)}
+          onFirmado={() => { setFirmar(null); setRecarga((n) => n + 1); }} />
+      )}
+      {modal === "controles" && (
+        <ModalAgendarControles paciente={paciente} pacienteId={pacienteId} procedimiento={proc.nombre}
+          fases={(proc.controles || []).filter((k) => !(proc.controles_agendados || []).some((c) => c.fase === k))}
+          onClose={() => setModal(null)}
+          onAgendado={(hechos) => {
+            setDatos((d) => ({
+              ...d,
+              procedimiento: {
+                ...(d.procedimiento || {}),
+                controles_agendados: [...(d.procedimiento?.controles_agendados || []), ...hechos],
+                controles: (d.procedimiento?.controles || []).filter((k) => !hechos.some((h) => h.fase === k)),
+              },
+            }));
+            // Se guarda la consulta para no perder qué controles ya están en la agenda
+            setTimeout(() => onGuardar?.(), 120);
+          }} />
       )}
     </div>
   );
@@ -483,7 +543,7 @@ function ModalPresupuesto({ paciente, pacienteId, sugeridos, onClose }) {
   );
 }
 
-function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose }) {
+function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose, onFirmar }) {
   const sugerida = PLANTILLAS_CONSENTIMIENTO.find((p) => procedimiento && String(procedimiento).toLowerCase().includes(p.procedimiento.toLowerCase().slice(0, 6)));
   const [plantillaId, setPlantillaId] = useState(sugerida ? String(sugerida.id) : "");
   const [otro, setOtro] = useState(sugerida ? "" : (procedimiento || ""));
@@ -497,12 +557,12 @@ function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose }) {
   const guardar = async () => {
     setGuardando(true);
     try {
-      await crearEstetica("consentimiento", pacienteId, {
+      const creado = await crearEstetica("consentimiento", pacienteId, {
         paciente_id: String(pacienteId), plantilla_id: plantillaId, notas,
         procedimiento: nombre, contenido, riesgos: plantilla?.riesgos || [],
         paciente_nombre: nombrePac(paciente), firmado: false, creado_en: new Date().toISOString(),
       });
-      setListo(true);
+      setListo(creado);
     } catch (e) { alert(e.response?.data?.msg || "No se pudo guardar el consentimiento."); }
     setGuardando(false);
   };
@@ -512,10 +572,12 @@ function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose }) {
         <div className="text-center py-3">
           <i className="bi bi-check-circle-fill" style={{ fontSize: "2.2rem", color: "#16a34a" }} />
           <div className="fw-bold mt-2">Consentimiento creado</div>
-          <div className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>Imprímalo y márquelo como firmado en Consentimientos.</div>
-          <div className="d-flex gap-2 justify-content-center">
-            <Link to={`/estetica/consentimientos?paciente_id=${pacienteId}`} target="_blank" className="btn btn-sm btn-outline-secondary">Abrir Consentimientos</Link>
-            <button type="button" className="btn btn-sm" style={{ background: ROSA, color: "#fff" }} onClick={onClose}>Volver a la consulta</button>
+          <div className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>Pase el teléfono o la tablet al paciente para que lo lea y firme con el dedo.</div>
+          <div className="d-flex gap-2 justify-content-center flex-wrap">
+            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Firmar después</button>
+            <button type="button" className="btn btn-sm" style={{ background: ROSA, color: "#fff", fontWeight: 700 }} onClick={() => onFirmar?.(listo)}>
+              <i className="bi bi-pen me-1" />Firmar ahora
+            </button>
           </div>
         </div>
       ) : (

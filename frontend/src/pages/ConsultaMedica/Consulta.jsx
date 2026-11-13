@@ -337,6 +337,10 @@ export default function Consulta() {
     }
   }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion, guardarEstetica]);
 
+  // Siempre la versión más reciente de handleSave (para guardar desde ventanas que cambian datos)
+  const guardarRef = useRef(null);
+  guardarRef.current = handleSave;
+
   // PDF del plan de alimentación: guarda primero (si se puede editar) y lo descarga.
   // En el teléfono abre el menú de compartir (WhatsApp, correo…).
   const descargarPlanNutricion = async () => {
@@ -712,6 +716,7 @@ export default function Consulta() {
               paciente={paciente}
               pacienteId={paciente?.id || pacId}
               historiaId={hid}
+              onGuardar={() => guardarRef.current?.(false)}
             />
           )}
 

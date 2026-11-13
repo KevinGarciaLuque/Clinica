@@ -30,13 +30,13 @@ export const PLANTILLAS_CONSENTIMIENTO = [
 
 /** Fases del control post-procedimiento (mismas claves que la pantalla de Seguimiento) */
 export const FASES_CONTROL = [
-  { key: "dia1",   label: "Día 1" },
-  { key: "dia3",   label: "Día 3" },
-  { key: "dia7",   label: "Semana 1" },
-  { key: "dia15",  label: "2 semanas" },
-  { key: "dia30",  label: "1 mes" },
-  { key: "dia90",  label: "3 meses" },
-  { key: "dia180", label: "6 meses" },
+  { key: "dia1",   label: "Día 1",     dias: 1 },
+  { key: "dia3",   label: "Día 3",     dias: 3 },
+  { key: "dia7",   label: "Semana 1",  dias: 7 },
+  { key: "dia15",  label: "2 semanas", dias: 15 },
+  { key: "dia30",  label: "1 mes",     dias: 30 },
+  { key: "dia90",  label: "3 meses",   dias: 90 },
+  { key: "dia180", label: "6 meses",   dias: 180 },
 ];
 export const EDEMA_OPC = ["Ausente", "Leve", "Moderado", "Severo"];
 export const CICATRIZ_OPC = ["Sin alteraciones", "Eritematosa", "Elevada", "Deprimida", "Queloidea", "Hipopigmentada"];
@@ -69,26 +69,36 @@ export const CONTRAINDICACIONES = [
 ];
 
 /** Zonas del cuerpo (las de la cara se marcan en el dibujo) */
-export const ZONAS_CUERPO = ["Papada", "Cuello", "Escote", "Mamas", "Brazos", "Abdomen", "Flancos", "Espalda", "Glúteos", "Muslos", "Manos", "Cuero cabelludo"];
+export const ZONAS_CUERPO = ["Papada", "Escote", "Mamas", "Brazos", "Abdomen", "Flancos", "Espalda", "Glúteos", "Muslos", "Manos", "Cuero cabelludo"];
 
-/** Zonas de la cara para el dibujo (components/MapaFacial). der./izq. = lado del paciente */
+/**
+ * Zonas de la cara (components/MapaFacial). Coordenadas sobre la ilustración
+ * /img/cara-estetica.webp en una cuadrícula de 880×1168.
+ * der./izq. = lado del paciente: la izquierda del dibujo es su lado derecho.
+ * Cada forma es una elipse { cx, cy, rx, ry, rot } (rot en grados).
+ */
+export const ANCHO_CARA = 880;
+const par = (id, label, f) => [
+  { id: `${id}_der`, label: `${label} der.`, formas: [{ ...f }] },
+  { id: `${id}_izq`, label: `${label} izq.`, formas: [{ ...f, cx: ANCHO_CARA - f.cx, rot: f.rot ? -f.rot : 0 }] },
+];
 export const ZONAS_CARA = [
-  { id: "frente",          label: "Frente",                formas: [{ cx: 130, cy: 62, rx: 58, ry: 22 }] },
-  { id: "entrecejo",       label: "Entrecejo",             formas: [{ cx: 130, cy: 100, rx: 13, ry: 11 }] },
-  { id: "patas_gallo_der", label: "Patas de gallo der.",   formas: [{ cx: 58, cy: 122, rx: 9, ry: 15 }] },
-  { id: "patas_gallo_izq", label: "Patas de gallo izq.",   formas: [{ cx: 202, cy: 122, rx: 9, ry: 15 }] },
-  { id: "ojera_der",       label: "Ojera der.",            formas: [{ cx: 96, cy: 140, rx: 18, ry: 7 }] },
-  { id: "ojera_izq",       label: "Ojera izq.",            formas: [{ cx: 164, cy: 140, rx: 18, ry: 7 }] },
-  { id: "nariz",           label: "Nariz",                 formas: [{ cx: 130, cy: 150, rx: 11, ry: 26 }] },
-  { id: "pomulo_der",      label: "Pómulo der.",           formas: [{ cx: 78, cy: 168, rx: 19, ry: 15 }] },
-  { id: "pomulo_izq",      label: "Pómulo izq.",           formas: [{ cx: 182, cy: 168, rx: 19, ry: 15 }] },
-  { id: "surco_der",       label: "Surco nasogeniano der.", formas: [{ cx: 106, cy: 194, rx: 6, ry: 16 }] },
-  { id: "surco_izq",       label: "Surco nasogeniano izq.", formas: [{ cx: 154, cy: 194, rx: 6, ry: 16 }] },
-  { id: "labios",          label: "Labios",                formas: [{ cx: 130, cy: 222, rx: 24, ry: 10 }] },
-  { id: "comisuras",       label: "Comisuras",             formas: [{ cx: 100, cy: 228, rx: 6, ry: 6 }, { cx: 160, cy: 228, rx: 6, ry: 6 }] },
-  { id: "menton",          label: "Mentón",                formas: [{ cx: 130, cy: 262, rx: 22, ry: 12 }] },
-  { id: "mandibula_der",   label: "Mandíbula der.",        formas: [{ cx: 74, cy: 236, rx: 9, ry: 22 }] },
-  { id: "mandibula_izq",   label: "Mandíbula izq.",        formas: [{ cx: 186, cy: 236, rx: 9, ry: 22 }] },
+  { id: "frente",    label: "Frente",                 formas: [{ cx: 440, cy: 258, rx: 185, ry: 72 }] },
+  { id: "entrecejo", label: "Entrecejo (glabela)",    formas: [{ cx: 440, cy: 410, rx: 34, ry: 32 }] },
+  ...par("sien", "Sien", { cx: 172, cy: 400, rx: 24, ry: 56 }),
+  ...par("patas_gallo", "Patas de gallo", { cx: 192, cy: 482, rx: 20, ry: 36 }),
+  ...par("ojera", "Surco lagrimal / ojera", { cx: 300, cy: 527, rx: 62, ry: 16, rot: 6 }),
+  { id: "nariz",     label: "Nariz",                  formas: [{ cx: 440, cy: 562, rx: 32, ry: 82 }] },
+  ...par("pomulo", "Pómulo", { cx: 262, cy: 602, rx: 56, ry: 38, rot: -15 }),
+  ...par("masetero", "Masetero", { cx: 214, cy: 722, rx: 28, ry: 52 }),
+  ...par("surco", "Surco nasogeniano", { cx: 346, cy: 712, rx: 14, ry: 50, rot: 20 }),
+  { id: "codigo_barras", label: "Código de barras (líneas periorales)", formas: [{ cx: 440, cy: 707, rx: 46, ry: 14 }] },
+  { id: "labios",    label: "Labios",                 formas: [{ cx: 440, cy: 781, rx: 108, ry: 40 }] },
+  { id: "comisuras", label: "Comisuras",              formas: [{ cx: 318, cy: 778, rx: 14, ry: 14 }, { cx: 562, cy: 778, rx: 14, ry: 14 }] },
+  ...par("marioneta", "Línea de marioneta", { cx: 330, cy: 842, rx: 14, ry: 36, rot: -12 }),
+  { id: "menton",    label: "Mentón",                 formas: [{ cx: 440, cy: 900, rx: 66, ry: 34 }] },
+  ...par("mandibula", "Mandíbula", { cx: 252, cy: 862, rx: 20, ry: 66, rot: -45 }),
+  { id: "cuello",    label: "Bandas del cuello (platisma)", formas: [{ cx: 440, cy: 1045, rx: 130, ry: 38 }] },
 ];
 
 export const nombreZona = (id) => ZONAS_CARA.find((z) => z.id === id)?.label || id;

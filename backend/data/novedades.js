@@ -249,4 +249,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "estetica-firma-controles-mapa",
+    version: "1.36",
+    titulo: "Estética: firma con el dedo, controles en la agenda y nueva cara",
+    descripcion: "El paciente ya puede firmar el consentimiento con el dedo en el teléfono o la tablet (en la consulta o en Consentimientos), y se puede imprimir con la firma. En la consulta, al terminar el procedimiento, elija los controles (Semana 1, 1 mes…) y se agendan solos en la agenda con su recordatorio. La cara para marcar zonas ahora es una ilustración profesional con más zonas (sienes, marionetas, código de barras, masetero, cuello).",
+    icono: "bi-pen",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

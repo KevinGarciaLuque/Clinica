@@ -3,6 +3,9 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import { listarEstetica, crearEstetica, actualizarEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 import { PLANTILLAS_CONSENTIMIENTO as PLANTILLAS } from "../../utils/esteticaCatalogos";
+import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
+import { consentimientoHtml } from "../../utils/consentimientoHtml";
+import { imprimirHtml } from "../../utils/descargarPdf";
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -70,11 +73,15 @@ export default function ConsentimientosEsteticos() {
     setPlantillaSelec(null);
   };
 
+  const [firmarC, setFirmarC] = useState(null);
   const toggleFirma = async (id) => {
     const c = consentimientos.find(x => x.id === id);
     if (!c) return;
+    if (!c.firmado) { setFirmarC(c); return; }
+    if (!window.confirm("¿Anular la firma de este consentimiento?")) return;
     try {
-      const nuevo = await actualizarEstetica(id, { ...c, firmado: !c.firmado, firmado_en: !c.firmado ? new Date().toISOString() : null });
+      // Anular la firma también borra la firma dibujada
+      const nuevo = await actualizarEstetica(id, { ...c, firmado: false, firmado_en: null, firma_paciente: null, firma_papel: false, firmante_nombre: null, firmante_relacion: null });
       setConsentimientos(l => l.map(x => x.id === id ? nuevo : x));
     } catch { alert("No se pudo guardar el cambio."); }
   };
@@ -228,7 +235,12 @@ export default function ConsentimientosEsteticos() {
                     fontSize: 12, fontWeight: 600, cursor: "pointer",
                   }}>
                   <i className={`bi bi-${c.firmado ? "x-circle" : "pen-fill"} me-1`} />
-                  {c.firmado ? "Anular firma" : "Marcar firmado"}
+                  {c.firmado ? "Anular firma" : "Firmar"}
+                </button>
+                <button onClick={() => imprimirHtml(consentimientoHtml(c))} title="Imprimir"
+                  style={{ background: "rgba(100,116,139,.08)", border: "1px solid rgba(100,116,139,.25)", borderRadius: 8,
+                             padding: "6px 12px", color: "#475569", fontSize: 12, cursor: "pointer" }}>
+                  <i className="bi bi-printer" />
                 </button>
                 <button onClick={() => eliminar(c.id)}
                   style={{ background: "rgba(239,68,68,.07)", border: "1px solid rgba(239,68,68,.2)",
@@ -283,12 +295,34 @@ export default function ConsentimientosEsteticos() {
                   </ul>
                 </div>
               )}
+              {consentimientoVer.firmado && (
+                <div style={{ marginTop: 16, borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
+                  {consentimientoVer.firma_paciente && (
+                    <img src={consentimientoVer.firma_paciente} alt="Firma del paciente" style={{ maxHeight: 110, maxWidth: "100%", display: "block" }} />
+                  )}
+                  <div style={{ fontSize: 13, color: C.textSub }}>
+                    <strong>{consentimientoVer.firmante_nombre || consentimientoVer.paciente_nombre}</strong>
+                    {consentimientoVer.firmante_relacion && consentimientoVer.firmante_relacion !== "Paciente" ? ` (${consentimientoVer.firmante_relacion})` : ""}
+                    {" · "}Firmado {consentimientoVer.firma_papel ? "en papel" : "en pantalla"} el {new Date(consentimientoVer.firmado_en).toLocaleString("es")}
+                  </div>
+                </div>
+              )}
+              <div style={{ marginTop: 14, textAlign: "right" }}>
+                <button className="btn btn-sm btn-outline-secondary" onClick={() => imprimirHtml(consentimientoHtml(consentimientoVer))}>
+                  <i className="bi bi-printer me-1" />Imprimir
+                </button>
+              </div>
             </div>
           </div>
         </>
       )}
 
       </div>{/* fin padding */}
+
+      {firmarC && (
+        <ModalFirmarConsentimiento consentimiento={firmarC} onClose={() => setFirmarC(null)}
+          onFirmado={(nuevo) => { setConsentimientos(l => l.map(x => x.id === nuevo.id ? nuevo : x)); setFirmarC(null); }} />
+      )}
 
       {/* Modal nuevo consentimiento */}
       {showModal && (
