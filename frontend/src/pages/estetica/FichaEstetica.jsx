@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import { fechaLocal } from "../../utils/fechaNacimiento";
+import { listarEstetica, crearEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 
 const C = {
   bg:      "#f0f2f5",
@@ -76,6 +77,8 @@ export default function FichaEstetica() {
   const [modalVer,    setModalVer]   = useState(false);
   const [fichaModal,  setFichaModal] = useState(null);
   const [pacModal,    setPacModal]   = useState(null);
+  // Fichas guardadas en el servidor, por paciente (antes solo en este navegador)
+  const [fichas,      setFichas]     = useState({});
 
   useEffect(() => {
     cargarDatos();
@@ -100,44 +103,40 @@ export default function FichaEstetica() {
     }
   };
 
-  const cargarPacientesConFicha = (pacs = pacientes) => {
+  const cargarPacientesConFicha = async (pacs = pacientes) => {
+    let lista = [];
+    try { lista = await listarEstetica("ficha"); } catch (e) { console.error("Error al cargar fichas:", e); return; }
+    const mapa = {};
+    lista.forEach(f => { if (!mapa[f.paciente_id]) mapa[f.paciente_id] = f; });
     const conFicha = [];
     pacs.forEach(p => {
-      const fichaGuardada = localStorage.getItem(`ficha_estetica_${p.id}`);
-      if (fichaGuardada) {
-        try {
-          const ficha = JSON.parse(fichaGuardada);
-          conFicha.push({
-            ...p,
-            ultima_actualizacion: ficha.actualizado_en || new Date().toISOString(),
-          });
-        } catch (e) {
-          console.error("Error al parsear ficha:", e);
-        }
-      }
+      const f = mapa[p.id];
+      if (f) conFicha.push({ ...p, ultima_actualizacion: f.actualizado_en || f._actualizado_en || f._creado_en || new Date().toISOString() });
     });
     conFicha.sort((a, b) => new Date(b.ultima_actualizacion) - new Date(a.ultima_actualizacion));
-    console.log("Pacientes con ficha estética:", conFicha.length);
+    setFichas(mapa);
     setPacientesConFicha(conFicha);
   };
 
   useEffect(() => {
     if (!pacId) { setFicha(null); setEditando(false); return; }
-    const saved = JSON.parse(localStorage.getItem(`ficha_estetica_${pacId}`) || "null");
-    console.log("Ficha cargada para paciente", pacId, ":", saved ? "Existe" : "No existe");
+    const saved = fichas[pacId] || null;
     if (saved) { setFicha(saved); setEditando(false); }
     else       { setFicha(null);  setEditando(true); setFormFicha(initFicha()); }
-  }, [pacId]);
+  }, [pacId, fichas]);
 
   const abrir = () => {
     setFormFicha(ficha ? { ...ficha } : initFicha());
     setEditando(true);
   };
 
-  const guardar = (e) => {
+  const guardar = async (e) => {
     e.preventDefault();
-    const nuevaFicha = { ...formFicha, pac_id: pacId, actualizado_en: new Date().toISOString() };
-    localStorage.setItem(`ficha_estetica_${pacId}`, JSON.stringify(nuevaFicha));
+    const { id: _id, paciente_id: _p, _tipo, _creado_en, _actualizado_en, ...limpio } = formFicha;
+    let nuevaFicha;
+    try {
+      nuevaFicha = await crearEstetica("ficha", pacId, { ...limpio, pac_id: pacId, actualizado_en: new Date().toISOString() });
+    } catch (err) { alert(err.response?.data?.msg || "No se pudo guardar la ficha."); return; }
     setFicha(nuevaFicha);
     setEditando(false);
     setGuardado(true);
@@ -148,12 +147,12 @@ export default function FichaEstetica() {
 
   const eliminarFicha = () => {
     if (!window.confirm('¿Eliminar la ficha estética de este paciente? Esta acción no se puede deshacer.')) return;
-    localStorage.removeItem(`ficha_estetica_${pacId}`);
+    const f = fichas[pacId];
+    if (f) eliminarEstetica(f.id).catch(() => alert("No se pudo eliminar la ficha.")).then(() => cargarPacientesConFicha(pacientes));
     setFicha(null);
     setEditando(false);
     setPacId("");
     setBusqueda("");
-    cargarPacientesConFicha(pacientes);
   };
 
   const toggleProc = (p) => setFormFicha(f => ({
@@ -190,9 +189,9 @@ export default function FichaEstetica() {
   };
 
   const abrirModalVer = (paciente) => {
-    const fichaGuardada = localStorage.getItem(`ficha_estetica_${paciente.id}`);
+    const fichaGuardada = fichas[paciente.id];
     if (fichaGuardada) {
-      setFichaModal(JSON.parse(fichaGuardada));
+      setFichaModal(fichaGuardada);
       setPacModal(paciente);
       setModalVer(true);
     }
@@ -498,8 +497,8 @@ export default function FichaEstetica() {
                       onEditar={() => { seleccionarPaciente(pac); setTimeout(() => setEditando(true), 0); }}
                       onEliminar={() => {
                         if (!window.confirm(`¿Eliminar la ficha de ${pac.nombres} ${pac.apellidos}?`)) return;
-                        localStorage.removeItem(`ficha_estetica_${pac.id}`);
-                        cargarPacientesConFicha(pacientes);
+                        const f = fichas[pac.id];
+                        if (f) eliminarEstetica(f.id).then(() => cargarPacientesConFicha(pacientes)).catch(() => alert("No se pudo eliminar la ficha."));
                       }}
                     />
                   ))}

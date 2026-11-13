@@ -231,4 +231,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "estetica-pestana-nuevo-diseno",
+    version: "1.34",
+    titulo: "Estética: nueva pestaña del paciente y datos en la nube",
+    descripcion: "En el perfil del paciente → Estética ahora ve avisos (biopsia sin resultado, control vencido, procedimiento sin consentimiento), un resumen, el antes y después con deslizador y todo el historial estético por fecha. La ficha, presupuestos, consentimientos y controles post-procedimiento ahora se guardan en el sistema y se ven desde cualquier equipo.",
+    icono: "bi-stars",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];

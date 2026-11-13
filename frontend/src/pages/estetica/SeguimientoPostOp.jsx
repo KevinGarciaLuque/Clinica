@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
+import { listarEstetica, crearEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -56,26 +57,29 @@ export default function SeguimientoPostOp() {
     }).catch(() => {});
   }, [pacienteIdInicial]);
 
+  // Los controles se guardan en el servidor (antes solo en este navegador)
   useEffect(() => {
-    if (!pacId) { setRegistros([]); return; }
-    const saved = JSON.parse(localStorage.getItem(`seguimiento_postop_${pacId}`) || "[]");
-    setRegistros(saved);
+    if (!pacId) return undefined;
+    let vivo = true;
+    listarEstetica("seguimiento", pacId).then(l => { if (vivo) setRegistros(l.reverse()); }).catch(() => {});
+    return () => { vivo = false; };
   }, [pacId]);
 
-  const guardar = (e) => {
+  const guardar = async (e) => {
     e.preventDefault();
-    const nuevo = { ...form, id: Date.now(), pac_id: pacId, creado_en: new Date().toISOString() };
-    const lista = [...registros, nuevo];
-    localStorage.setItem(`seguimiento_postop_${pacId}`, JSON.stringify(lista));
-    setRegistros(lista);
-    setShowModal(false);
-    setForm(initForm());
+    try {
+      const nuevo = await crearEstetica("seguimiento", pacId, { ...form, pac_id: pacId, creado_en: new Date().toISOString() });
+      setRegistros(l => [...l, nuevo]);
+      setShowModal(false);
+      setForm(initForm());
+    } catch (err) { alert(err.response?.data?.msg || "No se pudo guardar el control."); }
   };
 
-  const eliminar = (id) => {
-    const lista = registros.filter(r => r.id !== id);
-    localStorage.setItem(`seguimiento_postop_${pacId}`, JSON.stringify(lista));
-    setRegistros(lista);
+  const eliminar = async (id) => {
+    try {
+      await eliminarEstetica(id);
+      setRegistros(l => l.filter(r => r.id !== id));
+    } catch { alert("No se pudo eliminar."); }
   };
 
   const pacSeleccionado = pacientes.find(p => String(p.id) === String(pacId));

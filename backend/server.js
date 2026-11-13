@@ -168,6 +168,7 @@ app.use("/api/caja", require("./routes/caja"));
 app.use("/api/finanzas", require("./routes/finanzas"));
 app.use("/api/sucursales", require("./routes/sucursales"));
 app.use("/api/nutricion", require("./routes/nutricion"));
+app.use("/api/estetica-datos", require("./routes/esteticaDatos"));
 app.use("/api/recordatorios-whatsapp", require("./routes/recordatoriosWhatsapp"));
 app.use("/api/videoconsultas", require("./routes/videoconsultas"));
 app.use("/api/superadmin/almacenamiento", require("./routes/almacenamientoAdmin"));
@@ -970,6 +971,15 @@ const pool = require("./db");
       console.log("✅ [auto-migrate] módulo nutrición OK");
     } catch (e) {
       console.warn("⚠️  [auto-migrate] módulo nutrición:", e.message);
+    }
+
+    // Estética: ficha, presupuestos, consentimientos y seguimiento post-op en el servidor
+    // (antes solo en el navegador). Los navegadores suben lo que tenían al abrir Estética.
+    try {
+      await require("./routes/esteticaDatos").asegurarTabla();
+      console.log("✅ [auto-migrate] estetica_registros OK");
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] estetica_registros:", e.message);
     }
 
     // Especialidades de los médicos: la lista original tenía 16; se agregan las que

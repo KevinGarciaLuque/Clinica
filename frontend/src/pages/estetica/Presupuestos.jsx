@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
+import { listarEstetica, crearEstetica, actualizarEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -52,40 +53,45 @@ export default function Presupuestos() {
     cargar();
   }, []);
 
-  const cargar = () => {
-    // Simulamos lista local mientras no hay endpoint dedicado
-    const saved = JSON.parse(localStorage.getItem("presupuestos_est") || "[]");
-    setPresupuestos(saved);
+  // Los presupuestos se guardan en el servidor (antes solo en este navegador)
+  const cargar = async () => {
+    try {
+      const lista = await listarEstetica("presupuesto");
+      setPresupuestos(lista.reverse()); // más antiguos primero, como antes
+    } catch { alert("No se pudieron cargar los presupuestos."); }
   };
 
-  const guardar = (e) => {
+  const guardar = async (e) => {
     e.preventDefault();
     const pac = pacientes.find(p => String(p.id) === String(form.paciente_id));
     const total = form.procedimientos.reduce((s, p) => s + (parseFloat(p.precio) || 0), 0);
-    const nuevo = {
-      ...form,
-      id: Date.now(),
-      paciente_nombre: pac ? `${pac.nombres} ${pac.apellidos}` : "—",
-      total,
-      creado_en: new Date().toISOString(),
-    };
-    const lista = [...presupuestos, nuevo];
-    localStorage.setItem("presupuestos_est", JSON.stringify(lista));
-    setPresupuestos(lista);
-    setShowModal(false);
-    setForm(initForm());
+    try {
+      const nuevo = await crearEstetica("presupuesto", form.paciente_id, {
+        ...form,
+        paciente_nombre: pac ? `${pac.nombres} ${pac.apellidos}` : "—",
+        total,
+        creado_en: new Date().toISOString(),
+      });
+      setPresupuestos(l => [...l, nuevo]);
+      setShowModal(false);
+      setForm(initForm());
+    } catch (err) { alert(err.response?.data?.msg || "No se pudo guardar el presupuesto."); }
   };
 
-  const cambiarEstado = (id, estado) => {
-    const lista = presupuestos.map(p => p.id === id ? { ...p, estado } : p);
-    localStorage.setItem("presupuestos_est", JSON.stringify(lista));
-    setPresupuestos(lista);
+  const cambiarEstado = async (id, estado) => {
+    const actual = presupuestos.find(p => p.id === id);
+    if (!actual) return;
+    try {
+      const nuevo = await actualizarEstetica(id, { ...actual, estado });
+      setPresupuestos(l => l.map(p => p.id === id ? nuevo : p));
+    } catch { alert("No se pudo cambiar el estado."); }
   };
 
-  const eliminar = (id) => {
-    const lista = presupuestos.filter(p => p.id !== id);
-    localStorage.setItem("presupuestos_est", JSON.stringify(lista));
-    setPresupuestos(lista);
+  const eliminar = async (id) => {
+    try {
+      await eliminarEstetica(id);
+      setPresupuestos(l => l.filter(p => p.id !== id));
+    } catch { alert("No se pudo eliminar."); }
   };
 
   const addProc = () => setForm(f => ({ ...f, procedimientos: [...f.procedimientos, { nombre: "", precio: "" }] }));

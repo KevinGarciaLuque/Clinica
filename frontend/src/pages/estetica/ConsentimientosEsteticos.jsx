@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
+import { listarEstetica, crearEstetica, actualizarEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -64,8 +65,8 @@ export default function ConsentimientosEsteticos() {
         }
       }
     }).catch(() => {});
-    const saved = JSON.parse(localStorage.getItem("consentimientos_est") || "[]");
-    setConsentimientos(saved);
+    // Los consentimientos se guardan en el servidor (antes solo en este navegador)
+    listarEstetica("consentimiento").then(l => setConsentimientos(l.reverse())).catch(() => {});
   }, [pacienteIdInicial]);
 
   const selecPlantilla = (id) => {
@@ -74,38 +75,41 @@ export default function ConsentimientosEsteticos() {
     setForm(f => ({ ...f, plantilla_id: id }));
   };
 
-  const guardar = (e) => {
+  const guardar = async (e) => {
     e.preventDefault();
     const pac = pacientes.find(p => String(p.id) === String(form.paciente_id));
-    const nuevo = {
-      id: Date.now(), ...form,
-      procedimiento: plantillaSelec?.procedimiento || "—",
-      contenido: plantillaSelec?.contenido || "",
-      riesgos: plantillaSelec?.riesgos || [],
-      paciente_nombre: pac ? `${pac.nombres} ${pac.apellidos}` : "—",
-      firmado: false,
-      creado_en: new Date().toISOString(),
-    };
-    const lista = [...consentimientos, nuevo];
-    localStorage.setItem("consentimientos_est", JSON.stringify(lista));
-    setConsentimientos(lista);
+    let nuevo;
+    try {
+      nuevo = await crearEstetica("consentimiento", form.paciente_id, {
+        ...form,
+        procedimiento: plantillaSelec?.procedimiento || "—",
+        contenido: plantillaSelec?.contenido || "",
+        riesgos: plantillaSelec?.riesgos || [],
+        paciente_nombre: pac ? `${pac.nombres} ${pac.apellidos}` : "—",
+        firmado: false,
+        creado_en: new Date().toISOString(),
+      });
+    } catch (err) { alert(err.response?.data?.msg || "No se pudo guardar el consentimiento."); return; }
+    setConsentimientos(l => [...l, nuevo]);
     setShowModal(false);
     setForm({ paciente_id: pacienteIdInicial || "", plantilla_id: "", notas: "" });
     setPlantillaSelec(null);
   };
 
-  const toggleFirma = (id) => {
-    const lista = consentimientos.map(c =>
-      c.id === id ? { ...c, firmado: !c.firmado, firmado_en: !c.firmado ? new Date().toISOString() : null } : c
-    );
-    localStorage.setItem("consentimientos_est", JSON.stringify(lista));
-    setConsentimientos(lista);
+  const toggleFirma = async (id) => {
+    const c = consentimientos.find(x => x.id === id);
+    if (!c) return;
+    try {
+      const nuevo = await actualizarEstetica(id, { ...c, firmado: !c.firmado, firmado_en: !c.firmado ? new Date().toISOString() : null });
+      setConsentimientos(l => l.map(x => x.id === id ? nuevo : x));
+    } catch { alert("No se pudo guardar el cambio."); }
   };
 
-  const eliminar = (id) => {
-    const lista = consentimientos.filter(c => c.id !== id);
-    localStorage.setItem("consentimientos_est", JSON.stringify(lista));
-    setConsentimientos(lista);
+  const eliminar = async (id) => {
+    try {
+      await eliminarEstetica(id);
+      setConsentimientos(l => l.filter(c => c.id !== id));
+    } catch { alert("No se pudo eliminar."); }
   };
 
   return (
