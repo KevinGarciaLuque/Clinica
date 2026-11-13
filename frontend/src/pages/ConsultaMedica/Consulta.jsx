@@ -29,6 +29,7 @@ import DocumentosTab from "./DocumentosTab";
 import EcocardiogramaTab, { PrintEco } from "./EcocardiogramaTab";
 import NutricionTab from "./NutricionTab";
 import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
+import EsteticaTab from "./EsteticaTab";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Consulta() {
@@ -87,6 +88,11 @@ export default function Consulta() {
   const [nutriAnterior, setNutriAnterior] = useState(null);
   const [generandoPdfNutri, setGenerandoPdfNutri] = useState(false);
   const setDatosNutri = useCallback((v) => { setNutriTocada(true); setDatosNutriBase(v); }, []);
+  // Pestaña Estética (clínicas con módulos de estética): se guarda aparte, junto con la consulta
+  const esEstetica = modulos.some(m => m.ruta?.startsWith("/estetica/"));
+  const [datosEst, setDatosEstBase] = useState({});
+  const [estTocada, setEstTocada] = useState(false);
+  const setDatosEst = useCallback((v) => { setEstTocada(true); setDatosEstBase(v); }, []);
   const soloLectura = firmada && !editMode;
 
   // ── carga inicial ────────────────────────────────────────────────────────────
@@ -192,6 +198,31 @@ export default function Consulta() {
     return () => { vivo = false; };
   }, [esNutricion, hid, paciente?.id, pacId]);
 
+  // ── estética: registro de esta consulta ──────────────────────────────────────
+  useEffect(() => {
+    if (!esEstetica || !hid) return;
+    api.get(`/estetica-datos/historia/${hid}`).then((r) => {
+      const reg = r.data.data;
+      if (reg) setDatosEstBase({ tipo_visita: reg.tipo, [reg.tipo]: reg.datos, _creado_en: reg.datos?.creado_en || reg.creado_en });
+    }).catch(() => {});
+  }, [esEstetica, hid]);
+
+  const guardarEstetica = useCallback(async (historiaId) => {
+    const tipoVisita = datosEst.tipo_visita;
+    if (!esEstetica || !historiaId || !tipoVisita || !estTocada) return;
+    const creado = datosEst._creado_en || new Date().toISOString();
+    try {
+      await api.put(`/estetica-datos/historia/${historiaId}`, {
+        tipo: tipoVisita,
+        datos: { ...(datosEst[tipoVisita] || {}), pac_id: String(paciente?.id || pacId), creado_en: creado },
+      });
+      setDatosEstBase((d) => ({ ...d, _creado_en: creado }));
+      setEstTocada(false);
+    } catch {
+      setAlertMsg({ type: "warning", msg: "La consulta se guardó, pero no se pudo guardar la parte de Estética. Intente de nuevo." });
+    }
+  }, [esEstetica, estTocada, datosEst, paciente?.id, pacId]);
+
   const guardarNutricion = useCallback(async (historiaId) => {
     if (!esNutricion || !historiaId) return;
     if (!nutriExiste && !nutriTocada && !vitals.peso && !vitals.talla) return; // consulta sin datos de nutrición
@@ -292,17 +323,19 @@ export default function Consulta() {
         }
         await registrarEnCurva();
         await guardarNutricion(r.data.id);
+        await guardarEstetica(r.data.id);
         return r.data.id;
       }
       await registrarEnCurva();
       await guardarNutricion(hid);
+      await guardarEstetica(hid);
       return hid;
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error al guardar" });
     } finally {
       setSaving(false);
     }
-  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion]);
+  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion, guardarEstetica]);
 
   // PDF del plan de alimentación: guarda primero (si se puede editar) y lo descarga.
   // En el teléfono abre el menú de compartir (WhatsApp, correo…).
@@ -344,6 +377,7 @@ export default function Consulta() {
 
   const TAB_LIST = [
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
+    ...(esEstetica ? [{ id: "estetica", icon: "bi-stars", label: "Estética" }] : []),
     ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
     ...(esCardioEco ? [{ id: "cardio_eco", icon: "bi-heart-pulse-fill", label: "Ecocardiograma" }] : []),
     ...(esNutricion ? [{ id: "nutricion", icon: "bi-apple", label: "Nutrición" }] : []),
@@ -666,6 +700,18 @@ export default function Consulta() {
               pacienteId={paciente?.id || pacId}
               firmada={soloLectura}
               onAutoSave={async () => handleSave(false)}
+            />
+          )}
+
+          {/* ── Estética ── */}
+          {tab === "estetica" && (
+            <EsteticaTab
+              datos={datosEst}
+              setDatos={setDatosEst}
+              firmada={soloLectura}
+              paciente={paciente}
+              pacienteId={paciente?.id || pacId}
+              historiaId={hid}
             />
           )}
 

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import { listarEstetica, crearEstetica, actualizarEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
+import { PLANTILLAS_CONSENTIMIENTO as PLANTILLAS } from "../../utils/esteticaCatalogos";
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -15,33 +16,6 @@ const inputSt = {
   color: C.text, padding: "8px 12px", width: "100%", fontSize: 14, outline: "none",
 };
 
-const PLANTILLAS = [
-  {
-    id: 1, procedimiento: "Rinoplastia",
-    contenido: `Yo, el/la abajo firmante, paciente de la clínica, declaro que he sido informado/a de manera clara y comprensible sobre el procedimiento de RINOPLASTIA, incluyendo sus beneficios, riesgos, complicaciones posibles, alternativas terapéuticas y el proceso de recuperación esperado. Autorizo al equipo médico a realizar dicho procedimiento y cualquier medida que sea necesaria durante su ejecución para garantizar mi seguridad.`,
-    riesgos: ["Hematoma postoperatorio","Infección de la herida","Asimetría residual","Alteraciones en la respiración","Cicatrices visibles"],
-  },
-  {
-    id: 2, procedimiento: "Abdominoplastia",
-    contenido: `Yo, el/la abajo firmante, paciente de la clínica, declaro que he sido informado/a sobre el procedimiento de ABDOMINOPLASTIA (plastia abdominal), sus riesgos inherentes, cuidados postoperatorios y resultados esperados. Doy mi consentimiento libre y voluntario para la realización de dicho procedimiento.`,
-    riesgos: ["Trombosis venosa profunda","Seromas","Necrosis cutánea","Cicatriz prominente","Cambios en la sensibilidad"],
-  },
-  {
-    id: 3, procedimiento: "Liposucción",
-    contenido: `Yo, el/la abajo firmante, paciente de la clínica, declaro haber recibido información completa sobre el procedimiento de LIPOSUCCIÓN, sus beneficios, limitaciones, riesgos y proceso de recuperación. Consiento voluntariamente la realización del procedimiento.`,
-    riesgos: ["Irregularidades en el contorno","Hematomas","Cambios en la sensibilidad","Infección","Resultados asimétricos"],
-  },
-  {
-    id: 4, procedimiento: "Aumento mamario",
-    contenido: `Yo, el/la abajo firmante, paciente de la clínica, declaro que he sido informada sobre el procedimiento de MAMOPLASTIA DE AUMENTO (implantes mamarios), sus riesgos específicos, la vida útil de los implantes, y la necesidad de controles periódicos. Otorgo mi consentimiento libre e informado.`,
-    riesgos: ["Contractura capsular","Rotura del implante","Cambios en la sensibilidad del pezón","Asimetría","Interferencia con mamografías"],
-  },
-  {
-    id: 5, procedimiento: "Bichectomía",
-    contenido: `Yo, el/la abajo firmante, paciente de la clínica, declaro que he sido informado/a sobre la BICHECTOMÍA (extirpación de las bolsas de Bichat), sus resultados esperados y posibles riesgos. Consiento voluntariamente la realización de dicha intervención.`,
-    riesgos: ["Asimetría facial","Paresia del nervio facial","Infección intraoral","Cicatriz intraoral","Resultado excesivo"],
-  },
-];
 
 export default function ConsentimientosEsteticos() {
   const [pacientes,      setPacientes]      = useState([]);

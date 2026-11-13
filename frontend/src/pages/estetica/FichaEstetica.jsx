@@ -132,7 +132,7 @@ export default function FichaEstetica() {
 
   const guardar = async (e) => {
     e.preventDefault();
-    const { id: _id, paciente_id: _p, _tipo, _creado_en, _actualizado_en, ...limpio } = formFicha;
+    const { id: _id, paciente_id: _p, historia_id: _h, _tipo, _creado_en, _actualizado_en, ...limpio } = formFicha;
     let nuevaFicha;
     try {
       nuevaFicha = await crearEstetica("ficha", pacId, { ...limpio, pac_id: pacId, actualizado_en: new Date().toISOString() });

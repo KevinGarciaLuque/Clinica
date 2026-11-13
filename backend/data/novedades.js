@@ -240,4 +240,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "estetica-en-la-consulta",
+    version: "1.35",
+    titulo: "Pestaña Estética dentro de la consulta",
+    descripcion: "En la consulta, pestaña «Estética»: elija Valoración, Día del procedimiento o Control. El día del procedimiento anote producto, lote, anestesia y toque en el dibujo de la cara las zonas tratadas con la cantidad de cada una; puede repetir lo de la última vez e imprimir el registro. El presupuesto y el consentimiento se hacen ahí mismo, sin salir de la consulta.",
+    icono: "bi-magic",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

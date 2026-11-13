@@ -11,13 +11,20 @@
  *  PUT    /api/estetica-datos/:id                  → { datos }
  *  DELETE /api/estetica-datos/:id                  → se marca como eliminado (no se borra)
  *  POST   /api/estetica-datos/importar             → { items: [{ tipo, paciente_id, datos, id_local }] }
+ *  GET    /api/estetica-datos/historia/:hid        → registro estético de esa consulta (o null)
+ *  PUT    /api/estetica-datos/historia/:hid        → { tipo, datos } crea o actualiza el de esa consulta
+ *
+ * Desde la pestaña «Estética» de la consulta se guarda un registro por consulta:
+ * «valoracion», «procedimiento» o «seguimiento» (el control post-procedimiento
+ * usa los mismos campos que la pantalla de Seguimiento post-op, así aparece allí).
  */
 const router = require("express").Router();
 const pool = require("../db");
 const auth = require("../middlewares/auth");
 
 const ROLES = ["ADMIN", "MEDICO", "ENFERMERA", "RECEPCIONISTA", "SUPER_ADMIN"];
-const TIPOS = ["ficha", "presupuesto", "consentimiento", "seguimiento"];
+const TIPOS = ["ficha", "presupuesto", "consentimiento", "seguimiento", "valoracion", "procedimiento"];
+const TIPOS_CONSULTA = ["valoracion", "procedimiento", "seguimiento"];
 
 let tablaLista = false;
 async function asegurarTabla() {
@@ -37,6 +44,11 @@ async function asegurarTabla() {
       UNIQUE KEY uq_est_local (clinica_id, tipo, id_local),
       INDEX idx_est_paciente (clinica_id, paciente_id, tipo)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  // Consulta (historia clínica) en la que se registró, si vino de la consulta
+  const [col] = await pool.query("SHOW COLUMNS FROM estetica_registros LIKE 'historia_id'");
+  if (!col.length) {
+    await pool.query("ALTER TABLE estetica_registros ADD COLUMN historia_id INT UNSIGNED NULL AFTER paciente_id, ADD INDEX idx_est_historia (historia_id)");
+  }
   tablaLista = true;
 }
 
@@ -47,7 +59,7 @@ const texto = (datos) => {
   return t.length > 500000 ? null : t;
 };
 const fila = (r) => ({
-  id: r.id, paciente_id: r.paciente_id, tipo: r.tipo, datos: leer(r.datos),
+  id: r.id, paciente_id: r.paciente_id, historia_id: r.historia_id || null, tipo: r.tipo, datos: leer(r.datos),
   paciente_nombre: r.pac_nombres ? `${r.pac_nombres} ${r.pac_apellidos || ""}`.trim() : null,
   creado_en: r.creado_en, actualizado_en: r.actualizado_en,
 });
@@ -175,6 +187,58 @@ router.post("/importar", auth(...ROLES), async (req, res) => {
       if (r.affectedRows) subidos++; else omitidos++;
     }
     res.json({ ok: true, subidos, omitidos });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+async function historiaDeClinica(hid, clinicaId) {
+  const [[h]] = await pool.query("SELECT id, paciente_id FROM historias_clinicas WHERE id = ? AND clinica_id = ?", [hid, clinicaId]);
+  return h || null;
+}
+
+router.get("/historia/:hid(\\d+)", auth(...ROLES), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const clinicaId = clinicaDe(req);
+    const [[r]] = await pool.query(
+      "SELECT * FROM estetica_registros WHERE historia_id = ? AND clinica_id = ? AND activo = 1 ORDER BY id DESC LIMIT 1",
+      [req.params.hid, clinicaId]
+    );
+    res.json({ ok: true, data: r ? fila(r) : null });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+router.put("/historia/:hid(\\d+)", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_ADMIN"), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const clinicaId = clinicaDe(req);
+    const { tipo, datos } = req.body || {};
+    if (!TIPOS_CONSULTA.includes(tipo)) return res.status(400).json({ ok: false, msg: "Tipo de visita no válido." });
+    const h = await historiaDeClinica(req.params.hid, clinicaId);
+    if (!h) return res.status(404).json({ ok: false, msg: "Consulta no encontrada." });
+    const t = texto(datos);
+    if (!t) return res.status(400).json({ ok: false, msg: "Los datos son demasiado grandes." });
+    const [[ya]] = await pool.query(
+      "SELECT id FROM estetica_registros WHERE historia_id = ? AND clinica_id = ? AND activo = 1 ORDER BY id DESC LIMIT 1",
+      [h.id, clinicaId]
+    );
+    let id;
+    if (ya) {
+      // Si se cambia el tipo de visita, el mismo registro cambia de tipo
+      await pool.query("UPDATE estetica_registros SET tipo = ?, datos = ?, actualizado_en = NOW() WHERE id = ?", [tipo, t, ya.id]);
+      id = ya.id;
+    } else {
+      const [ins] = await pool.query(
+        "INSERT INTO estetica_registros (clinica_id, paciente_id, historia_id, tipo, datos, creado_por) VALUES (?,?,?,?,?,?)",
+        [clinicaId, h.paciente_id, h.id, tipo, t, req.user.id]
+      );
+      id = ins.insertId;
+    }
+    const [[r]] = await pool.query("SELECT * FROM estetica_registros WHERE id = ?", [id]);
+    res.json({ ok: true, data: fila(r) });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

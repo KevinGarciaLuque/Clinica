@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import api from "../api/api";
 import { listarEstetica } from "../utils/esteticaDatos";
+import { nombreZona } from "../utils/esteticaCatalogos";
 
 /**
  * Pestaña «Estética» del perfil del paciente, pensada para el médico:
@@ -77,6 +78,10 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
     const presupuestos = de("presupuesto");
     const consentimientos = de("consentimiento");
     const controles = de("seguimiento");
+    const procedimientos = de("procedimiento");
+    const valoraciones = de("valoracion");
+    // Lo registrado en una consulta abre esa consulta
+    const enlace = (reg, otro) => (reg.historia_id ? `/consulta-medica?historia_id=${reg.historia_id}` : otro);
     const fechaControl = (c) => soloFecha(c.creado_en || c._creado_en);
 
     const ultimoControl = [...controles].sort((a, b) => fechaControl(b).localeCompare(fechaControl(a)))[0] || null;
@@ -92,6 +97,7 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
 
     const procs = [...new Set([
       ...controles.map((c) => c.procedimiento),
+      ...procedimientos.map((x) => x.nombre),
       ...presupuestos.filter((p) => p.estado === "APROBADO").flatMap((p) => (p.procedimientos || []).map((x) => x.nombre)),
     ].filter((p) => norm(p)))];
     const sinConsentimiento = procs.filter((p) => !firmados.some((c) => mismoProc(c.procedimiento, p)));
@@ -125,20 +131,31 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
     // Línea de tiempo: todo junto, lo más reciente arriba
     const eventos = [
       ...sesiones.map((s) => ({ fecha: soloFecha(s.fecha || s.creado_en), color: "#0ea5e9", icono: "bi-images", titulo: "Sesión de fotos", detalle: s.nombre, link: `/estetica/galeria?paciente_id=${pacienteId}` })),
-      ...controles.map((c) => ({ fecha: fechaControl(c), color: "#8b5cf6", icono: "bi-heart-pulse", titulo: `Control ${FASES[c.fase] || ""}`.trim(), detalle: [c.procedimiento, c.resultado && `Resultado: ${c.resultado}`, c.dolor_eva && `Dolor ${c.dolor_eva}/10`].filter(Boolean).join(" · "), link: `/estetica/seguimiento?paciente_id=${pacienteId}` })),
+      ...controles.map((c) => ({ fecha: fechaControl(c), color: "#8b5cf6", icono: "bi-heart-pulse", titulo: `Control ${FASES[c.fase] || ""}`.trim(), detalle: [c.procedimiento, c.resultado && `Resultado: ${c.resultado}`, c.dolor_eva && `Dolor ${c.dolor_eva}/10`].filter(Boolean).join(" · "), link: enlace(c, `/estetica/seguimiento?paciente_id=${pacienteId}`) })),
+      ...procedimientos.map((x) => ({ fecha: fechaControl(x), color: ROSA, icono: "bi-magic", titulo: x.nombre || "Procedimiento",
+        detalle: [
+          Object.entries(x.zonas || {}).map(([z, c]) => `${nombreZona(z)}${c ? ` ${c}${x.unidad ? ` ${x.unidad}` : ""}` : ""}`).join(", "),
+          (x.zonas_cuerpo || []).join(", "),
+          (x.productos || []).filter((p) => p.producto || p.lote).map((p) => `${p.producto || ""}${p.lote ? ` (lote ${p.lote})` : ""}`).join(", "),
+        ].filter(Boolean).join(" · "),
+        link: enlace(x, `/pacientes/${pacienteId}/perfil?tab=estetica`) })),
+      ...valoraciones.map((v) => ({ fecha: fechaControl(v), color: "#64748b", icono: "bi-search-heart", titulo: "Valoración",
+        detalle: [(v.sugeridos || []).join(", "), v.motivo].filter(Boolean).join(" · "),
+        link: enlace(v, `/pacientes/${pacienteId}/perfil?tab=estetica`) })),
       ...presupuestos.map((p) => ({ fecha: soloFecha(p.creado_en || p._creado_en), color: "#d97706", icono: "bi-receipt", titulo: `Presupuesto ${String(p.estado || "").toLowerCase()}`, detalle: [p.titulo || (p.procedimientos || []).map((x) => x.nombre).filter(Boolean).join(", "), `Total ${monto(p.total)}`].filter(Boolean).join(" · "), link: "/estetica/presupuestos" })),
       ...consentimientos.map((c) => ({ fecha: soloFecha(c.creado_en || c._creado_en), color: c.firmado ? "#16a34a" : "#9ca3af", icono: "bi-file-earmark-check", titulo: c.firmado ? "Consentimiento firmado" : "Consentimiento sin firmar", detalle: c.procedimiento, link: `/estetica/consentimientos?paciente_id=${pacienteId}` })),
       ...biopsias.map((b) => ({ fecha: soloFecha(b.fecha_toma || b.creado_en), color: "#dc2626", icono: "bi-eyedropper", titulo: "Biopsia", detalle: [b.tipo_biopsia, b.sitio_anatomico, b.resultado_patologico && b.resultado_patologico !== "pendiente" && `Resultado: ${b.resultado_patologico.replace(/_/g, " ")}`].filter(Boolean).join(" · "), link: `/estetica/biopsias?paciente_id=${pacienteId}` })),
     ].filter((e) => e.fecha).sort((a, b) => b.fecha.localeCompare(a.fecha));
 
-    return { ficha, presupuestos, pendientes, consentimientos, firmados, controles, ultimoControl, proximo, alertas, eventos };
+    const ultimoProc = [...procedimientos].sort((a, b) => fechaControl(b).localeCompare(fechaControl(a)))[0] || null;
+    return { ultimoProc, ficha, presupuestos, pendientes, consentimientos, firmados, controles, ultimoControl, proximo, alertas, eventos };
   }, [datos, sesiones, biopsias, pacienteId]);
 
   if (cargando) {
     return <div className="text-center text-muted py-5"><div className="spinner-border spinner-border-sm me-2" />Cargando datos estéticos…</div>;
   }
 
-  const { ficha, pendientes, consentimientos, firmados, ultimoControl, proximo, alertas, eventos } = resumen;
+  const { ultimoProc, ficha, pendientes, consentimientos, firmados, ultimoControl, proximo, alertas, eventos } = resumen;
   const visibles = verTodo ? eventos : eventos.slice(0, 8);
   const acciones = [
     { modulo: "galeria_estetica", icono: "bi-camera", texto: "Fotos", link: `/estetica/galeria?paciente_id=${pacienteId}` },
@@ -190,9 +207,15 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
 
       {/* Resumen */}
       <div className="ep-grid mb-3">
-        <Dato color="#0ea5e9" icono="bi-images" titulo="Últimas fotos"
-          valor={sesiones[0] ? fechaCorta(sesiones[0].fecha || sesiones[0].creado_en) : "Sin fotos"}
-          sub={sesiones[0]?.nombre || `${sesiones.length} sesiones`} />
+        {ultimoProc ? (
+          <Dato color={ROSA} icono="bi-magic" titulo="Último procedimiento"
+            valor={fechaCorta(ultimoProc.creado_en || ultimoProc._creado_en)}
+            sub={ultimoProc.nombre || "Procedimiento"} />
+        ) : (
+          <Dato color="#0ea5e9" icono="bi-images" titulo="Últimas fotos"
+            valor={sesiones[0] ? fechaCorta(sesiones[0].fecha || sesiones[0].creado_en) : "Sin fotos"}
+            sub={sesiones[0]?.nombre || `${sesiones.length} sesiones`} />
+        )}
         <Dato color="#8b5cf6" icono="bi-calendar-check" titulo="Próximo control"
           valor={proximo ? fechaCorta(proximo) : "Sin programar"}
           sub={ultimoControl ? `Último: ${FASES[ultimoControl.fase] || ""} ${ultimoControl.procedimiento || ""}`.trim() : "Sin controles"} />

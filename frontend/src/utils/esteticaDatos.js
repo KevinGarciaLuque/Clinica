@@ -4,7 +4,7 @@
 import api from "../api/api";
 
 /** Registro del servidor con la forma que usaban las pantallas: { ...datos, id, paciente_id } */
-const plano = (r) => ({ ...r.datos, id: r.id, _tipo: r.tipo, paciente_id: r.paciente_id, paciente_nombre: r.datos?.paciente_nombre || r.paciente_nombre, _creado_en: r.creado_en, _actualizado_en: r.actualizado_en });
+const plano = (r) => ({ ...r.datos, id: r.id, _tipo: r.tipo, historia_id: r.historia_id || null, paciente_id: r.paciente_id, paciente_nombre: r.datos?.paciente_nombre || r.paciente_nombre, _creado_en: r.creado_en, _actualizado_en: r.actualizado_en });
 
 let subida = null;
 export function subirDatosLocales() {
@@ -58,7 +58,7 @@ export async function crearEstetica(tipo, pacienteId, datos) {
 }
 
 export async function actualizarEstetica(id, datos) {
-  const { id: _id, paciente_id: _p, _tipo, _creado_en, _actualizado_en, ...limpio } = datos;
+  const { id: _id, paciente_id: _p, historia_id: _h, _tipo, _creado_en, _actualizado_en, ...limpio } = datos;
   const r = await api.put(`/estetica-datos/${id}`, { datos: limpio });
   return plano(r.data.data);
 }
