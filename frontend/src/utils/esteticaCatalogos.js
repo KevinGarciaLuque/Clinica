@@ -42,16 +42,17 @@ export const EDEMA_OPC = ["Ausente", "Leve", "Moderado", "Severo"];
 export const CICATRIZ_OPC = ["Sin alteraciones", "Eritematosa", "Elevada", "Deprimida", "Queloidea", "Hipopigmentada"];
 export const RESULTADO_OPC = ["Excelente", "Muy bueno", "Bueno", "Regular", "Requiere revisión"];
 
+/** mant = meses sugeridos hasta el mantenimiento (se puede cambiar en cada procedimiento) */
 export const PROCEDIMIENTOS_COMUNES = [
-  { nombre: "Toxina botulínica", unidad: "U" },
-  { nombre: "Ácido hialurónico (relleno)", unidad: "ml" },
-  { nombre: "Bioestimulador de colágeno", unidad: "ml" },
-  { nombre: "Hilos tensores", unidad: "hilos" },
-  { nombre: "Plasma rico en plaquetas", unidad: "ml" },
-  { nombre: "Mesoterapia", unidad: "ml" },
-  { nombre: "Peeling químico", unidad: "sesión" },
-  { nombre: "Láser", unidad: "disparos" },
-  { nombre: "Radiofrecuencia", unidad: "sesión" },
+  { nombre: "Toxina botulínica", unidad: "U", mant: 4 },
+  { nombre: "Ácido hialurónico (relleno)", unidad: "ml", mant: 9 },
+  { nombre: "Bioestimulador de colágeno", unidad: "ml", mant: 12 },
+  { nombre: "Hilos tensores", unidad: "hilos", mant: 12 },
+  { nombre: "Plasma rico en plaquetas", unidad: "ml", mant: 4 },
+  { nombre: "Mesoterapia", unidad: "ml", mant: 3 },
+  { nombre: "Peeling químico", unidad: "sesión", mant: 1 },
+  { nombre: "Láser", unidad: "disparos", mant: 1 },
+  { nombre: "Radiofrecuencia", unidad: "sesión", mant: 1 },
   { nombre: "Blefaroplastia", unidad: "" },
   { nombre: "Rinoplastia", unidad: "" },
   { nombre: "Bichectomía", unidad: "" },
@@ -102,3 +103,6 @@ export const ZONAS_CARA = [
 ];
 
 export const nombreZona = (id) => ZONAS_CARA.find((z) => z.id === id)?.label || id;
+
+/** Opciones de «mantenimiento en…» (meses) */
+export const MESES_MANTENIMIENTO = [1, 2, 3, 4, 5, 6, 9, 12, 18, 24];

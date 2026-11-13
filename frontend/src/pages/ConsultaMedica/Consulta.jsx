@@ -212,12 +212,18 @@ export default function Consulta() {
     if (!esEstetica || !historiaId || !tipoVisita || !estTocada) return;
     const creado = datosEst._creado_en || new Date().toISOString();
     try {
-      await api.put(`/estetica-datos/historia/${historiaId}`, {
+      const r = await api.put(`/estetica-datos/historia/${historiaId}`, {
         tipo: tipoVisita,
         datos: { ...(datosEst[tipoVisita] || {}), pac_id: String(paciente?.id || pacId), creado_en: creado },
       });
-      setDatosEstBase((d) => ({ ...d, _creado_en: creado }));
+      // El servidor programa el mantenimiento: se guarda su número para no repetirlo
+      const guardado = r.data?.data?.datos || {};
+      setDatosEstBase((d) => ({
+        ...d, _creado_en: creado,
+        [tipoVisita]: { ...(d[tipoVisita] || {}), mantenimiento_control_id: guardado.mantenimiento_control_id, mantenimiento_fecha: guardado.mantenimiento_fecha },
+      }));
       setEstTocada(false);
+      if (r.data?.avisos?.length) setAlertMsg({ type: "warning", msg: r.data.avisos.join(" ") });
     } catch {
       setAlertMsg({ type: "warning", msg: "La consulta se guardó, pero no se pudo guardar la parte de Estética. Intente de nuevo." });
     }

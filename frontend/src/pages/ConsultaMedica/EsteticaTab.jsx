@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import MapaFacial from "../../components/MapaFacial";
+import api from "../../api/api";
 import { listarEstetica, crearEstetica } from "../../utils/esteticaDatos";
 import { imprimirHtml } from "../../utils/descargarPdf";
 import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
 import ModalAgendarControles from "../../components/estetica/ModalAgendarControles";
 import {
   PLANTILLAS_CONSENTIMIENTO, FASES_CONTROL, EDEMA_OPC, CICATRIZ_OPC, RESULTADO_OPC,
-  PROCEDIMIENTOS_COMUNES, UNIDADES, ANESTESIA_OPC, CONTRAINDICACIONES, ZONAS_CUERPO, nombreZona,
+  PROCEDIMIENTOS_COMUNES, UNIDADES, ANESTESIA_OPC, CONTRAINDICACIONES, ZONAS_CUERPO, nombreZona, MESES_MANTENIMIENTO,
 } from "../../utils/esteticaCatalogos";
 
 /**
@@ -45,12 +46,20 @@ const Chip = ({ activo, onClick, children, disabled }) => (
 const fechaCorta = (v) => (v ? new Date(String(v).length <= 10 ? `${v}T12:00:00` : v).toLocaleDateString("es", { day: "numeric", month: "short", year: "numeric" }) : "—");
 const esc = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
 const unidadDe = (nombre) => PROCEDIMIENTOS_COMUNES.find((p) => p.nombre === nombre)?.unidad;
+const mantDe = (nombre) => PROCEDIMIENTOS_COMUNES.find((p) => p.nombre === nombre)?.mant;
+const sumarMeses = (meses) => { const d = new Date(); d.setMonth(d.getMonth() + Number(meses)); return d.toISOString().slice(0, 10); };
+const hoyTxt = () => new Date().toISOString().slice(0, 10);
 
 export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacienteId, historiaId, onGuardar }) {
   const [previos, setPrevios] = useState({ cargado: false, ficha: null, ultimoProc: null, firmados: [], consentimientos: [] });
   const [modal, setModal] = useState(null); // "presupuesto" | "consentimiento" | "controles"
   const [firmar, setFirmar] = useState(null); // consentimiento que se va a firmar con el dedo
   const [recarga, setRecarga] = useState(0);
+  const [inventario, setInventario] = useState([]); // productos con lotes, para descontar al guardar
+
+  useEffect(() => {
+    api.get("/inventario/para-procedimiento").then((r) => setInventario(r.data.data || [])).catch(() => {});
+  }, []);
   const tipo = datos.tipo_visita || "";
   const val = datos.valoracion || {};
   const proc = datos.procedimiento || {};
@@ -261,7 +270,14 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
             <div className="et-campos">
               <div><Lbl>Procedimiento</Lbl>
                 <input list="et-procs" style={inp} disabled={firmada} value={proc.nombre || ""} placeholder="Escriba o elija"
-                  onChange={(e) => { const n = e.target.value; setDatos((d) => ({ ...d, procedimiento: { ...(d.procedimiento || {}), nombre: n, unidad: d.procedimiento?.unidad || unidadDe(n) || "" } })); }} />
+                  onChange={(e) => {
+                    const n = e.target.value;
+                    setDatos((d) => ({ ...d, procedimiento: {
+                      ...(d.procedimiento || {}), nombre: n, unidad: d.procedimiento?.unidad || unidadDe(n) || "",
+                      // Mantenimiento sugerido según el procedimiento (se puede cambiar abajo)
+                      ...(d.procedimiento?.mantenimiento_meses == null && mantDe(n) ? { mantenimiento_meses: mantDe(n) } : {}),
+                    } }));
+                  }} />
                 <datalist id="et-procs">{PROCEDIMIENTOS_COMUNES.map((p) => <option key={p.nombre} value={p.nombre} />)}</datalist>
                 {proc.nombre && previos.cargado && !firmadoPara(proc.nombre) && (
                   <div className="mt-1" style={{ color: "#b91c1c", fontSize: "0.78rem", fontWeight: 600 }}>
@@ -296,11 +312,39 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
             {(proc.productos || [{}]).map((p, i) => {
               const cambiar = (campo, v) => setDatos((d) => {
                 const lista = [...(d.procedimiento?.productos || [{}])];
-                lista[i] = { ...lista[i], [campo]: v };
+                const extra = typeof campo === "object" ? campo : { [campo]: v };
+                // Si se escribe a mano el producto o el lote, deja de estar ligado al inventario
+                if (campo === "producto") Object.assign(extra, { item_id: null, lote_id: null });
+                if (campo === "lote") extra.lote_id = null;
+                lista[i] = { ...lista[i], ...extra };
                 return { ...d, procedimiento: { ...(d.procedimiento || {}), productos: lista } };
               });
+              const item = inventario.find((it) => it.id === p.item_id);
+              const lote = item?.lotes?.find((l) => l.id === p.lote_id);
+              const vencido = p.vence && String(p.vence).slice(0, 7) < hoyTxt().slice(0, 7);
               return (
-                <div key={i} className="et-prod mb-2">
+                <div key={i} className="mb-2">
+                {inventario.length > 0 && !firmada && (
+                  <select style={{ ...inp, marginBottom: 6, background: p.item_id ? "#f0f9ff" : "#fff", borderColor: p.item_id ? "#7dd3fc" : "#d1d5db" }}
+                    value={p.item_id ? `${p.item_id}|${p.lote_id || ""}` : ""}
+                    onChange={(e) => {
+                      if (!e.target.value) { cambiar({ item_id: null, lote_id: null }); return; }
+                      const [iid, lid] = e.target.value.split("|").map(Number);
+                      const it = inventario.find((x) => x.id === iid);
+                      const l = it?.lotes?.find((x) => x.id === lid);
+                      cambiar({ item_id: iid, lote_id: l?.id || null, producto: it?.nombre || "", lote: l?.lote || "", vence: l?.vence ? l.vence.slice(0, 7) : "" });
+                    }}>
+                    <option value="">Elegir del inventario (se descuenta al guardar)…</option>
+                    {inventario.map((it) => (it.lotes?.length ? it.lotes.map((l) => (
+                      <option key={`${it.id}|${l.id}`} value={`${it.id}|${l.id}`}>
+                        {it.nombre} — lote {l.lote}{l.vence ? ` · vence ${l.vence.slice(0, 7)}` : ""} · quedan {Number(l.cantidad)} {it.unidad_medida}
+                      </option>
+                    )) : (
+                      <option key={`${it.id}|`} value={`${it.id}|`}>{it.nombre} (sin lote) · quedan {Number(it.stock_actual)} {it.unidad_medida}</option>
+                    )))}
+                  </select>
+                )}
+                <div className="et-prod">
                   <input className="et-prod-prod" style={inp} disabled={firmada} placeholder="Producto / marca" value={p.producto || ""} onChange={(e) => cambiar("producto", e.target.value)} />
                   <input style={inp} disabled={firmada} placeholder="Lote" value={p.lote || ""} onChange={(e) => cambiar("lote", e.target.value)} />
                   <input style={inp} disabled={firmada} type="month" title="Vencimiento" value={p.vence || ""} onChange={(e) => cambiar("vence", e.target.value)} />
@@ -310,6 +354,13 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                       <i className="bi bi-x-lg" />
                     </button>
                   ) : <span />}
+                </div>
+                {(p.item_id || vencido) && (
+                  <div style={{ fontSize: "0.75rem", marginTop: 3, color: vencido ? "#b91c1c" : "#0369a1", fontWeight: 600 }}>
+                    {vencido && <><i className="bi bi-exclamation-triangle-fill me-1" />Este lote está vencido. </>}
+                    {p.item_id && <><i className="bi bi-box-seam me-1" />Se descuenta del inventario al guardar{item ? ` (${item.unidad_medida})` : ""}.{lote && Number(p.cantidad) > Number(lote.cantidad) ? " Ojo: quedan menos en ese lote." : ""}</>}
+                  </div>
+                )}
                 </div>
               );
             })}
@@ -384,6 +435,20 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                     </>
                   );
                 })()}
+              </div>
+              <div><Lbl>Mantenimiento (cuándo debería volver)</Lbl>
+                <select style={inp} disabled={firmada} value={proc.mantenimiento_meses || ""}
+                  onChange={(e) => set("procedimiento", "mantenimiento_meses", e.target.value ? Number(e.target.value) : 0)}>
+                  <option value="">Sin mantenimiento</option>
+                  {MESES_MANTENIMIENTO.map((m) => <option key={m} value={m}>En {m} {m === 1 ? "mes" : "meses"}</option>)}
+                </select>
+                {Number(proc.mantenimiento_meses) > 0 && (
+                  <div className="mt-1" style={{ fontSize: "0.78rem", color: "#5b21b6" }}>
+                    <i className="bi bi-arrow-repeat me-1" />
+                    Alrededor del <strong>{fechaCorta(proc.mantenimiento_fecha || sumarMeses(proc.mantenimiento_meses))}</strong>.
+                    {" "}7 días antes el paciente recibe un correo para agendar, y la clínica lo ve en Citas → Controles.
+                  </div>
+                )}
               </div>
               <div><Lbl>Complicaciones inmediatas</Lbl>
                 <textarea rows={2} style={inp} disabled={firmada} value={proc.complicaciones || ""} onChange={(e) => set("procedimiento", "complicaciones", e.target.value)} placeholder="Ninguna" /></div>

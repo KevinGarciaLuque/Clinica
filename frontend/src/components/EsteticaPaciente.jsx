@@ -141,6 +141,7 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
           Object.entries(x.zonas || {}).map(([z, c]) => `${nombreZona(z)}${c ? ` ${c}${x.unidad ? ` ${x.unidad}` : ""}` : ""}`).join(", "),
           (x.zonas_cuerpo || []).join(", "),
           (x.productos || []).filter((p) => p.producto || p.lote).map((p) => `${p.producto || ""}${p.lote ? ` (lote ${p.lote})` : ""}`).join(", "),
+          x.mantenimiento_fecha && `Mantenimiento: ${fechaCorta(x.mantenimiento_fecha)}`,
         ].filter(Boolean).join(" · "),
         link: enlace(x, `/pacientes/${pacienteId}/perfil?tab=estetica`) })),
       ...valoraciones.map((v) => ({ fecha: fechaControl(v), color: "#64748b", icono: "bi-search-heart", titulo: "Valoración",
@@ -214,7 +215,7 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
         {ultimoProc ? (
           <Dato color={ROSA} icono="bi-magic" titulo="Último procedimiento"
             valor={fechaCorta(ultimoProc.creado_en || ultimoProc._creado_en)}
-            sub={ultimoProc.nombre || "Procedimiento"} />
+            sub={`${ultimoProc.nombre || "Procedimiento"}${ultimoProc.mantenimiento_fecha ? ` · mantenimiento ${fechaCorta(ultimoProc.mantenimiento_fecha)}` : ""}`} />
         ) : (
           <Dato color="#0ea5e9" icono="bi-images" titulo="Últimas fotos"
             valor={sesiones[0] ? fechaCorta(sesiones[0].fecha || sesiones[0].creado_en) : "Sin fotos"}

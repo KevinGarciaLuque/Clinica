@@ -10,6 +10,13 @@
  * PUT    /api/inventario/:id          → actualizar ítem
  * POST   /api/inventario/:id/movimiento → registrar entrada/salida/ajuste
  * DELETE /api/inventario/:id          → eliminar ítem (solo ADMIN/SUPER_ADMIN)
+ *
+ * Lotes (tabla nueva inventario_lotes; el stock total del ítem sigue igual):
+ * GET    /api/inventario/para-procedimiento → productos activos con sus lotes (pestaña Estética)
+ * GET    /api/inventario/lotes/alertas      → lotes vencidos o por vencer (60 días) con existencia
+ * GET    /api/inventario/lotes/trazabilidad?lote=  → a qué pacientes se aplicó un lote
+ * GET    /api/inventario/:id/lotes          → lotes de un ítem
+ * La ENTRADA puede traer { lote, vence } y la SALIDA { lote_id }.
  */
 const router = require("express").Router();
 const pool   = require("../db");
@@ -17,6 +24,30 @@ const auth   = require("../middlewares/auth");
 
 const clinicaOf = (req) =>
   req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
+
+let lotesListos = null;
+/** Tabla de lotes y columna opcional lote_id en los movimientos (aditivo) */
+function asegurarLotes() {
+  if (!lotesListos) {
+    lotesListos = (async () => {
+      await pool.query(`
+        CREATE TABLE IF NOT EXISTS inventario_lotes (
+          id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+          clinica_id INT UNSIGNED NOT NULL,
+          item_id    INT UNSIGNED NOT NULL,
+          lote       VARCHAR(80) NOT NULL,
+          vence      DATE NULL,
+          cantidad   DECIMAL(10,2) NOT NULL DEFAULT 0,
+          creado_en  DATETIME DEFAULT CURRENT_TIMESTAMP,
+          UNIQUE KEY uq_lote_item (item_id, lote),
+          INDEX idx_lote_clinica (clinica_id, vence)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+      const [col] = await pool.query("SHOW COLUMNS FROM inventario_movimientos LIKE 'lote_id'");
+      if (!col.length) await pool.query("ALTER TABLE inventario_movimientos ADD COLUMN lote_id INT UNSIGNED NULL");
+    })().catch((e) => { lotesListos = null; throw e; });
+  }
+  return lotesListos;
+}
 
 // ── GET / (lista) ─────────────────────────────────────────────────────────────
 router.get("/", auth(), async (req, res) => {
@@ -56,6 +87,80 @@ router.get("/categorias", auth(), async (req, res) => {
       [cid]
     );
     res.json({ ok: true, data: rows.map(r => r.categoria) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /para-procedimiento: productos con sus lotes disponibles ─────────────
+router.get("/para-procedimiento", auth(), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    if (!cid) return res.json({ ok: true, data: [] });
+    await asegurarLotes();
+    const [items] = await pool.query(
+      `SELECT id, nombre, categoria, unidad_medida, stock_actual FROM inventario_items
+       WHERE clinica_id = ? AND activo = 1 ORDER BY nombre`, [cid]);
+    const [lotes] = await pool.query(
+      `SELECT id, item_id, lote, DATE_FORMAT(vence,'%Y-%m-%d') AS vence, cantidad FROM inventario_lotes
+       WHERE clinica_id = ? AND cantidad > 0 ORDER BY vence IS NULL, vence, id`, [cid]);
+    res.json({ ok: true, data: items.map((it) => ({ ...it, lotes: lotes.filter((l) => l.item_id === it.id) })) });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /lotes/alertas: vencidos o por vencer, con existencia ────────────────
+router.get("/lotes/alertas", auth(), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    if (!cid) return res.json({ ok: true, data: [] });
+    await asegurarLotes();
+    const dias = Math.min(Math.max(Number(req.query.dias) || 60, 1), 365);
+    const [rows] = await pool.query(
+      `SELECT l.id, l.item_id, l.lote, DATE_FORMAT(l.vence,'%Y-%m-%d') AS vence, l.cantidad,
+              i.nombre, i.unidad_medida, DATEDIFF(l.vence, CURDATE()) AS dias
+       FROM inventario_lotes l JOIN inventario_items i ON i.id = l.item_id
+       WHERE l.clinica_id = ? AND l.cantidad > 0 AND l.vence IS NOT NULL
+         AND l.vence <= DATE_ADD(CURDATE(), INTERVAL ? DAY)
+       ORDER BY l.vence`, [cid, dias]);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /lotes/trazabilidad?lote=: pacientes a los que se aplicó ─────────────
+router.get("/lotes/trazabilidad", auth("SUPER_ADMIN", "ADMIN", "MEDICO", "ENFERMERA"), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    const lote = String(req.query.lote || "").trim();
+    if (!cid || lote.length < 2) return res.json({ ok: true, data: [] });
+    const { asegurarAplicaciones } = require("./esteticaDatos");
+    await asegurarAplicaciones();
+    const [rows] = await pool.query(
+      `SELECT a.id, a.paciente_id, a.historia_id, a.producto, a.lote, a.vence, a.cantidad, a.unidad,
+              DATE_FORMAT(a.fecha,'%Y-%m-%d') AS fecha, p.nombres, p.apellidos, p.telefono
+       FROM estetica_aplicaciones a JOIN pacientes p ON p.id = a.paciente_id
+       WHERE a.clinica_id = ? AND a.lote LIKE ?
+       ORDER BY a.fecha DESC, a.id DESC LIMIT 500`, [cid, `%${lote}%`]);
+    res.json({ ok: true, data: rows });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── GET /:id/lotes ────────────────────────────────────────────────────────────
+router.get("/:id/lotes", auth(), async (req, res) => {
+  try {
+    const cid = clinicaOf(req);
+    await asegurarLotes();
+    const [rows] = await pool.query(
+      `SELECT id, lote, DATE_FORMAT(vence,'%Y-%m-%d') AS vence, cantidad, creado_en,
+              DATEDIFF(vence, CURDATE()) AS dias
+       FROM inventario_lotes WHERE item_id = ? AND clinica_id = ?
+       ORDER BY cantidad <= 0, vence IS NULL, vence`, [req.params.id, cid]);
+    res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -163,6 +268,12 @@ router.post("/:id/movimiento", auth("SUPER_ADMIN", "ADMIN", "MEDICO", "RECEPCION
 
     const cid = clinicaOf(req);
     const { tipo, cantidad, motivo, referencia } = req.body;
+    const loteTxt = String(req.body.lote || "").trim().slice(0, 80);
+    // "2027-03" (como viene en la caja) = vence el último día de ese mes
+    const finDeMes = (ym) => { const [y, m] = ym.split("-").map(Number); return `${ym}-${String(new Date(y, m, 0).getDate()).padStart(2, "0")}`; };
+    const vence = /^\d{4}-\d{2}(-\d{2})?$/.test(req.body.vence || "") ? (req.body.vence.length === 7 ? finDeMes(req.body.vence) : req.body.vence) : null;
+    const loteId = Number(req.body.lote_id) || null;
+    if (loteTxt || loteId) await asegurarLotes();
 
     if (!["ENTRADA", "SALIDA", "AJUSTE"].includes(tipo))
       return res.status(400).json({ ok: false, msg: "tipo debe ser ENTRADA, SALIDA o AJUSTE" });
@@ -188,6 +299,22 @@ router.post("/:id/movimiento", auth("SUPER_ADMIN", "ADMIN", "MEDICO", "RECEPCION
       despues = cant;
     }
 
+    // Lote: la entrada suma al lote (lo crea si es nuevo); la salida le resta
+    let idLote = null;
+    if (tipo === "ENTRADA" && loteTxt) {
+      await conn.query(
+        `INSERT INTO inventario_lotes (clinica_id, item_id, lote, vence, cantidad) VALUES (?,?,?,?,?)
+         ON DUPLICATE KEY UPDATE cantidad = cantidad + VALUES(cantidad), vence = COALESCE(VALUES(vence), vence)`,
+        [cid, item.id, loteTxt, vence, cant]);
+      const [[l]] = await conn.query("SELECT id FROM inventario_lotes WHERE item_id = ? AND lote = ?", [item.id, loteTxt]);
+      idLote = l?.id || null;
+    } else if (tipo === "SALIDA" && loteId) {
+      const [u] = await conn.query(
+        "UPDATE inventario_lotes SET cantidad = GREATEST(cantidad - ?, 0) WHERE id = ? AND item_id = ? AND clinica_id = ?",
+        [cant, loteId, item.id, cid]);
+      if (u.affectedRows) idLote = loteId;
+    }
+
     await conn.query(
       "UPDATE inventario_items SET stock_actual = ? WHERE id = ?",
       [despues, item.id]
@@ -198,6 +325,7 @@ router.post("/:id/movimiento", auth("SUPER_ADMIN", "ADMIN", "MEDICO", "RECEPCION
        VALUES (?,?,?,?,?,?,?,?,?)`,
       [cid, item.id, req.user.id, tipo, cant, antes, despues, motivo || null, referencia || null]
     );
+    if (idLote) await conn.query("UPDATE inventario_movimientos SET lote_id = ? WHERE id = ?", [idLote, r.insertId]);
 
     await conn.commit();
     res.status(201).json({ ok: true, id: r.insertId, stock_despues: despues });
@@ -225,3 +353,4 @@ router.delete("/:id", auth("SUPER_ADMIN", "ADMIN"), async (req, res) => {
 });
 
 module.exports = router;
+module.exports.asegurarLotes = asegurarLotes;

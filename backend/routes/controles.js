@@ -41,7 +41,11 @@ function asegurarTabla() {
         INDEX idx_cp_clinica (clinica_id, estado, fecha_objetivo),
         INDEX idx_cp_paciente (paciente_id)
       ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
-    `).catch((e) => { tablaLista = null; throw e; });
+    `).then(async () => {
+      // origen: NULL = control normal; 'ESTETICA_MANT' = mantenimiento de un procedimiento estético
+      const [col] = await pool.query("SHOW COLUMNS FROM controles_programados LIKE 'origen'");
+      if (!col.length) await pool.query("ALTER TABLE controles_programados ADD COLUMN origen VARCHAR(20) NULL");
+    }).catch((e) => { tablaLista = null; throw e; });
   }
   return tablaLista;
 }
@@ -62,6 +66,8 @@ async function sincronizarAgendados(clinicaId = null) {
                  AND c.creado_en >= cp.creado_en
                  AND c.estado NOT IN ('CANCELADA','NO_ASISTIO')
                  AND (cp.cita_origen_id IS NULL OR c.id <> cp.cita_origen_id)
+                 -- Mantenimiento estético: solo cuenta una cita cercana a la fecha (no los controles post-procedimiento)
+                 AND (cp.origen IS NULL OR c.inicio >= DATE_SUB(cp.fecha_objetivo, INTERVAL 45 DAY))
      SET cp.estado = 'AGENDADO', cp.cita_id = c.id
      WHERE cp.estado IN ('PENDIENTE','AVISADO') ${clinicaId ? "AND cp.clinica_id = ?" : ""}`,
     clinicaId ? [clinicaId] : []);
@@ -172,7 +178,7 @@ router.post("/", auth(...ROLES), async (req, res) => {
     // Un control abierto por paciente y médico: uno nuevo reemplaza al anterior
     await pool.query(
       `UPDATE controles_programados SET estado='CANCELADO'
-       WHERE clinica_id=? AND paciente_id=? AND medico_id=? AND estado IN ('PENDIENTE','AVISADO')`,
+       WHERE clinica_id=? AND paciente_id=? AND medico_id=? AND estado IN ('PENDIENTE','AVISADO') AND origen IS NULL`,
       [clinicaId, paciente_id, medico_id]);
     const [r] = await pool.query(
       `INSERT INTO controles_programados (clinica_id, paciente_id, medico_id, cita_origen_id, fecha_objetivo, motivo, creado_por)

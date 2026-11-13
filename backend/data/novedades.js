@@ -258,4 +258,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "estetica-inventario-lotes-mantenimiento",
+    version: "1.37",
+    titulo: "Lotes en el inventario y avisos de mantenimiento",
+    descripcion: "En Inventario registre el lote y vencimiento al dar entrada: el sistema avisa lo que está por vencer y con «¿A quién se aplicó un lote?» ve los pacientes que lo recibieron. En la consulta (Estética → Día del procedimiento) elija el producto del inventario y se descuenta solo. Además, indique cuándo debe volver el paciente (toxina 4 meses, relleno 9…): 7 días antes le llega un correo para agendar y la clínica lo ve en Citas → Controles.",
+    icono: "bi-upc-scan",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import api from "../api/api";
+import { ModalLotes, ModalTrazabilidad, AvisoVencimientos } from "../components/inventario/LotesInventario";
 
 /* ─── Colores ─────────────────────────────────────────────────────── */
 const C = {
@@ -151,6 +152,10 @@ function ModalMovimiento({ item, onClose, onSaved }) {
   const [cantidad,  setCantidad]  = useState("");
   const [motivo,    setMotivo]    = useState("");
   const [referencia,setReferencia]= useState("");
+  const [lote,      setLote]      = useState("");
+  const [vence,     setVence]     = useState("");
+  const [loteId,    setLoteId]    = useState("");
+  const [lotes,     setLotes]     = useState([]);
   const [saving,    setSaving]    = useState(false);
   const [err,       setErr]       = useState("");
 
@@ -160,11 +165,20 @@ function ModalMovimiento({ item, onClose, onSaved }) {
     { v: "AJUSTE",   label: "Ajuste",   icon: "bi-sliders",                 color: C.warning },
   ];
 
+  // Lotes del producto (para elegir de cuál sale)
+  useEffect(() => {
+    api.get(`/inventario/${item.id}/lotes`).then((r) => setLotes((r.data.data || []).filter((l) => Number(l.cantidad) > 0))).catch(() => {});
+  }, [item.id]);
+
   const guardar = async () => {
     if (!cantidad || Number(cantidad) <= 0) { setErr("Ingresa una cantidad válida"); return; }
     setSaving(true); setErr("");
     try {
-      await api.post(`/inventario/${item.id}/movimiento`, { tipo, cantidad: Number(cantidad), motivo, referencia });
+      await api.post(`/inventario/${item.id}/movimiento`, {
+        tipo, cantidad: Number(cantidad), motivo, referencia,
+        ...(tipo === "ENTRADA" && lote.trim() ? { lote: lote.trim(), vence: vence || null } : {}),
+        ...(tipo === "SALIDA" && loteId ? { lote_id: Number(loteId) } : {}),
+      });
       onSaved();
     } catch (e) {
       setErr(e.response?.data?.msg || "Error al registrar movimiento");
@@ -226,6 +240,28 @@ function ModalMovimiento({ item, onClose, onSaved }) {
                 </div>
               )}
             </div>
+            {tipo === "ENTRADA" && (
+              <div className="row g-2 mb-3">
+                <div className="col-7">
+                  <label className="form-label fw-semibold">Lote <span className="text-muted fw-normal">(opcional)</span></label>
+                  <input className="form-control" value={lote} onChange={e => setLote(e.target.value)} placeholder="Ej. C1234A" />
+                </div>
+                <div className="col-5">
+                  <label className="form-label fw-semibold">Vence</label>
+                  <input className="form-control" type="month" value={vence} onChange={e => setVence(e.target.value)} disabled={!lote.trim()} />
+                </div>
+                <div className="form-text">Con el lote, el sistema avisa antes del vencimiento y sabe a qué pacientes se aplicó.</div>
+              </div>
+            )}
+            {tipo === "SALIDA" && lotes.length > 0 && (
+              <div className="mb-3">
+                <label className="form-label fw-semibold">¿De qué lote sale?</label>
+                <select className="form-select" value={loteId} onChange={e => setLoteId(e.target.value)}>
+                  <option value="">Sin indicar lote</option>
+                  {lotes.map(l => <option key={l.id} value={l.id}>Lote {l.lote}{l.vence ? ` · vence ${l.vence.slice(0, 7)}` : ""} · quedan {Number(l.cantidad)}</option>)}
+                </select>
+              </div>
+            )}
             <div className="mb-3">
               <label className="form-label fw-semibold">Motivo</label>
               <input className="form-control" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej. Compra, Uso en procedimiento, Vencimiento..." />
@@ -331,6 +367,8 @@ export default function Inventario() {
   const [modalItem,  setModalItem]  = useState(null); // null | {} | item
   const [modalMov,   setModalMov]   = useState(null); // item | null
   const [modalHist,  setModalHist]  = useState(null); // item | null
+  const [modalLotes, setModalLotes] = useState(null); // item | null
+  const [modalTraza, setModalTraza] = useState(false);
   const [confirmDel, setConfirmDel] = useState(null); // item | null
   const [deleting,   setDeleting]   = useState(false);
 
@@ -399,6 +437,10 @@ export default function Inventario() {
                 Control de stock de insumos y materiales
               </p>
             </div>
+            <div className="d-flex gap-2 flex-wrap">
+            <button className="btn btn-sm btn-outline-light" style={{ fontWeight: 600 }} onClick={() => setModalTraza(true)}>
+              <i className="bi bi-search me-1" />¿A quién se aplicó un lote?
+            </button>
             <button
               className="btn btn-sm"
               style={{ background: C.accent, color: "#fff", fontWeight: 600 }}
@@ -407,6 +449,7 @@ export default function Inventario() {
               <i className="bi bi-plus-lg me-1" />
               Nuevo ítem
             </button>
+            </div>
           </div>
 
           {/* Stats rápidas */}
@@ -427,6 +470,7 @@ export default function Inventario() {
         </div>
 
         <div className="inv-body">
+          <AvisoVencimientos onVer={(itemId) => { const it = items.find(x => x.id === itemId); if (it) setModalLotes(it); }} />
           {/* Filtros */}
           <div className="d-flex gap-2 flex-wrap mb-3">
             <input
@@ -504,6 +548,9 @@ export default function Inventario() {
                             <button className="btn btn-xs btn-outline-success me-1" title="Entrada/Salida" onClick={() => setModalMov(it)}>
                               <i className="bi bi-arrow-left-right" />
                             </button>
+                            <button className="btn btn-xs btn-outline-info me-1" title="Lotes y vencimientos" onClick={() => setModalLotes(it)}>
+                              <i className="bi bi-upc-scan" />
+                            </button>
                             <button className="btn btn-xs btn-outline-secondary me-1" title="Historial" onClick={() => setModalHist(it)}>
                               <i className="bi bi-clock-history" />
                             </button>
@@ -535,6 +582,9 @@ export default function Inventario() {
                       <div className="d-flex gap-1 mt-2">
                         <button className="btn btn-xs btn-outline-success flex-fill" onClick={() => setModalMov(it)}>
                           <i className="bi bi-arrow-left-right me-1" />Mover
+                        </button>
+                        <button className="btn btn-xs btn-outline-info flex-fill" onClick={() => setModalLotes(it)}>
+                          <i className="bi bi-upc-scan me-1" />Lotes
                         </button>
                         <button className="btn btn-xs btn-outline-secondary flex-fill" onClick={() => setModalHist(it)}>
                           <i className="bi bi-clock-history me-1" />Historial
@@ -573,6 +623,8 @@ export default function Inventario() {
       {modalHist && (
         <ModalHistorial item={modalHist} onClose={() => setModalHist(null)} />
       )}
+      {modalLotes && <ModalLotes item={modalLotes} onClose={() => setModalLotes(null)} />}
+      {modalTraza && <ModalTrazabilidad onClose={() => setModalTraza(false)} />}
 
       {/* Confirmar eliminar */}
       {confirmDel && (
