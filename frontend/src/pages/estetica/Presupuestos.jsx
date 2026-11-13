@@ -2,6 +2,19 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import { listarEstetica, crearEstetica, actualizarEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
+import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
+
+const lps = (n) => `L ${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+
+/** Estado del cobro de un presupuesto (factura o recibo ligado) */
+function EstadoCobro({ f }) {
+  if (!f) return null;
+  const [bg, color, txt] = f.estado === "ANULADA" ? ["#f3f4f6", "#6b7280", "Cobro anulado"]
+    : f.estado === "PAGADA" || f.pagado >= f.total ? ["#dcfce7", "#15803d", "Pagado"]
+    : f.pagado > 0 ? ["#fef3c7", "#b45309", `Abonado ${lps(f.pagado)} de ${lps(f.total)}`]
+    : ["#fee2e2", "#b91c1c", "Pendiente de pago"];
+  return <span style={{ background: bg, color, borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}><i className="bi bi-cash-coin me-1" />{txt}</span>;
+}
 
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
@@ -28,6 +41,8 @@ export default function Presupuestos() {
   const [servicios,    setServicios]   = useState([]);
   const [catalogoProcedimientos, setCatalogoProcedimientos] = useState([]);
   const [presupuestos, setPresupuestos] = useState([]);
+  const [usoSesiones, setUsoSesiones] = useState({}); // "presupuestoId|índice" → sesiones usadas
+  const [pdfId, setPdfId] = useState(null);
   const navigate = useNavigate();
   const [showModal,    setShowModal]   = useState(false);
   const [form,         setForm]        = useState(initForm());
@@ -56,10 +71,33 @@ export default function Presupuestos() {
   // Los presupuestos se guardan en el servidor (antes solo en este navegador)
   const cargar = async () => {
     try {
-      const lista = await listarEstetica("presupuesto");
+      const [lista, procs] = await Promise.all([listarEstetica("presupuesto"), listarEstetica("procedimiento").catch(() => [])]);
       setPresupuestos(lista.reverse()); // más antiguos primero, como antes
+      // Sesiones usadas de cada paquete (procedimientos registrados en la consulta)
+      const uso = {};
+      procs.forEach((x) => { if (x.paquete?.presupuesto_id) { const k = `${x.paquete.presupuesto_id}|${x.paquete.indice}`; uso[k] = (uso[k] || 0) + 1; } });
+      setUsoSesiones(uso);
     } catch { alert("No se pudieron cargar los presupuestos."); }
   };
+
+  // PDF con el logo de la clínica (en el teléfono se puede compartir por WhatsApp)
+  const descargarPdf = async (p) => {
+    setPdfId(p.id);
+    const nombre = `presupuesto_${String(p.paciente_nombre || "paciente").split(" ")[0]}.pdf`.normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+    try {
+      const r = await api.get(`/estetica-datos/${p.id}/pdf`, { responseType: "blob" });
+      const blob = new Blob([r.data], { type: "application/pdf" });
+      if (!(await compartirEnTelefono(blob, nombre))) descargarBlob(blob, nombre);
+    } catch (e) {
+      const info = await errorDeBlob(e);
+      try {
+        const h = await api.get(`/estetica-datos/${p.id}/pdf`, { params: { formato: "html" }, responseType: "text" });
+        imprimirHtml(h.data);
+      } catch { alert(info.msg || "No se pudo generar el PDF."); }
+    } finally { setPdfId(null); }
+  };
+
+  const cobrar = (p) => navigate(`/facturacion?nueva=1&paciente_id=${p.paciente_id}&presupuesto_id=${p.id}`);
 
   const guardar = async (e) => {
     e.preventDefault();
@@ -209,9 +247,9 @@ export default function Presupuestos() {
                   <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                     <div style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 20, fontWeight: 700, color: C.accent }}>
-                        S/ {Number(p.total).toLocaleString("es-PE", { minimumFractionDigits: 2 })}
+                        {lps(p.total)}
                       </div>
-                      <div style={{ fontSize: 11, color: C.muted }}>{p.procedimientos.length} procedimiento{p.procedimientos.length !== 1 ? "s" : ""}</div>
+                      <div style={{ fontSize: 11, color: C.muted }}>{(p.procedimientos || []).length} procedimiento{(p.procedimientos || []).length !== 1 ? "s" : ""}</div>
                     </div>
                     <span style={{
                       background: col.bg, border: `1px solid ${col.border}`,
@@ -222,11 +260,42 @@ export default function Presupuestos() {
                     </span>
                   </div>
                 </div>
+                {/* Paquetes de sesiones y cobro */}
+                {((p.procedimientos || []).some((x) => Number(x.sesiones) > 1) || p._factura) && (
+                  <div style={{ padding: "0 20px 12px", display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+                    {(p.procedimientos || []).map((x, idx) => {
+                      const total = Number(x.sesiones) || 0;
+                      if (total <= 1) return null;
+                      const usadas = usoSesiones[`${p.id}|${idx}`] || 0;
+                      return (
+                        <span key={idx} style={{ background: "#f5f3ff", color: "#6d28d9", borderRadius: 999, padding: "3px 10px", fontSize: 12, fontWeight: 700 }}>
+                          <i className="bi bi-collection me-1" />{x.nombre}: {usadas} de {total} sesiones · quedan {Math.max(total - usadas, 0)}
+                        </span>
+                      );
+                    })}
+                    <EstadoCobro f={p._factura} />
+                  </div>
+                )}
                 {/* Acciones */}
                 <div style={{
                   padding: "10px 20px", borderTop: `1px solid ${C.border}`,
                   background: C.surface, display: "flex", gap: 8, flexWrap: "wrap",
                 }}>
+                  <button onClick={() => descargarPdf(p)} disabled={pdfId === p.id}
+                    style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 7, padding: "5px 12px", color: C.textSub, fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+                    {pdfId === p.id ? <span className="spinner-border spinner-border-sm" /> : <><i className="bi bi-file-earmark-pdf me-1" />PDF</>}
+                  </button>
+                  {p._factura && p._factura.estado !== "ANULADA" ? (
+                    <button onClick={() => navigate(`/facturacion?ver=${p._factura.id}`)}
+                      style={{ background: "rgba(16,185,129,.1)", border: "1px solid rgba(16,185,129,.3)", borderRadius: 7, padding: "5px 12px", color: "#047857", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      <i className="bi bi-cash-coin me-1" />{p._factura.pagado >= p._factura.total ? "Ver cobro" : "Registrar abono"}
+                    </button>
+                  ) : p.estado !== "RECHAZADO" && (
+                    <button onClick={() => cobrar(p)}
+                      style={{ background: `linear-gradient(135deg, ${C.accent}, ${C.accentD})`, border: "none", borderRadius: 7, padding: "5px 14px", color: "#fff", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+                      <i className="bi bi-cash-coin me-1" />Cobrar
+                    </button>
+                  )}
                   {ESTADOS.filter(e => e !== p.estado).map(e => (
                     <button key={e} onClick={() => cambiarEstado(p.id, e)}
                       style={{
@@ -321,8 +390,11 @@ export default function Presupuestos() {
                     <input style={{ ...inputSt, flex: 2 }} placeholder="Procedimiento"
                       value={p.nombre} onChange={e => updProc(i, "nombre", e.target.value)}
                       list="presupuestos-procedimientos-list" />
-                    <input style={{ ...inputSt, flex: 1 }} placeholder="S/ 0.00" type="number"
+                    <input style={{ ...inputSt, flex: 1 }} placeholder="L 0.00" type="number"
                       value={p.precio} onChange={e => updProc(i, "precio", e.target.value)} />
+                    <input style={{ ...inputSt, width: 96, flex: "0 0 96px" }} type="number" min="1" placeholder="Sesiones"
+                      title="Si es un paquete (ej.: 6 sesiones de láser), escriba cuántas sesiones incluye"
+                      value={p.sesiones || ""} onChange={e => updProc(i, "sesiones", e.target.value)} />
                     {form.procedimientos.length > 1 && (
                       <button type="button" onClick={() => delProc(i)}
                         style={{ background: "none", border: "none", color: "#f87171", cursor: "pointer", fontSize: 18 }}>
@@ -343,7 +415,7 @@ export default function Presupuestos() {
                   <i className="bi bi-plus me-1" /> Agregar procedimiento
                 </button>
                 <div style={{ textAlign: "right", marginTop: 10, fontWeight: 700, fontSize: 16, color: C.accent }}>
-                  Total: S/ {form.procedimientos.reduce((s, p) => s + (parseFloat(p.precio) || 0), 0).toFixed(2)}
+                  Total: L {form.procedimientos.reduce((s, p) => s + (parseFloat(p.precio) || 0), 0).toFixed(2)}
                 </div>
               </div>
 

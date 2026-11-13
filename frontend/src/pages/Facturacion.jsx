@@ -118,7 +118,7 @@ function ModalNuevaFactura({ onClose, onCreated, prefill }) {
 
     setGuardando(true);
     try {
-      await api.post("/facturacion", {
+      const r = await api.post("/facturacion", {
         paciente_id: paciente.id,
         cita_id: citaId,
         medico_id: medicoId,
@@ -127,8 +127,9 @@ function ModalNuevaFactura({ onClose, onCreated, prefill }) {
         rtn_cliente: rtn || null,
         direccion_cliente: direccionCliente || null,
         items: validos,
+        presupuesto_id: prefill?.presupuesto_id || null,
       });
-      onCreated();
+      onCreated(r.data?.id);
     } catch (e) {
       setError(e.response?.data?.msg || "Error al crear la factura");
     } finally {
@@ -809,16 +810,26 @@ export default function Facturacion() {
   // Si venimos desde "Consulta médica" con ?nueva=1&paciente_id=&cita_id=, precargamos
   // los datos del paciente/cita y abrimos el modal automáticamente.
   useEffect(() => {
+    // ?ver=ID abre directamente ese cobro (desde Presupuestos estéticos)
+    const ver = Number(searchParams.get("ver"));
+    if (ver) {
+      setDetalleId(ver);
+      const next = new URLSearchParams(searchParams);
+      next.delete("ver");
+      setSearchParams(next, { replace: true });
+      return;
+    }
     if (searchParams.get("nueva") !== "1") return;
     const pacienteId = searchParams.get("paciente_id");
     const citaId = searchParams.get("cita_id");
+    const presupuestoId = searchParams.get("presupuesto_id");
     const limpiarUrl = () => {
       const next = new URLSearchParams(searchParams);
-      next.delete("nueva"); next.delete("paciente_id"); next.delete("cita_id");
+      next.delete("nueva"); next.delete("paciente_id"); next.delete("cita_id"); next.delete("presupuesto_id");
       setSearchParams(next, { replace: true });
     };
     if (!pacienteId) { limpiarUrl(); return; }
-    api.get("/facturacion/prefill", { params: { paciente_id: pacienteId, cita_id: citaId || undefined } })
+    api.get("/facturacion/prefill", { params: { paciente_id: pacienteId, cita_id: citaId || undefined, presupuesto_id: presupuestoId || undefined } })
       .then(r => setPrefill(r.data.data))
       .catch(() => setPrefill(null))
       .finally(() => { setShowNueva(true); limpiarUrl(); });
@@ -1136,7 +1147,12 @@ export default function Facturacion() {
 
       {showNueva && (
         <ModalNuevaFactura prefill={prefill} onClose={() => { setShowNueva(false); setPrefill(null); }}
-          onCreated={() => { setShowNueva(false); setPrefill(null); cargar(); cargarResumen(); }} />
+          onCreated={(id) => {
+            // Si viene de un presupuesto, se abre el cobro para registrar el pago o el anticipo
+            const dePresupuesto = !!prefill?.presupuesto_id;
+            setShowNueva(false); setPrefill(null); cargar(); cargarResumen();
+            if (dePresupuesto && id) setDetalleId(id);
+          }} />
       )}
       {detalleId && (
         <ModalDetalle facturaId={detalleId} esAdmin={esAdmin} onClose={() => setDetalleId(null)}

@@ -481,6 +481,7 @@ router.get("/historia/:hid(\\d+)/pdf", auth(...ROLES), async (req, res) => {
 module.exports = router;
 module.exports.htmlPlan = htmlPlan;
 module.exports.documentoPlan = documentoPlan;
+module.exports.logoEmbebido = logoEmbebido;
 module.exports.formatear = formatear;
 module.exports.SELECT = SELECT;
 module.exports.asegurarTablas = asegurarTablas;

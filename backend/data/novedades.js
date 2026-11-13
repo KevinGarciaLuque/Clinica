@@ -267,4 +267,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "estetica-presupuesto-cobro-paquetes",
+    version: "1.38",
+    titulo: "Presupuestos: cobro, abonos, paquetes de sesiones y PDF",
+    descripcion: "En Presupuestos estéticos: «Cobrar» lo convierte en recibo o factura con sus procedimientos y ahí se registran el anticipo y los abonos (entran a caja). Indique cuántas sesiones incluye un paquete (ej.: láser 6 sesiones): en la consulta se descuenta una sesión y se ve cuántas quedan y cuánto falta por pagar. Además, descargue el presupuesto en PDF con el logo para enviarlo por WhatsApp.",
+    icono: "bi-cash-coin",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

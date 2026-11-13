@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import api from "../api/api";
 import { listarEstetica } from "../utils/esteticaDatos";
 import { nombreZona } from "../utils/esteticaCatalogos";
+import { paquetesDe } from "../utils/esteticaPaquetes";
 
 /**
  * Pestaña «Estética» del perfil del paciente, pensada para el médico:
@@ -147,7 +148,7 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
       ...valoraciones.map((v) => ({ fecha: fechaControl(v), color: "#64748b", icono: "bi-search-heart", titulo: "Valoración",
         detalle: [(v.sugeridos || []).join(", "), v.motivo].filter(Boolean).join(" · "),
         link: enlace(v, `/pacientes/${pacienteId}/perfil?tab=estetica`) })),
-      ...presupuestos.map((p) => ({ fecha: soloFecha(p.creado_en || p._creado_en), color: "#d97706", icono: "bi-receipt", titulo: `Presupuesto ${String(p.estado || "").toLowerCase()}`, detalle: [p.titulo || (p.procedimientos || []).map((x) => x.nombre).filter(Boolean).join(", "), `Total ${monto(p.total)}`].filter(Boolean).join(" · "), link: "/estetica/presupuestos" })),
+      ...presupuestos.map((p) => ({ fecha: soloFecha(p.creado_en || p._creado_en), color: "#d97706", icono: "bi-receipt", titulo: `Presupuesto ${String(p.estado || "").toLowerCase()}`, detalle: [p.titulo || (p.procedimientos || []).map((x) => x.nombre).filter(Boolean).join(", "), `Total L ${monto(p.total)}`].filter(Boolean).join(" · "), link: "/estetica/presupuestos" })),
       ...consentimientos.map((c) => ({ fecha: soloFecha(c.creado_en || c._creado_en), color: c.firmado ? "#16a34a" : "#9ca3af", icono: "bi-file-earmark-check", titulo: c.firmado ? "Consentimiento firmado" : "Consentimiento sin firmar", detalle: c.procedimiento, link: `/estetica/consentimientos?paciente_id=${pacienteId}` })),
       ...biopsias.map((b) => ({ fecha: soloFecha(b.fecha_toma || b.creado_en), color: "#dc2626", icono: "bi-eyedropper", titulo: "Biopsia", detalle: [b.tipo_biopsia, b.sitio_anatomico, b.resultado_patologico && b.resultado_patologico !== "pendiente" && `Resultado: ${b.resultado_patologico.replace(/_/g, " ")}`].filter(Boolean).join(" · "), link: `/estetica/biopsias?paciente_id=${pacienteId}` })),
     ].filter((e) => e.fecha).sort((a, b) => b.fecha.localeCompare(a.fecha));
@@ -225,12 +226,32 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
           valor={proximo ? fechaCorta(proximo) : "Sin programar"}
           sub={ultimoControl ? `Último: ${FASES[ultimoControl.fase] || ""} ${ultimoControl.procedimiento || ""}`.trim() : "Sin controles"} />
         <Dato color="#d97706" icono="bi-receipt" titulo="Presupuestos"
-          valor={pendientes.length ? monto(pendientes.reduce((s, p) => s + Number(p.total || 0), 0)) : "Al día"}
+          valor={pendientes.length ? "L " + monto(pendientes.reduce((s, p) => s + Number(p.total || 0), 0)) : "Al día"}
           sub={pendientes.length ? `${pendientes.length} por aprobar` : "Ninguno pendiente"} />
         <Dato color="#16a34a" icono="bi-file-earmark-check" titulo="Consentimientos"
           valor={`${firmados.length} de ${consentimientos.length} firmados`}
           sub={ficha ? `Ficha: fototipo ${ficha.fototipo || "—"} · piel ${String(ficha.piel_tipo || "—").toLowerCase()}` : "Sin ficha estética"} />
       </div>
+
+      {/* Paquetes de sesiones */}
+      {paquetesDe(datos).length > 0 && (
+        <div className="mb-3 d-flex flex-column gap-2">
+          {paquetesDe(datos).map((pq) => (
+            <div key={`${pq.presupuesto_id}-${pq.indice}`} className="d-flex align-items-center gap-2 flex-wrap"
+              style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 12, padding: "8px 12px" }}>
+              <i className="bi bi-collection" style={{ color: "#7c3aed" }} />
+              <strong style={{ fontSize: "0.88rem" }}>{pq.nombre}</strong>
+              <span style={{ fontSize: "0.82rem", color: "#5b21b6" }}>{pq.usadas} de {pq.sesiones} sesiones · quedan {pq.quedan}</span>
+              <div className="flex-grow-1" style={{ minWidth: 80, height: 6, background: "#ede9fe", borderRadius: 99, overflow: "hidden" }}>
+                <div style={{ width: `${Math.min(100, (pq.usadas / pq.sesiones) * 100)}%`, height: "100%", background: "#7c3aed" }} />
+              </div>
+              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: !pq.factura ? "#b91c1c" : pq.factura.pagado >= pq.factura.total ? "#15803d" : "#b45309" }}>
+                {!pq.factura ? "Sin cobrar" : pq.factura.pagado >= pq.factura.total ? "Pagado" : `Debe L ${monto(pq.factura.total - pq.factura.pagado)}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="ep-dos">
         {/* Antes y después */}

@@ -83,9 +83,96 @@ router.get("/", auth(...ROLES), async (req, res) => {
        WHERE ${where.join(" AND ")} ORDER BY e.creado_en DESC, e.id DESC LIMIT 2000`,
       params
     );
-    res.json({ ok: true, data: rows.map(fila) });
+    const data = rows.map(fila);
+    // Presupuestos cobrados: estado del cobro (pagado, abonado o pendiente)
+    const ids = [...new Set(data.filter((d) => d.tipo === "presupuesto" && Number(d.datos?.factura_id)).map((d) => Number(d.datos.factura_id)))];
+    if (ids.length) {
+      const [fs] = await pool.query(
+        `SELECT f.id, f.numero, f.numero_completo, f.estado, f.total,
+                (SELECT COALESCE(SUM(p.monto),0) FROM pagos p WHERE p.factura_id = f.id) AS pagado
+         FROM facturas f WHERE f.clinica_id = ? AND f.id IN (?)`, [clinicaId, ids]).catch(() => [[]]);
+      const porId = new Map(fs.map((f) => [f.id, {
+        id: f.id, numero: f.numero_completo || f.numero, estado: f.estado, total: Number(f.total), pagado: Number(f.pagado),
+      }]));
+      data.forEach((d) => { if (d.tipo === "presupuesto") d.factura = porId.get(Number(d.datos?.factura_id)) || null; });
+    }
+    res.json({ ok: true, data });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+// ── PDF del presupuesto (con el logo de la clínica), para enviarlo al paciente ──
+const escH = (t) => String(t ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const lps = (n) => `L ${Number(n || 0).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+function htmlPresupuesto({ d, clinica, logo, paciente, fecha, medico }) {
+  const procs = (Array.isArray(d.procedimientos) ? d.procedimientos : []).filter((x) => x && x.nombre);
+  const total = procs.reduce((t, x) => t + (Number(x.precio) || 0), 0);
+  const dias = Number(d.validez_dias) || 0;
+  let vence = "";
+  if (dias) { const v = new Date(`${fecha}T12:00:00`); v.setDate(v.getDate() + dias); vence = v.toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" }); }
+  const f = new Date(`${fecha}T12:00:00`).toLocaleDateString("es-HN", { day: "numeric", month: "long", year: "numeric" });
+  return `<!doctype html><html><head><meta charset="utf-8"><title>Presupuesto</title><style>
+  *{box-sizing:border-box}body{font-family:'Segoe UI',Arial,sans-serif;color:#1f2937;margin:0;font-size:12.5px}
+  .hoja{padding:34px 40px}.cab{display:flex;align-items:center;gap:16px;border-bottom:3px solid #db2777;padding-bottom:14px}
+  .cab img{max-height:64px;max-width:160px;object-fit:contain}.cab h1{font-size:19px;margin:0;color:#111827}.cab .s{color:#6b7280;font-size:11.5px}
+  .tit{display:flex;justify-content:space-between;align-items:flex-end;margin:22px 0 12px}.tit h2{margin:0;font-size:22px;color:#be185d;letter-spacing:.02em}
+  .datos{display:grid;grid-template-columns:1fr 1fr;gap:6px 24px;background:#fdf2f8;border-radius:10px;padding:12px 16px;margin-bottom:16px}
+  .datos b{display:block;font-size:10.5px;color:#9d174d;text-transform:uppercase;letter-spacing:.04em}
+  table{width:100%;border-collapse:collapse}th{background:#be185d;color:#fff;text-align:left;padding:9px 10px;font-size:11px;text-transform:uppercase;letter-spacing:.04em}
+  td{padding:10px;border-bottom:1px solid #f1f5f9;vertical-align:top}.r{text-align:right;white-space:nowrap}
+  .tot{display:flex;justify-content:flex-end;margin-top:12px}.tot div{background:#111827;color:#fff;border-radius:10px;padding:12px 20px;font-size:16px;font-weight:700}
+  .obs{margin-top:18px;border-left:3px solid #f9a8d4;padding:8px 12px;background:#fafafa;white-space:pre-wrap}
+  .pie{margin-top:46px;display:flex;justify-content:space-between;gap:30px}.pie div{flex:1;text-align:center;border-top:1px solid #9ca3af;padding-top:5px;color:#6b7280;font-size:11px}
+  .nota{margin-top:22px;color:#6b7280;font-size:10.5px;text-align:center}</style></head><body><div class="hoja">
+  <div class="cab">${logo ? `<img src="${logo}" alt="">` : ""}<div><h1>${escH(clinica?.nombre || "")}</h1>
+  <div class="s">${[clinica?.telefono, clinica?.direccion].filter(Boolean).map(escH).join(" · ")}</div></div></div>
+  <div class="tit"><h2>PRESUPUESTO</h2><div class="s">${escH(f)}</div></div>
+  <div class="datos"><div><b>Paciente</b>${escH(paciente)}</div><div><b>Válido hasta</b>${escH(vence || "—")}</div>
+  ${d.titulo ? `<div><b>Tratamiento</b>${escH(d.titulo)}</div>` : ""}${medico ? `<div><b>Médico</b>${escH(medico)}</div>` : ""}</div>
+  <table><thead><tr><th>Procedimiento</th><th>Sesiones</th><th class="r">Precio</th></tr></thead><tbody>
+  ${procs.map((x) => `<tr><td>${escH(x.nombre)}</td><td>${Number(x.sesiones) > 1 ? `${Number(x.sesiones)} sesiones` : "1"}</td><td class="r">${lps(x.precio)}</td></tr>`).join("")}
+  </tbody></table><div class="tot"><div>Total: ${lps(total)}</div></div>
+  ${d.observaciones ? `<div class="obs">${escH(d.observaciones)}</div>` : ""}
+  <div class="pie"><div>Firma del paciente</div><div>Firma y sello de la clínica</div></div>
+  <div class="nota">Los precios pueden variar según la evaluación médica. Presupuesto generado con Medic-KG.</div>
+  </div></body></html>`;
+}
+
+router.get("/:id(\\d+)/pdf", auth(...ROLES), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const clinicaId = clinicaDe(req);
+    const [[reg]] = await pool.query(
+      "SELECT * FROM estetica_registros WHERE id = ? AND clinica_id = ? AND tipo = 'presupuesto' AND activo = 1", [req.params.id, clinicaId]);
+    if (!reg) return res.status(404).json({ ok: false, msg: "Presupuesto no encontrado." });
+    const d = leer(reg.datos);
+    const [[clinica]] = await pool.query("SELECT * FROM clinicas WHERE id = ?", [clinicaId]);
+    const [[pac]] = await pool.query("SELECT nombres, apellidos FROM pacientes WHERE id = ?", [reg.paciente_id]);
+    const [[u]] = await pool.query("SELECT * FROM usuarios WHERE id = ?", [reg.creado_por || 0]).catch(() => [[null]]);
+    let medico = "";
+    if (u && ["MEDICO", "ADMIN"].includes(u.tipo)) {
+      const { tituloMedico } = require("../utils/tituloMedico");
+      medico = u.nombre_display || `${tituloMedico(u.sexo, { tipo: u.tipo })}${u.nombres} ${u.apellidos}`.trim();
+    }
+    const fecha = String(d.creado_en || "").slice(0, 10) || new Date(reg.creado_en).toISOString().slice(0, 10);
+    const base = { d, clinica, paciente: `${pac?.nombres || ""} ${pac?.apellidos || ""}`.trim(), fecha, medico };
+    const { logoEmbebido } = require("./nutricion");
+    const logo = await logoEmbebido(clinica?.logo_url);
+    if (req.query.formato === "html") return res.type("html").send(htmlPresupuesto({ ...base, logo }));
+    const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+    let pdf;
+    try { pdf = await generarPdfDesdeHtml(htmlPresupuesto({ ...base, logo }), { paper_size: "LETTER", orientacion: "portrait" }); }
+    catch (e) {
+      if (!logo) throw e;
+      pdf = await generarPdfDesdeHtml(htmlPresupuesto({ ...base, logo: null }), { paper_size: "LETTER", orientacion: "portrait" });
+    }
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="presupuesto_${reg.id}.pdf"`);
+    res.send(pdf);
+  } catch (e) {
+    console.error("[estetica] pdf presupuesto:", e.message);
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF.", imprimible: true });
   }
 });
 

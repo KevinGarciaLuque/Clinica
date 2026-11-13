@@ -253,6 +253,28 @@ router.get("/prefill", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
       if (tipoCita && tipoCita.precio != null) precio = Number(tipoCita.precio);
     }
 
+    // Desde un presupuesto estético aprobado: sus procedimientos y precios
+    let items = [{ descripcion, cantidad: 1, precio_unit: precio }];
+    let presupuestoId = null;
+    if (Number(req.query.presupuesto_id)) {
+      const [[pr]] = await pool.query(
+        "SELECT id, datos FROM estetica_registros WHERE id=? AND clinica_id=? AND paciente_id=? AND tipo='presupuesto' AND activo=1",
+        [req.query.presupuesto_id, clinicaId, pac.id]
+      ).catch(() => [[null]]);
+      if (pr) {
+        let d = {};
+        try { d = JSON.parse(pr.datos); } catch { /* datos dañados */ }
+        const procs = (Array.isArray(d.procedimientos) ? d.procedimientos : []).filter((x) => x && x.nombre);
+        if (procs.length) {
+          items = procs.map((x) => ({
+            descripcion: `${x.nombre}${Number(x.sesiones) > 1 ? ` (paquete de ${Number(x.sesiones)} sesiones)` : ""}`.slice(0, 250),
+            cantidad: 1, precio_unit: Number(x.precio) || 0,
+          }));
+          presupuestoId = pr.id;
+        }
+      }
+    }
+
     res.json({
       ok: true,
       data: {
@@ -261,7 +283,8 @@ router.get("/prefill", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), 
         medico_id: cita?.medico_id || null,
         cliente,
         es_menor: esMenor,
-        items: [{ descripcion, cantidad: 1, precio_unit: precio }],
+        items,
+        presupuesto_id: presupuestoId,
         tipo_comprobante: "RECIBO",
       },
     });
@@ -664,6 +687,20 @@ router.post("/", auth("ADMIN", "MEDICO", "SUPER_ADMIN", "RECEPCIONISTA"), async 
     }
 
     await recalcularTotales(conn, facturaId);
+
+    // Cobro de un presupuesto estético: el presupuesto queda aprobado y ligado a este cobro
+    if (Number(req.body.presupuesto_id)) {
+      const [[pr]] = await conn.query(
+        "SELECT id, datos FROM estetica_registros WHERE id=? AND clinica_id=? AND paciente_id=? AND tipo='presupuesto' AND activo=1 FOR UPDATE",
+        [req.body.presupuesto_id, clinicaId, paciente_id]
+      ).catch(() => [[null]]);
+      if (pr) {
+        let d = {};
+        try { d = JSON.parse(pr.datos); } catch { /* datos dañados */ }
+        d = { ...d, estado: "APROBADO", factura_id: facturaId };
+        await conn.query("UPDATE estetica_registros SET datos=?, actualizado_en=NOW() WHERE id=?", [JSON.stringify(d), pr.id]);
+      }
+    }
     await conn.commit();
 
     res.status(201).json({ ok: true, id: facturaId });

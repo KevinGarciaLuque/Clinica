@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import MapaFacial from "../../components/MapaFacial";
 import api from "../../api/api";
 import { listarEstetica, crearEstetica } from "../../utils/esteticaDatos";
+import { paquetesDe } from "../../utils/esteticaPaquetes";
 import { imprimirHtml } from "../../utils/descargarPdf";
 import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
 import ModalAgendarControles from "../../components/estetica/ModalAgendarControles";
@@ -85,6 +86,7 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
         ultimoProc: otros.find((r) => r._tipo === "procedimiento") || null,
         consentimientos,
         firmados: consentimientos.filter((c) => c.firmado),
+        paquetes: paquetesDe(l, historiaId),
       });
     }).catch(() => vivo && setPrevios((p) => ({ ...p, cargado: true })));
     return () => { vivo = false; };
@@ -304,6 +306,45 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                 <textarea rows={2} style={inp} disabled={firmada} value={proc.tecnica || ""} onChange={(e) => set("procedimiento", "tecnica", e.target.value)} placeholder="Ej.: aguja 30G, puntos de inyección, cánula 25G, plano…" /></div>
             </div>
           </Seccion>
+
+          {(() => {
+            const paquetes = (previos.paquetes || []).filter((pq) => pq.quedan > 0 || (proc.paquete?.presupuesto_id === pq.presupuesto_id && proc.paquete?.indice === pq.indice));
+            if (!paquetes.length) return null;
+            return (
+              <Seccion titulo="Paquete de sesiones" icono="bi-collection" color="#7c3aed">
+                {paquetes.map((pq) => {
+                  const usa = proc.paquete?.presupuesto_id === pq.presupuesto_id && proc.paquete?.indice === pq.indice;
+                  return (
+                    <div key={`${pq.presupuesto_id}-${pq.indice}`} className="d-flex align-items-center gap-2 flex-wrap mb-2"
+                      style={{ background: usa ? "#f5f3ff" : "#fafafa", border: `1px solid ${usa ? "#c4b5fd" : "#e5e7eb"}`, borderRadius: 10, padding: "8px 12px" }}>
+                      <div className="flex-grow-1" style={{ minWidth: 0 }}>
+                        <div style={{ fontWeight: 700, fontSize: "0.9rem" }}>{pq.nombre} — paquete de {pq.sesiones} sesiones</div>
+                        <div className="text-muted" style={{ fontSize: "0.8rem" }}>
+                          {usa ? `Esta consulta es la sesión ${pq.usadas + 1} de ${pq.sesiones}` : `Usadas ${pq.usadas} · quedan ${pq.quedan}`}
+                          {pq.factura && (pq.factura.pagado < pq.factura.total
+                            ? ` · Pagado L ${pq.factura.pagado.toLocaleString("en-US", { minimumFractionDigits: 2 })} de L ${pq.factura.total.toLocaleString("en-US", { minimumFractionDigits: 2 })}`
+                            : " · Pagado")}
+                          {!pq.factura && " · Aún sin cobrar"}
+                        </div>
+                      </div>
+                      {!firmada && (usa ? (
+                        <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => set("procedimiento", "paquete", null)}>Quitar</button>
+                      ) : (
+                        <button type="button" className="btn btn-sm" style={{ background: "#7c3aed", color: "#fff", fontWeight: 700 }}
+                          onClick={() => setDatos((d) => ({ ...d, procedimiento: {
+                            ...(d.procedimiento || {}),
+                            paquete: { presupuesto_id: pq.presupuesto_id, indice: pq.indice, nombre: pq.nombre, sesiones: pq.sesiones },
+                            nombre: d.procedimiento?.nombre || pq.nombre,
+                          } }))}>
+                          Usar 1 sesión
+                        </button>
+                      ))}
+                    </div>
+                  );
+                })}
+              </Seccion>
+            );
+          })()}
 
           <Seccion titulo="Producto y lote" icono="bi-box-seam" color="#0ea5e9">
             <div className="et-prod mb-1 d-none d-md-grid" style={{ fontSize: "0.74rem", fontWeight: 700, color: "#6b7280" }}>
@@ -582,8 +623,11 @@ function ModalPresupuesto({ paciente, pacienteId, sugeridos, onClose }) {
             <div key={i} className="d-flex gap-2 mb-2">
               <input list="et-procs-modal" style={{ ...inp, flex: 2 }} placeholder="Procedimiento" value={it.nombre}
                 onChange={(e) => setItems((l) => l.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)))} />
-              <input style={{ ...inp, flex: 1 }} placeholder="Precio" inputMode="decimal" value={it.precio}
+              <input style={{ ...inp, flex: 1 }} placeholder="Precio L" inputMode="decimal" value={it.precio}
                 onChange={(e) => setItems((l) => l.map((x, j) => (j === i ? { ...x, precio: e.target.value } : x)))} />
+              <input style={{ ...inp, width: 78, flex: "0 0 78px" }} placeholder="Sesiones" inputMode="numeric" value={it.sesiones || ""}
+                title="Si es un paquete, cuántas sesiones incluye"
+                onChange={(e) => setItems((l) => l.map((x, j) => (j === i ? { ...x, sesiones: e.target.value.replace(/\D/g, "") } : x)))} />
               <button type="button" className="btn btn-sm btn-light" onClick={() => setItems((l) => l.filter((_, j) => j !== i))}><i className="bi bi-x-lg" /></button>
             </div>
           ))}
@@ -596,7 +640,7 @@ function ModalPresupuesto({ paciente, pacienteId, sugeridos, onClose }) {
             <div style={{ flex: 1 }}><Lbl>Observaciones</Lbl><input style={inp} value={obs} onChange={(e) => setObs(e.target.value)} /></div>
           </div>
           <div className="d-flex align-items-center mt-3">
-            <strong>Total: {total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
+            <strong>Total: L {total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
             <button type="button" className="btn ms-auto" style={{ background: ROSA, color: "#fff", fontWeight: 700 }}
               disabled={guardando || !items.some((i) => i.nombre)} onClick={guardar}>
               {guardando ? "Guardando…" : "Guardar presupuesto"}
