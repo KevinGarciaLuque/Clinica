@@ -850,6 +850,19 @@ export default function PerfilPaciente() {
     }
   };
 
+  // Clínicas de estética: si el paciente no tiene consultas, el expediente abre en
+  // «Estética» (donde están sus datos) en vez de «Evolución» vacía. Solo al entrar,
+  // y nunca si el enlace ya pide una pestaña.
+  const tabElegida = useRef(false);
+  useEffect(() => { tabElegida.current = false; }, [id]);
+  const clinicaEstetica = ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"]
+    .some((clave) => modulos.some((m) => m.clave === clave));
+  useEffect(() => {
+    if (tabElegida.current || loading || !paciente) return;
+    tabElegida.current = true;
+    if (!tabParam && tab === "evolucion" && clinicaEstetica && historias.length === 0) setTab("estetica");
+  }, [loading, paciente, tabParam, tab, clinicaEstetica, historias.length]);
+
   // ══════════════════════════════════════════════════════════
   // RENDER
   // ══════════════════════════════════════════════════════════
