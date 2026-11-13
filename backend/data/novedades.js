@@ -195,4 +195,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "modulo-nutricion-consulta",
+    version: "1.30",
+    titulo: "Nuevo módulo de Nutrición en la consulta",
+    descripcion: "Las clínicas de nutrición tienen una pestaña «Nutrición» dentro de la consulta: evaluación (recordatorio de 24 horas, hábitos y objetivos), medidas y % de grasa con gráficas de evolución y peso meta, cálculo de calorías, plan por porciones con menú de la semana, plantillas reutilizables y un PDF del plan para entregar al paciente.",
+    icono: "bi-apple",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

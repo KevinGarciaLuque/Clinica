@@ -167,6 +167,7 @@ app.use("/api/facturacion", require("./routes/facturacion"));
 app.use("/api/caja", require("./routes/caja"));
 app.use("/api/finanzas", require("./routes/finanzas"));
 app.use("/api/sucursales", require("./routes/sucursales"));
+app.use("/api/nutricion", require("./routes/nutricion"));
 app.use("/api/recordatorios-whatsapp", require("./routes/recordatoriosWhatsapp"));
 app.use("/api/videoconsultas", require("./routes/videoconsultas"));
 app.use("/api/superadmin/almacenamiento", require("./routes/almacenamientoAdmin"));
@@ -951,6 +952,24 @@ const pool = require("./db");
       } catch (e) {
         console.warn(`⚠️  [auto-migrate] índice ${nombre}:`, e.message);
       }
+    }
+
+    // Módulo Nutrición: pestaña "Nutrición" dentro de la consulta. Se activa en las
+    // clínicas de tipo nutrición; el SUPER_ADMIN puede activarlo en otras.
+    try {
+      await pool.query(
+        `INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, disponible, orden, descripcion, para_normal, para_pediatrica)
+         VALUES ('nutricion_consulta', 'Nutrición', 'bi-apple', '/consulta', 1, 46, 'Evaluación nutricional, medidas, calorías y plan de alimentación en la consulta', 1, 1)`
+      );
+      await pool.query(
+        `INSERT IGNORE INTO tipo_clinica_modulos (tipo_id, modulo_id)
+         SELECT tc.id, ms.id FROM tipos_clinica tc, modulos_sistema ms
+         WHERE ms.clave = 'nutricion_consulta' AND (LOWER(tc.clave) LIKE '%nutri%' OR LOWER(tc.nombre) LIKE '%nutri%')`
+      );
+      await require("./routes/nutricion").asegurarTablas();
+      console.log("✅ [auto-migrate] módulo nutrición OK");
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] módulo nutrición:", e.message);
     }
 
     // Especialidades de los médicos: la lista original tenía 16; se agregan las que

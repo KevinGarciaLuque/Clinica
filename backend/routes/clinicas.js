@@ -113,6 +113,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   const esPsico  = tipoClave.includes("psico");
   const esDental = tipoClave.includes("dental") || tipoClave.includes("odonto");
   const esEndo   = tipoClave.includes("endocrino");
+  const esNutri  = tipoClave.includes("nutri");
 
   const [mods] = await pool.query("SELECT id, clave FROM modulos_sistema WHERE disponible=1");
   const base  = ["dashboard", "pacientes", "citas", "plantillas"];
@@ -122,6 +123,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   const dental = ["consulta_odontologica", "historia_clinica", "estudios", "inventario", "recordatorios"];
   const endocrino = ["consulta", "historia_clinica", "estudios", "control_seguimiento_dm1", "educacion_diabetes", "recordatorios"];
   const generalExtras = ["consulta", "historia_clinica", "estudios", "inventario"];
+  const nutri = ["consulta", "historia_clinica", "estudios", "nutricion_consulta", "curva_crecimiento", "recordatorios"];
 
   // Ítems de administración: SIEMPRE habilitados por defecto en el preset.
   // El SUPER_ADMIN puede desactivarlos luego desde el modal de permisos.
@@ -133,6 +135,7 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   else if (esPsico)  psico.forEach((k) => enabled.add(k));
   else if (esDental) dental.forEach((k) => enabled.add(k));
   else if (esEndo)   endocrino.forEach((k) => enabled.add(k));
+  else if (esNutri)  nutri.forEach((k) => enabled.add(k));
   else               generalExtras.forEach((k) => enabled.add(k));
 
   for (const m of mods) {

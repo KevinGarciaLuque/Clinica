@@ -27,6 +27,7 @@ import AntecedentesTab from "./AntecedentesTab";
 import DermaTab from "./DermaTab";
 import DocumentosTab from "./DocumentosTab";
 import EcocardiogramaTab, { PrintEco } from "./EcocardiogramaTab";
+import NutricionTab from "./NutricionTab";
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Consulta() {
@@ -77,6 +78,14 @@ export default function Consulta() {
   // Hoja de ecocardiograma (cardiología)
   const [datosEco, setDatosEco] = useState({});
   const [showEcoPrint, setShowEcoPrint] = useState(false);
+  // Hoja de nutrición (módulo Nutrición): se guarda aparte, junto con la consulta
+  const esNutricion = modulos.some(m => m.clave === "nutricion_consulta");
+  const [datosNutri, setDatosNutriBase] = useState({ evaluacion: {}, medidas: {}, pliegues: {}, requerimiento: {}, plan: {} });
+  const [nutriExiste, setNutriExiste] = useState(false);
+  const [nutriTocada, setNutriTocada] = useState(false);
+  const [nutriAnterior, setNutriAnterior] = useState(null);
+  const [generandoPdfNutri, setGenerandoPdfNutri] = useState(false);
+  const setDatosNutri = useCallback((v) => { setNutriTocada(true); setDatosNutriBase(v); }, []);
   const soloLectura = firmada && !editMode;
 
   // ── carga inicial ────────────────────────────────────────────────────────────
@@ -151,6 +160,55 @@ export default function Consulta() {
       .then(r => setResumenPac(r.data.data))
       .catch(() => {});
   }, [paciente?.id, pacId, hid]);
+
+  // ── nutrición: hoja de esta consulta, o lo de la consulta anterior para continuar ──
+  useEffect(() => {
+    const pid = paciente?.id || pacId;
+    if (!esNutricion || !pid) return;
+    let vivo = true;
+    (async () => {
+      let actual = null;
+      if (hid) actual = (await api.get(`/nutricion/historia/${hid}`).catch(() => null))?.data?.data || null;
+      const ant = (await api.get(`/nutricion/paciente/${pid}/anterior`, { params: hid ? { excluir: hid } : {} }).catch(() => null))?.data?.data || null;
+      if (!vivo) return;
+      if (actual) {
+        setDatosNutriBase({ evaluacion: actual.evaluacion, medidas: actual.medidas, pliegues: actual.pliegues, requerimiento: actual.requerimiento, plan: actual.plan });
+        setNutriExiste(true);
+        setNutriAnterior(ant);
+      } else {
+        // Consulta de seguimiento: se copian la evaluación, el plan y la meta de la última vez
+        const copiado = ant?.evaluacion?.fecha || ant?.plan?.fecha || null;
+        setDatosNutriBase((d) => ({
+          ...d,
+          evaluacion: ant?.evaluacion?.datos || d.evaluacion,
+          plan: ant?.plan?.plan || d.plan,
+          requerimiento: ant?.plan?.requerimiento || d.requerimiento,
+          medidas: { ...d.medidas, ...(ant?.ultima?.medidas?.peso_meta ? { peso_meta: ant.ultima.medidas.peso_meta } : {}) },
+        }));
+        setNutriAnterior(ant ? { ...ant, copiado } : null);
+      }
+    })();
+    return () => { vivo = false; };
+  }, [esNutricion, hid, paciente?.id, pacId]);
+
+  const guardarNutricion = useCallback(async (historiaId) => {
+    if (!esNutricion || !historiaId) return;
+    if (!nutriExiste && !nutriTocada && !vitals.peso && !vitals.talla) return; // consulta sin datos de nutrición
+    const cintura = parseFloat(datosNutri.medidas?.cintura), cadera = parseFloat(datosNutri.medidas?.cadera);
+    try {
+      await api.put(`/nutricion/historia/${historiaId}`, {
+        ...datosNutri,
+        medidas: {
+          ...datosNutri.medidas,
+          peso: vitals.peso || null, talla: vitals.talla || null, imc: vitals.imc || null,
+          icc: cintura && cadera ? Math.round((cintura / cadera) * 1000) / 1000 : null,
+        },
+      });
+      setNutriExiste(true);
+    } catch {
+      setAlertMsg({ type: "warning", msg: "La consulta se guardó, pero no se pudo guardar la hoja de nutrición. Intente de nuevo." });
+    }
+  }, [esNutricion, nutriExiste, nutriTocada, datosNutri, vitals]);
 
   // ── curva de crecimiento ─────────────────────────────────────────────────────
   // Con el switch activo, el peso/talla/PC de la consulta se guarda como medición.
@@ -232,16 +290,46 @@ export default function Consulta() {
           setAlertMsg({ type: "success", msg: "Guardado como borrador." });
         }
         await registrarEnCurva();
+        await guardarNutricion(r.data.id);
         return r.data.id;
       }
       await registrarEnCurva();
+      await guardarNutricion(hid);
       return hid;
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error al guardar" });
     } finally {
       setSaving(false);
     }
-  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva]);
+  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion]);
+
+  // PDF del plan de alimentación: guarda primero (si se puede editar) y lo abre o comparte
+  const descargarPlanNutricion = async () => {
+    setGenerandoPdfNutri(true);
+    const telefono = window.matchMedia("(pointer: coarse)").matches;
+    // La ventana se abre en el mismo clic (si se abre después, el navegador la bloquea)
+    const ventana = telefono ? null : window.open("", "_blank");
+    try {
+      const id = soloLectura ? hid : await handleSave(false);
+      if (!id) { ventana?.close(); return; }
+      const r = await api.get(`/nutricion/historia/${id}/pdf`, { responseType: "blob" });
+      const nombre = `Plan de alimentación - ${paciente?.nombres || "paciente"}.pdf`;
+      const archivo = new File([r.data], nombre, { type: "application/pdf" });
+      // En el teléfono se abre el menú de compartir (WhatsApp, correo…); en la computadora se abre el PDF
+      if (telefono && navigator.canShare?.({ files: [archivo] })) {
+        await navigator.share({ files: [archivo], title: nombre }).catch(() => {});
+      } else {
+        const url = URL.createObjectURL(r.data);
+        if (ventana) ventana.location.href = url; else window.open(url, "_blank");
+        setTimeout(() => URL.revokeObjectURL(url), 60000);
+      }
+    } catch {
+      ventana?.close();
+      setAlertMsg({ type: "danger", msg: "No se pudo generar el PDF del plan." });
+    } finally {
+      setGenerandoPdfNutri(false);
+    }
+  };
 
   // ── UI ───────────────────────────────────────────────────────────────────────
   const edad = edadDetallada(paciente?.fecha_nacimiento);
@@ -253,6 +341,7 @@ export default function Consulta() {
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
     ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
     ...(esCardioEco ? [{ id: "cardio_eco", icon: "bi-heart-pulse-fill", label: "Ecocardiograma" }] : []),
+    ...(esNutricion ? [{ id: "nutricion", icon: "bi-apple", label: "Nutrición" }] : []),
     { id: "rx",           icon: "bi-capsule",          label: "Prescripción" },
     { id: "estudios",     icon: "bi-eyedropper",       label: "Estudios" },
     { id: "antecedentes", icon: "bi-folder2-open",     label: "Antecedentes" },
@@ -587,6 +676,22 @@ export default function Consulta() {
           )}
 
           {/* ── Ecocardiograma (cardiología) ── */}
+          {tab === "nutricion" && (
+            <NutricionTab
+              datos={datosNutri}
+              setDatos={setDatosNutri}
+              vitals={vitals}
+              setVitals={setVitals}
+              paciente={paciente}
+              pacienteId={paciente?.id || pacId}
+              historiaId={hid}
+              anterior={nutriAnterior}
+              firmada={soloLectura}
+              generandoPdf={generandoPdfNutri}
+              onPdf={descargarPlanNutricion}
+            />
+          )}
+
           {tab === "cardio_eco" && (
             <EcocardiogramaTab
               datos={datosEco}
