@@ -6,6 +6,10 @@
  *   - «firma»:        el paciente lee el consentimiento y lo firma con el dedo.
  *   - «indicaciones»: las indicaciones para la casa después del procedimiento,
  *                      con sus controles y el mantenimiento.
+ *   - «como_va»:      «¿Cómo va?» unos días después: dolor, inflamación, señales
+ *                      de alarma, comentario y hasta 2 fotos. Se guarda como un
+ *                      control post-procedimiento (origen «paciente») y avisa a la
+ *                      clínica; si marca una señal de alarma, el aviso es urgente.
  *
  * Seguridad: clave aleatoria de 32 bytes; en la base solo se guarda su huella
  * (SHA-256). El enlace vence (7 días la firma, 60 las indicaciones) y el de
@@ -13,6 +17,7 @@
  *
  *  GET  /api/estetica-publico/:token          → datos para mostrar
  *  POST /api/estetica-publico/:token/firmar   → { firma, nombre, relacion, leido }
+ *  POST /api/estetica-publico/:token/responder → { dolor, inflamacion, alarmas, comentario, fotos }
  */
 const router    = require("express").Router();
 const crypto    = require("crypto");
@@ -20,7 +25,21 @@ const rateLimit = require("express-rate-limit");
 const pool      = require("../db");
 const { urlPublica } = require("../utils/urlPublica");
 
-const DIAS = { firma: 7, indicaciones: 60 };
+const DIAS = { firma: 7, indicaciones: 60, como_va: 14 };
+
+/** Señales de alarma que el paciente puede marcar (claves fijas) */
+const ALARMAS = {
+  dolor_fuerte:   "Dolor fuerte que no mejora",
+  piel_color:     "Piel blanca, morada o fría en la zona",
+  vision:         "Visión borrosa o pérdida de visión",
+  fiebre:         "Fiebre o escalofríos",
+  pus:            "Pus, secreción o mal olor",
+  bulto:          "Bulto duro, enrojecido o caliente",
+  respirar:       "Dificultad para respirar o hinchazón de la cara/garganta",
+};
+const INFLAMACION = { Nada: "Ausente", Poca: "Leve", Moderada: "Moderado", Mucha: "Severo" };
+const faseDe = (dias) => (dias <= 1 ? "dia1" : dias <= 4 ? "dia3" : dias <= 10 ? "dia7" : dias <= 20 ? "dia15" : dias <= 45 ? "dia30" : dias <= 120 ? "dia90" : "dia180");
+const diasDesde = (fecha) => (fecha ? Math.max(0, Math.round((Date.now() - new Date(`${String(fecha).slice(0, 10)}T12:00:00`).getTime()) / 86400000)) : null);
 const TOKEN_RE = /^[a-f0-9]{64}$/;
 const huella = (t) => crypto.createHash("sha256").update(String(t)).digest("hex");
 const leer = (t) => { try { return JSON.parse(t); } catch { return {}; } };
@@ -97,6 +116,14 @@ router.get("/:token", limiter, async (req, res) => {
         firmado: !!d.firmado, firmado_en: d.firmado_en || null,
       } });
     }
+    if (e.tipo === "como_va") {
+      const fecha = String(d.creado_en || "").slice(0, 10) || null;
+      return res.json({ ok: true, data: {
+        ...base,
+        procedimiento: d.nombre || "su procedimiento", fecha, dias: diasDesde(fecha),
+        respondido: !!e.usado_en, alarmas: ALARMAS,
+      } });
+    }
     let medico = "";
     if (e.historia_id) {
       const [[m]] = await pool.query("SELECT u.* FROM historias_clinicas h JOIN usuarios u ON u.id = h.medico_id WHERE h.id = ?", [e.historia_id]).catch(() => [[null]]);
@@ -157,21 +184,89 @@ router.post("/:token/firmar", limiter, async (req, res) => {
   }
 });
 
+/** Guarda una foto del paciente (data:image/jpeg) en la nube o en el servidor */
+async function guardarFoto(dataUrl, clinicaId) {
+  const m = /^data:image\/(jpeg|png|webp);base64,([A-Za-z0-9+/=]+)$/.exec(String(dataUrl || ""));
+  if (!m) return null;
+  const buf = Buffer.from(m[2], "base64");
+  if (!buf.length || buf.length > 2.5e6) return null;
+  const nube = !!(process.env.CLOUDINARY_URL || (process.env.CLOUDINARY_CLOUD_NAME && process.env.CLOUDINARY_API_KEY && process.env.CLOUDINARY_API_SECRET));
+  if (nube) {
+    const cloudinary = require("../utils/cloudinary");
+    const r = await new Promise((ok, mal) => {
+      const st = cloudinary.uploader.upload_stream({ folder: `clinica/estetica-paciente/${clinicaId}` }, (err, x) => (err ? mal(err) : ok(x)));
+      require("streamifier").createReadStream(buf).pipe(st);
+    });
+    return r.secure_url;
+  }
+  const path = require("path"), fs = require("fs");
+  const dir = path.join(__dirname, "../uploads/estetica-paciente");
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  const nombre = `paciente_${Date.now()}_${crypto.randomBytes(8).toString("hex")}.${m[1] === "jpeg" ? "jpg" : m[1]}`;
+  fs.writeFileSync(path.join(dir, nombre), buf);
+  return `/uploads/estetica-paciente/${nombre}`;
+}
+
+router.post("/:token/responder", limiter, async (req, res) => {
+  try {
+    const e = await buscar(req.params.token);
+    if (!e || !e.reg_activo || e.tipo !== "como_va") return res.status(404).json({ ok: false, msg: "El enlace no es válido." });
+    if (e.vencido) return res.status(410).json({ ok: false, msg: "Este enlace ya venció. Si necesita algo, comuníquese con la clínica." });
+    if (e.usado_en) return res.json({ ok: true, ya: true });
+    const b = req.body || {};
+    const dolor = Math.min(10, Math.max(0, Math.round(Number(b.dolor) || 0)));
+    const inflamacion = Object.keys(INFLAMACION).includes(b.inflamacion) ? b.inflamacion : "Nada";
+    const alarmas = (Array.isArray(b.alarmas) ? b.alarmas : []).filter((k) => ALARMAS[k]).slice(0, 10);
+    const comentario = String(b.comentario || "").trim().slice(0, 1500);
+    const fotos = [];
+    for (const f of (Array.isArray(b.fotos) ? b.fotos : []).slice(0, 2)) {
+      try { const url = await guardarFoto(f, e.clinica_id); if (url) fotos.push(url); } catch (err) { console.error("[estetica-publico] foto:", err.message); }
+    }
+    const d = leer(e.datos);
+    const fecha = String(d.creado_en || "").slice(0, 10) || null;
+    const urgente = alarmas.length > 0 || dolor >= 7 || inflamacion === "Mucha";
+    const datos = {
+      origen: "paciente", procedimiento: d.nombre || "", fase: faseDe(diasDesde(fecha) ?? 3), pac_id: String(e.paciente_id),
+      dolor_eva: String(dolor), edema: INFLAMACION[inflamacion], alarmas: alarmas.map((k) => ALARMAS[k]),
+      comentario, fotos, urgente, procedimiento_registro_id: e.registro_id, creado_en: new Date().toISOString(),
+    };
+    // Una sola respuesta por enlace (si dos pestañas envían a la vez, gana la primera)
+    const [u] = await pool.query("UPDATE estetica_enlaces SET usado_en = NOW() WHERE id = ? AND usado_en IS NULL", [e.id]);
+    if (!u.affectedRows) return res.json({ ok: true, ya: true });
+    await pool.query(
+      "INSERT INTO estetica_registros (clinica_id, paciente_id, tipo, datos) VALUES (?,?, 'seguimiento', ?)",
+      [e.clinica_id, e.paciente_id, JSON.stringify(datos)]);
+    const quien = `${e.nombres} ${e.apellidos || ""}`.replace(/\s+/g, " ").trim();
+    const mensaje = urgente
+      ? `⚠️ ${quien} reporta después de ${d.nombre || "su procedimiento"}: ${[...datos.alarmas, dolor >= 7 ? `dolor ${dolor}/10` : "", inflamacion === "Mucha" ? "mucha inflamación" : ""].filter(Boolean).join(", ")}`
+      : `${quien} contó cómo va después de ${d.nombre || "su procedimiento"} (dolor ${dolor}/10, inflamación ${inflamacion.toLowerCase()})`;
+    avisarClinica(e, null, {
+      mensaje, tipo: urgente ? "ESTETICA_ALERTA" : "ESTETICA_COMO_VA",
+      titulo: urgente ? "⚠️ Alerta después de un procedimiento" : "Respuesta de un paciente",
+      url: `/estetica/seguimiento?paciente_id=${e.paciente_id}`,
+    }).catch(() => {});
+    res.json({ ok: true, urgente });
+  } catch (err) {
+    console.error("[estetica-publico] responder:", err.message);
+    res.status(500).json({ ok: false, msg: "No se pudo enviar. Intente de nuevo." });
+  }
+});
+
 /** Aviso a la clínica: notificación en la campana, en tiempo real y push */
-async function avisarClinica(e, procedimiento) {
+async function avisarClinica(e, procedimiento, opciones = null) {
   const [usuarios] = await pool.query(
     "SELECT id FROM usuarios WHERE clinica_id = ? AND activo = 1 AND tipo <> 'SUPER_ADMIN'", [e.clinica_id]);
   if (!usuarios.length) return;
-  const mensaje = `${e.nombres} ${e.apellidos || ""} firmó desde su teléfono el consentimiento de ${procedimiento || "su procedimiento"}`.replace(/\s+/g, " ").slice(0, 300);
-  const tipo = "CONSENTIMIENTO_FIRMADO";
+  const mensaje = (opciones?.mensaje || `${e.nombres} ${e.apellidos || ""} firmó desde su teléfono el consentimiento de ${procedimiento || "su procedimiento"}`).replace(/\s+/g, " ").slice(0, 300);
+  const tipo = opciones?.tipo || "CONSENTIMIENTO_FIRMADO";
   await pool.query(
     "INSERT INTO notificaciones_usuario (usuario_id, clinica_id, tipo, mensaje, paciente_id, cita_id) VALUES ?",
     [usuarios.map((u) => [u.id, e.clinica_id, tipo, mensaje, e.paciente_id, null])]);
   const sse = require("../utils/sseManager");
   for (const u of usuarios) sse.notifyUser(u.id, "notificacion_portal", { tipo, mensaje });
   await require("../utils/webPush").sendToUsers(pool, usuarios.map((u) => u.id), {
-    title: "Consentimiento firmado", body: mensaje, tag: tipo,
-    data: { tipo, url: `/estetica/consentimientos?paciente_id=${e.paciente_id}` },
+    title: opciones?.titulo || "Consentimiento firmado", body: mensaje, tag: tipo,
+    data: { tipo, url: opciones?.url || `/estetica/consentimientos?paciente_id=${e.paciente_id}` },
   });
 }
 

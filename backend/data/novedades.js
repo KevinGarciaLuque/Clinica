@@ -285,4 +285,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "estetica-como-va",
+    version: "1.40",
+    titulo: "«¿Cómo va?»: el paciente cuenta su recuperación con fotos",
+    descripcion: "Al registrar un procedimiento (Estética → Día del procedimiento) elija cuándo preguntarle al paciente «¿Cómo va?» (a los 3 días por defecto): le llega un enlace para responder dolor, inflamación, señales de alarma y enviar fotos. Su respuesta aparece en Seguimiento Post-Op y, si marca algo preocupante, la clínica recibe una alerta urgente. También se puede enviar en el momento por WhatsApp.",
+    icono: "bi-chat-heart",
+    audiencia: "TODOS",
+    importante: true,
+  },
 ];

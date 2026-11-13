@@ -101,7 +101,7 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
       nuevo.seguimiento = { fase: "dia7", edema: "Leve", cicatriz: "Sin alteraciones", resultado: "Bueno", dolor_eva: "0", ...(d.seguimiento || {}), procedimiento: previos.ultimoProc.nombre || "" };
     }
     if (id === "seguimiento" && !nuevo.seguimiento) nuevo.seguimiento = { fase: "dia7", edema: "Leve", cicatriz: "Sin alteraciones", resultado: "Bueno", dolor_eva: "0" };
-    if (id === "procedimiento" && !d.procedimiento) nuevo.procedimiento = { anestesia: "Tópica (crema)", productos: [{}], zonas: {}, tolerancia: "Buena" };
+    if (id === "procedimiento" && !d.procedimiento) nuevo.procedimiento = { anestesia: "Tópica (crema)", productos: [{}], zonas: {}, tolerancia: "Buena", como_va_dias: 3 };
     return nuevo;
   });
 
@@ -493,6 +493,22 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                   </div>
                 )}
               </div>
+              <div><Lbl>Preguntarle «¿Cómo va?»</Lbl>
+                <select style={inp} disabled={firmada} value={proc.como_va_dias || ""}
+                  onChange={(e) => set("procedimiento", "como_va_dias", e.target.value ? Number(e.target.value) : 0)}>
+                  <option value="">No preguntar</option>
+                  {[1, 2, 3, 5, 7, 15].map((n) => <option key={n} value={n}>A {n === 1 ? "1 día" : `los ${n} días`} (por correo)</option>)}
+                </select>
+                <div className="d-flex align-items-center gap-2 flex-wrap mt-1">
+                  {proc.como_va_enviado_en
+                    ? <span style={{ fontSize: "0.76rem", color: "#15803d" }}><i className="bi bi-check2-all me-1" />Enviado el {fechaCorta(proc.como_va_enviado_en)}</span>
+                    : Number(proc.como_va_dias) > 0 && <span className="text-muted" style={{ fontSize: "0.76rem" }}>El paciente responde dolor, inflamación, señales de alarma y fotos; si algo preocupa, la clínica recibe una alerta.</span>}
+                  <button type="button" className="btn btn-sm btn-link p-0" style={{ color: "#16a34a", fontWeight: 700, fontSize: "0.8rem" }}
+                    onClick={() => setEnviar({ tipo: "como_va" })}>
+                    <i className="bi bi-whatsapp me-1" />Enviar ahora
+                  </button>
+                </div>
+              </div>
               <div><Lbl>Complicaciones inmediatas</Lbl>
                 <textarea rows={2} style={inp} disabled={firmada} value={proc.complicaciones || ""} onChange={(e) => set("procedimiento", "complicaciones", e.target.value)} placeholder="Ninguna" /></div>
               <div><Lbl>Indicaciones para la casa</Lbl>
@@ -565,6 +581,17 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
         <ModalEnviarPaciente titulo="Enviar para firmar en casa" onClose={() => setEnviar(null)}
           descripcion={`El paciente recibe un enlace para leer el consentimiento de ${enviar.consentimiento.procedimiento} y firmarlo con el dedo desde su teléfono. Cuando firme, le llega un aviso a la clínica.`}
           crear={async (enviarCorreo) => (await api.post(`/estetica-datos/${enviar.consentimiento.id}/enlace`, { enviar_correo: enviarCorreo })).data.data} />
+      )}
+      {enviar?.tipo === "como_va" && (
+        <ModalEnviarPaciente titulo="Enviar «¿Cómo va?»" onClose={() => setEnviar(null)}
+          descripcion="Se guarda la consulta y el paciente recibe un enlace para contar cómo se siente: dolor, inflamación, señales de alarma y fotos. Si marca algo preocupante, la clínica recibe una alerta urgente."
+          crear={async (enviarCorreo) => {
+            const hid = firmada ? historiaId : await onGuardar?.();
+            if (!hid) throw new Error("No se pudo guardar la consulta.");
+            const d = (await api.post(`/estetica-datos/historia/${hid}/enlace`, { enviar_correo: enviarCorreo, tipo: "como_va" })).data.data;
+            if (!firmada) set("procedimiento", "como_va_enviado_en", new Date().toISOString());
+            return d;
+          }} />
       )}
       {enviar?.tipo === "indicaciones" && (
         <ModalEnviarPaciente titulo="Enviar indicaciones" onClose={() => setEnviar(null)}

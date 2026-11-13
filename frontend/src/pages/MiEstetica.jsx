@@ -3,6 +3,7 @@
  * la clínica (correo o WhatsApp), sin iniciar sesión.
  *   - firma:        lee el consentimiento y lo firma con el dedo.
  *   - indicaciones: sus cuidados para la casa, controles y mantenimiento.
+ *   - como_va:      «¿Cómo va?»: dolor, inflamación, señales de alarma y fotos.
  * URL: /mi-estetica/:token
  */
 import { useCallback, useEffect, useState } from "react";
@@ -60,6 +61,7 @@ export default function MiEstetica() {
           )}
           {d?.tipo === "firma" && <Firma d={d} token={token} onListo={cargar} />}
           {d?.tipo === "indicaciones" && <Indicaciones d={d} />}
+          {d?.tipo === "como_va" && <ComoVa d={d} token={token} />}
         </div>
         <div className="text-center text-muted mt-3" style={{ fontSize: "0.75rem" }}>Enlace personal enviado por su clínica · Medic-KG</div>
       </div>
@@ -202,6 +204,160 @@ function Indicaciones({ d }) {
           </a>
         </div>
       )}
+    </div>
+  );
+}
+
+/** Achica la foto en el teléfono (máx. 1280 px, JPEG) para que suba rápido */
+function achicarFoto(archivo) {
+  return new Promise((ok, mal) => {
+    const img = new Image();
+    const url = URL.createObjectURL(archivo);
+    img.onload = () => {
+      const max = 1280;
+      const k = Math.min(1, max / Math.max(img.width, img.height));
+      const c = document.createElement("canvas");
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      ok(c.toDataURL("image/jpeg", 0.8));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); mal(new Error("foto")); };
+    img.src = url;
+  });
+}
+
+const INFLAMACION = ["Nada", "Poca", "Moderada", "Mucha"];
+
+function ComoVa({ d, token }) {
+  const [dolor, setDolor] = useState(0);
+  const [inflamacion, setInflamacion] = useState("");
+  const [alarmas, setAlarmas] = useState([]);
+  const [comentario, setComentario] = useState("");
+  const [fotos, setFotos] = useState([]);
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+  const [listo, setListo] = useState(null); // { urgente }
+
+  if (listo || d.respondido) {
+    const tel = soloDigitos(d.clinica.telefono);
+    return (
+      <div className="text-center py-3">
+        <i className={`bi ${listo?.urgente ? "bi-exclamation-triangle-fill" : "bi-heart-fill"}`} style={{ fontSize: "3rem", color: listo?.urgente ? "#dc2626" : ROSA }} />
+        <h4 className="mt-2" style={{ fontWeight: 800 }}>{listo ? `¡Gracias, ${d.paciente}!` : "Ya nos contó cómo va"}</h4>
+        <p className="text-muted">
+          {listo?.urgente
+            ? "La clínica recibió un aviso urgente. Por lo que nos cuenta, comuníquese con la clínica ahora mismo."
+            : listo ? "La clínica ya recibió su respuesta. Si algo cambia, escríbanos." : "Su respuesta ya fue enviada a la clínica."}
+        </p>
+        {tel && (
+          <div className="d-flex gap-2 flex-wrap">
+            <a className="btn flex-fill" href={`tel:${tel}`} style={{ background: listo?.urgente ? "#dc2626" : "#fff", color: listo?.urgente ? "#fff" : ROSA, border: `1px solid ${listo?.urgente ? "#dc2626" : ROSA}`, fontWeight: 700, borderRadius: 12 }}>
+              <i className="bi bi-telephone me-1" />Llamar a la clínica
+            </a>
+            <a className="btn flex-fill" href={`https://wa.me/${tel.length === 8 ? `504${tel}` : tel}`} target="_blank" rel="noreferrer" style={{ background: "#16a34a", color: "#fff", fontWeight: 700, borderRadius: 12 }}>
+              <i className="bi bi-whatsapp me-1" />WhatsApp
+            </a>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  const agregarFotos = async (e) => {
+    const archivos = [...(e.target.files || [])].slice(0, 2 - fotos.length);
+    e.target.value = "";
+    try {
+      const nuevas = await Promise.all(archivos.map(achicarFoto));
+      setFotos((f) => [...f, ...nuevas].slice(0, 2));
+    } catch { setError("No se pudo leer la foto. Intente con otra."); }
+  };
+  const toggle = (k) => setAlarmas((l) => (l.includes(k) ? l.filter((x) => x !== k) : [...l, k]));
+  const enviar = async () => {
+    setEnviando(true); setError("");
+    try {
+      const r = await axios.post(`${BASE}/estetica-publico/${token}/responder`, { dolor, inflamacion, alarmas, comentario, fotos });
+      setListo({ urgente: !!r.data.urgente });
+    } catch (e) {
+      setError(e.response?.data?.msg || "No se pudo enviar. Revise su conexión e intente de nuevo.");
+    }
+    setEnviando(false);
+  };
+  const colorDolor = dolor >= 7 ? "#dc2626" : dolor >= 4 ? "#d97706" : "#16a34a";
+  const chip = (activo, color = ROSA) => ({ border: `2px solid ${activo ? color : "#e5e7eb"}`, background: activo ? `${color}12` : "#fff", color: activo ? color : "#374151", borderRadius: 12, padding: "10px 6px", fontWeight: 700, fontSize: "0.92rem" });
+
+  return (
+    <div>
+      <div style={{ color: ROSA, fontWeight: 800, fontSize: "0.78rem", letterSpacing: ".05em", textTransform: "uppercase" }}>¿Cómo va?</div>
+      <h4 style={{ fontWeight: 800, margin: "4px 0 4px" }}>Hola {d.paciente} 👋</h4>
+      <p className="text-muted" style={{ fontSize: "0.92rem" }}>
+        Queremos saber cómo se siente después de <strong>{d.procedimiento}</strong>{d.dias != null ? ` (hace ${d.dias} día${d.dias === 1 ? "" : "s"})` : ""}.
+      </p>
+
+      <div className="mb-4">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>1. ¿Cuánto dolor siente? <span style={{ color: colorDolor }}>{dolor}/10</span></div>
+        <input type="range" min="0" max="10" value={dolor} onChange={(e) => setDolor(Number(e.target.value))} className="form-range" style={{ accentColor: colorDolor }} />
+        <div className="d-flex justify-content-between text-muted" style={{ fontSize: "0.76rem" }}><span>Nada</span><span>El peor</span></div>
+      </div>
+
+      <div className="mb-4">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>2. ¿Cuánta inflamación tiene?</div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 6 }}>
+          {INFLAMACION.map((o) => (
+            <button key={o} type="button" onClick={() => setInflamacion(o)} style={chip(inflamacion === o, o === "Mucha" ? "#dc2626" : ROSA)}>{o}</button>
+          ))}
+        </div>
+      </div>
+
+      <div className="mb-4">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>3. ¿Ha notado algo de esto?</div>
+        {Object.entries(d.alarmas || {}).map(([k, txt]) => (
+          <label key={k} className="d-flex align-items-start gap-2 mb-2" style={{ cursor: "pointer", border: `1px solid ${alarmas.includes(k) ? "#fca5a5" : "#e5e7eb"}`, background: alarmas.includes(k) ? "#fef2f2" : "#fff", borderRadius: 10, padding: "9px 12px", fontSize: "0.93rem" }}>
+            <input type="checkbox" className="form-check-input mt-1" style={{ flexShrink: 0 }} checked={alarmas.includes(k)} onChange={() => toggle(k)} />
+            <span>{txt}</span>
+          </label>
+        ))}
+        <div className="text-muted" style={{ fontSize: "0.8rem" }}>Si no ha notado nada, deje todo sin marcar.</div>
+      </div>
+
+      <div className="mb-3">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>Fotos de la zona <span className="text-muted" style={{ fontWeight: 400 }}>(opcional, hasta 2)</span></div>
+        <div className="d-flex gap-2 flex-wrap">
+          {fotos.map((f, i) => (
+            <div key={i} style={{ position: "relative" }}>
+              <img src={f} alt="" style={{ width: 96, height: 96, objectFit: "cover", borderRadius: 10 }} />
+              <button type="button" aria-label="Quitar foto" onClick={() => setFotos((l) => l.filter((_, j) => j !== i))}
+                style={{ position: "absolute", top: -8, right: -8, width: 26, height: 26, borderRadius: "50%", border: "none", background: "#111827", color: "#fff", fontSize: 13 }}>
+                <i className="bi bi-x" />
+              </button>
+            </div>
+          ))}
+          {fotos.length < 2 && (
+            <label style={{ width: 96, height: 96, borderRadius: 10, border: `2px dashed ${ROSA}55`, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: ROSA, cursor: "pointer", fontSize: "0.78rem", fontWeight: 700 }}>
+              <i className="bi bi-camera" style={{ fontSize: "1.4rem" }} />Agregar
+              <input type="file" accept="image/*" capture="environment" multiple hidden onChange={agregarFotos} />
+            </label>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-3">
+        <div style={{ fontWeight: 800, marginBottom: 6 }}>¿Algo más que quiera contarnos?</div>
+        <textarea rows={3} value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Opcional"
+          style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 10, fontSize: "1rem" }} />
+      </div>
+
+      {alarmas.length > 0 && (
+        <div className="mb-3" style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "10px 12px", fontSize: "0.88rem", color: "#7f1d1d" }}>
+          <i className="bi bi-exclamation-triangle-fill me-1" />Por lo que marcó, además de enviar esto, <strong>llame a la clínica ahora</strong>.
+        </div>
+      )}
+      {error && <div className="alert alert-danger py-2" style={{ fontSize: "0.9rem" }}>{error}</div>}
+      <button type="button" className="btn w-100" disabled={enviando || !inflamacion} onClick={enviar}
+        style={{ background: ROSA, color: "#fff", fontWeight: 800, padding: 12, borderRadius: 12, fontSize: "1.02rem" }}>
+        {enviando ? "Enviando…" : "Enviar a la clínica"}
+      </button>
+      {!inflamacion && <div className="text-center text-muted mt-2" style={{ fontSize: "0.8rem" }}>Responda la pregunta 2 para continuar.</div>}
     </div>
   );
 }

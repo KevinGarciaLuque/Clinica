@@ -21,6 +21,8 @@ const hoyTexto = () => {
   const d = new Date();
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 };
+/** "YYYY-MM-DD" de hace n días */
+const haceDias = (n) => { const d = new Date(); d.setDate(d.getDate() - n); return d.toISOString().slice(0, 10); };
 const soloFecha = (v) => (v ? String(v).slice(0, 10) : "");
 const fechaCorta = (v) => {
   const t = soloFecha(v);
@@ -108,6 +110,12 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
     const sinConsentimiento = procs.filter((p) => !firmados.some((c) => mismoProc(c.procedimiento, p)));
 
     const alertas = [];
+    // El paciente reportó una señal de alarma desde su teléfono (últimos 14 días)
+    controles.filter((c) => c.urgente && fechaControl(c) >= haceDias(14)).forEach((c) => alertas.push({
+      color: "#dc2626", icono: "bi-exclamation-octagon-fill",
+      texto: `El paciente reportó el ${fechaCorta(fechaControl(c))}: ${[...(c.alarmas || []), Number(c.dolor_eva) >= 7 ? `dolor ${c.dolor_eva}/10` : "", c.edema === "Severo" ? "mucha inflamación" : ""].filter(Boolean).join(", ")}.`,
+      link: `/estetica/seguimiento?paciente_id=${pacienteId}`, modulo: "seguimiento_postop",
+    }));
     biopsias.filter((b) => b.estado === "PENDIENTE").forEach((b) => alertas.push({
       color: "#d97706", icono: "bi-hourglass-split", texto: `Biopsia esperando resultado${b.sitio_anatomico ? ` (${b.sitio_anatomico})` : ""}, tomada el ${fechaCorta(b.fecha_toma)}.`,
       link: `/estetica/biopsias?paciente_id=${pacienteId}`, modulo: "biopsias_patologia",
@@ -136,7 +144,8 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
     // Línea de tiempo: todo junto, lo más reciente arriba
     const eventos = [
       ...sesiones.map((s) => ({ fecha: soloFecha(s.fecha || s.creado_en), color: "#0ea5e9", icono: "bi-images", titulo: "Sesión de fotos", detalle: s.nombre, link: `/estetica/galeria?paciente_id=${pacienteId}` })),
-      ...controles.map((c) => ({ fecha: fechaControl(c), color: "#8b5cf6", icono: "bi-heart-pulse", titulo: `Control ${FASES[c.fase] || ""}`.trim(), detalle: [c.procedimiento, c.resultado && `Resultado: ${c.resultado}`, c.dolor_eva && `Dolor ${c.dolor_eva}/10`].filter(Boolean).join(" · "), link: enlace(c, `/estetica/seguimiento?paciente_id=${pacienteId}`) })),
+      ...controles.map((c) => ({ fecha: fechaControl(c), color: c.urgente ? "#dc2626" : c.origen === "paciente" ? "#0ea5e9" : "#8b5cf6", icono: c.origen === "paciente" ? "bi-phone" : "bi-heart-pulse",
+        titulo: c.origen === "paciente" ? (c.urgente ? "⚠️ El paciente reportó una alarma" : "El paciente contó cómo va") : `Control ${FASES[c.fase] || ""}`.trim(), detalle: [c.procedimiento, c.resultado && `Resultado: ${c.resultado}`, c.dolor_eva && `Dolor ${c.dolor_eva}/10`].filter(Boolean).join(" · "), link: enlace(c, `/estetica/seguimiento?paciente_id=${pacienteId}`) })),
       ...procedimientos.map((x) => ({ fecha: fechaControl(x), color: ROSA, icono: "bi-magic", titulo: x.nombre || "Procedimiento",
         detalle: [
           Object.entries(x.zonas || {}).map(([z, c]) => `${nombreZona(z)}${c ? ` ${c}${x.unidad ? ` ${x.unidad}` : ""}` : ""}`).join(", "),

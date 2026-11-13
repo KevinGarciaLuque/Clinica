@@ -1081,6 +1081,10 @@ cron.schedule("5 10 * * *", () => { require("./routes/opiniones").enviarEncuesta
 cron.schedule("5 9 * * *", () => { require("./routes/controles").enviarAvisosControl(); },
   { timezone: "America/Tegucigalpa" });
 
+// ===== CRON: «¿Cómo va?» de estética (diario 10:20): a los días que indicó el médico =====
+cron.schedule("20 10 * * *", () => { require("./routes/esteticaDatos").enviarComoVaAutomatico(); },
+  { timezone: "America/Tegucigalpa" });
+
 // ===== CRON: Limpieza de datos vencidos (diario 03:30): códigos temporales y notificaciones leídas viejas =====
 cron.schedule("30 3 * * *", () => { require("./utils/limpiezaDatos").limpiarDatosVencidos().catch((e) => console.error("❌ [CRON] limpieza:", e.message)); },
   { timezone: "America/Tegucigalpa" });

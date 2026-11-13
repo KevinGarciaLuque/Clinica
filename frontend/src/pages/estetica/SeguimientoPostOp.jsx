@@ -3,6 +3,10 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import api from "../../api/api";
 import { listarEstetica, crearEstetica, eliminarEstetica } from "../../utils/esteticaDatos";
 
+// Fotos que manda el paciente: en la nube (URL completa) o en el servidor (/uploads/…)
+const RAIZ_API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+const urlFoto = (u) => (/^https?:/.test(u) ? u : `${RAIZ_API}${u}`);
+
 const C = {
   bg: "#f0f2f5", surface: "#f8fafc", card: "#ffffff",
   border: "#e5e7eb", accent: "#e91e8c", accentD: "#c2185b",
@@ -188,7 +192,8 @@ export default function SeguimientoPostOp() {
                   boxShadow: `0 0 0 2px ${fase.color}55`,
                 }} />
                 <div style={{
-                  background: C.card, border: `1px solid ${C.border}`,
+                  background: C.card, border: `1px solid ${r.urgente ? "#fca5a5" : C.border}`,
+                  borderLeft: r.urgente ? "4px solid #dc2626" : `1px solid ${C.border}`,
                   borderRadius: 14, overflow: "hidden",
                   boxShadow: "0 1px 4px rgba(0,0,0,.06)",
                 }}>
@@ -207,6 +212,12 @@ export default function SeguimientoPostOp() {
                         {fase.label}
                       </span>
                       <span style={{ fontWeight: 600, color: C.text }}>{r.procedimiento}</span>
+                      {r.origen === "paciente" && (
+                        <span style={{ background: r.urgente ? "#fee2e2" : "#e0f2fe", color: r.urgente ? "#b91c1c" : "#0369a1", borderRadius: 6, padding: "3px 9px", fontSize: 11, fontWeight: 700 }}>
+                          <i className={`bi ${r.urgente ? "bi-exclamation-triangle-fill" : "bi-phone"} me-1`} />
+                          {r.urgente ? "Alerta del paciente" : "Respondido por el paciente"}
+                        </span>
+                      )}
                     </div>
                     <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                       <span style={{ fontSize: 12, color: C.muted }}>
@@ -231,10 +242,32 @@ export default function SeguimientoPostOp() {
                   <div style={{ padding: "14px 18px", display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(160px,1fr))", gap: 12 }}>
                     <DatoItem icon="bi-thermometer-half" label="Dolor (EVA)" value={`${r.dolor_eva} / 10`} />
                     <DatoItem icon="bi-droplet-fill" label="Edema" value={r.edema} />
-                    <DatoItem icon="bi-bandaid-fill" label="Cicatriz" value={r.cicatriz} />
-                    <DatoItem icon="bi-star-fill" label="Resultado" value={r.resultado} />
+                    {r.origen !== "paciente" && <DatoItem icon="bi-bandaid-fill" label="Cicatriz" value={r.cicatriz} />}
+                    {r.origen !== "paciente" && <DatoItem icon="bi-star-fill" label="Resultado" value={r.resultado} />}
                     {r.proxima_cita && <DatoItem icon="bi-calendar2" label="Próximo control" value={new Date(r.proxima_cita).toLocaleDateString("es-PE")} />}
                   </div>
+                  {r.alarmas?.length > 0 && (
+                    <div style={{ padding: "0 18px 12px" }}>
+                      <div style={{ background: "#fef2f2", border: "1px solid #fecaca", borderRadius: 10, padding: "8px 12px", color: "#991b1b", fontSize: 13 }}>
+                        <strong><i className="bi bi-exclamation-triangle-fill me-1" />El paciente marcó:</strong>
+                        <ul className="mb-0 mt-1 ps-3">{r.alarmas.map((a) => <li key={a}>{a}</li>)}</ul>
+                      </div>
+                    </div>
+                  )}
+                  {r.comentario && (
+                    <div style={{ padding: "0 18px 12px", fontSize: 13, color: C.textSub }}>
+                      <span style={{ color: C.muted, fontWeight: 600 }}>Comentario del paciente: </span>{r.comentario}
+                    </div>
+                  )}
+                  {r.fotos?.length > 0 && (
+                    <div style={{ padding: "0 18px 14px", display: "flex", gap: 8, flexWrap: "wrap" }}>
+                      {r.fotos.map((f) => (
+                        <a key={f} href={urlFoto(f)} target="_blank" rel="noreferrer">
+                          <img src={urlFoto(f)} alt="Foto del paciente" style={{ width: 110, height: 110, objectFit: "cover", borderRadius: 10, border: `1px solid ${C.border}` }} />
+                        </a>
+                      ))}
+                    </div>
+                  )}
                   {r.indicaciones && (
                     <div style={{ padding: "0 18px 14px" }}>
                       <div style={{ fontSize: 12, color: C.muted, fontWeight: 600, marginBottom: 4 }}>Indicaciones:</div>

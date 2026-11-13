@@ -199,10 +199,10 @@ function correoEnlace({ nombre, clinica, titulo, texto, boton, url, dias }) {
  * Crea el enlace y, si se pide y el paciente tiene correo, se lo envía.
  * Devuelve también el texto para WhatsApp (la clínica lo envía desde su teléfono).
  */
-async function enviarEnlacePaciente({ req, reg, tipo, enviarCorreo, procedimiento }) {
-  const clinicaId = clinicaDe(req);
+async function enviarEnlacePaciente({ req, clinicaId: cid, usuarioId, reg, tipo, enviarCorreo, procedimiento }) {
+  const clinicaId = cid || clinicaDe(req);
   const { crearEnlace } = require("./esteticaPublico");
-  const { url, dias } = await crearEnlace({ clinicaId, pacienteId: reg.paciente_id, registroId: reg.id, tipo, usuarioId: req.user.id });
+  const { url, dias } = await crearEnlace({ clinicaId, pacienteId: reg.paciente_id, registroId: reg.id, tipo, usuarioId: usuarioId ?? req?.user?.id });
   const [[pac]] = await pool.query("SELECT nombres, apellidos, email, telefono FROM pacientes WHERE id = ?", [reg.paciente_id]);
   const [[cl]] = await pool.query("SELECT nombre FROM clinicas WHERE id = ?", [clinicaId]);
   const nombre = String(pac?.nombres || "").split(" ")[0];
@@ -210,6 +210,9 @@ async function enviarEnlacePaciente({ req, reg, tipo, enviarCorreo, procedimient
   const textos = tipo === "firma"
     ? { titulo: "Consentimiento informado", texto: `Antes de su cita de <strong>${escE(proc)}</strong>, le pedimos leer el consentimiento informado y firmarlo con el dedo desde su teléfono.`, boton: "Leer y firmar",
         wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. Antes de su cita de ${proc}, por favor lea y firme su consentimiento desde este enlace: ${url}` }
+    : tipo === "como_va"
+    ? { titulo: "¿Cómo va su recuperación?", texto: `Queremos saber cómo se siente después de <strong>${escE(proc)}</strong>. Son 3 preguntas rápidas y, si quiere, puede enviarnos una foto.`, boton: "Contarnos cómo va",
+        wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. ¿Cómo va después de ${proc}? Cuéntenos en este enlace (3 preguntas y una foto si quiere): ${url}` }
     : { titulo: "Sus indicaciones", texto: `Aquí tiene las indicaciones para su cuidado después de <strong>${escE(proc)}</strong> y las fechas de sus controles.`, boton: "Ver mis indicaciones",
         wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. Aquí tiene sus indicaciones después de ${proc} y las fechas de sus controles: ${url}` };
   let correoEnviado = false;
@@ -240,7 +243,7 @@ router.post("/:id(\\d+)/enlace", auth(...ROLES), async (req, res) => {
   }
 });
 
-// POST /historia/:hid/enlace  { enviar_correo } → indicaciones del procedimiento de esa consulta
+// POST /historia/:hid/enlace  { enviar_correo, tipo: "indicaciones" | "como_va" } → enlace del procedimiento de esa consulta
 router.post("/historia/:hid(\\d+)/enlace", auth(...ROLES), async (req, res) => {
   try {
     await asegurarTabla();
@@ -249,11 +252,13 @@ router.post("/historia/:hid(\\d+)/enlace", auth(...ROLES), async (req, res) => {
       [req.params.hid, clinicaDe(req)]);
     if (!reg) return res.status(404).json({ ok: false, msg: "Guarde primero el procedimiento de esta consulta." });
     const d = leer(reg.datos);
-    if (!String(d.indicaciones || "").trim() && !(d.controles_agendados || []).length)
+    const tipo = req.body?.tipo === "como_va" ? "como_va" : "indicaciones";
+    if (tipo === "indicaciones" && !String(d.indicaciones || "").trim() && !(d.controles_agendados || []).length)
       return res.status(400).json({ ok: false, msg: "Escriba las indicaciones para la casa antes de enviarlas." });
-    const info = await enviarEnlacePaciente({ req, reg, tipo: "indicaciones", enviarCorreo: !!req.body?.enviar_correo, procedimiento: d.nombre });
-    // Se anota cuándo se enviaron (se ve en la consulta)
-    await pool.query("UPDATE estetica_registros SET datos = ? WHERE id = ?", [JSON.stringify({ ...d, indicaciones_enviadas_en: new Date().toISOString() }), reg.id]);
+    const info = await enviarEnlacePaciente({ req, reg, tipo, enviarCorreo: !!req.body?.enviar_correo, procedimiento: d.nombre });
+    // Se anota cuándo se envió (se ve en la consulta)
+    const marca = tipo === "como_va" ? "como_va_enviado_en" : "indicaciones_enviadas_en";
+    await pool.query("UPDATE estetica_registros SET datos = ? WHERE id = ?", [JSON.stringify({ ...d, [marca]: new Date().toISOString() }), reg.id]);
     res.json({ ok: true, data: info });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -554,7 +559,7 @@ router.put("/historia/:hid(\\d+)", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_A
     );
     // Si la pantalla no trae el mantenimiento ya programado, se conserva el que había
     const previo = ya ? leer(ya.datos) : {};
-    for (const k of ["mantenimiento_control_id", "indicaciones_enviadas_en"]) {
+    for (const k of ["mantenimiento_control_id", "indicaciones_enviadas_en", "como_va_enviado_en"]) {
       if (previo[k] && !datos?.[k] && datos && typeof datos === "object") datos[k] = previo[k];
     }
     let id;
@@ -596,3 +601,43 @@ router.put("/historia/:hid(\\d+)", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_A
 module.exports = router;
 module.exports.asegurarTabla = asegurarTabla;
 module.exports.asegurarAplicaciones = asegurarAplicaciones;
+
+/**
+ * Cron diario: «¿Cómo va?» automático por correo a los días que indicó el médico
+ * (procedimiento.como_va_dias). Solo procedimientos de los últimos 30 días, una vez.
+ */
+module.exports.enviarComoVaAutomatico = async function enviarComoVaAutomatico() {
+  try {
+    await asegurarTabla();
+    if (!process.env.FRONTEND_URL && !process.env.PUBLIC_URL) return { enviados: 0 };
+    const [regs] = await pool.query(
+      `SELECT e.* FROM estetica_registros e JOIN pacientes p ON p.id = e.paciente_id
+       WHERE e.tipo = 'procedimiento' AND e.activo = 1 AND e.creado_en >= NOW() - INTERVAL 30 DAY
+         AND p.email IS NOT NULL AND p.email <> ''`);
+    let enviados = 0;
+    for (const reg of regs) {
+      const d = leer(reg.datos);
+      const dias = Number(d.como_va_dias) || 0;
+      if (!dias || d.como_va_enviado_en) continue;
+      const base = String(d.creado_en || "").slice(0, 10) || new Date(reg.creado_en).toISOString().slice(0, 10);
+      const toca = new Date(`${base}T12:00:00`); toca.setDate(toca.getDate() + dias);
+      if (toca.getTime() > Date.now()) continue;
+      // Se marca antes de enviar: si el servidor se reinicia, no se envía dos veces
+      const [u] = await pool.query(
+        "UPDATE estetica_registros SET datos = ? WHERE id = ? AND datos = ?",
+        [JSON.stringify({ ...d, como_va_enviado_en: new Date().toISOString() }), reg.id, reg.datos]);
+      if (!u.affectedRows) continue;
+      try {
+        const info = await enviarEnlacePaciente({ clinicaId: reg.clinica_id, usuarioId: null, reg, tipo: "como_va", enviarCorreo: true, procedimiento: d.nombre });
+        if (info.correo_enviado) enviados++;
+      } catch (e) {
+        console.error("[estetica] como va automático:", e.message);
+      }
+    }
+    if (enviados) console.log(`💬 [estetica] ${enviados} «¿Cómo va?» enviado(s)`);
+    return { enviados };
+  } catch (e) {
+    console.error("[estetica] enviarComoVaAutomatico:", e.message);
+    return { enviados: 0, error: e.message };
+  }
+};
