@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../api/api";
 import { ACTIVIDADES, FORMULAS, clasificarIMC } from "../utils/nutricion";
 import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../utils/descargarPdf";
+import TarjetaHistorial from "./TarjetaHistorial";
 
 /**
  * Historial de consultas de nutrición del paciente: línea de tiempo con las fechas;
@@ -58,16 +59,9 @@ function Fila({ label, valor, unidad, extra }) {
   );
 }
 
-function Tarjeta({ tipo, children }) {
+function Tarjeta({ tipo, children, ancha }) {
   const s = SECCIONES[tipo];
-  return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderTop: `3px solid ${s.color}`, borderRadius: 10, padding: "12px 14px" }}>
-      <div className="d-flex align-items-center gap-2 mb-2" style={{ color: s.color, fontWeight: 800, fontSize: "0.78rem", letterSpacing: ".04em", textTransform: "uppercase" }}>
-        <i className={`bi ${s.icono}`} />{s.nombre}
-      </div>
-      {children}
-    </div>
-  );
+  return <TarjetaHistorial color={s.color} icono={s.icono} nombre={s.nombre} ancha={ancha}>{children}</TarjetaHistorial>;
 }
 
 function Detalle({ v, grupos, tiempos, onAbrir, onPdf, bajando }) {

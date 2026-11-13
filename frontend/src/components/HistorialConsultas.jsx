@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { VITALS_FIELDS } from "../pages/ConsultaMedica/helpers";
+import TarjetaHistorial from "./TarjetaHistorial";
 
 /**
  * Historial de consultas del paciente con el mismo diseño del Historial de Nutrición:
@@ -44,14 +45,7 @@ function seccionesDe(h, docs) {
 
 function Tarjeta({ tipo, children, ancha }) {
   const s = SECCIONES[tipo];
-  return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderTop: `3px solid ${s.color}`, borderRadius: 10, padding: "12px 14px", gridColumn: ancha ? "1 / -1" : undefined }}>
-      <div className="d-flex align-items-center gap-2 mb-2" style={{ color: s.color, fontWeight: 800, fontSize: "0.78rem", letterSpacing: ".04em", textTransform: "uppercase" }}>
-        <i className={`bi ${s.icono}`} />{s.nombre}
-      </div>
-      {children}
-    </div>
-  );
+  return <TarjetaHistorial color={s.color} icono={s.icono} nombre={s.nombre} ancha={ancha}>{children}</TarjetaHistorial>;
 }
 
 function Fila({ label, valor }) {
