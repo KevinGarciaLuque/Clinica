@@ -64,6 +64,74 @@ function Tarjeta({ tipo, children, ancha }) {
   return <TarjetaHistorial color={s.color} icono={s.icono} nombre={s.nombre} ancha={ancha}>{children}</TarjetaHistorial>;
 }
 
+// Nombres cortos para que la tabla del plan quepa en la tarjeta
+const TIEMPO_CORTO = { desayuno: "Des", merienda_am: "M.AM", almuerzo: "Alm", merienda_pm: "M.PM", cena: "Cena" };
+const DIA_CORTO = { Lunes: "Lun", Martes: "Mar", "Miércoles": "Mié", Jueves: "Jue", Viernes: "Vie", "Sábado": "Sáb", Domingo: "Dom" };
+
+/** Plan en tabla: grupo de alimento × tiempo de comida, con el total del día */
+function TablaPlan({ porciones, grupos, tiempos }) {
+  const n = (t, g) => Number(porciones?.[t]?.[g]) || 0;
+  const tiemposUsados = tiempos.filter((t) => grupos.some((g) => n(t.clave, g.clave) > 0));
+  const gruposUsados = grupos.filter((g) => tiempos.some((t) => n(t.clave, g.clave) > 0));
+  const celda = { padding: "4px 1px", textAlign: "center", borderBottom: "1px solid #f1f5f9" };
+  return (
+    <div style={{ overflowX: "auto" }}>
+      <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "0.74rem" }}>
+        <thead>
+          <tr style={{ color: "#64748b" }}>
+            <th style={{ ...celda, textAlign: "left", fontWeight: 600 }}>Grupo</th>
+            {tiemposUsados.map((t) => <th key={t.clave} title={t.nombre} style={{ ...celda, fontWeight: 600, whiteSpace: "nowrap" }}>{TIEMPO_CORTO[t.clave] || t.nombre}</th>)}
+            <th style={{ ...celda, fontWeight: 700, color: "#0f172a" }}>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          {gruposUsados.map((g) => {
+            const total = tiempos.reduce((s, t) => s + n(t.clave, g.clave), 0);
+            return (
+              <tr key={g.clave}>
+                <td style={{ ...celda, textAlign: "left", whiteSpace: "nowrap" }} title={g.ejemplos?.join(" · ")}>
+                  <span style={{ display: "inline-block", width: 8, height: 8, borderRadius: "50%", background: g.color, marginRight: 4 }} />
+                  {g.nombre.split(/[ ,]/)[0]}
+                </td>
+                {tiemposUsados.map((t) => <td key={t.clave} style={{ ...celda, color: n(t.clave, g.clave) ? "#0f172a" : "#cbd5e1" }}>{n(t.clave, g.clave) || "·"}</td>)}
+                <td style={{ ...celda, fontWeight: 800 }}>{total}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Menú: botones de días y un solo día a la vez */
+function MenuPorDia({ menu, tiempos }) {
+  const dias = Object.keys(DIA_CORTO).filter((d) => Object.values(menu?.[d] || {}).some(hay));
+  const [dia, setDia] = useState(dias[0]);
+  const visto = dias.includes(dia) ? dia : dias[0];
+  return (
+    <div>
+      <div className="d-flex flex-wrap gap-1 mb-2">
+        {dias.map((d) => (
+          <button key={d} type="button" onClick={() => setDia(d)}
+            style={{
+              borderRadius: 999, padding: "2px 9px", fontSize: "0.74rem", fontWeight: 700, cursor: "pointer",
+              border: `1px solid ${visto === d ? "#a855f7" : "#e5e7eb"}`,
+              background: visto === d ? "#a855f7" : "#fff", color: visto === d ? "#fff" : "#64748b",
+            }}>
+            {DIA_CORTO[d]}
+          </button>
+        ))}
+      </div>
+      {tiempos.filter((t) => hay(menu?.[visto]?.[t.clave])).map((t) => (
+        <div key={t.clave} className="py-1" style={{ fontSize: "0.82rem", borderBottom: "1px solid #f1f5f9" }}>
+          <span style={{ color: "#a855f7", fontWeight: 700 }}>{t.nombre}:</span> {menu[visto][t.clave]}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Detalle({ v, grupos, tiempos, onAbrir, onPdf, bajando }) {
   const md = v.medidas || {}, ev = v.evaluacion || {}, pl = v.plan || {}, rq = v.requerimiento || {}, pg = v.pliegues || {};
   const secc = seccionesDe(v);
@@ -132,31 +200,13 @@ function Detalle({ v, grupos, tiempos, onAbrir, onPdf, bajando }) {
 
       {secc.includes("plan") && (
         <Tarjeta tipo="plan">
-          {tiempos.filter((t) => grupos.some((g) => Number(porciones?.[t.clave]?.[g.clave]) > 0)).map((t) => (
-            <div key={t.clave} className="py-1" style={{ borderBottom: "1px solid #f1f5f9", fontSize: "0.82rem" }}>
-              <div style={{ color: "#64748b" }}>{t.nombre}</div>
-              <div className="d-flex flex-wrap gap-1 mt-1">
-                {grupos.filter((g) => Number(porciones?.[t.clave]?.[g.clave]) > 0).map((g) => (
-                  <span key={g.clave} style={{ background: `${g.color}22`, borderRadius: 999, padding: "1px 8px", fontWeight: 600, fontSize: "0.76rem" }}>
-                    {porciones[t.clave][g.clave]} {Number(porciones[t.clave][g.clave]) === 1 ? "porción" : "porciones"} de {g.nombre.toLowerCase()}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
+          <TablaPlan porciones={porciones} grupos={grupos} tiempos={tiempos} />
         </Tarjeta>
       )}
 
       {secc.includes("menu") && (
         <Tarjeta tipo="menu">
-          {Object.entries(menu).filter(([, d]) => Object.values(d || {}).some(hay)).map(([dia, d]) => (
-            <div key={dia} className="py-1" style={{ borderBottom: "1px solid #f1f5f9", fontSize: "0.82rem" }}>
-              <b>{dia}</b>
-              {tiempos.filter((t) => hay(d?.[t.clave])).map((t) => (
-                <div key={t.clave}><span style={{ color: "#64748b" }}>{t.nombre}:</span> {d[t.clave]}</div>
-              ))}
-            </div>
-          ))}
+          <MenuPorDia menu={menu} tiempos={tiempos} />
         </Tarjeta>
       )}
 
