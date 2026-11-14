@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Link } from "react-router-dom";
+import api from "../../api/api";
 import { crearEstetica } from "../../utils/esteticaDatos";
 import { PLANTILLAS_CONSENTIMIENTO, PROCEDIMIENTOS_COMUNES } from "../../utils/esteticaCatalogos";
 
@@ -221,6 +222,143 @@ export function ModalFichaRapida({ pacienteId, fichaActual, onClose, onGuardada 
         <button type="button" className="btn ms-auto" style={{ background: ROSA, color: "#fff", fontWeight: 700 }} disabled={guardando} onClick={guardar}>
           {guardando ? "Guardando…" : "Guardar ficha"}
         </button>
+      </div>
+    </Modal>
+  );
+}
+
+const POSES_FOTO = [
+  { id: "frontal", texto: "Frontal" },
+  { id: "45_izq", texto: "45° izq." },
+  { id: "45_der", texto: "45° der." },
+  { id: "perfil_izq", texto: "Perfil izq." },
+  { id: "perfil_der", texto: "Perfil der." },
+  { id: "cenital", texto: "Superior" },
+];
+
+const hoyLocal = () => {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+};
+
+/** Achica las fotos del teléfono (pueden pesar más de 10 MB) antes de subirlas. */
+async function achicarFoto(archivo, max = 2000) {
+  if (!archivo?.type?.startsWith("image/") || archivo.type === "image/gif") return archivo;
+  try {
+    const bmp = await createImageBitmap(archivo);
+    const k = Math.min(1, max / Math.max(bmp.width, bmp.height));
+    if (k === 1 && archivo.size < 3 * 1024 * 1024) return archivo;
+    const c = document.createElement("canvas");
+    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k);
+    c.getContext("2d").drawImage(bmp, 0, 0, c.width, c.height);
+    const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.86));
+    return blob ? new File([blob], (archivo.name || "foto").replace(/\.\w+$/, "") + ".jpg", { type: "image/jpeg" }) : archivo;
+  } catch { return archivo; }
+}
+
+/**
+ * Tomar o subir fotos de antes/después sin ir a la Galería. Las fotos quedan en
+ * una sesión de la galería (la de hoy o una que el médico elija).
+ */
+export function ModalFotoRapida({ pacienteId, sesiones = [], nombreSugerido = "", onClose, onSubida }) {
+  const hoy = hoyLocal();
+  const deHoy = sesiones.find((s) => String(s.fecha || "").slice(0, 10) === hoy);
+  const [sesionId, setSesionId] = useState(deHoy ? String(deHoy.id) : "nueva");
+  const [nombre, setNombre] = useState(nombreSugerido || "");
+  const [momento, setMomento] = useState("antes");
+  const [pose, setPose] = useState("frontal");
+  const [subiendo, setSubiendo] = useState(false);
+  const [subidas, setSubidas] = useState([]); // [{ url, momento, pose }]
+  const camara = useRef(null);
+  const archivo = useRef(null);
+
+  const subir = async (file) => {
+    if (!file) return;
+    setSubiendo(true);
+    try {
+      let sid = sesionId;
+      if (sid === "nueva") {
+        const r = await api.post("/galeria-estetica/sesiones", { paciente_id: pacienteId, nombre: nombre.trim() || "Fotos", fecha: hoy });
+        sid = String(r.data.data.id);
+        setSesionId(sid);
+      }
+      const fd = new FormData();
+      fd.append("archivo", await achicarFoto(file));
+      fd.append("sesion_id", sid);
+      fd.append("paciente_id", pacienteId);
+      fd.append("momento", momento);
+      fd.append("pose", pose);
+      const r = await api.post("/galeria-estetica/fotos", fd, { headers: { "Content-Type": "multipart/form-data" } });
+      setSubidas((l) => [...l.filter((x) => !(x.momento === momento && x.pose === pose)), { url: r.data.data.archivo_url, momento, pose }]);
+      // Pasa sola a la siguiente pose para seguir tomando
+      const i = POSES_FOTO.findIndex((p) => p.id === pose);
+      if (i < POSES_FOTO.length - 1) setPose(POSES_FOTO[i + 1].id);
+    } catch (e) {
+      alert(e.response?.data?.message || e.response?.data?.msg || "No se pudo subir la foto.");
+    }
+    setSubiendo(false);
+  };
+  const chip = (activo) => ({ borderRadius: 999, fontSize: "0.8rem", fontWeight: 700, padding: "4px 12px", border: `1px solid ${ROSA}`, background: activo ? ROSA : "#fff", color: activo ? "#fff" : ROSA, cursor: "pointer" });
+  const yaTiene = (m, p) => subidas.some((x) => x.momento === m && x.pose === p);
+  const cerrar = () => (subidas.length ? onSubida?.() : onClose?.());
+
+  return (
+    <Modal titulo="Fotos del paciente" icono="bi-camera" onClose={cerrar}>
+      <Lbl>Sesión de fotos</Lbl>
+      <select style={inp} value={sesionId} onChange={(e) => setSesionId(e.target.value)} disabled={subiendo}>
+        <option value="nueva">Nueva sesión de hoy</option>
+        {sesiones.map((s) => <option key={s.id} value={String(s.id)}>{s.nombre || "Sesión"} · {String(s.fecha || "").slice(0, 10)}</option>)}
+      </select>
+      {sesionId === "nueva" && (
+        <div className="mt-2">
+          <input style={inp} value={nombre} onChange={(e) => setNombre(e.target.value)} placeholder="Nombre (ej.: Toxina botulínica frente)" list="fr-procs" />
+          <datalist id="fr-procs">{PROCEDIMIENTOS_COMUNES.map((p) => <option key={p} value={p} />)}</datalist>
+        </div>
+      )}
+
+      <div className="mt-3"><Lbl>¿Antes o después del procedimiento?</Lbl></div>
+      <div className="d-flex gap-2">
+        {[["antes", "Antes"], ["despues", "Después"]].map(([k, t]) => <button key={k} type="button" style={chip(momento === k)} onClick={() => setMomento(k)}>{t}</button>)}
+      </div>
+
+      <div className="mt-3"><Lbl>Pose</Lbl></div>
+      <div className="d-flex flex-wrap gap-1">
+        {POSES_FOTO.map((p) => (
+          <button key={p.id} type="button" style={chip(pose === p.id)} onClick={() => setPose(p.id)}>
+            {yaTiene(momento, p.id) && <i className="bi bi-check-circle-fill me-1" />}{p.texto}
+          </button>
+        ))}
+      </div>
+
+      <input ref={camara} type="file" accept="image/*" capture="environment" hidden onChange={(e) => { subir(e.target.files?.[0]); e.target.value = ""; }} />
+      <input ref={archivo} type="file" accept="image/*" hidden onChange={(e) => { subir(e.target.files?.[0]); e.target.value = ""; }} />
+      <div className="d-flex gap-2 mt-3 flex-wrap">
+        <button type="button" className="btn flex-grow-1" style={{ background: ROSA, color: "#fff", fontWeight: 700 }} disabled={subiendo} onClick={() => camara.current?.click()}>
+          {subiendo ? <span className="spinner-border spinner-border-sm me-2" /> : <i className="bi bi-camera-fill me-2" />}Tomar foto
+        </button>
+        <button type="button" className="btn flex-grow-1" style={{ border: `1px solid ${ROSA}`, color: ROSA, fontWeight: 700 }} disabled={subiendo} onClick={() => archivo.current?.click()}>
+          <i className="bi bi-image me-2" />Elegir de la galería
+        </button>
+      </div>
+
+      {subidas.length > 0 && (
+        <>
+          <div className="mt-3"><Lbl>Subidas ahora ({subidas.length})</Lbl></div>
+          <div className="d-flex flex-wrap gap-2">
+            {subidas.map((x) => (
+              <div key={`${x.momento}-${x.pose}`} style={{ width: 74, textAlign: "center" }}>
+                <img src={x.url} alt="" style={{ width: 74, height: 90, objectFit: "cover", borderRadius: 8, border: "1px solid #fbcfe8" }} />
+                <div style={{ fontSize: "0.66rem", color: "#6b7280", lineHeight: 1.2 }}>{x.momento === "antes" ? "Antes" : "Después"}<br />{POSES_FOTO.find((p) => p.id === x.pose)?.texto}</div>
+              </div>
+            ))}
+          </div>
+          <button type="button" className="btn btn-sm mt-3 w-100" style={{ background: "#16a34a", color: "#fff", fontWeight: 700 }} onClick={() => onSubida?.()}>
+            <i className="bi bi-check2 me-1" />Listo
+          </button>
+        </>
+      )}
+      <div className="text-muted mt-2" style={{ fontSize: "0.74rem" }}>
+        Las fotos quedan guardadas en la Galería de este paciente. Use la misma pose antes y después para poder compararlas.
       </div>
     </Modal>
   );

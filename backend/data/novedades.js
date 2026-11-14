@@ -336,4 +336,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "estetica-tratamiento-en-curso-fotos",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
+    version: "1.44",
+    titulo: "Tratamiento en curso y fotos desde el perfil",
+    descripcion: "Arriba de la pestaña Estética del paciente verá su tratamiento de un vistazo: último procedimiento, qué sigue, próximo control y mantenimiento, sesiones que le quedan y saldo. Además puede tomar o subir fotos ahí mismo con el teléfono y comparar la misma pose en fechas distintas.",
+    icono: "bi-camera",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

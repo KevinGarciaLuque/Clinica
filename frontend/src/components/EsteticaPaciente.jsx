@@ -4,7 +4,7 @@ import api from "../api/api";
 import { listarEstetica } from "../utils/esteticaDatos";
 import { nombreZona } from "../utils/esteticaCatalogos";
 import { paquetesDe } from "../utils/esteticaPaquetes";
-import { ModalPresupuesto, ModalConsentimiento, ModalFichaRapida } from "./estetica/ModalesEstetica";
+import { ModalPresupuesto, ModalConsentimiento, ModalFichaRapida, ModalFotoRapida } from "./estetica/ModalesEstetica";
 import ModalFirmarConsentimiento from "./estetica/ModalFirmarConsentimiento";
 import ModalEnviarPaciente from "./estetica/ModalEnviarPaciente";
 import { descargarBlob, compartirEnTelefono, imprimirHtml } from "../utils/descargarPdf";
@@ -55,7 +55,7 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
   const [datos, setDatos] = useState([]);
   const [sesiones, setSesiones] = useState([]);
   const [biopsias, setBiopsias] = useState([]);
-  const [comparar, setComparar] = useState(null); // { sesion, pares: [{pose, antes, despues}] }
+  const [fotos, setFotos] = useState([]); // todas las fotos (de las últimas sesiones), con su sesión
   const [verTodo, setVerTodo] = useState(false);
 
   useEffect(() => {
@@ -73,17 +73,10 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
       setBiopsias(rB.status === "fulfilled" ? rB.value.data.data || [] : []);
       setCargando(false);
 
-      // Antes/después: la sesión más reciente que tenga la misma pose en ambos momentos
-      for (const s of ses.slice(0, 5)) {
-        const r = await api.get(`/galeria-estetica/fotos?sesion_id=${s.id}`).catch(() => null);
-        const fotos = r?.data?.data || [];
-        const pares = Object.keys(POSES).map((pose) => ({
-          pose,
-          antes: fotos.find((f) => f.momento === "antes" && f.pose === pose),
-          despues: fotos.find((f) => f.momento === "despues" && f.pose === pose),
-        })).filter((p) => p.antes && p.despues);
-        if (pares.length) { if (vivo) setComparar({ sesion: s, pares }); break; }
-      }
+      // Fotos de las últimas sesiones, para comparar la misma pose en fechas distintas
+      const porSesion = await Promise.all(ses.slice(0, 12).map((s) =>
+        api.get(`/galeria-estetica/fotos?sesion_id=${s.id}`).then((r) => (r.data.data || []).map((f) => ({ ...f, sesion: s }))).catch(() => [])));
+      if (vivo) setFotos(porSesion.flat());
     })();
     return () => { vivo = false; };
   }, [pacienteId, recarga]);
@@ -127,7 +120,7 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
     const alertas = [];
     // El paciente reportó una señal de alarma desde su teléfono (últimos 14 días)
     controles.filter((c) => c.urgente && fechaControl(c) >= haceDias(14)).forEach((c) => alertas.push({
-      color: "#dc2626", icono: "bi-exclamation-octagon-fill",
+      color: "#dc2626", icono: "bi-exclamation-octagon-fill", urgente: true,
       texto: `El paciente reportó el ${fechaCorta(fechaControl(c))}: ${[...(c.alarmas || []), Number(c.dolor_eva) >= 7 ? `dolor ${c.dolor_eva}/10` : "", c.edema === "Severo" ? "mucha inflamación" : ""].filter(Boolean).join(", ")}.`,
       link: `/estetica/seguimiento?paciente_id=${pacienteId}`, modulo: "seguimiento_postop",
     }));
@@ -201,18 +194,36 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
     ].filter((e) => e.fecha).sort((a, b) => b.fecha.localeCompare(a.fecha));
 
     const ultimoProc = [...procedimientos].sort((a, b) => fechaControl(b).localeCompare(fechaControl(a)))[0] || null;
-    return { ultimoProc, ficha, presupuestos, pendientes, consentimientos, firmados, controles, ultimoControl, proximo, alertas, eventos };
+
+    // Tratamiento en curso
+    const proximoMant = procedimientos.map((x) => soloFecha(x.mantenimiento_fecha)).filter((f) => f && f >= hoy).sort()[0] || null;
+    const paquetes = paquetesDe(datos).filter((pq) => pq.quedan > 0);
+    const facturados = presupuestos.filter((p) => p._factura && p._factura.estado !== "ANULADA");
+    const saldo = facturados.reduce((s, p) => s + Math.max(Number(p._factura.total || 0) - Number(p._factura.pagado || 0), 0), 0);
+    const sinCobrar = presupuestos.filter((p) => p.estado === "APROBADO" && !p._factura);
+    const zonasUltimo = ultimoProc ? [...Object.keys(ultimoProc.zonas || {}).map(nombreZona), ...(ultimoProc.zonas_cuerpo || [])] : [];
+    let sigue = null;
+    if (alertas.some((a) => a.urgente)) sigue = { icono: "bi-exclamation-triangle-fill", color: "#dc2626", texto: "Revisar la alarma que reportó el paciente." };
+    else if (vencido) sigue = { icono: "bi-calendar-x", color: "#dc2626", texto: `Control atrasado: tocaba el ${fechaCorta(vencido)}.`, visita: "seguimiento" };
+    else if (proximo) sigue = { icono: "bi-calendar-check", color: "#8b5cf6", texto: `Próximo control el ${fechaCorta(proximo)}.`, visita: "seguimiento" };
+    else if (paquetes.length) sigue = { icono: "bi-collection", color: "#7c3aed", texto: `Siguiente sesión de ${paquetes[0].nombre} (le quedan ${paquetes[0].quedan}).`, visita: "procedimiento" };
+    else if (proximoMant) sigue = { icono: "bi-arrow-repeat", color: "#0369a1", texto: `Mantenimiento alrededor del ${fechaCorta(proximoMant)}.`, visita: "procedimiento" };
+    else if (sinCobrar.length || pendientes.length) sigue = { icono: "bi-receipt", color: "#d97706", texto: sinCobrar.length ? "Tiene un presupuesto aprobado listo para hacerse." : "Tiene un presupuesto esperando su aprobación.", visita: sinCobrar.length ? "procedimiento" : null };
+    else if (!ultimoProc && !valoraciones.length) sigue = { icono: "bi-search-heart", color: ROSA, texto: "Paciente nuevo en estética: empiece con una valoración.", visita: "valoracion" };
+    const tratamiento = { proximoMant, paquetes, saldo, sinCobrar, zonasUltimo, sigue, hayAlgo: !!(ultimoProc || valoraciones.length || presupuestos.length || controles.length) };
+
+    return { tratamiento, ultimoProc, ficha, presupuestos, pendientes, consentimientos, firmados, controles, ultimoControl, proximo, alertas, eventos };
   }, [datos, sesiones, biopsias, pacienteId]);
 
   if (cargando) {
     return <div className="text-center text-muted py-5"><div className="spinner-border spinner-border-sm me-2" />Cargando datos estéticos…</div>;
   }
 
-  const { ultimoProc, ficha, pendientes, consentimientos, firmados, ultimoControl, proximo, alertas, eventos } = resumen;
+  const { tratamiento: tr, ultimoProc, ficha, pendientes, consentimientos, firmados, ultimoControl, proximo, alertas, eventos } = resumen;
   const visibles = verTodo ? eventos : eventos.slice(0, 8);
   // Accesos secundarios: los que se pueden hacer aquí mismo abren una ventana
   const acciones = [
-    { modulo: "galeria_estetica", icono: "bi-camera", texto: "Fotos", link: `/estetica/galeria?paciente_id=${pacienteId}` },
+    { modulo: "galeria_estetica", icono: "bi-camera", texto: "Fotos", accion: { tipo: "fotos" } },
     { modulo: "presupuestos", icono: "bi-receipt", texto: "Presupuesto", accion: { tipo: "presupuesto" } },
     { modulo: "consentimientos_esteticos", icono: "bi-pen", texto: "Consentimiento", accion: { tipo: "consentimiento" } },
     { modulo: "ficha_estetica", icono: "bi-clipboard2-pulse", texto: ficha ? "Ficha" : "Crear ficha", accion: { tipo: "ficha" } },
@@ -235,6 +246,7 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
     else setVentana(a);
   };
   const nuevaAtencion = (tipo) => navigate(`/consulta-medica?paciente_id=${pacienteId}&estetica=${tipo}`);
+  const comparables = Object.keys(POSES).filter((pose) => fotos.filter((f) => f.pose === pose).length >= 2);
   const sugeridos = [...new Set([ultimoProc?.nombre, ...pendientes.flatMap((p) => (p.procedimientos || []).map((x) => x.nombre))].filter(Boolean))];
 
   return (
@@ -247,6 +259,14 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
         .estetica-paciente .ep-accion:hover { background:#fdf2f8; transform:translateY(-1px); }
         .estetica-paciente .ep-accion i { font-size:1.25rem; }
         .estetica-paciente button.ep-accion { cursor:pointer; }
+        .estetica-paciente .ep-trat { background:#fff; border:1px solid #fbcfe8; border-left:5px solid ${ROSA}; border-radius:14px; padding:12px 14px; }
+        .estetica-paciente .ep-trat-tit { display:flex; align-items:center; gap:6px; color:${ROSA}; font-weight:800; font-size:.74rem; letter-spacing:.05em; text-transform:uppercase; }
+        .estetica-paciente .ep-sigue { display:flex; align-items:center; gap:10px; border:1px solid; border-radius:12px; padding:8px 10px; flex:1 1 300px; max-width:520px; font-size:.86rem; font-weight:600; color:#1f2937; }
+        .estetica-paciente .ep-sigue > i { font-size:1.25rem; }
+        .estetica-paciente .ep-sigue > span { flex:1; }
+        .estetica-paciente .ep-sigue small { display:block; font-size:.68rem; font-weight:800; text-transform:uppercase; letter-spacing:.05em; color:#6b7280; }
+        .estetica-paciente .ep-mini { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); gap:8px; }
+        .estetica-paciente .ep-mini > div { background:#fafafa; border:1px solid #f1f5f9; border-radius:10px; padding:7px 9px; min-width:0; }
         .estetica-paciente .ep-acciones { grid-template-columns:repeat(5,minmax(0,1fr)); }
         .estetica-paciente .ep-accion { flex-direction:row; justify-content:center; padding:8px 6px; }
         .estetica-paciente .ep-accion i { font-size:1rem; }
@@ -265,14 +285,70 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
         .estetica-paciente .ep-aviso-btns { display:flex; gap:6px; flex-wrap:wrap; }
         .estetica-paciente .ep-btn { display:inline-flex; align-items:center; gap:5px; border:1px solid; background:#fff; border-radius:999px;
           padding:4px 11px; font-size:.78rem; font-weight:700; cursor:pointer; white-space:nowrap; }
-        @media (max-width: 991px) { .estetica-paciente .ep-dos { grid-template-columns:minmax(0,1fr); } }
+        @media (max-width: 991px) { .estetica-paciente .ep-dos { grid-template-columns:minmax(0,1fr); } .estetica-paciente .ep-mini { grid-template-columns:repeat(3,minmax(0,1fr)); } }
         @media (max-width: 767px) {
           .estetica-paciente .ep-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px; }
           .estetica-paciente .ep-acciones { grid-template-columns:repeat(3,minmax(0,1fr)); }
           .estetica-paciente .ep-nueva-btns { grid-template-columns:minmax(0,1fr); }
+          .estetica-paciente .ep-mini { grid-template-columns:repeat(2,minmax(0,1fr)); }
+          .estetica-paciente .ep-accion { flex-direction:column; gap:2px; font-size:.72rem; padding:7px 2px; overflow-wrap:anywhere; }
           .estetica-paciente .ep-aviso-btns { width:100%; }
         }
       `}</style>
+
+      {/* Tratamiento en curso: el paciente de un vistazo */}
+      <div className="ep-trat mb-3">
+        <div className="d-flex align-items-start gap-2 flex-wrap">
+          <div style={{ minWidth: 0, flex: "1 1 260px" }}>
+            <div className="ep-trat-tit"><i className="bi bi-stars" />Tratamiento en curso</div>
+            {ultimoProc ? (
+              <div style={{ marginTop: 4 }}>
+                <span style={{ fontWeight: 800, fontSize: "1.05rem", color: "#111827" }}>{ultimoProc.nombre || "Procedimiento"}</span>
+                <span className="text-muted" style={{ fontSize: "0.82rem" }}> · {fechaCorta(ultimoProc.creado_en || ultimoProc._creado_en)}</span>
+                {tr.zonasUltimo.length > 0 && <div className="text-muted" style={{ fontSize: "0.8rem", overflowWrap: "anywhere" }}>{tr.zonasUltimo.join(", ")}</div>}
+              </div>
+            ) : (
+              <div className="text-muted" style={{ marginTop: 4, fontSize: "0.88rem" }}>Todavía no tiene procedimientos registrados.</div>
+            )}
+          </div>
+          {tr.sigue && (
+            <div className="ep-sigue" style={{ borderColor: `${tr.sigue.color}55`, background: `${tr.sigue.color}0d` }}>
+              <i className={`bi ${tr.sigue.icono}`} style={{ color: tr.sigue.color }} />
+              <span style={{ minWidth: 0 }}><small>Qué sigue</small>{tr.sigue.texto}</span>
+              {tr.sigue.visita && (
+                <button type="button" className="ep-btn" style={{ background: tr.sigue.color, color: "#fff", borderColor: tr.sigue.color }} onClick={() => nuevaAtencion(tr.sigue.visita)}>
+                  Atender<i className="bi bi-arrow-right" />
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+        <div className="ep-mini mt-2">
+          <Mini icono="bi-calendar-check" color="#8b5cf6" titulo="Próximo control" valor={proximo ? fechaCorta(proximo) : "Sin programar"}
+            sub={ultimoControl ? `Último: ${FASES[ultimoControl.fase] || fechaCorta(ultimoControl.creado_en || ultimoControl._creado_en)}` : ""} />
+          <Mini icono="bi-arrow-repeat" color="#0369a1" titulo="Mantenimiento" valor={tr.proximoMant ? fechaCorta(tr.proximoMant) : "—"} sub={tr.proximoMant ? "aproximado" : ""} />
+          <Mini icono="bi-collection" color="#7c3aed" titulo="Sesiones" valor={tr.paquetes.length ? `Quedan ${tr.paquetes.reduce((s, x) => s + x.quedan, 0)}` : "Sin paquete"}
+            sub={tr.paquetes.length ? tr.paquetes.map((x) => x.nombre).join(", ") : ""} />
+          <Mini icono="bi-cash-coin" color={tr.saldo > 0 ? "#b45309" : "#15803d"} titulo="Saldo" valor={tr.saldo > 0 ? `L ${monto(tr.saldo)}` : "Al día"}
+            sub={pendientes.length ? `${pendientes.length} presupuesto${pendientes.length > 1 ? "s" : ""} por aprobar` : tr.sinCobrar.length ? `${tr.sinCobrar.length} aprobado sin cobrar` : ""} />
+          <Mini icono="bi-file-earmark-check" color="#16a34a" titulo="Consentimientos" valor={consentimientos.length ? `${firmados.length} de ${consentimientos.length}` : "—"} sub={consentimientos.length ? "firmados" : ""} />
+          <Mini icono="bi-clipboard2-pulse" color={ficha ? "#0f766e" : "#9ca3af"} titulo="Ficha" valor={ficha ? `Fototipo ${ficha.fototipo || "—"}` : "Sin ficha"}
+            sub={ficha ? `Piel ${String(ficha.piel_tipo || "—").toLowerCase()}${ficha.alergias_medicamentos || ficha.alergias_anestesia || ficha.alergias_latex ? " · ⚠ alergias" : ""}` : ""} />
+        </div>
+        {tr.paquetes.map((pq) => (
+          <div key={`${pq.presupuesto_id}-${pq.indice}`} className="d-flex align-items-center gap-2 flex-wrap mt-2" style={{ fontSize: "0.82rem" }}>
+            <i className="bi bi-collection" style={{ color: "#7c3aed" }} />
+            <strong>{pq.nombre}</strong>
+            <span style={{ color: "#5b21b6" }}>{pq.usadas} de {pq.sesiones}</span>
+            <div className="flex-grow-1" style={{ minWidth: 80, height: 6, background: "#ede9fe", borderRadius: 99, overflow: "hidden" }}>
+              <div style={{ width: `${Math.min(100, (pq.usadas / pq.sesiones) * 100)}%`, height: "100%", background: "#7c3aed" }} />
+            </div>
+            <span style={{ fontWeight: 700, color: !pq.factura ? "#b91c1c" : pq.factura.pagado >= pq.factura.total ? "#15803d" : "#b45309" }}>
+              {!pq.factura ? "Sin cobrar" : pq.factura.pagado >= pq.factura.total ? "Pagado" : `Debe L ${monto(pq.factura.total - pq.factura.pagado)}`}
+            </span>
+          </div>
+        ))}
+      </div>
 
       {/* Nueva atención estética: abre la consulta con la pestaña Estética lista */}
       {(
@@ -336,61 +412,26 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
         </div>
       )}
 
-      {/* Resumen */}
-      <div className="ep-grid mb-3">
-        {ultimoProc ? (
-          <Dato color={ROSA} icono="bi-magic" titulo="Último procedimiento"
-            valor={fechaCorta(ultimoProc.creado_en || ultimoProc._creado_en)}
-            sub={`${ultimoProc.nombre || "Procedimiento"}${ultimoProc.mantenimiento_fecha ? ` · mantenimiento ${fechaCorta(ultimoProc.mantenimiento_fecha)}` : ""}`} />
-        ) : (
-          <Dato color="#0ea5e9" icono="bi-images" titulo="Últimas fotos"
-            valor={sesiones[0] ? fechaCorta(sesiones[0].fecha || sesiones[0].creado_en) : "Sin fotos"}
-            sub={sesiones[0]?.nombre || `${sesiones.length} sesiones`} />
-        )}
-        <Dato color="#8b5cf6" icono="bi-calendar-check" titulo="Próximo control"
-          valor={proximo ? fechaCorta(proximo) : "Sin programar"}
-          sub={ultimoControl ? `Último: ${FASES[ultimoControl.fase] || ""} ${ultimoControl.procedimiento || ""}`.trim() : "Sin controles"} />
-        <Dato color="#d97706" icono="bi-receipt" titulo="Presupuestos"
-          valor={pendientes.length ? "L " + monto(pendientes.reduce((s, p) => s + Number(p.total || 0), 0)) : "Al día"}
-          sub={pendientes.length ? `${pendientes.length} por aprobar` : "Ninguno pendiente"} />
-        <Dato color="#16a34a" icono="bi-file-earmark-check" titulo="Consentimientos"
-          valor={`${firmados.length} de ${consentimientos.length} firmados`}
-          sub={ficha ? `Ficha: fototipo ${ficha.fototipo || "—"} · piel ${String(ficha.piel_tipo || "—").toLowerCase()}` : "Sin ficha estética"} />
-      </div>
-
-      {/* Paquetes de sesiones */}
-      {paquetesDe(datos).length > 0 && (
-        <div className="mb-3 d-flex flex-column gap-2">
-          {paquetesDe(datos).map((pq) => (
-            <div key={`${pq.presupuesto_id}-${pq.indice}`} className="d-flex align-items-center gap-2 flex-wrap"
-              style={{ background: "#f5f3ff", border: "1px solid #ddd6fe", borderRadius: 12, padding: "8px 12px" }}>
-              <i className="bi bi-collection" style={{ color: "#7c3aed" }} />
-              <strong style={{ fontSize: "0.88rem" }}>{pq.nombre}</strong>
-              <span style={{ fontSize: "0.82rem", color: "#5b21b6" }}>{pq.usadas} de {pq.sesiones} sesiones · quedan {pq.quedan}</span>
-              <div className="flex-grow-1" style={{ minWidth: 80, height: 6, background: "#ede9fe", borderRadius: 99, overflow: "hidden" }}>
-                <div style={{ width: `${Math.min(100, (pq.usadas / pq.sesiones) * 100)}%`, height: "100%", background: "#7c3aed" }} />
-              </div>
-              <span style={{ fontSize: "0.8rem", fontWeight: 700, color: !pq.factura ? "#b91c1c" : pq.factura.pagado >= pq.factura.total ? "#15803d" : "#b45309" }}>
-                {!pq.factura ? "Sin cobrar" : pq.factura.pagado >= pq.factura.total ? "Pagado" : `Debe L ${monto(pq.factura.total - pq.factura.pagado)}`}
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
       <div className="ep-dos">
         {/* Antes y después */}
         <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderTop: `3px solid ${ROSA}`, borderRadius: 12, padding: 14 }}>
           <div className="d-flex align-items-center gap-2 mb-2" style={{ color: ROSA, fontWeight: 800, fontSize: "0.78rem", letterSpacing: ".04em", textTransform: "uppercase" }}>
             <i className="bi bi-arrow-left-right" />Antes y después
           </div>
-          {comparar ? <AntesDespues {...comparar} /> : (
+          {comparables.length ? <Comparador fotos={fotos} poses={comparables} /> : (
             <div className="text-center text-muted py-4" style={{ fontSize: "0.88rem" }}>
               <i className="bi bi-camera d-block mb-2" style={{ fontSize: "1.8rem", color: "#f9a8d4" }} />
-              {sesiones.length ? "Aún no hay una foto de «antes» y otra de «después» con la misma pose." : "Aún no hay fotos de este paciente."}
-              {tieneModulo("galeria_estetica") && (
-                <div className="mt-2"><Link to={`/estetica/galeria?paciente_id=${pacienteId}`} className="btn btn-sm btn-outline-danger" style={{ borderColor: ROSA, color: ROSA }}>Ir a la galería</Link></div>
-              )}
+              {fotos.length ? "Para comparar hace falta otra foto con la misma pose (de antes y después, o de otra fecha)." : "Aún no hay fotos de este paciente."}
+            </div>
+          )}
+          {tieneModulo("galeria_estetica") && (
+            <div className="d-flex gap-2 flex-wrap mt-2">
+              <button type="button" className="ep-btn" style={{ background: ROSA, color: "#fff", borderColor: ROSA }} onClick={() => setVentana({ tipo: "fotos" })}>
+                <i className="bi bi-camera-fill" />Tomar o subir fotos
+              </button>
+              <Link to={`/estetica/galeria?paciente_id=${pacienteId}`} className="ep-btn text-decoration-none" style={{ color: ROSA, borderColor: "#f9a8d4" }}>
+                <i className="bi bi-images" />Galería completa
+              </Link>
             </div>
           )}
         </div>
@@ -438,6 +479,9 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
           onFirmar={(c) => setVentana({ tipo: "firmar", consentimiento: c })}
           onEnviar={(c) => setVentana({ tipo: "enviar", consentimiento: c })} />
       )}
+      {ventana?.tipo === "fotos" && (
+        <ModalFotoRapida pacienteId={pacienteId} sesiones={sesiones} nombreSugerido={ultimoProc?.nombre || ""} onClose={() => setVentana(null)} onSubida={recargar} />
+      )}
       {ventana?.tipo === "ficha" && (
         <ModalFichaRapida pacienteId={pacienteId} fichaActual={ficha} onClose={() => setVentana(null)} onGuardada={recargar} />
       )}
@@ -453,50 +497,69 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
   );
 }
 
-function Dato({ color, icono, titulo, valor, sub }) {
+
+function Mini({ icono, color, titulo, valor, sub }) {
   return (
-    <div style={{ background: "#fff", border: "1px solid #e5e7eb", borderRadius: 12, padding: "10px 12px", minWidth: 0 }}>
-      <div className="d-flex align-items-center gap-2" style={{ color, fontSize: "0.72rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".03em" }}>
-        <i className={`bi ${icono}`} /><span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{titulo}</span>
+    <div>
+      <div className="d-flex align-items-center gap-1" style={{ color, fontSize: "0.68rem", fontWeight: 800, textTransform: "uppercase", letterSpacing: ".03em" }}>
+        <i className={`bi ${icono}`} /><span style={{ lineHeight: 1.15 }}>{titulo}</span>
       </div>
-      <div style={{ fontWeight: 800, fontSize: "1.02rem", color: "#111827", marginTop: 4 }}>{valor}</div>
-      <div className="text-muted" style={{ fontSize: "0.76rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sub}>{sub}</div>
+      <div style={{ fontWeight: 800, fontSize: "0.92rem", color: "#111827", marginTop: 2, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{valor}</div>
+      {sub && <div className="text-muted" style={{ fontSize: "0.72rem", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={sub}>{sub}</div>}
     </div>
   );
 }
 
-/** Foto de antes y después superpuestas; se arrastra la línea para comparar. */
-function AntesDespues({ sesion, pares }) {
-  const [pose, setPose] = useState(pares[0].pose);
+const ordenFoto = (f) => `${soloFecha(f.sesion?.fecha || f.creado_en)}|${f.momento === "antes" ? 0 : 1}|${f.creado_en || ""}`;
+const nombreFoto = (f) => `${fechaCorta(f.sesion?.fecha || f.creado_en)} · ${f.momento === "antes" ? "Antes" : "Después"}${f.sesion?.nombre ? ` · ${f.sesion.nombre}` : ""}`;
+
+/**
+ * Compara dos fotos de la misma pose (de la misma sesión o de fechas distintas):
+ * se superponen y se arrastra la línea. Por defecto, la más antigua contra la más reciente.
+ */
+function Comparador({ fotos, poses }) {
+  const [sel, setSel] = useState(() => ({ pose: poses.includes("frontal") ? "frontal" : poses[0], a: null, b: null }));
   const [corte, setCorte] = useState(50);
-  const par = pares.find((p) => p.pose === pose) || pares[0];
-  const etiqueta = { position: "absolute", top: 8, padding: "2px 8px", borderRadius: 999, background: "rgba(17,24,39,.65)", color: "#fff", fontSize: "0.72rem", fontWeight: 700 };
+  const pose = poses.includes(sel.pose) ? sel.pose : poses[0];
+  const lista = fotos.filter((f) => f.pose === pose).sort((x, y) => ordenFoto(x).localeCompare(ordenFoto(y)));
+  const izq = lista.find((f) => f.id === sel.a) || lista[0];
+  const der = lista.find((f) => f.id === sel.b) || lista[lista.length - 1];
+  const etiqueta = { position: "absolute", top: 8, padding: "2px 8px", borderRadius: 999, background: "rgba(17,24,39,.65)", color: "#fff", fontSize: "0.72rem", fontWeight: 700, maxWidth: "46%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" };
+  const corto = (f) => `${f.momento === "antes" ? "Antes" : "Después"} · ${fechaCorta(f.sesion?.fecha || f.creado_en)}`;
+  const selStyle = { width: "100%", padding: "5px 8px", border: "1px solid #f9a8d4", borderRadius: 8, fontSize: "0.8rem", background: "#fff", minWidth: 0 };
   return (
     <div>
-      <div className="text-muted mb-2" style={{ fontSize: "0.8rem" }}>{sesion.nombre || "Sesión"} · {fechaCorta(sesion.fecha || sesion.creado_en)}</div>
+      {poses.length > 1 && (
+        <div className="d-flex flex-wrap gap-1 mb-2">
+          {poses.map((p) => (
+            <button key={p} type="button" onClick={() => setSel({ pose: p, a: null, b: null })} className="btn btn-sm"
+              style={{ borderRadius: 999, fontSize: "0.75rem", fontWeight: 700, padding: "2px 10px", border: `1px solid ${ROSA}`, background: p === pose ? ROSA : "#fff", color: p === pose ? "#fff" : ROSA }}>
+              {POSES[p] || p}
+            </button>
+          ))}
+        </div>
+      )}
+      <div className="d-grid gap-2 mb-2" style={{ gridTemplateColumns: "minmax(0,1fr) minmax(0,1fr)" }}>
+        <select style={selStyle} value={izq.id} onChange={(e) => setSel({ ...sel, pose, a: Number(e.target.value) })} aria-label="Foto de la izquierda">
+          {lista.map((f) => <option key={f.id} value={f.id}>{nombreFoto(f)}</option>)}
+        </select>
+        <select style={selStyle} value={der.id} onChange={(e) => setSel({ ...sel, pose, b: Number(e.target.value) })} aria-label="Foto de la derecha">
+          {lista.map((f) => <option key={f.id} value={f.id}>{nombreFoto(f)}</option>)}
+        </select>
+      </div>
       <div style={{ position: "relative", width: "100%", aspectRatio: "4 / 5", maxHeight: 420, borderRadius: 10, overflow: "hidden", background: "#111", userSelect: "none" }}>
-        <img src={par.despues.archivo_url} alt="Después" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
-        <img src={par.antes.archivo_url} alt="Antes" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
+        <img src={der.archivo_url} alt="Derecha" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} />
+        <img src={izq.archivo_url} alt="Izquierda" style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", clipPath: `inset(0 ${100 - corte}% 0 0)` }} />
         <div style={{ position: "absolute", top: 0, bottom: 0, left: `${corte}%`, width: 3, marginLeft: -1.5, background: "#fff", boxShadow: "0 0 6px rgba(0,0,0,.4)", pointerEvents: "none" }}>
           <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", width: 34, height: 34, borderRadius: "50%", background: "#fff", display: "flex", alignItems: "center", justifyContent: "center", color: ROSA, boxShadow: "0 2px 6px rgba(0,0,0,.3)" }}>
             <i className="bi bi-arrow-left-right" />
           </div>
         </div>
-        <span style={{ ...etiqueta, left: 8 }}>Antes</span>
-        <span style={{ ...etiqueta, right: 8 }}>Después</span>
-        <input type="range" min="0" max="100" value={corte} onChange={(e) => setCorte(Number(e.target.value))} aria-label="Comparar antes y después"
+        <span style={{ ...etiqueta, left: 8 }}>{corto(izq)}</span>
+        <span style={{ ...etiqueta, right: 8 }}>{corto(der)}</span>
+        <input type="range" min="0" max="100" value={corte} onChange={(e) => setCorte(Number(e.target.value))} aria-label="Comparar fotos"
           style={{ position: "absolute", inset: 0, width: "100%", height: "100%", opacity: 0, cursor: "ew-resize", margin: 0, touchAction: "pan-y" }} />
       </div>
-      {pares.length > 1 && (
-        <div className="d-flex flex-wrap gap-1 mt-2">
-          {pares.map((p) => (
-            <button key={p.pose} type="button" onClick={() => setPose(p.pose)} className="btn btn-sm"
-              style={{ borderRadius: 999, fontSize: "0.75rem", fontWeight: 700, padding: "2px 10px", border: `1px solid ${ROSA}`, background: p.pose === pose ? ROSA : "#fff", color: p.pose === pose ? "#fff" : ROSA }}>
-              {POSES[p.pose] || p.pose}
-            </button>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
