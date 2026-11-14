@@ -18,6 +18,7 @@
  *  GET  /api/estetica-publico/:token          → datos para mostrar
  *  POST /api/estetica-publico/:token/firmar   → { firma, nombre, relacion, leido }
  *  POST /api/estetica-publico/:token/responder → { dolor, inflamacion, alarmas, comentario, fotos }
+ *  POST /api/estetica-publico/:token/calificar → { estrellas, recomendaria, comentario }  (encuesta de satisfacción)
  */
 const router    = require("express").Router();
 const crypto    = require("crypto");
@@ -25,7 +26,7 @@ const rateLimit = require("express-rate-limit");
 const pool      = require("../db");
 const { urlPublica } = require("../utils/urlPublica");
 
-const DIAS = { firma: 7, indicaciones: 60, como_va: 14 };
+const DIAS = { firma: 7, indicaciones: 60, como_va: 14, satisfaccion: 30 };
 
 /** Señales de alarma que el paciente puede marcar (claves fijas) */
 const ALARMAS = {
@@ -114,6 +115,12 @@ router.get("/:token", limiter, async (req, res) => {
         ...base,
         procedimiento: d.procedimiento || "Procedimiento", contenido: d.contenido || "", riesgos: d.riesgos || [],
         firmado: !!d.firmado, firmado_en: d.firmado_en || null,
+      } });
+    }
+    if (e.tipo === "satisfaccion") {
+      return res.json({ ok: true, data: {
+        ...base, procedimiento: d.nombre || "su procedimiento", fecha: String(d.creado_en || "").slice(0, 10) || null,
+        respondido: !!d.satisfaccion,
       } });
     }
     if (e.tipo === "como_va") {
@@ -248,6 +255,47 @@ router.post("/:token/responder", limiter, async (req, res) => {
     res.json({ ok: true, urgente });
   } catch (err) {
     console.error("[estetica-publico] responder:", err.message);
+    res.status(500).json({ ok: false, msg: "No se pudo enviar. Intente de nuevo." });
+  }
+});
+
+router.post("/:token/calificar", limiter, async (req, res) => {
+  try {
+    const e = await buscar(req.params.token);
+    if (!e || !e.reg_activo || e.tipo !== "satisfaccion") return res.status(404).json({ ok: false, msg: "El enlace no es válido." });
+    if (e.vencido) return res.status(410).json({ ok: false, msg: "Este enlace ya venció." });
+    const estrellas = Math.round(Number(req.body?.estrellas));
+    if (!(estrellas >= 1 && estrellas <= 5)) return res.status(400).json({ ok: false, msg: "Elija de 1 a 5 estrellas." });
+    const recomendaria = req.body?.recomendaria === true ? true : req.body?.recomendaria === false ? false : null;
+    const comentario = String(req.body?.comentario || "").trim().slice(0, 1000);
+    const conn = await pool.getConnection();
+    let d;
+    try {
+      await conn.beginTransaction();
+      const [[r]] = await conn.query("SELECT id, datos FROM estetica_registros WHERE id = ? AND activo = 1 FOR UPDATE", [e.registro_id]);
+      d = leer(r?.datos);
+      if (!r || d.satisfaccion) { await conn.rollback(); return res.json({ ok: true, ya: true }); }
+      d.satisfaccion = { estrellas, recomendaria, comentario, fecha: new Date().toISOString() };
+      await conn.query("UPDATE estetica_registros SET datos = ? WHERE id = ?", [JSON.stringify(d), r.id]);
+      await conn.query("UPDATE estetica_enlaces SET usado_en = NOW() WHERE id = ?", [e.id]);
+      await conn.commit();
+    } catch (err) {
+      await conn.rollback().catch(() => {});
+      throw err;
+    } finally {
+      conn.release();
+    }
+    const quien = `${e.nombres} ${e.apellidos || ""}`.replace(/\s+/g, " ").trim();
+    const baja = estrellas <= 2 || recomendaria === false;
+    avisarClinica(e, null, {
+      mensaje: `${baja ? "⚠️ " : ""}${quien} calificó su ${d.nombre || "procedimiento"}: ${"★".repeat(estrellas)}${"☆".repeat(5 - estrellas)}${comentario ? ` — «${comentario.slice(0, 120)}»` : ""}`,
+      tipo: baja ? "ESTETICA_SATISFACCION_BAJA" : "ESTETICA_SATISFACCION",
+      titulo: baja ? "⚠️ Paciente poco satisfecho" : "Nueva calificación de un paciente",
+      url: `/pacientes/${e.paciente_id}/perfil?tab=estetica`,
+    }).catch(() => {});
+    res.json({ ok: true, estrellas });
+  } catch (err) {
+    console.error("[estetica-publico] calificar:", err.message);
     res.status(500).json({ ok: false, msg: "No se pudo enviar. Intente de nuevo." });
   }
 });

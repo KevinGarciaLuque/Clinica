@@ -294,4 +294,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: true,
   },
+  {
+    clave: "estetica-portal-satisfaccion",
+    version: "1.41",
+    titulo: "«Mi estética» en el portal y encuesta «¿Cómo le quedó?»",
+    descripcion: "En el portal del paciente aparece «Mi estética»: sus próximos controles y mantenimientos, paquetes de sesiones, presupuestos con su saldo (y en PDF), procedimientos con indicaciones, y los consentimientos pendientes para firmar. Además, al mes del procedimiento el paciente recibe «¿Cómo le quedó?» para calificar su resultado; si la calificación es baja, la clínica recibe un aviso.",
+    icono: "bi-person-heart",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];

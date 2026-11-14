@@ -152,6 +152,7 @@ export default function EsteticaPaciente({ pacienteId, tieneModulo = () => true 
           (x.zonas_cuerpo || []).join(", "),
           (x.productos || []).filter((p) => p.producto || p.lote).map((p) => `${p.producto || ""}${p.lote ? ` (lote ${p.lote})` : ""}`).join(", "),
           x.mantenimiento_fecha && `Mantenimiento: ${fechaCorta(x.mantenimiento_fecha)}`,
+          x.satisfaccion && `Calificación del paciente: ${"★".repeat(x.satisfaccion.estrellas)}${"☆".repeat(5 - x.satisfaccion.estrellas)}${x.satisfaccion.comentario ? ` «${x.satisfaccion.comentario}»` : ""}`,
         ].filter(Boolean).join(" · "),
         link: enlace(x, `/pacientes/${pacienteId}/perfil?tab=estetica`) })),
       ...valoraciones.map((v) => ({ fecha: fechaControl(v), color: "#64748b", icono: "bi-search-heart", titulo: "Valoración",

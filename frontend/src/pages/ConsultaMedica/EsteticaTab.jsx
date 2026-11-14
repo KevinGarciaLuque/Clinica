@@ -101,7 +101,7 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
       nuevo.seguimiento = { fase: "dia7", edema: "Leve", cicatriz: "Sin alteraciones", resultado: "Bueno", dolor_eva: "0", ...(d.seguimiento || {}), procedimiento: previos.ultimoProc.nombre || "" };
     }
     if (id === "seguimiento" && !nuevo.seguimiento) nuevo.seguimiento = { fase: "dia7", edema: "Leve", cicatriz: "Sin alteraciones", resultado: "Bueno", dolor_eva: "0" };
-    if (id === "procedimiento" && !d.procedimiento) nuevo.procedimiento = { anestesia: "Tópica (crema)", productos: [{}], zonas: {}, tolerancia: "Buena", como_va_dias: 3 };
+    if (id === "procedimiento" && !d.procedimiento) nuevo.procedimiento = { anestesia: "Tópica (crema)", productos: [{}], zonas: {}, tolerancia: "Buena", como_va_dias: 3, satisfaccion_dias: 30 };
     return nuevo;
   });
 
@@ -509,6 +509,26 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
                   </button>
                 </div>
               </div>
+              <div><Lbl>Encuesta «¿Cómo le quedó?»</Lbl>
+                <select style={inp} disabled={firmada} value={proc.satisfaccion_dias || ""}
+                  onChange={(e) => set("procedimiento", "satisfaccion_dias", e.target.value ? Number(e.target.value) : 0)}>
+                  <option value="">No enviar</option>
+                  {[15, 30, 45, 60].map((n) => <option key={n} value={n}>A los {n} días (por correo)</option>)}
+                </select>
+                <div className="d-flex align-items-center gap-2 flex-wrap mt-1">
+                  {proc.satisfaccion
+                    ? <span style={{ fontSize: "0.8rem", color: "#b45309", fontWeight: 700 }}>{"★".repeat(proc.satisfaccion.estrellas)}{"☆".repeat(5 - proc.satisfaccion.estrellas)} calificó el paciente</span>
+                    : proc.satisfaccion_enviada_en
+                      ? <span style={{ fontSize: "0.76rem", color: "#15803d" }}><i className="bi bi-check2-all me-1" />Enviada el {fechaCorta(proc.satisfaccion_enviada_en)}</span>
+                      : <span className="text-muted" style={{ fontSize: "0.76rem" }}>El paciente califica el resultado con estrellas.</span>}
+                  {!proc.satisfaccion && (
+                    <button type="button" className="btn btn-sm btn-link p-0" style={{ color: "#16a34a", fontWeight: 700, fontSize: "0.8rem" }}
+                      onClick={() => setEnviar({ tipo: "satisfaccion" })}>
+                      <i className="bi bi-whatsapp me-1" />Enviar ahora
+                    </button>
+                  )}
+                </div>
+              </div>
               <div><Lbl>Complicaciones inmediatas</Lbl>
                 <textarea rows={2} style={inp} disabled={firmada} value={proc.complicaciones || ""} onChange={(e) => set("procedimiento", "complicaciones", e.target.value)} placeholder="Ninguna" /></div>
               <div><Lbl>Indicaciones para la casa</Lbl>
@@ -590,6 +610,17 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
             if (!hid) throw new Error("No se pudo guardar la consulta.");
             const d = (await api.post(`/estetica-datos/historia/${hid}/enlace`, { enviar_correo: enviarCorreo, tipo: "como_va" })).data.data;
             if (!firmada) set("procedimiento", "como_va_enviado_en", new Date().toISOString());
+            return d;
+          }} />
+      )}
+      {enviar?.tipo === "satisfaccion" && (
+        <ModalEnviarPaciente titulo="Enviar «¿Cómo le quedó?»" onClose={() => setEnviar(null)}
+          descripcion="Se guarda la consulta y el paciente recibe un enlace para calificar su resultado con estrellas y decir si recomendaría la clínica. Si la calificación es baja, la clínica recibe un aviso."
+          crear={async (enviarCorreo) => {
+            const hid = firmada ? historiaId : await onGuardar?.();
+            if (!hid) throw new Error("No se pudo guardar la consulta.");
+            const d = (await api.post(`/estetica-datos/historia/${hid}/enlace`, { enviar_correo: enviarCorreo, tipo: "satisfaccion" })).data.data;
+            if (!firmada) set("procedimiento", "satisfaccion_enviada_en", new Date().toISOString());
             return d;
           }} />
       )}

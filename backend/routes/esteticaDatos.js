@@ -139,6 +139,30 @@ function htmlPresupuesto({ d, clinica, logo, paciente, fecha, medico }) {
   </div></body></html>`;
 }
 
+/** PDF (o página para imprimir) de un presupuesto; lo usan la clínica y el portal del paciente */
+async function documentoPresupuesto(reg, clinicaId, { soloHtml = false } = {}) {
+  const d = leer(reg.datos);
+  const [[clinica]] = await pool.query("SELECT * FROM clinicas WHERE id = ?", [clinicaId]);
+  const [[pac]] = await pool.query("SELECT nombres, apellidos FROM pacientes WHERE id = ?", [reg.paciente_id]);
+  const [[u]] = await pool.query("SELECT * FROM usuarios WHERE id = ?", [reg.creado_por || 0]).catch(() => [[null]]);
+  let medico = "";
+  if (u && ["MEDICO", "ADMIN"].includes(u.tipo)) {
+    const { tituloMedico } = require("../utils/tituloMedico");
+    medico = u.nombre_display || `${tituloMedico(u.sexo, { tipo: u.tipo })}${u.nombres} ${u.apellidos}`.trim();
+  }
+  const fecha = String(d.creado_en || "").slice(0, 10) || new Date(reg.creado_en).toISOString().slice(0, 10);
+  const base = { d, clinica, paciente: `${pac?.nombres || ""} ${pac?.apellidos || ""}`.trim(), fecha, medico };
+  const { logoEmbebido } = require("./nutricion");
+  const logo = await logoEmbebido(clinica?.logo_url);
+  if (soloHtml) return { html: htmlPresupuesto({ ...base, logo }) };
+  const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
+  try { return { pdf: await generarPdfDesdeHtml(htmlPresupuesto({ ...base, logo }), { paper_size: "LETTER", orientacion: "portrait" }) }; }
+  catch (e) {
+    if (!logo) throw e;
+    return { pdf: await generarPdfDesdeHtml(htmlPresupuesto({ ...base, logo: null }), { paper_size: "LETTER", orientacion: "portrait" }) };
+  }
+}
+
 router.get("/:id(\\d+)/pdf", auth(...ROLES), async (req, res) => {
   try {
     await asegurarTabla();
@@ -146,27 +170,8 @@ router.get("/:id(\\d+)/pdf", auth(...ROLES), async (req, res) => {
     const [[reg]] = await pool.query(
       "SELECT * FROM estetica_registros WHERE id = ? AND clinica_id = ? AND tipo = 'presupuesto' AND activo = 1", [req.params.id, clinicaId]);
     if (!reg) return res.status(404).json({ ok: false, msg: "Presupuesto no encontrado." });
-    const d = leer(reg.datos);
-    const [[clinica]] = await pool.query("SELECT * FROM clinicas WHERE id = ?", [clinicaId]);
-    const [[pac]] = await pool.query("SELECT nombres, apellidos FROM pacientes WHERE id = ?", [reg.paciente_id]);
-    const [[u]] = await pool.query("SELECT * FROM usuarios WHERE id = ?", [reg.creado_por || 0]).catch(() => [[null]]);
-    let medico = "";
-    if (u && ["MEDICO", "ADMIN"].includes(u.tipo)) {
-      const { tituloMedico } = require("../utils/tituloMedico");
-      medico = u.nombre_display || `${tituloMedico(u.sexo, { tipo: u.tipo })}${u.nombres} ${u.apellidos}`.trim();
-    }
-    const fecha = String(d.creado_en || "").slice(0, 10) || new Date(reg.creado_en).toISOString().slice(0, 10);
-    const base = { d, clinica, paciente: `${pac?.nombres || ""} ${pac?.apellidos || ""}`.trim(), fecha, medico };
-    const { logoEmbebido } = require("./nutricion");
-    const logo = await logoEmbebido(clinica?.logo_url);
-    if (req.query.formato === "html") return res.type("html").send(htmlPresupuesto({ ...base, logo }));
-    const { generarPdfDesdeHtml } = require("../utils/pdfFromHtml");
-    let pdf;
-    try { pdf = await generarPdfDesdeHtml(htmlPresupuesto({ ...base, logo }), { paper_size: "LETTER", orientacion: "portrait" }); }
-    catch (e) {
-      if (!logo) throw e;
-      pdf = await generarPdfDesdeHtml(htmlPresupuesto({ ...base, logo: null }), { paper_size: "LETTER", orientacion: "portrait" });
-    }
+    if (req.query.formato === "html") return res.type("html").send((await documentoPresupuesto(reg, clinicaId, { soloHtml: true })).html);
+    const { pdf } = await documentoPresupuesto(reg, clinicaId);
     res.setHeader("Content-Type", "application/pdf");
     res.setHeader("Content-Disposition", `inline; filename="presupuesto_${reg.id}.pdf"`);
     res.send(pdf);
@@ -210,6 +215,9 @@ async function enviarEnlacePaciente({ req, clinicaId: cid, usuarioId, reg, tipo,
   const textos = tipo === "firma"
     ? { titulo: "Consentimiento informado", texto: `Antes de su cita de <strong>${escE(proc)}</strong>, le pedimos leer el consentimiento informado y firmarlo con el dedo desde su teléfono.`, boton: "Leer y firmar",
         wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. Antes de su cita de ${proc}, por favor lea y firme su consentimiento desde este enlace: ${url}` }
+    : tipo === "satisfaccion"
+    ? { titulo: "¿Cómo le quedó?", texto: `Ya pasó un tiempo desde su <strong>${escE(proc)}</strong>. ¿Está contenta(o) con el resultado? Su opinión nos ayuda a mejorar (toma 30 segundos).`, boton: "Calificar mi resultado",
+        wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. ¿Cómo le quedó su ${proc}? Nos ayudaría mucho su opinión (30 segundos): ${url}` }
     : tipo === "como_va"
     ? { titulo: "¿Cómo va su recuperación?", texto: `Queremos saber cómo se siente después de <strong>${escE(proc)}</strong>. Son 3 preguntas rápidas y, si quiere, puede enviarnos una foto.`, boton: "Contarnos cómo va",
         wa: `Hola ${nombre}, le saluda ${cl?.nombre || "la clínica"}. ¿Cómo va después de ${proc}? Cuéntenos en este enlace (3 preguntas y una foto si quiere): ${url}` }
@@ -252,12 +260,12 @@ router.post("/historia/:hid(\\d+)/enlace", auth(...ROLES), async (req, res) => {
       [req.params.hid, clinicaDe(req)]);
     if (!reg) return res.status(404).json({ ok: false, msg: "Guarde primero el procedimiento de esta consulta." });
     const d = leer(reg.datos);
-    const tipo = req.body?.tipo === "como_va" ? "como_va" : "indicaciones";
+    const tipo = ["como_va", "satisfaccion"].includes(req.body?.tipo) ? req.body.tipo : "indicaciones";
     if (tipo === "indicaciones" && !String(d.indicaciones || "").trim() && !(d.controles_agendados || []).length)
       return res.status(400).json({ ok: false, msg: "Escriba las indicaciones para la casa antes de enviarlas." });
     const info = await enviarEnlacePaciente({ req, reg, tipo, enviarCorreo: !!req.body?.enviar_correo, procedimiento: d.nombre });
     // Se anota cuándo se envió (se ve en la consulta)
-    const marca = tipo === "como_va" ? "como_va_enviado_en" : "indicaciones_enviadas_en";
+    const marca = { como_va: "como_va_enviado_en", satisfaccion: "satisfaccion_enviada_en" }[tipo] || "indicaciones_enviadas_en";
     await pool.query("UPDATE estetica_registros SET datos = ? WHERE id = ?", [JSON.stringify({ ...d, [marca]: new Date().toISOString() }), reg.id]);
     res.json({ ok: true, data: info });
   } catch (e) {
@@ -559,7 +567,7 @@ router.put("/historia/:hid(\\d+)", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_A
     );
     // Si la pantalla no trae el mantenimiento ya programado, se conserva el que había
     const previo = ya ? leer(ya.datos) : {};
-    for (const k of ["mantenimiento_control_id", "indicaciones_enviadas_en", "como_va_enviado_en"]) {
+    for (const k of ["mantenimiento_control_id", "indicaciones_enviadas_en", "como_va_enviado_en", "satisfaccion_enviada_en", "satisfaccion"]) {
       if (previo[k] && !datos?.[k] && datos && typeof datos === "object") datos[k] = previo[k];
     }
     let id;
@@ -601,6 +609,8 @@ router.put("/historia/:hid(\\d+)", auth("ADMIN", "MEDICO", "ENFERMERA", "SUPER_A
 module.exports = router;
 module.exports.asegurarTabla = asegurarTabla;
 module.exports.asegurarAplicaciones = asegurarAplicaciones;
+module.exports.documentoPresupuesto = documentoPresupuesto;
+module.exports.leerDatos = leer;
 
 /**
  * Cron diario: «¿Cómo va?» automático por correo a los días que indicó el médico
@@ -612,26 +622,34 @@ module.exports.enviarComoVaAutomatico = async function enviarComoVaAutomatico() 
     if (!process.env.FRONTEND_URL && !process.env.PUBLIC_URL) return { enviados: 0 };
     const [regs] = await pool.query(
       `SELECT e.* FROM estetica_registros e JOIN pacientes p ON p.id = e.paciente_id
-       WHERE e.tipo = 'procedimiento' AND e.activo = 1 AND e.creado_en >= NOW() - INTERVAL 30 DAY
+       WHERE e.tipo = 'procedimiento' AND e.activo = 1 AND e.creado_en >= NOW() - INTERVAL 60 DAY
          AND p.email IS NOT NULL AND p.email <> ''`);
     let enviados = 0;
-    for (const reg of regs) {
-      const d = leer(reg.datos);
-      const dias = Number(d.como_va_dias) || 0;
-      if (!dias || d.como_va_enviado_en) continue;
-      const base = String(d.creado_en || "").slice(0, 10) || new Date(reg.creado_en).toISOString().slice(0, 10);
-      const toca = new Date(`${base}T12:00:00`); toca.setDate(toca.getDate() + dias);
-      if (toca.getTime() > Date.now()) continue;
-      // Se marca antes de enviar: si el servidor se reinicia, no se envía dos veces
-      const [u] = await pool.query(
-        "UPDATE estetica_registros SET datos = ? WHERE id = ? AND datos = ?",
-        [JSON.stringify({ ...d, como_va_enviado_en: new Date().toISOString() }), reg.id, reg.datos]);
-      if (!u.affectedRows) continue;
-      try {
-        const info = await enviarEnlacePaciente({ clinicaId: reg.clinica_id, usuarioId: null, reg, tipo: "como_va", enviarCorreo: true, procedimiento: d.nombre });
-        if (info.correo_enviado) enviados++;
-      } catch (e) {
-        console.error("[estetica] como va automático:", e.message);
+    // «¿Cómo va?» (a los pocos días) y encuesta de satisfacción (al mes)
+    const ENVIOS = [
+      { tipo: "como_va", dias: "como_va_dias", marca: "como_va_enviado_en" },
+      { tipo: "satisfaccion", dias: "satisfaccion_dias", marca: "satisfaccion_enviada_en" },
+    ];
+    for (const reg0 of regs) {
+      let reg = reg0;
+      for (const env of ENVIOS) {
+        const d = leer(reg.datos);
+        const dias = Number(d[env.dias]) || 0;
+        if (!dias || d[env.marca] || (env.tipo === "satisfaccion" && d.satisfaccion)) continue;
+        const base = String(d.creado_en || "").slice(0, 10) || new Date(reg.creado_en).toISOString().slice(0, 10);
+        const toca = new Date(`${base}T12:00:00`); toca.setDate(toca.getDate() + dias);
+        if (toca.getTime() > Date.now()) continue;
+        // Se marca antes de enviar: si el servidor se reinicia, no se envía dos veces
+        const nuevo = JSON.stringify({ ...d, [env.marca]: new Date().toISOString() });
+        const [u] = await pool.query("UPDATE estetica_registros SET datos = ? WHERE id = ? AND datos = ?", [nuevo, reg.id, reg.datos]);
+        if (!u.affectedRows) continue;
+        reg = { ...reg, datos: nuevo };
+        try {
+          const info = await enviarEnlacePaciente({ clinicaId: reg.clinica_id, usuarioId: null, reg, tipo: env.tipo, enviarCorreo: true, procedimiento: d.nombre });
+          if (info.correo_enviado) enviados++;
+        } catch (e) {
+          console.error(`[estetica] ${env.tipo} automático:`, e.message);
+        }
       }
     }
     if (enviados) console.log(`💬 [estetica] ${enviados} «¿Cómo va?» enviado(s)`);

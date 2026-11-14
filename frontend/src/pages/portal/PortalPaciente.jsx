@@ -1,12 +1,14 @@
 /**
  * Portal del paciente — /portal
  * Sin sesión: formulario para pedir el enlace de entrada por correo.
- * Con sesión: citas (confirmar/cancelar), recetas, estudios, nutrición (si tiene plan) y datos personales.
+ * Con sesión: citas (confirmar/cancelar), recetas, estudios, nutrición (si tiene plan),
+ * estética (si tiene procedimientos, presupuestos o consentimientos) y datos personales.
  */
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { portalApi, leerSesion, cerrarSesion, fechaHora } from "./portalApi";
 import MiNutricion from "./MiNutricion";
+import PortalEstetica from "./PortalEstetica";
 
 const C = { verde: "#10b981", oscuro: "#0f172a", gris: "#64748b", borde: "#e2e8f0" };
 
@@ -261,7 +263,16 @@ function Panel({ onSalir }) {
     portalApi.get("/nutricion").then((r) => setNutricion(r.data.data?.perfiles?.length ? r.data.data : null)).catch(() => {});
   }, []);
   useEffect(() => { cargarNutricion(); }, [cargarNutricion]);
-  const tabs = nutricion ? [...TABS.slice(0, 3), { id: "nutricion", label: "Mi nutrición", icon: "bi-apple" }, TABS[3]] : TABS;
+  const [estetica, setEstetica] = useState(null); // solo si tiene datos de estética
+  useEffect(() => {
+    portalApi.get("/estetica").then((r) => setEstetica(r.data.data?.perfiles?.length ? r.data.data : null)).catch(() => {});
+  }, []);
+  const tabs = [
+    ...TABS.slice(0, 3),
+    ...(estetica ? [{ id: "estetica", label: "Mi estética", icon: "bi-stars" }] : []),
+    ...(nutricion ? [{ id: "nutricion", label: "Mi nutrición", icon: "bi-apple" }] : []),
+    TABS[3],
+  ];
 
   if (!yo) return <div className="pp-wrap"><style>{CSS}</style><div className="pp-vacio pt-5"><span className="spinner-border spinner-border-sm me-2" />Cargando…</div></div>;
   const p0 = yo.perfiles[0];
@@ -297,6 +308,7 @@ function Panel({ onSalir }) {
         {tab === "recetas" && <Recetas />}
         {tab === "estudios" && <Estudios />}
         {tab === "nutricion" && nutricion && <MiNutricion data={nutricion} onRecargar={cargarNutricion} />}
+        {tab === "estetica" && estetica && <PortalEstetica data={estetica} />}
         {tab === "datos" && <MisDatos yo={yo} />}
       </div>
     </div>

@@ -424,5 +424,111 @@ router.get("/nutricion/:pacienteId(\\d+)/pdf", limiterPortal, sesionPortal, asyn
   }
 });
 
+// ═════════════════════════════════════════════════════════════════════════════
+// Mi estética: procedimientos, indicaciones, próximos controles, presupuestos,
+// paquetes (sesiones y saldo) y consentimientos del paciente.
+// ═════════════════════════════════════════════════════════════════════════════
+router.get("/estetica", limiterPortal, sesionPortal, async (req, res) => {
+  try {
+    const { leerDatos } = require("./esteticaDatos");
+    const hoy = dayjs().format("YYYY-MM-DD");
+    const perfiles = [];
+    for (const p of req.portal.pacientes) {
+      const [regs] = await pool.query(
+        "SELECT * FROM estetica_registros WHERE paciente_id = ? AND clinica_id = ? AND activo = 1 ORDER BY creado_en DESC, id DESC",
+        [p.id, p.clinica_id]).catch(() => [[]]);
+      if (!regs.length) continue;
+      const items = regs.map((r) => ({ ...leerDatos(r.datos), _id: r.id, _tipo: r.tipo, _fecha: r.creado_en }));
+      const fechaDe = (x) => String(x.creado_en || "").slice(0, 10) || dayjs(x._fecha).format("YYYY-MM-DD");
+
+      // Estado de pago de los presupuestos cobrados
+      const fids = [...new Set(items.filter((x) => x._tipo === "presupuesto" && Number(x.factura_id)).map((x) => Number(x.factura_id)))];
+      const facturas = new Map();
+      if (fids.length) {
+        const [fs] = await pool.query(
+          `SELECT f.id, f.estado, f.total, (SELECT COALESCE(SUM(pg.monto),0) FROM pagos pg WHERE pg.factura_id = f.id) AS pagado
+           FROM facturas f WHERE f.clinica_id = ? AND f.id IN (?)`, [p.clinica_id, fids]).catch(() => [[]]);
+        fs.forEach((f) => facturas.set(f.id, { estado: f.estado, total: Number(f.total), pagado: Number(f.pagado) }));
+      }
+
+      const procedimientos = items.filter((x) => x._tipo === "procedimiento").map((x) => ({
+        id: x._id, fecha: fechaDe(x), nombre: x.nombre || "Procedimiento",
+        zonas: Object.keys(x.zonas || {}), zonas_cuerpo: x.zonas_cuerpo || [],
+        indicaciones: x.indicaciones || "", mantenimiento_fecha: x.mantenimiento_fecha || null,
+      }));
+      const uso = {};
+      items.filter((x) => x._tipo === "procedimiento" && x.paquete?.presupuesto_id).forEach((x) => {
+        const k = `${x.paquete.presupuesto_id}|${x.paquete.indice}`; uso[k] = (uso[k] || 0) + 1;
+      });
+      const presupuestos = items.filter((x) => x._tipo === "presupuesto" && !["BORRADOR", "RECHAZADO"].includes(x.estado)).map((x) => {
+        const f = facturas.get(Number(x.factura_id)) || null;
+        return {
+          id: x._id, fecha: fechaDe(x), titulo: x.titulo || "", estado: x.estado, total: Number(x.total) || 0,
+          procedimientos: (x.procedimientos || []).filter((y) => y?.nombre).map((y, i) => ({
+            nombre: y.nombre, precio: Number(y.precio) || 0, sesiones: Number(y.sesiones) || 0,
+            usadas: uso[`${x._id}|${i}`] || 0,
+          })),
+          pago: f && f.estado !== "ANULADA" ? f : null,
+        };
+      });
+      const consentimientos = items.filter((x) => x._tipo === "consentimiento").map((x) => ({
+        id: x._id, procedimiento: x.procedimiento || "", firmado: !!x.firmado, firmado_en: x.firmado_en || null, fecha: fechaDe(x),
+      }));
+      // Próximos: controles agendados y mantenimientos
+      const proximos = [];
+      items.filter((x) => x._tipo === "procedimiento").forEach((x) => {
+        (x.controles_agendados || []).filter((c) => c.fecha >= hoy).forEach((c) => proximos.push({ tipo: "control", fecha: c.fecha, hora: c.hora || null, texto: `Control ${c.label} — ${x.nombre || ""}`.trim() }));
+        if (x.mantenimiento_fecha && x.mantenimiento_fecha >= hoy) proximos.push({ tipo: "mantenimiento", fecha: x.mantenimiento_fecha, texto: `Mantenimiento de ${x.nombre || "su procedimiento"}` });
+      });
+      proximos.sort((a, b) => a.fecha.localeCompare(b.fecha));
+
+      perfiles.push({
+        paciente_id: p.id, nombre: `${p.nombres} ${p.apellidos}`.trim(), clinica: p.clinica, clinica_telefono: p.clinica_telefono,
+        procedimientos, presupuestos, consentimientos, proximos: proximos.slice(0, 6),
+      });
+    }
+    res.json({ ok: true, data: { perfiles } });
+  } catch (e) {
+    console.error("[portal] estetica:", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo cargar tu información." });
+  }
+});
+
+/** Presupuesto del paciente en PDF (solo los suyos y ya enviados por la clínica) */
+router.get("/estetica/presupuesto/:id(\\d+)/pdf", limiterPortal, sesionPortal, async (req, res) => {
+  try {
+    const [[reg]] = await pool.query(
+      "SELECT * FROM estetica_registros WHERE id = ? AND tipo = 'presupuesto' AND activo = 1", [req.params.id]);
+    const { leerDatos, documentoPresupuesto } = require("./esteticaDatos");
+    if (!reg || !req.portal.ids.includes(reg.paciente_id) || ["BORRADOR", "RECHAZADO"].includes(leerDatos(reg.datos).estado))
+      return res.status(404).json({ ok: false, msg: "Presupuesto no encontrado." });
+    if (req.query.formato === "html") return res.type("html").send((await documentoPresupuesto(reg, reg.clinica_id, { soloHtml: true })).html);
+    const { pdf } = await documentoPresupuesto(reg, reg.clinica_id);
+    res.setHeader("Content-Type", "application/pdf");
+    res.setHeader("Content-Disposition", `inline; filename="presupuesto_${reg.id}.pdf"`);
+    res.send(pdf);
+  } catch (e) {
+    console.error("[portal] pdf presupuesto:", e.message);
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: "No se pudo generar el PDF.", imprimible: true });
+  }
+});
+
+/** Firmar un consentimiento pendiente desde el portal: se abre la misma página de firma */
+router.post("/estetica/consentimiento/:id(\\d+)/firmar", limiterPortal, sesionPortal, async (req, res) => {
+  try {
+    const [[reg]] = await pool.query(
+      "SELECT * FROM estetica_registros WHERE id = ? AND tipo = 'consentimiento' AND activo = 1", [req.params.id]);
+    const { leerDatos } = require("./esteticaDatos");
+    if (!reg || !req.portal.ids.includes(reg.paciente_id)) return res.status(404).json({ ok: false, msg: "Consentimiento no encontrado." });
+    if (leerDatos(reg.datos).firmado) return res.status(400).json({ ok: false, msg: "Este consentimiento ya está firmado." });
+    const { url } = await require("./esteticaPublico").crearEnlace({
+      clinicaId: reg.clinica_id, pacienteId: reg.paciente_id, registroId: reg.id, tipo: "firma", usuarioId: null });
+    res.json({ ok: true, data: { ruta: new URL(url).pathname } });
+  } catch (e) {
+    console.error("[portal] firmar:", e.message);
+    res.status(500).json({ ok: false, msg: "No se pudo abrir el consentimiento." });
+  }
+});
+
 module.exports = router;
 module.exports.asegurarTabla = asegurarTabla;

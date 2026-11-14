@@ -4,6 +4,7 @@
  *   - firma:        lee el consentimiento y lo firma con el dedo.
  *   - indicaciones: sus cuidados para la casa, controles y mantenimiento.
  *   - como_va:      «¿Cómo va?»: dolor, inflamación, señales de alarma y fotos.
+ *   - satisfaccion: «¿Cómo le quedó?»: estrellas, si nos recomendaría y comentario.
  * URL: /mi-estetica/:token
  */
 import { useCallback, useEffect, useState } from "react";
@@ -16,6 +17,7 @@ const BASE = `${RAIZ}/api`;
 const ROSA = "#db2777";
 
 const fechaLarga = (v) => (v ? new Date(`${String(v).slice(0, 10)}T12:00:00`).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "");
+const mayus = (t) => (t ? t.charAt(0).toUpperCase() + t.slice(1) : t);
 const hora12 = (h) => {
   if (!h) return "";
   const [H, M] = String(h).split(":").map(Number);
@@ -62,6 +64,7 @@ export default function MiEstetica() {
           {d?.tipo === "firma" && <Firma d={d} token={token} onListo={cargar} />}
           {d?.tipo === "indicaciones" && <Indicaciones d={d} />}
           {d?.tipo === "como_va" && <ComoVa d={d} token={token} />}
+          {d?.tipo === "satisfaccion" && <Satisfaccion d={d} token={token} />}
         </div>
         <div className="text-center text-muted mt-3" style={{ fontSize: "0.75rem" }}>Enlace personal enviado por su clínica · Medic-KG</div>
       </div>
@@ -175,7 +178,7 @@ function Indicaciones({ d }) {
           <div style={{ fontWeight: 800, marginBottom: 8 }}><i className="bi bi-calendar-check me-2" style={{ color: "#7c3aed" }} />Sus controles</div>
           {d.controles.map((c) => (
             <div key={`${c.label}-${c.fecha}`} className="d-flex justify-content-between flex-wrap gap-1 mb-2" style={{ background: "#f5f3ff", borderRadius: 10, padding: "9px 12px", fontSize: "0.95rem" }}>
-              <strong>{c.label}</strong><span style={{ textTransform: "capitalize" }}>{fechaLarga(c.fecha)}{c.hora ? `, ${hora12(c.hora)}` : ""}</span>
+              <strong>{c.label}</strong><span>{mayus(fechaLarga(c.fecha))}{c.hora ? `, ${hora12(c.hora)}` : ""}</span>
             </div>
           ))}
         </div>
@@ -358,6 +361,71 @@ function ComoVa({ d, token }) {
         {enviando ? "Enviando…" : "Enviar a la clínica"}
       </button>
       {!inflamacion && <div className="text-center text-muted mt-2" style={{ fontSize: "0.8rem" }}>Responda la pregunta 2 para continuar.</div>}
+    </div>
+  );
+}
+
+const ETIQUETA_ESTRELLAS = ["", "Nada satisfecha(o)", "Poco satisfecha(o)", "Regular", "Satisfecha(o)", "¡Encantada(o)!"];
+
+function Satisfaccion({ d, token }) {
+  const [estrellas, setEstrellas] = useState(0);
+  const [recomendaria, setRecomendaria] = useState(null);
+  const [comentario, setComentario] = useState("");
+  const [enviando, setEnviando] = useState(false);
+  const [error, setError] = useState("");
+  const [listo, setListo] = useState(false);
+
+  if (listo || d.respondido) {
+    return (
+      <div className="text-center py-4">
+        <i className="bi bi-heart-fill" style={{ fontSize: "3rem", color: ROSA }} />
+        <h4 className="mt-2" style={{ fontWeight: 800 }}>{listo ? `¡Gracias, ${d.paciente}!` : "Ya nos dio su opinión"}</h4>
+        <p className="text-muted mb-0">{listo ? "Su opinión ya llegó a la clínica. Nos ayuda mucho a mejorar." : "Gracias por tomarse el tiempo."}</p>
+      </div>
+    );
+  }
+  const enviar = async () => {
+    setEnviando(true); setError("");
+    try {
+      await axios.post(`${BASE}/estetica-publico/${token}/calificar`, { estrellas, recomendaria, comentario });
+      setListo(true);
+    } catch (e) {
+      setError(e.response?.data?.msg || "No se pudo enviar. Intente de nuevo.");
+    }
+    setEnviando(false);
+  };
+  return (
+    <div>
+      <div style={{ color: ROSA, fontWeight: 800, fontSize: "0.78rem", letterSpacing: ".05em", textTransform: "uppercase" }}>¿Cómo le quedó?</div>
+      <h4 style={{ fontWeight: 800, margin: "4px 0 4px" }}>Hola {d.paciente} 👋</h4>
+      <p className="text-muted" style={{ fontSize: "0.92rem" }}>¿Qué tan contenta(o) está con el resultado de su <strong>{d.procedimiento}</strong>{d.fecha ? ` del ${fechaLarga(d.fecha)}` : ""}?</p>
+      <div className="d-flex justify-content-center gap-1 my-2" role="radiogroup" aria-label="Calificación">
+        {[1, 2, 3, 4, 5].map((n) => (
+          <button key={n} type="button" role="radio" aria-checked={estrellas === n} aria-label={`${n} estrellas`} onClick={() => setEstrellas(n)}
+            style={{ border: "none", background: "none", fontSize: "2.4rem", lineHeight: 1, color: n <= estrellas ? "#f59e0b" : "#e5e7eb", padding: "0 2px" }}>
+            ★
+          </button>
+        ))}
+      </div>
+      <div className="text-center mb-3" style={{ minHeight: 22, fontWeight: 700, color: "#92400e" }}>{ETIQUETA_ESTRELLAS[estrellas]}</div>
+      <div style={{ fontWeight: 800, marginBottom: 6 }}>¿Recomendaría la clínica a una amiga o familiar?</div>
+      <div className="d-flex gap-2 mb-3">
+        {[[true, "Sí", "#16a34a"], [false, "No", "#dc2626"]].map(([v, t, col]) => (
+          <button key={t} type="button" onClick={() => setRecomendaria(v)} className="flex-fill"
+            style={{ border: `2px solid ${recomendaria === v ? col : "#e5e7eb"}`, background: recomendaria === v ? `${col}12` : "#fff", color: recomendaria === v ? col : "#374151", borderRadius: 12, padding: 10, fontWeight: 700 }}>
+            {t}
+          </button>
+        ))}
+      </div>
+      <div style={{ fontWeight: 800, marginBottom: 6 }}>¿Algo que quiera contarnos?</div>
+      <textarea rows={3} value={comentario} onChange={(e) => setComentario(e.target.value)} placeholder="Opcional"
+        style={{ width: "100%", padding: "10px 12px", border: "1px solid #d1d5db", borderRadius: 10, fontSize: "1rem" }} />
+      {error && <div className="alert alert-danger py-2 mt-2" style={{ fontSize: "0.9rem" }}>{error}</div>}
+      <button type="button" className="btn w-100 mt-3" disabled={enviando || !estrellas} onClick={enviar}
+        style={{ background: ROSA, color: "#fff", fontWeight: 800, padding: 12, borderRadius: 12, fontSize: "1.02rem" }}>
+        {enviando ? "Enviando…" : "Enviar mi opinión"}
+      </button>
+      {!estrellas && <div className="text-center text-muted mt-2" style={{ fontSize: "0.8rem" }}>Toque las estrellas para calificar.</div>}
     </div>
   );
 }
