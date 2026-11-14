@@ -9,6 +9,7 @@ import { Link } from "react-router-dom";
 import { portalApi, leerSesion, cerrarSesion, fechaHora } from "./portalApi";
 import MiNutricion from "./MiNutricion";
 import PortalEstetica from "./PortalEstetica";
+import { mensajeError } from "../../utils/mensajeError";
 
 const C = { verde: "#10b981", oscuro: "#0f172a", gris: "#64748b", borde: "#e2e8f0" };
 
@@ -61,7 +62,7 @@ function Acceso() {
       await portalApi.pedirAcceso(email);
       setEstado("enviado");
     } catch (err) {
-      setError(err?.response?.data?.msg || "No se pudo enviar el enlace. Intenta de nuevo.");
+      setError(mensajeError(err, "No se pudo enviar el enlace. Intenta de nuevo."));
       setEstado("form");
     }
   };

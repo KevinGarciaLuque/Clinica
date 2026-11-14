@@ -7,6 +7,9 @@
  *
  * Tablas nuevas (no modifica ninguna existente):
  *   novedades         cada anuncio (versión, título, descripción, audiencia…)
+ *                     modulos (opcional): claves de módulos separadas por coma; si
+ *                     tiene, solo la ven las clínicas con alguno de esos módulos
+ *                     (ej.: lo de estética no le aparece a una clínica de nutrición)
  *   novedades_vistas  hasta qué anuncio vio cada usuario
  */
 const router = require("express").Router();
@@ -106,6 +109,10 @@ async function sincronizarDesdeArchivo() {
   if (!col.length) {
     await pool.query("ALTER TABLE novedades ADD COLUMN clave VARCHAR(80) NULL UNIQUE AFTER id");
   }
+  const [colMod] = await pool.query("SHOW COLUMNS FROM novedades LIKE 'modulos'");
+  if (!colMod.length) {
+    await pool.query("ALTER TABLE novedades ADD COLUMN modulos VARCHAR(300) NULL");
+  }
   let lista = [];
   try { lista = require("../data/novedades"); } catch { return; }
   for (const n of lista) {
@@ -115,6 +122,11 @@ async function sincronizarDesdeArchivo() {
        VALUES (?, ?, ?, ?, ?, ?, ?)`,
       [String(n.clave).slice(0, 80), n.version || null, String(n.titulo).slice(0, 150), String(n.descripcion),
        n.icono || "bi-stars", AUDIENCIAS.includes(n.audiencia) ? n.audiencia : "TODOS", n.importante ? 1 : 0]);
+    // Módulos a los que va dirigida (también para las ya publicadas que no lo tenían)
+    if (Array.isArray(n.modulos) && n.modulos.length) {
+      await pool.query("UPDATE novedades SET modulos = ? WHERE clave = ? AND modulos IS NULL",
+        [n.modulos.join(",").slice(0, 300), String(n.clave).slice(0, 80)]);
+    }
   }
 }
 
@@ -142,6 +154,29 @@ function audienciasDe(tipo) {
   return ["TODOS"];
 }
 
+/** Claves de los módulos de la clínica del usuario (null = ve todo, p. ej. SUPER_ADMIN) */
+async function modulosDeClinica(req) {
+  if (req.user.tipo === "SUPER_ADMIN" || req.user.super) return null;
+  const cid = req.user.clinica_id;
+  if (!cid) return null;
+  try {
+    const [rows] = await pool.query(
+      `SELECT ms.clave FROM modulos_sistema ms
+       JOIN tipo_clinica_modulos tcm ON tcm.modulo_id = ms.id
+       JOIN clinicas c ON c.tipo_id = tcm.tipo_id
+       WHERE c.id = ?
+         AND NOT EXISTS (SELECT 1 FROM clinica_modulos cm WHERE cm.clinica_id = c.id AND cm.modulo_id = ms.id AND cm.habilitado = 0)
+       UNION
+       SELECT ms.clave FROM modulos_sistema ms
+       JOIN clinica_modulos cm ON cm.modulo_id = ms.id AND cm.clinica_id = ? AND cm.habilitado = 1`, [cid, cid]);
+    return new Set(rows.map((x) => x.clave));
+  } catch {
+    return null; // si no se puede saber, se muestran todas (como antes)
+  }
+}
+const visiblePara = (mods) => (n) =>
+  !mods || !n.modulos || String(n.modulos).split(",").some((m) => mods.has(m.trim()));
+
 const versionActual = async () => {
   const [[v]] = await pool.query(
     "SELECT version FROM novedades WHERE publicada=1 AND version IS NOT NULL AND version<>'' ORDER BY publicado_en DESC, id DESC LIMIT 1");
@@ -153,13 +188,14 @@ router.get("/", auth(), async (req, res) => {
   try {
     await asegurarTablas();
     const uid = req.user.uid ?? req.user.id;
-    const [rows] = await pool.query(
-      `SELECT id, version, titulo, descripcion, icono, imagen_url, importante,
+    const [todas] = await pool.query(
+      `SELECT id, version, titulo, descripcion, icono, imagen_url, importante, modulos,
               DATE_FORMAT(${enHonduras("publicado_en")}, '%Y-%m-%d') AS fecha
        FROM novedades
        WHERE publicada = 1 AND publicado_en <= NOW() AND audiencia IN (?)
        ORDER BY publicado_en DESC, id DESC
-       LIMIT 40`, [audienciasDe(req.user.tipo)]);
+       LIMIT 80`, [audienciasDe(req.user.tipo)]);
+    const rows = todas.filter(visiblePara(await modulosDeClinica(req))).slice(0, 40).map(({ modulos: _m, ...n }) => n);
     const [[v]] = await pool.query("SELECT ultima_vista_id FROM novedades_vistas WHERE usuario_id=?", [uid]);
     const ultima = v?.ultima_vista_id || 0;
     const nuevas = rows.filter((r) => r.id > ultima);
@@ -191,11 +227,13 @@ router.post("/vistas", auth(), async (req, res) => {
        ON DUPLICATE KEY UPDATE ultima_vista_id = GREATEST(ultima_vista_id, VALUES(ultima_vista_id)), visto_en = NOW()`,
       [uid, m.maxid]);
     // Una fila por cada novedad visible para este usuario que aún no había visto
-    await pool.query(
-      `INSERT IGNORE INTO novedades_lecturas (novedad_id, usuario_id)
-       SELECT id, ? FROM novedades
-       WHERE publicada = 1 AND publicado_en <= NOW() AND audiencia IN (?)`,
-      [uid, audienciasDe(req.user.tipo)]);
+    const [vis] = await pool.query(
+      "SELECT id, modulos FROM novedades WHERE publicada = 1 AND publicado_en <= NOW() AND audiencia IN (?)",
+      [audienciasDe(req.user.tipo)]);
+    const ids = vis.filter(visiblePara(await modulosDeClinica(req))).map((n) => n.id);
+    if (ids.length) {
+      await pool.query("INSERT IGNORE INTO novedades_lecturas (novedad_id, usuario_id) VALUES ?", [ids.map((id) => [id, uid])]);
+    }
     res.json({ ok: true });
   } catch (e) {
     console.error("[novedades] vistas:", e.message);

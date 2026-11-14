@@ -54,7 +54,10 @@ api.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error.response?.status === 401) {
+    // 401 = sesión vencida: se vuelve al inicio. Excepto en el propio inicio de
+    // sesión (contraseña o código equivocado), donde hay que mostrar el mensaje.
+    const esInicioSesion = /\/auth\/(login|google-login|verificar-2fa|reenviar-2fa)/.test(error.config?.url || "");
+    if (error.response?.status === 401 && !esInicioSesion) {
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       window.location.href = "/login";

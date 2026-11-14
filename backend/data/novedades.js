@@ -13,6 +13,8 @@
  *   icono       clase de Bootstrap Icons (bi-…)
  *   audiencia   "TODOS" | "MEDICOS" | "ADMIN"
  *   importante  true solo para cambios grandes (sale en ventana al entrar)
+ *   modulos     (opcional) claves de módulos: solo la ven las clínicas que tienen
+ *               alguno (ej.: ["nutricion_consulta"]). Sin este campo la ven todas.
  */
 module.exports = [
   {
@@ -197,6 +199,7 @@ module.exports = [
   },
   {
     clave: "modulo-nutricion-consulta",
+    modulos: ["nutricion_consulta"],
     version: "1.30",
     titulo: "Nuevo módulo de Nutrición en la consulta",
     descripcion: "Las clínicas de nutrición tienen una pestaña «Nutrición» dentro de la consulta: evaluación (recordatorio de 24 horas, hábitos y objetivos), medidas y % de grasa con gráficas de evolución y peso meta, cálculo de calorías, plan por porciones con menú de la semana, plantillas reutilizables y un PDF del plan para entregar al paciente.",
@@ -206,6 +209,7 @@ module.exports = [
   },
   {
     clave: "nutricion-portal-paciente",
+    modulos: ["nutricion_consulta"],
     version: "1.31",
     titulo: "El paciente ve su plan de alimentación en su teléfono",
     descripcion: "Los pacientes con plan de nutrición ahora tienen la pestaña «Mi nutrición» en su portal: ven sus porciones, el menú y las recomendaciones, descargan el PDF y anotan su peso en casa. Ese peso aparece en la gráfica de Evolución de la pestaña Nutrición de la consulta.",
@@ -215,6 +219,7 @@ module.exports = [
   },
   {
     clave: "historial-nutricion",
+    modulos: ["nutricion_consulta"],
     version: "1.32",
     titulo: "Historial de consultas de nutrición",
     descripcion: "En el perfil del paciente → Historial Clínico → «Historial de Nutrición» (y en la pestaña Nutrición de la consulta) ve cada visita por fecha: peso, cambio desde la anterior y todo lo que se registró ese día (medidas, calorías, plan, menú, hábitos). También puede descargar el PDF del plan de esa visita.",
@@ -233,6 +238,7 @@ module.exports = [
   },
   {
     clave: "estetica-pestana-nuevo-diseno",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.34",
     titulo: "Estética: nueva pestaña del paciente y datos en la nube",
     descripcion: "En el perfil del paciente → Estética ahora ve avisos (biopsia sin resultado, control vencido, procedimiento sin consentimiento), un resumen, el antes y después con deslizador y todo el historial estético por fecha. La ficha, presupuestos, consentimientos y controles post-procedimiento ahora se guardan en el sistema y se ven desde cualquier equipo.",
@@ -242,6 +248,7 @@ module.exports = [
   },
   {
     clave: "estetica-en-la-consulta",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.35",
     titulo: "Pestaña Estética dentro de la consulta",
     descripcion: "En la consulta, pestaña «Estética»: elija Valoración, Día del procedimiento o Control. El día del procedimiento anote producto, lote, anestesia y toque en el dibujo de la cara las zonas tratadas con la cantidad de cada una; puede repetir lo de la última vez e imprimir el registro. El presupuesto y el consentimiento se hacen ahí mismo, sin salir de la consulta.",
@@ -251,6 +258,7 @@ module.exports = [
   },
   {
     clave: "estetica-firma-controles-mapa",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.36",
     titulo: "Estética: firma con el dedo, controles en la agenda y nueva cara",
     descripcion: "El paciente ya puede firmar el consentimiento con el dedo en el teléfono o la tablet (en la consulta o en Consentimientos), y se puede imprimir con la firma. En la consulta, al terminar el procedimiento, elija los controles (Semana 1, 1 mes…) y se agendan solos en la agenda con su recordatorio. La cara para marcar zonas ahora es una ilustración profesional con más zonas (sienes, marionetas, código de barras, masetero, cuello).",
@@ -260,6 +268,7 @@ module.exports = [
   },
   {
     clave: "estetica-inventario-lotes-mantenimiento",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.37",
     titulo: "Lotes en el inventario y avisos de mantenimiento",
     descripcion: "En Inventario registre el lote y vencimiento al dar entrada: el sistema avisa lo que está por vencer y con «¿A quién se aplicó un lote?» ve los pacientes que lo recibieron. En la consulta (Estética → Día del procedimiento) elija el producto del inventario y se descuenta solo. Además, indique cuándo debe volver el paciente (toxina 4 meses, relleno 9…): 7 días antes le llega un correo para agendar y la clínica lo ve en Citas → Controles.",
@@ -269,6 +278,7 @@ module.exports = [
   },
   {
     clave: "estetica-presupuesto-cobro-paquetes",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.38",
     titulo: "Presupuestos: cobro, abonos, paquetes de sesiones y PDF",
     descripcion: "En Presupuestos estéticos: «Cobrar» lo convierte en recibo o factura con sus procedimientos y ahí se registran el anticipo y los abonos (entran a caja). Indique cuántas sesiones incluye un paquete (ej.: láser 6 sesiones): en la consulta se descuenta una sesión y se ve cuántas quedan y cuánto falta por pagar. Además, descargue el presupuesto en PDF con el logo para enviarlo por WhatsApp.",
@@ -278,6 +288,7 @@ module.exports = [
   },
   {
     clave: "estetica-enlaces-paciente",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.39",
     titulo: "El paciente firma desde su casa y recibe sus indicaciones",
     descripcion: "En Consentimientos (o en la consulta, al crear uno) toque «Enviar para firmar»: el paciente recibe un enlace por correo o WhatsApp, lo lee y firma con el dedo desde su teléfono, y a la clínica le llega un aviso. En la consulta (Estética → Día del procedimiento), «Enviar indicaciones al paciente» le manda sus cuidados en casa, las fechas de sus controles y su próximo mantenimiento.",
@@ -287,6 +298,7 @@ module.exports = [
   },
   {
     clave: "estetica-como-va",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.40",
     titulo: "«¿Cómo va?»: el paciente cuenta su recuperación con fotos",
     descripcion: "Al registrar un procedimiento (Estética → Día del procedimiento) elija cuándo preguntarle al paciente «¿Cómo va?» (a los 3 días por defecto): le llega un enlace para responder dolor, inflamación, señales de alarma y enviar fotos. Su respuesta aparece en Seguimiento Post-Op y, si marca algo preocupante, la clínica recibe una alerta urgente. También se puede enviar en el momento por WhatsApp.",
@@ -296,10 +308,21 @@ module.exports = [
   },
   {
     clave: "estetica-portal-satisfaccion",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
     version: "1.41",
     titulo: "«Mi estética» en el portal y encuesta «¿Cómo le quedó?»",
     descripcion: "En el portal del paciente aparece «Mi estética»: sus próximos controles y mantenimientos, paquetes de sesiones, presupuestos con su saldo (y en PDF), procedimientos con indicaciones, y los consentimientos pendientes para firmar. Además, al mes del procedimiento el paciente recibe «¿Cómo le quedó?» para calificar su resultado; si la calificación es baja, la clínica recibe un aviso.",
     icono: "bi-person-heart",
+    audiencia: "TODOS",
+    importante: false,
+  },
+  {
+    clave: "inventario-lotes-vencimientos",
+    version: "1.42",
+    modulos: ["inventario"],
+    titulo: "Inventario: lotes y vencimientos",
+    descripcion: "En Inventario, al registrar una entrada puede anotar el lote y la fecha de vencimiento (opcional). El sistema le avisa arriba lo que está vencido o por vencer en los próximos 60 días, y en «Lotes» ve cuánto queda de cada uno.",
+    icono: "bi-upc-scan",
     audiencia: "TODOS",
     importante: false,
   },

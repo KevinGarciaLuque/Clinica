@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../auth/AuthContext";
 import { useConfigSistema } from "../context/ConfigSistemaContext";
+import { mensajeError } from "../utils/mensajeError";
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
@@ -56,7 +57,7 @@ export default function Login() {
         navigate("/dashboard");
       }
     } catch (err) {
-      setMsg(err?.response?.data?.msg || "Credenciales incorrectas");
+      setMsg(mensajeError(err, "Credenciales incorrectas"));
     } finally {
       setLoading(false);
     }
@@ -70,7 +71,7 @@ export default function Login() {
       await verificar2FA(preToken, codigo2FA.trim());
       navigate("/dashboard");
     } catch (err) {
-      setMsg(err?.response?.data?.msg || "Código incorrecto");
+      setMsg(mensajeError(err, "Código incorrecto"));
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export default function Login() {
         setCodigo2FA("");
       }
     } catch (err) {
-      setMsg(err?.response?.data?.msg || "No se pudo reenviar el código");
+      setMsg(mensajeError(err, "No se pudo reenviar el código"));
     } finally {
       setLoading(false);
     }
@@ -105,7 +106,7 @@ export default function Login() {
         await loginConGoogle(response.credential);
         navigate("/dashboard");
       } catch (err) {
-        setMsg(err?.response?.data?.msg || "No se pudo iniciar sesión con Google");
+        setMsg(mensajeError(err, "No se pudo iniciar sesión con Google"));
       } finally {
         setLoading(false);
       }

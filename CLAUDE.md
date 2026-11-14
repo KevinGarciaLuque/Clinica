@@ -34,6 +34,7 @@ Sistema de gestión clínica multi-clínica (medickg.com). **Está en producció
 - `icono`: clase `bi-…` de Bootstrap Icons.
 - `audiencia`: `TODOS`, `MEDICOS` o `ADMIN`.
 - `importante`: `true` solo para cambios grandes.
+- `modulos` (opcional): lista de claves de módulos, por ejemplo `["nutricion_consulta"]`. Si la mejora es solo de una especialidad (estética, nutrición…), ponerlo para que no la vean las demás clínicas. Sin este campo la ven todas.
 
 El servidor la publica sola al arrancar y nunca la duplica.
 
