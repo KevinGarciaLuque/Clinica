@@ -2119,7 +2119,7 @@ export default function PerfilPaciente() {
             </h5>
           </div>
           <div className="card-body">
-            <EsteticaPaciente pacienteId={id} tieneModulo={tieneModulo} />
+            <EsteticaPaciente pacienteId={id} paciente={paciente} tieneModulo={tieneModulo} />
           </div>
         </div>
       )}

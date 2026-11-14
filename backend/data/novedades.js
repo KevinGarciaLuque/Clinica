@@ -326,4 +326,14 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "estetica-perfil-atencion-rapida",
+    modulos: ["ficha_estetica", "galeria_estetica", "presupuestos", "consentimientos_esteticos", "seguimiento_postop", "biopsias_patologia"],
+    version: "1.43",
+    titulo: "Estética más rápida desde el perfil",
+    descripcion: "En la pestaña Estética del paciente hay un botón «Nueva atención estética»: elija Valoración, Procedimiento o Control y la consulta se abre lista. Los avisos ahora tienen botones para resolverlos ahí mismo: firmar o enviar el consentimiento, llenar la ficha, cobrar el presupuesto o bajar su PDF.",
+    icono: "bi-lightning-charge",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

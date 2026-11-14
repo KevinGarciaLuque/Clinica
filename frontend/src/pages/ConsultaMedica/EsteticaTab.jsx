@@ -1,13 +1,14 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import MapaFacial from "../../components/MapaFacial";
 import api from "../../api/api";
-import { listarEstetica, crearEstetica } from "../../utils/esteticaDatos";
+import { listarEstetica } from "../../utils/esteticaDatos";
 import { paquetesDe } from "../../utils/esteticaPaquetes";
 import { imprimirHtml } from "../../utils/descargarPdf";
 import ModalFirmarConsentimiento from "../../components/estetica/ModalFirmarConsentimiento";
 import ModalAgendarControles from "../../components/estetica/ModalAgendarControles";
 import ModalEnviarPaciente from "../../components/estetica/ModalEnviarPaciente";
+import { ModalPresupuesto, ModalConsentimiento } from "../../components/estetica/ModalesEstetica";
 import {
   PLANTILLAS_CONSENTIMIENTO, FASES_CONTROL, EDEMA_OPC, CICATRIZ_OPC, RESULTADO_OPC,
   PROCEDIMIENTOS_COMUNES, UNIDADES, ANESTESIA_OPC, CONTRAINDICACIONES, ZONAS_CUERPO, nombreZona, MESES_MANTENIMIENTO,
@@ -52,7 +53,7 @@ const mantDe = (nombre) => PROCEDIMIENTOS_COMUNES.find((p) => p.nombre === nombr
 const sumarMeses = (meses) => { const d = new Date(); d.setMonth(d.getMonth() + Number(meses)); return d.toISOString().slice(0, 10); };
 const hoyTxt = () => new Date().toISOString().slice(0, 10);
 
-export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacienteId, historiaId, onGuardar }) {
+export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacienteId, historiaId, onGuardar, visitaInicial }) {
   const [previos, setPrevios] = useState({ cargado: false, ficha: null, ultimoProc: null, firmados: [], consentimientos: [] });
   const [modal, setModal] = useState(null); // "presupuesto" | "consentimiento" | "controles"
   const [firmar, setFirmar] = useState(null); // consentimiento que se va a firmar con el dedo
@@ -89,6 +90,11 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
         consentimientos,
         firmados: consentimientos.filter((c) => c.firmado),
         paquetes: paquetesDe(l, historiaId),
+        // Procedimientos que ya se le hicieron (para elegir cuál se controla), el más reciente primero
+        hechos: [...new Map(otros.filter((r) => r._tipo === "procedimiento" && r.nombre)
+          .map((r) => [r.nombre, { nombre: r.nombre, fecha: String(r.creado_en || r._creado_en || "").slice(0, 10) }])).values()],
+        aprobados: [...new Set(l.filter((r) => r._tipo === "presupuesto" && (r.estado === "APROBADO" || r._factura))
+          .flatMap((r) => (r.procedimientos || []).map((x) => x.nombre)).filter(Boolean))],
       });
     }).catch(() => vivo && setPrevios((p) => ({ ...p, cargado: true })));
     return () => { vivo = false; };
@@ -103,6 +109,15 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
     if (id === "seguimiento" && !nuevo.seguimiento) nuevo.seguimiento = { fase: "dia7", edema: "Leve", cicatriz: "Sin alteraciones", resultado: "Bueno", dolor_eva: "0" };
     if (id === "procedimiento" && !d.procedimiento) nuevo.procedimiento = { anestesia: "Tópica (crema)", productos: [{}], zonas: {}, tolerancia: "Buena", como_va_dias: 3, satisfaccion_dias: 30 };
     return nuevo;
+  });
+
+  // Llega desde el perfil con el tipo de visita ya elegido: se marca una vez,
+  // cuando ya se sabe qué procedimientos tiene el paciente (para llenar el control)
+  const visitaPuesta = useRef(false);
+  useEffect(() => {
+    if (visitaPuesta.current || !visitaInicial || !previos.cargado || datos.tipo_visita || firmada) return;
+    visitaPuesta.current = true;
+    elegirVisita(visitaInicial);
   });
 
   const repetirAnterior = () => {
@@ -556,7 +571,32 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
         <Seccion titulo="Control post-procedimiento" icono="bi-heart-pulse" color="#8b5cf6">
           <div className="et-campos">
             <div><Lbl>Procedimiento que se controla</Lbl>
-              <input style={inp} disabled={firmada} value={seg.procedimiento || ""} onChange={(e) => set("seguimiento", "procedimiento", e.target.value)} /></div>
+              {(() => {
+                const opciones = [...(previos.hechos || []).map((h) => h.nombre), ...(previos.aprobados || [])]
+                  .filter((n, i, a) => a.indexOf(n) === i);
+                const actual = seg.procedimiento || "";
+                const esOtro = seg._otro || (actual && !opciones.includes(actual));
+                return (
+                  <>
+                    <select style={inp} disabled={firmada} value={esOtro ? "__otro" : actual}
+                      onChange={(e) => {
+                        const v = e.target.value;
+                        setDatos((d) => ({ ...d, seguimiento: { ...(d.seguimiento || {}), procedimiento: v === "__otro" ? "" : v, _otro: v === "__otro" } }));
+                      }}>
+                      <option value="">Elija el procedimiento…</option>
+                      {(previos.hechos || []).map((h) => <option key={h.nombre} value={h.nombre}>{h.nombre}{h.fecha ? ` (${fechaCorta(h.fecha)})` : ""}</option>)}
+                      {(previos.aprobados || []).filter((n) => !(previos.hechos || []).some((h) => h.nombre === n)).map((n) => <option key={n} value={n}>{n} (presupuesto)</option>)}
+                      <option value="__otro">Otro (escribir)…</option>
+                    </select>
+                    {esOtro && (
+                      <input style={{ ...inp, marginTop: 6 }} disabled={firmada} list="et-procs-control" placeholder="Nombre del procedimiento"
+                        value={actual} onChange={(e) => set("seguimiento", "procedimiento", e.target.value)} />
+                    )}
+                    <datalist id="et-procs-control">{PROCEDIMIENTOS_COMUNES.map((p) => <option key={p.nombre} value={p.nombre} />)}</datalist>
+                  </>
+                );
+              })()}
+            </div>
             <div><Lbl>Momento del control</Lbl>
               <div className="d-flex flex-wrap gap-1">
                 {FASES_CONTROL.map((f) => <Chip key={f.key} disabled={firmada} activo={seg.fase === f.key} onClick={() => set("seguimiento", "fase", f.key)}>{f.label}</Chip>)}
@@ -661,152 +701,7 @@ export default function EsteticaTab({ datos, setDatos, firmada, paciente, pacien
   );
 }
 
-function Modal({ titulo, icono, children, onClose }) {
-  return (
-    <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,.5)", zIndex: 1060, display: "flex", alignItems: "center", justifyContent: "center", padding: 12 }} onClick={onClose}>
-      <div style={{ background: "#fff", borderRadius: 14, width: "100%", maxWidth: 560, maxHeight: "92vh", overflowY: "auto", padding: 18 }} onClick={(e) => e.stopPropagation()}>
-        <div className="d-flex align-items-center mb-3">
-          <h6 className="mb-0" style={{ fontWeight: 800, color: ROSA }}><i className={`bi ${icono} me-2`} />{titulo}</h6>
-          <button type="button" className="btn-close ms-auto" aria-label="Cerrar" onClick={onClose} />
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
-
 const nombrePac = (p) => [p?.nombres, p?.apellidos].filter(Boolean).join(" ") || "—";
-
-function ModalPresupuesto({ paciente, pacienteId, sugeridos, onClose }) {
-  const [items, setItems] = useState(() => (sugeridos.length ? sugeridos : [""]).map((n) => ({ nombre: n, precio: "" })));
-  const [validez, setValidez] = useState("30");
-  const [obs, setObs] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [listo, setListo] = useState(false);
-  const total = items.reduce((s, i) => s + (parseFloat(i.precio) || 0), 0);
-  const guardar = async () => {
-    setGuardando(true);
-    try {
-      await crearEstetica("presupuesto", pacienteId, {
-        paciente_id: String(pacienteId), titulo: items.map((i) => i.nombre).filter(Boolean).join(" + "),
-        procedimientos: items.filter((i) => i.nombre), observaciones: obs, validez_dias: validez, estado: "BORRADOR",
-        paciente_nombre: nombrePac(paciente), total, creado_en: new Date().toISOString(),
-      });
-      setListo(true);
-    } catch (e) { alert(e.response?.data?.msg || "No se pudo guardar el presupuesto."); }
-    setGuardando(false);
-  };
-  return (
-    <Modal titulo="Nuevo presupuesto" icono="bi-receipt" onClose={onClose}>
-      {listo ? (
-        <div className="text-center py-3">
-          <i className="bi bi-check-circle-fill" style={{ fontSize: "2.2rem", color: "#16a34a" }} />
-          <div className="fw-bold mt-2">Presupuesto guardado</div>
-          <div className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>Puede enviarlo o cambiar su estado en Presupuestos.</div>
-          <div className="d-flex gap-2 justify-content-center">
-            <Link to="/estetica/presupuestos" target="_blank" className="btn btn-sm btn-outline-secondary">Abrir Presupuestos</Link>
-            <button type="button" className="btn btn-sm" style={{ background: ROSA, color: "#fff" }} onClick={onClose}>Volver a la consulta</button>
-          </div>
-        </div>
-      ) : (
-        <>
-          {items.map((it, i) => (
-            <div key={i} className="d-flex gap-2 mb-2">
-              <input list="et-procs-modal" style={{ ...inp, flex: 2 }} placeholder="Procedimiento" value={it.nombre}
-                onChange={(e) => setItems((l) => l.map((x, j) => (j === i ? { ...x, nombre: e.target.value } : x)))} />
-              <input style={{ ...inp, flex: 1 }} placeholder="Precio L" inputMode="decimal" value={it.precio}
-                onChange={(e) => setItems((l) => l.map((x, j) => (j === i ? { ...x, precio: e.target.value } : x)))} />
-              <input style={{ ...inp, width: 78, flex: "0 0 78px" }} placeholder="Sesiones" inputMode="numeric" value={it.sesiones || ""}
-                title="Si es un paquete, cuántas sesiones incluye"
-                onChange={(e) => setItems((l) => l.map((x, j) => (j === i ? { ...x, sesiones: e.target.value.replace(/\D/g, "") } : x)))} />
-              <button type="button" className="btn btn-sm btn-light" onClick={() => setItems((l) => l.filter((_, j) => j !== i))}><i className="bi bi-x-lg" /></button>
-            </div>
-          ))}
-          <datalist id="et-procs-modal">{PROCEDIMIENTOS_COMUNES.map((p) => <option key={p.nombre} value={p.nombre} />)}</datalist>
-          <button type="button" className="btn btn-sm btn-link p-0 mb-3" style={{ color: ROSA, fontWeight: 700 }} onClick={() => setItems((l) => [...l, { nombre: "", precio: "" }])}>
-            <i className="bi bi-plus-circle me-1" />Agregar procedimiento
-          </button>
-          <div className="d-flex gap-2 mb-2">
-            <div style={{ width: 130 }}><Lbl>Válido por (días)</Lbl><input style={inp} inputMode="numeric" value={validez} onChange={(e) => setValidez(e.target.value)} /></div>
-            <div style={{ flex: 1 }}><Lbl>Observaciones</Lbl><input style={inp} value={obs} onChange={(e) => setObs(e.target.value)} /></div>
-          </div>
-          <div className="d-flex align-items-center mt-3">
-            <strong>Total: L {total.toLocaleString("en-US", { minimumFractionDigits: 2 })}</strong>
-            <button type="button" className="btn ms-auto" style={{ background: ROSA, color: "#fff", fontWeight: 700 }}
-              disabled={guardando || !items.some((i) => i.nombre)} onClick={guardar}>
-              {guardando ? "Guardando…" : "Guardar presupuesto"}
-            </button>
-          </div>
-        </>
-      )}
-    </Modal>
-  );
-}
-
-function ModalConsentimiento({ paciente, pacienteId, procedimiento, onClose, onFirmar, onEnviar }) {
-  const sugerida = PLANTILLAS_CONSENTIMIENTO.find((p) => procedimiento && String(procedimiento).toLowerCase().includes(p.procedimiento.toLowerCase().slice(0, 6)));
-  const [plantillaId, setPlantillaId] = useState(sugerida ? String(sugerida.id) : "");
-  const [otro, setOtro] = useState(sugerida ? "" : (procedimiento || ""));
-  const [notas, setNotas] = useState("");
-  const [guardando, setGuardando] = useState(false);
-  const [listo, setListo] = useState(false);
-  const plantilla = PLANTILLAS_CONSENTIMIENTO.find((p) => String(p.id) === plantillaId);
-  const nombre = plantilla?.procedimiento || otro;
-  const contenido = plantilla?.contenido
-    || `Yo, el/la abajo firmante, paciente de la clínica, declaro que he sido informado/a de manera clara y comprensible sobre el procedimiento de ${String(nombre || "").toUpperCase()}, sus beneficios, riesgos, posibles complicaciones, alternativas y cuidados posteriores. He podido hacer preguntas y doy mi consentimiento libre y voluntario para su realización.`;
-  const guardar = async () => {
-    setGuardando(true);
-    try {
-      const creado = await crearEstetica("consentimiento", pacienteId, {
-        paciente_id: String(pacienteId), plantilla_id: plantillaId, notas,
-        procedimiento: nombre, contenido, riesgos: plantilla?.riesgos || [],
-        paciente_nombre: nombrePac(paciente), firmado: false, creado_en: new Date().toISOString(),
-      });
-      setListo(creado);
-    } catch (e) { alert(e.response?.data?.msg || "No se pudo guardar el consentimiento."); }
-    setGuardando(false);
-  };
-  return (
-    <Modal titulo="Consentimiento informado" icono="bi-pen" onClose={onClose}>
-      {listo ? (
-        <div className="text-center py-3">
-          <i className="bi bi-check-circle-fill" style={{ fontSize: "2.2rem", color: "#16a34a" }} />
-          <div className="fw-bold mt-2">Consentimiento creado</div>
-          <div className="text-muted mb-3" style={{ fontSize: "0.85rem" }}>Que el paciente lo firme aquí con el dedo, o envíeselo para que lo firme desde su teléfono.</div>
-          <div className="d-flex gap-2 justify-content-center flex-wrap">
-            <button type="button" className="btn btn-sm btn-outline-secondary" onClick={onClose}>Firmar después</button>
-            <button type="button" className="btn btn-sm" style={{ border: `1px solid ${ROSA}`, color: ROSA, fontWeight: 700 }} onClick={() => onEnviar?.(listo)}>
-              <i className="bi bi-send me-1" />Enviar para firmar en casa
-            </button>
-            <button type="button" className="btn btn-sm" style={{ background: ROSA, color: "#fff", fontWeight: 700 }} onClick={() => onFirmar?.(listo)}>
-              <i className="bi bi-pen me-1" />Firmar ahora
-            </button>
-          </div>
-        </div>
-      ) : (
-        <>
-          <Lbl>Plantilla</Lbl>
-          <select style={inp} className="mb-2" value={plantillaId} onChange={(e) => setPlantillaId(e.target.value)}>
-            <option value="">Otro procedimiento (texto general)</option>
-            {PLANTILLAS_CONSENTIMIENTO.map((p) => <option key={p.id} value={p.id}>{p.procedimiento}</option>)}
-          </select>
-          {!plantilla && (<><Lbl>Procedimiento</Lbl><input style={inp} className="mb-2" value={otro} onChange={(e) => setOtro(e.target.value)} placeholder="Ej.: Toxina botulínica" /></>)}
-          <div style={{ background: "#f9fafb", border: "1px solid #e5e7eb", borderRadius: 8, padding: 10, fontSize: "0.82rem", maxHeight: 180, overflowY: "auto" }} className="mb-2">
-            {contenido}
-            {plantilla?.riesgos?.length > 0 && <div className="mt-2"><strong>Riesgos:</strong> {plantilla.riesgos.join(", ")}.</div>}
-          </div>
-          <Lbl>Notas</Lbl>
-          <input style={inp} value={notas} onChange={(e) => setNotas(e.target.value)} />
-          <div className="d-flex mt-3">
-            <button type="button" className="btn ms-auto" style={{ background: ROSA, color: "#fff", fontWeight: 700 }} disabled={guardando || !nombre} onClick={guardar}>
-              {guardando ? "Guardando…" : "Crear consentimiento"}
-            </button>
-          </div>
-        </>
-      )}
-    </Modal>
-  );
-}
 
 /** Hoja imprimible del procedimiento (para el expediente físico). */
 function htmlRegistro({ proc, paciente }) {

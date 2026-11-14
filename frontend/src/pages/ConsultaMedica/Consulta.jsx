@@ -49,7 +49,9 @@ export default function Consulta() {
   const historiaId = params.get("historia_id");
   const editMode   = params.get("editar") === "1";
 
-  const [tab,       setTab]       = useState("soap");
+  // ?estetica=valoracion|procedimiento|seguimiento (desde el perfil: «Nueva atención estética»)
+  const visitaEstetica = ["valoracion", "procedimiento", "seguimiento"].includes(params.get("estetica")) ? params.get("estetica") : null;
+  const [tab,       setTab]       = useState(visitaEstetica ? "estetica" : "soap");
   const [historia,  setHistoria]  = useState(null);   // loaded historia object
   const [hid,       setHid]       = useState(historiaId || null); // historia id (created or loaded)
   const [paciente,  setPaciente]  = useState(null);
@@ -722,6 +724,7 @@ export default function Consulta() {
               paciente={paciente}
               pacienteId={paciente?.id || pacId}
               historiaId={hid}
+              visitaInicial={hid ? null : visitaEstetica}
               onGuardar={() => guardarRef.current?.(false)}
             />
           )}
