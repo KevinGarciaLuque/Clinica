@@ -39,6 +39,7 @@ export default function LicenciaVencidaModal() {
   const [enviando, setEnviando]         = useState(false);
   const [enviado, setEnviado]           = useState(false);
   const [errorMsg, setErrorMsg]         = useState("");
+  const [renovacion, setRenovacion]     = useState(false);
 
   const esVencida = !!(user && !user.super && licenciaInfo?.vencida);
 
@@ -53,13 +54,16 @@ export default function LicenciaVencidaModal() {
 
   useEffect(() => {
     const handlerVencida = () => setVisible(true);
-    const handlerManual  = () => {
+    const handlerManual  = (ev) => {
       if (!esVencida) {
         setManualOpen(true);
         setEnviado(false);
         setErrorMsg("");
         setMensaje("");
-        setPlanSel("anual");
+        // Renovación: por defecto el mismo plan que tiene hoy
+        const actual = licenciaInfo?.plan_tipo;
+        setRenovacion(!!ev?.detail?.renovacion);
+        setPlanSel(ev?.detail?.renovacion && ["semestral", "anual"].includes(actual) ? actual : "anual");
       }
       setVisible(true);
     };
@@ -88,8 +92,11 @@ export default function LicenciaVencidaModal() {
       await api.post("/clinicas/solicitar-licencia", {
         plan_solicitado: planSel,
         mensaje: mensaje.trim() || null,
+        // Si ya tenía un plan pagado (o lo pidió desde el aviso), es una renovación
+        tipo_solicitud: renovacion || ["semestral", "anual"].includes(licenciaInfo?.plan_tipo) ? "renovacion" : undefined,
       });
       setEnviado(true);
+      window.dispatchEvent(new CustomEvent("solicitudLicenciaEnviada"));
     } catch (e) {
       setErrorMsg(e.response?.data?.msg || "Error al enviar la solicitud");
     } finally {
@@ -106,11 +113,11 @@ export default function LicenciaVencidaModal() {
       ? "linear-gradient(135deg, rgba(33,150,243,.15), rgba(33,150,243,.08))"
       : "linear-gradient(135deg, rgba(239,68,68,.15), rgba(220,38,38,.08))";
   const hIcon   = enviado ? "bi-check-circle-fill" : manualOpen ? "bi-arrow-up-circle-fill" : "bi-lock-fill";
-  const hTitle  = enviado ? "Solicitud Enviada" : manualOpen ? "Solicitar Plan" : "Licencia Vencida";
+  const hTitle  = enviado ? "Solicitud Enviada" : manualOpen ? (renovacion ? "Solicitar renovación" : "Solicitar Plan") : "Licencia Vencida";
   const hSub    = enviado
     ? "El administrador fue notificado y revisará tu solicitud"
     : manualOpen
-      ? "Elige el plan que deseas y envía tu solicitud al administrador"
+      ? (renovacion ? "Elija cómo desea renovar y envíe la solicitud al administrador" : "Elige el plan que deseas y envía tu solicitud al administrador")
       : "El acceso a tu clínica ha sido suspendido";
 
   return (
@@ -219,7 +226,7 @@ export default function LicenciaVencidaModal() {
             <>
               {/* Selector de plan */}
               <p style={{ fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 10, textTransform: "uppercase", letterSpacing: ".06em" }}>
-                ¿Qué plan deseas solicitar?
+                {renovacion ? "¿Cómo desea renovar?" : "¿Qué plan deseas solicitar?"}
               </p>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 16 }}>
                 {PLANES.map(p => (
@@ -308,7 +315,7 @@ export default function LicenciaVencidaModal() {
               >
                 {enviando
                   ? <><span className="spinner-border spinner-border-sm me-2" />Enviando...</>
-                  : <><i className="bi bi-send-fill me-2" />Solicitar plan {PLANES_LABEL[planSel]?.label}</>
+                  : <><i className="bi bi-send-fill me-2" />{renovacion ? "Solicitar renovación" : "Solicitar plan"} {PLANES_LABEL[planSel]?.label}</>
                 }
               </button>
             </>

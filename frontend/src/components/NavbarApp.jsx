@@ -248,6 +248,17 @@ export default function NavbarApp({ onMenuClick }) {
             })
             .catch(() => {});
         });
+        es.addEventListener("nueva_solicitud_licencia", () => {
+          api.get("/clinicas/solicitudes-licencia")
+            .then(r => {
+              setSolicitudes(prev => {
+                const nuevos = r.data.data || [];
+                if (nuevos.length >= prev.length) playNotificationSound();
+                return nuevos;
+              });
+            })
+            .catch(() => {});
+        });
         es.addEventListener("nueva_solicitud_plan", () => {
           api.get("/planes-publicos/solicitudes?estado=pendiente")
             .then(r => {
@@ -641,8 +652,14 @@ export default function NavbarApp({ onMenuClick }) {
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 12, fontWeight: 700, color: "#e2e8f0" }}>{s.clinica_nombre}</div>
                                 <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 1 }}>
-                                  Plan <span style={{ color, fontWeight: 700 }}>{s.plan_solicitado}</span> · {fecha}
+                                  {s.tipo_solicitud === "renovacion" ? "Renovación" : "Plan"} <span style={{ color, fontWeight: 700 }}>{s.plan_solicitado}</span> · {fecha}
                                 </div>
+                                {(s.solicitante_nombres || s.licencia_fin) && (
+                                  <div style={{ fontSize: 10.5, color: "#64748b", marginTop: 1 }}>
+                                    {s.solicitante_nombres ? `${s.solicitante_nombres} ${s.solicitante_apellidos || ""}`.trim() : ""}
+                                    {s.licencia_fin ? `${s.solicitante_nombres ? " · " : ""}vence ${new Date(s.licencia_fin).toLocaleDateString("es-HN", { day: "2-digit", month: "short" })}` : ""}
+                                  </div>
+                                )}
                                 <button onClick={() => atenderSolicitud(s.id, s.clinica_id)} style={{
                                   marginTop: 5, background: `${color}20`, border: `1px solid ${color}50`,
                                   borderRadius: 6, padding: "3px 9px", color, fontSize: 10, fontWeight: 700, cursor: "pointer",

@@ -10,6 +10,8 @@ const streamifier = require("streamifier");
 const fs          = require("fs");
 const path        = require("path");
 const { enviarEmail, templateCredenciales } = require("../utils/mailer");
+const sse     = require("../utils/sseManager");
+const webPush = require("../utils/webPush");
 const { urlPublica } = require("../utils/urlPublica");
 const { zonaClinica, olvidarZona, ahoraClinica, offsetMin } = require("../utils/zonaHoraria");
 const { puedeVerFinanzas } = require("../utils/permisoFinanzas");
@@ -611,6 +613,47 @@ router.get("/", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","RECEPCIONISTA",
 //  SOLICITUDES DE LICENCIA  (deben ir ANTES de /:id para no ser capturadas)
 // ══════════════════════════════════════════════════════════════════════════
 
+// Columnas opcionales (aditivas): quién pidió y si es renovación
+let columnasSolicitudOk = false;
+async function asegurarColumnasSolicitud() {
+  if (columnasSolicitudOk) return;
+  const [cols] = await pool.query("SHOW COLUMNS FROM solicitudes_licencia");
+  const tiene = (c) => cols.some((x) => x.Field === c);
+  if (!tiene("usuario_id")) await pool.query("ALTER TABLE solicitudes_licencia ADD COLUMN usuario_id INT UNSIGNED NULL");
+  if (!tiene("tipo_solicitud")) await pool.query("ALTER TABLE solicitudes_licencia ADD COLUMN tipo_solicitud VARCHAR(20) NULL");
+  columnasSolicitudOk = true;
+}
+
+const PLAN_TEXTO = { trial: "Prueba", semestral: "Semestral (6 meses)", anual: "Anual (12 meses)" };
+const diasHasta = (fin) => (fin ? Math.ceil((new Date(fin) - new Date()) / 86400000) : null);
+
+// GET /api/clinicas/mi-licencia  → licencia actual de mi clínica (siempre al día) y si ya hay solicitud pendiente
+router.get("/mi-licencia",
+  auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"),
+  async (req, res) => {
+  try {
+    const cid = req.user.clinica_id;
+    if (!cid) return res.json({ ok: true, data: null });
+    const [[c]] = await pool.query("SELECT plan_tipo, licencia_inicio, licencia_fin FROM clinicas WHERE id=? LIMIT 1", [cid]);
+    if (!c) return res.json({ ok: true, data: null });
+    await asegurarColumnasSolicitud().catch(() => {});
+    const [[pend]] = await pool.query(
+      `SELECT id, plan_solicitado, tipo_solicitud, creado_en FROM solicitudes_licencia
+       WHERE clinica_id=? AND estado='pendiente' ORDER BY id DESC LIMIT 1`, [cid]).catch(() => [[null]]);
+    const dias = diasHasta(c.licencia_fin);
+    res.json({ ok: true, data: {
+      plan_tipo: c.plan_tipo || "trial",
+      licencia_inicio: c.licencia_inicio || null,
+      licencia_fin: c.licencia_fin || null,
+      dias_restantes: dias,
+      vencida: c.licencia_fin ? new Date(c.licencia_fin) < new Date() : false,
+      solicitud_pendiente: pend || null,
+    } });
+  } catch (e) {
+    res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
 // POST /api/clinicas/solicitar-licencia  → clínica pide activación de plan
 router.post("/solicitar-licencia",
   auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","SUPER_ADMIN"),
@@ -629,11 +672,42 @@ router.post("/solicitar-licencia",
        WHERE clinica_id=? AND estado='pendiente'`,
       [clinica_id]
     );
-    await pool.query(
-      `INSERT INTO solicitudes_licencia (clinica_id, plan_solicitado, mensaje) VALUES (?, ?, ?)`,
-      [clinica_id, plan_solicitado, mensaje || null]
-    );
+    await asegurarColumnasSolicitud().catch(() => {});
+    const tipoSolicitud = req.body.tipo_solicitud === "renovacion" ? "renovacion" : null;
+    const [ins] = columnasSolicitudOk
+      ? await pool.query(
+        `INSERT INTO solicitudes_licencia (clinica_id, plan_solicitado, mensaje, usuario_id, tipo_solicitud) VALUES (?, ?, ?, ?, ?)`,
+        [clinica_id, plan_solicitado, mensaje || null, req.user.id || null, tipoSolicitud])
+      : await pool.query(
+        `INSERT INTO solicitudes_licencia (clinica_id, plan_solicitado, mensaje) VALUES (?, ?, ?)`,
+        [clinica_id, plan_solicitado, mensaje || null]);
     res.json({ ok: true, msg: "Solicitud enviada al administrador" });
+
+    // Aviso al super admin: en tiempo real, push y correo (no detiene la respuesta)
+    (async () => {
+      const [[c]] = await pool.query("SELECT nombre, licencia_fin FROM clinicas WHERE id=?", [clinica_id]);
+      const [[u]] = await pool.query("SELECT nombres, apellidos FROM usuarios WHERE id=?", [req.user.id]).catch(() => [[null]]);
+      const [admins] = await pool.query("SELECT id, email FROM usuarios WHERE tipo='SUPER_ADMIN' AND activo=1");
+      const quien = u ? `${u.nombres || ""} ${u.apellidos || ""}`.trim() : "La clínica";
+      const dias = diasHasta(c?.licencia_fin);
+      const que = tipoSolicitud === "renovacion" ? "renovación" : "activación";
+      const titulo = `${c?.nombre || "Una clínica"} solicita ${que}`;
+      const cuerpo = `${quien} pide ${que} del plan ${PLAN_TEXTO[plan_solicitado] || plan_solicitado}`
+        + (dias !== null ? (dias > 0 ? ` · le quedan ${dias} día${dias === 1 ? "" : "s"}` : " · plan vencido") : "")
+        + (mensaje ? ` · «${String(mensaje).slice(0, 120)}»` : "");
+      sse.notifySuperAdmins("nueva_solicitud_licencia", { clinica_id, plan_solicitado, tipo_solicitud: tipoSolicitud });
+      await webPush.sendToUsers(pool, admins.map((a) => a.id), {
+        title: titulo, body: cuerpo, tag: `solicitud_licencia_${clinica_id}`, data: { url: "/superadmin/clinicas" },
+      }).catch(() => {});
+      for (const a of admins) {
+        if (!a.email) continue;
+        await enviarEmail({
+          to: a.email,
+          subject: titulo,
+          html: `<p><b>${titulo}</b></p><p>${cuerpo.replace(/</g, "&lt;")}</p><p>Puede activarla en <a href="https://medickg.com/superadmin/clinicas">Super Admin → Clínicas</a>.</p>`,
+        }).catch(() => {});
+      }
+    })().catch((e) => console.error("[aviso solicitud licencia]", e.message));
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
@@ -642,12 +716,14 @@ router.post("/solicitar-licencia",
 // GET /api/clinicas/solicitudes-licencia  → SUPER_ADMIN lista solicitudes pendientes
 router.get("/solicitudes-licencia", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    await asegurarColumnasSolicitud().catch(() => {});
     const [rows] = await pool.query(`
-      SELECT sl.id, sl.plan_solicitado, sl.mensaje, sl.estado, sl.creado_en,
+      SELECT sl.*, u.nombres AS solicitante_nombres, u.apellidos AS solicitante_apellidos,
              c.id AS clinica_id, c.nombre AS clinica_nombre, c.email AS clinica_email,
              c.plan_tipo AS plan_actual, c.licencia_fin
       FROM solicitudes_licencia sl
       JOIN clinicas c ON c.id = sl.clinica_id
+      LEFT JOIN usuarios u ON u.id = sl.usuario_id
       WHERE sl.estado = 'pendiente'
       ORDER BY sl.creado_en DESC
     `);

@@ -117,7 +117,12 @@ export default function Clinicas() {
     const c = clinicas.find(cl => cl.id === sol.clinica_id);
     if (c) {
       setClinicaLicencia(c);
-      setLicenciaForm({ ...LIC_FORM_BASE, plan_tipo: sol.plan_solicitado, notas: `Solicitud #${sol.id} atendida` });
+      // Renovación: el nuevo periodo empieza cuando vence el actual (no pierde los días que le quedan)
+      const finActual = sol.licencia_fin ? String(sol.licencia_fin).slice(0, 10) : "";
+      const hoy = new Date().toISOString().slice(0, 10);
+      const inicio = sol.tipo_solicitud === "renovacion" && finActual > hoy ? finActual : "";
+      setLicenciaForm({ ...LIC_FORM_BASE, plan_tipo: sol.plan_solicitado, inicio_manual: inicio,
+        notas: `${sol.tipo_solicitud === "renovacion" ? "Renovación" : "Solicitud"} #${sol.id} atendida` });
       setShowLicenciaModal(true);
     }
   };
@@ -666,10 +671,16 @@ export default function Clinicas() {
                       background: `${col}20`, color: col, border: `1px solid ${col}40`,
                       fontSize: 11, fontWeight: 700, borderRadius: 6, padding: "2px 8px",
                     }}>
-                      Plan {PLAN_L[s.plan_solicitado]}
+                      {s.tipo_solicitud === "renovacion" ? "Renovación" : "Plan"} {PLAN_L[s.plan_solicitado]}
                     </span>
                     <span style={{ fontSize: 11, color: C.muted }}>{fecha}</span>
                   </div>
+                  {(s.solicitante_nombres || s.licencia_fin) && (
+                    <div style={{ fontSize: 12, color: C.muted, marginBottom: 6 }}>
+                      {s.solicitante_nombres && <><i className="bi bi-person me-1" />Pidió: {`${s.solicitante_nombres} ${s.solicitante_apellidos || ""}`.trim()}</>}
+                      {s.licencia_fin && <span className="ms-2"><i className="bi bi-calendar-x me-1" />Plan actual ({PLAN_L[s.plan_actual] || s.plan_actual}) vence el {new Date(s.licencia_fin).toLocaleDateString("es-HN", { day: "2-digit", month: "short", year: "numeric" })}</span>}
+                    </div>
+                  )}
                   {s.mensaje && (
                     <div style={{
                       fontSize: 12, color: C.muted, fontStyle: "italic",

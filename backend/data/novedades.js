@@ -355,4 +355,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "aviso-renovacion-plan",
+    version: "1.46",
+    titulo: "Aviso y solicitud de renovación del plan",
+    descripcion: "Cuando a su plan le queden 10 días, y luego 5, 4, 3, 2 y 1, verá un aviso con el botón «Solicitar renovación». Elija si la quiere semestral o anual y el administrador la activará sin que pierda los días que le quedan.",
+    icono: "bi-arrow-repeat",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];
