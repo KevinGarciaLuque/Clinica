@@ -125,8 +125,8 @@ function Fila({ label, valor }) {
   if (!hay(valor)) return null;
   return (
     <div className="d-flex justify-content-between gap-3 py-1" style={{ borderBottom: "1px solid #f1f5f9", fontSize: "0.85rem" }}>
-      <span style={{ color: "#64748b", flexShrink: 0 }}>{label}</span>
-      <span className="text-end" style={{ fontWeight: 700, color: "#0f172a", minWidth: 0, overflowWrap: "anywhere" }}>{valor}</span>
+      <span style={{ color: "#64748b", flex: "0 1 auto", maxWidth: "55%" }}>{label}</span>
+      <span className="text-end" style={{ fontWeight: 700, color: "#0f172a", flex: "1 1 40%", minWidth: 0, overflowWrap: "break-word" }}>{valor}</span>
     </div>
   );
 }
@@ -370,7 +370,7 @@ export default function HistorialConsultas({
                             </Tarjeta>
                           )}
                           {secc.includes("estetica") && (
-                            <Tarjeta tipo="estetica" ancha><DetalleEstetica e={det ? det.estetica : null} /></Tarjeta>
+                            <Tarjeta tipo="estetica"><DetalleEstetica e={det ? det.estetica : null} /></Tarjeta>
                           )}
                           {!secc.length && <div className="text-muted small">Esta consulta no tiene datos registrados todavía.</div>}
                         </div>

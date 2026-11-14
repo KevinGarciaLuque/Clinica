@@ -912,6 +912,11 @@ export default function PerfilPaciente() {
       ? [{ key: "evolucion", label: "Evolución", short: "Evolución", icon: "bi-graph-up-arrow", color: "#2563eb" }]
       : []),
     { key: "datos",       label: "Datos Generales",      short: "Datos",    icon: "bi-person-lines-fill" },
+    // Estética va junto a los datos del paciente, antes del historial de consultas
+    ...(hayEstetica
+      ? [{ key: "estetica", label: "Estética", short: "Estética", icon: "bi-star-fill",
+          badge: esteticaResumen.loading ? null : totalEstetica > 0 ? totalEstetica : null, badgeColor: "#d97706" }]
+      : []),
     ...(tieneModulo("control_seguimiento_dm1")
       ? [
           { key: "endo_historia", label: "Historia Clínica", short: "Hist. Endo", icon: "bi-file-earmark-medical", color: "#ea580c" },
@@ -940,10 +945,6 @@ export default function PerfilPaciente() {
       badge: documentos.length > 0 ? documentos.length : null, badgeColor: "#0891b2" },
     { key: "cuenta",      label: "Estado de Cuenta",     short: "Cuenta",   icon: "bi-wallet2",
       badge: saldoPendiente > 0 ? "!" : null, badgeColor: "#dc2626", color: "#0d6efd" },
-    ...(hayEstetica
-      ? [{ key: "estetica", label: "Estética", short: "Estética", icon: "bi-star-fill",
-          badge: esteticaResumen.loading ? null : totalEstetica > 0 ? totalEstetica : null, badgeColor: "#d97706" }]
-      : []),
     ...(tieneModulo("curva_crecimiento")
       ? [{ key: "crecimiento", label: "Curvas de Crecimiento", short: "Curvas", icon: "bi-graph-up-arrow" }]
       : []),
