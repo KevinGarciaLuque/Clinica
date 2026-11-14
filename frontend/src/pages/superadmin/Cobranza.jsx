@@ -544,14 +544,18 @@ function ModalCuenta({ clinica, onCerrar, onPagar, onCambio }) {
                       </span>
                       <div style={{ flex: "1 1 180px", minWidth: 0 }}>
                         <div style={{ fontWeight: 800, textDecoration: p.anulado ? "line-through" : "none" }}>
-                          {dinero(p.monto, p.moneda)} <span style={{ fontWeight: 600, color: C.muted, fontSize: "0.74rem" }}>{desc ? "Descuento" : p.numero}</span>
+                          {dinero(p.monto, p.moneda)} <span style={{ fontWeight: 600, color: p.implicito ? C.accent : C.muted, fontSize: "0.74rem" }}>{desc ? "Descuento" : p.implicito ? "Pagado al activar el plan" : p.numero}</span>
                         </div>
                         <div style={{ fontSize: "0.72rem", color: C.muted }}>
-                          {fFecha(p.fecha)}{!desc ? ` · ${(METODOS.find((m) => m.k === p.metodo) || {}).t || p.metodo}` : ""}{p.referencia ? ` · ${p.referencia}` : ""}{p.notas ? ` · ${p.notas}` : ""}
+                          {fFecha(p.fecha)}{p.implicito ? " · el plan está activo; no hay un pago registrado" : <>{!desc ? ` · ${(METODOS.find((m) => m.k === p.metodo) || {}).t || p.metodo}` : ""}{p.referencia ? ` · ${p.referencia}` : ""}{p.notas ? ` · ${p.notas}` : ""}</>}
                           {p.recibo_enviado_en ? " · recibo enviado" : ""}{p.registrado_por ? ` · por ${p.registrado_por}` : ""}
                         </div>
                       </div>
-                      {p.anulado ? <Chip color={C.muted}>Anulado</Chip> : (
+                      {p.implicito ? (
+                        <button type="button" style={btnMini(C.success)} onClick={() => onPagar(clinica)} title="Registre el pago real (con su fecha y comprobante); este automático desaparece.">
+                          <i className="bi bi-pencil-square me-1" />Registrar pago real
+                        </button>
+                      ) : p.anulado ? <Chip color={C.muted}>Anulado</Chip> : (
                         <div className="d-flex gap-1 flex-wrap">
                           {!desc && <button type="button" style={btnMini(C.accent)} onClick={() => abrirArchivo(`/cobranza/pagos/${p.id}/recibo`)}><i className="bi bi-receipt me-1" />Recibo</button>}
                           {!desc && d.clinica.email && (
@@ -742,7 +746,8 @@ export default function Cobranza() {
       {/* Indicadores */}
       <div className="cb-kpis mb-3">
         <Kpi label="Cobrado este mes" value={porMoneda(t.cobrado_mes)} icon="bi-calendar-check" color={C.success} sub={`Este año: ${porMoneda(t.cobrado_anio, true)}`} />
-        <Kpi label="Generado en total" value={porMoneda(t.cobrado_total)} icon="bi-graph-up-arrow" color={C.violet} sub="Todos los pagos registrados" />
+        <Kpi label="Generado en total" value={porMoneda(t.cobrado_total)} icon="bi-graph-up-arrow" color={C.violet}
+          sub={d.activados_sin_pago ? `Incluye ${d.activados_sin_pago} plan(es) activo(s) sin pago registrado` : "Todos los pagos registrados"} />
         <Kpi label="Por cobrar" value={porMoneda(t.por_cobrar)} icon="bi-hourglass-split" color={C.warning} sub={`${d.conteo.atrasadas + d.conteo.pendientes} clínica(s) con saldo`} />
         <Kpi label="Atrasado" value={porMoneda(t.atrasado)} icon="bi-exclamation-octagon" color={C.danger} sub={`Más de ${d.dias_gracia} días sin pagar`} />
         <Kpi label="Ingreso mensual" value={porMoneda(t.mensual_esperado)} icon="bi-arrow-repeat" color={C.accent}
@@ -785,7 +790,7 @@ export default function Cobranza() {
           {d.pagos_recientes.length === 0 ? <div style={{ color: C.muted, fontSize: "0.84rem" }}>Aún no hay pagos registrados.</div>
             : d.pagos_recientes.slice(0, 6).map((p) => (
               <div key={p.id} className="d-flex justify-content-between gap-2" style={{ padding: "6px 0", borderBottom: `1px solid ${C.border}`, fontSize: "0.82rem" }}>
-                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clinica}<span style={{ color: C.muted }}> · {fFecha(p.fecha, false)}</span></span>
+                <span style={{ minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{p.clinica}<span style={{ color: C.muted }}> · {fFecha(p.fecha, false)}{p.implicito ? " · al activar" : ""}</span></span>
                 <b style={{ color: C.success, whiteSpace: "nowrap" }}>{dinero(p.monto, p.moneda)}</b>
               </div>
             ))}
@@ -818,7 +823,7 @@ export default function Cobranza() {
                   <Chip color={e.color} icon={e.icon}>{e.label}</Chip>
                 </div>
                 <div style={{ fontSize: "0.74rem", color: C.muted, marginTop: 2 }}>
-                  {PLAN[c.plan_tipo] || c.plan_tipo}{c.licencia_fin ? ` · ${c.vigente ? "vence" : "venció"} ${fFecha(c.licencia_fin)}` : ""}
+                  {PLAN[c.plan_tipo] || c.plan_tipo}{c.licencia_fin ? ` · ${c.licencia_fin >= d.hoy ? "vence" : "venció"} ${fFecha(c.licencia_fin)}` : ""}
                   {c.cuotas_atrasadas > 0 ? ` · ${c.cuotas_atrasadas} cuota(s) atrasada(s) desde ${fFecha(c.deuda_mas_antigua, false)}` : ""}
                 </div>
               </div>
@@ -862,7 +867,7 @@ export default function Cobranza() {
               </div>
               <div style={{ fontSize: "0.84rem" }}>
                 <span className="cb-et">Le toca / pagó</span>
-                {c.estado === "sin_cuota" ? <span style={{ color: C.muted }}>—</span> : (
+                {c.estado === "sin_cuota" || (c.en_prueba && !c.esperado) ? <span style={{ color: C.muted }}>—</span> : (
                   <>
                     <div>{dinero(c.esperado, c.moneda)}</div>
                     <div style={{ color: C.success, fontSize: "0.76rem" }}>pagó {dinero(c.pagado, c.moneda)}</div>
@@ -873,7 +878,7 @@ export default function Cobranza() {
               <div>
                 <span className="cb-et">Saldo</span>
                 <b style={{ color: c.saldo > 0 ? (c.estado === "atrasado" ? C.danger : C.warning) : c.saldo < 0 ? C.accent : C.success, fontSize: "0.95rem" }}>
-                  {c.estado === "sin_cuota" ? "—" : c.saldo > 0 ? dinero(c.saldo, c.moneda) : c.saldo < 0 ? `+${dinero(-c.saldo, c.moneda)}` : "Al día"}
+                  {c.estado === "sin_cuota" || (c.en_prueba && !c.saldo) ? "—" : c.saldo > 0 ? dinero(c.saldo, c.moneda) : c.saldo < 0 ? `+${dinero(-c.saldo, c.moneda)}` : "Al día"}
                 </b>
                 {c.saldo < 0 && <div style={{ fontSize: "0.7rem", color: C.muted }}>a favor</div>}
               </div>
@@ -898,7 +903,7 @@ export default function Cobranza() {
         })}
       </div>
       <div style={{ color: C.muted, fontSize: "0.74rem", marginTop: 10 }}>
-        <i className="bi bi-info-circle me-1" />Las cuotas salen de la licencia de cada clínica (monto mensual y día de cobro). Los pagos se aplican a la cuota más antigua. Una cuota se marca atrasada {d.dias_gracia} días después de su fecha de cobro.
+        <i className="bi bi-info-circle me-1" />Las cuotas salen de la licencia de cada clínica (monto mensual y día de cobro). Los pagos se aplican a la cuota más antigua. Una cuota se marca atrasada {d.dias_gracia} días después de su fecha de cobro. Un plan de pago único que está activo se da por pagado («Pagado al activar el plan») hasta que registre el pago real.
       </div>
 
       {pago && <ModalPago clinicas={d.clinicas} inicial={pago.clinica} onCerrar={() => setPago(null)} onGuardado={guardado} />}

@@ -238,6 +238,29 @@ async function calendarioCuotas(clinicaId = null) {
   return res;
 }
 
+/**
+ * Un plan de pago único que está vigente se da por pagado: el plan se activa cuando la
+ * clínica ya pagó. Si no hay un pago registrado que lo cubra, se agrega un pago
+ * automático («Pagado al activar el plan») por lo que falte, con la fecha de inicio.
+ * Cuando se registra el pago real, el automático deja de agregarse.
+ */
+function pagosImplicitos(clinicaId, cuotas, pagos, hoy = hoyTexto()) {
+  const res = [];
+  for (const q of cuotas) {
+    if (!q.unico || q.fecha_cobro > hoy || !(q.hasta > hoy)) continue;
+    const desde = sumarDias(q.fecha_cobro, -60);
+    const cubierto = pagos.filter((p) => { const f = aFecha(p.fecha); return f >= desde && f < q.hasta; })
+      .reduce((a, p) => a + Number(p.monto), 0);
+    const falta = r2(q.monto - cubierto);
+    if (falta > 0) {
+      res.push({ id: `auto-${clinicaId}-${q.periodo}`, clinica_id: clinicaId, fecha: q.fecha_cobro, monto: falta, moneda: q.moneda,
+        metodo: "OTRO", tipo: "pago", implicito: true, notas: "Pagado al activar el plan (sin pago registrado)" });
+    }
+  }
+  return res;
+}
+const ordenarPagos = (l) => l.sort((a, b) => aFecha(a.fecha).localeCompare(aFecha(b.fecha)) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true }));
+
 /** Aplica los pagos (más antiguos primero) a las cuotas y calcula el estado de la clínica. */
 function estadoClinica(cuotas, pagos, hoy = hoyTexto()) {
   let disponible = r2(pagos.reduce((s, p) => s + Number(p.monto), 0));
@@ -296,6 +319,16 @@ router.get("/resumen", auth("SUPER_ADMIN"), async (req, res) => {
     const esIngreso = (p) => p.tipo !== "descuento";
     const pagosPor = new Map();
     pagos.forEach((p) => { const l = pagosPor.get(p.clinica_id) || []; l.push(p); pagosPor.set(p.clinica_id, l); });
+    // Planes de pago único vigentes sin pago registrado: se dan por pagados
+    let activadosSinPago = 0;
+    clinicas.forEach((c) => {
+      const auto = pagosImplicitos(c.id, calendario.get(c.id) || [], pagosPor.get(c.id) || [], hoy);
+      if (!auto.length) return;
+      activadosSinPago += 1;
+      pagos.push(...auto);
+      pagosPor.set(c.id, ordenarPagos([...(pagosPor.get(c.id) || []), ...auto]));
+    });
+    ordenarPagos(pagos);
 
     const totales = { cobrado_mes: {}, cobrado_anio: {}, cobrado_total: {}, por_cobrar: {}, atrasado: {}, mensual_esperado: {}, a_favor: {} };
     const filas = clinicas.map((c) => {
@@ -363,11 +396,11 @@ router.get("/resumen", auth("SUPER_ADMIN"), async (req, res) => {
     const nombrePor = new Map(clinicas.map((c) => [c.id, c.nombre]));
     const recientes = [...pagos].filter(esIngreso).reverse().slice(0, 12).map((p) => ({
       id: p.id, clinica_id: p.clinica_id, clinica: nombrePor.get(p.clinica_id) || "—", fecha: aFecha(p.fecha),
-      monto: Number(p.monto), moneda: p.moneda, metodo: p.metodo, referencia: p.referencia,
+      monto: Number(p.monto), moneda: p.moneda, metodo: p.metodo, referencia: p.referencia, implicito: !!p.implicito,
     }));
 
     res.json({ ok: true, data: {
-      hoy, dias_gracia: DIAS_GRACIA, lista_precios: lista, totales, serie, proyeccion, clinicas: filas, pagos_recientes: recientes,
+      hoy, dias_gracia: DIAS_GRACIA, lista_precios: lista, activados_sin_pago: activadosSinPago, totales, serie, proyeccion, clinicas: filas, pagos_recientes: recientes,
       conteo: {
         pagando: filas.filter((f) => f.vigente && f.cuota_mensual > 0 && f.activo).length,
         al_dia: filas.filter((f) => ["al_dia", "adelantado"].includes(f.estado)).length,
@@ -398,7 +431,9 @@ router.get("/clinica/:id", auth("SUPER_ADMIN"), async (req, res) => {
               (p.comprobante IS NOT NULL) AS tiene_comprobante, u.nombres AS registrado_por
          FROM pagos_licencia p LEFT JOIN usuarios u ON u.id = p.creado_por
         WHERE p.clinica_id = ? ORDER BY p.fecha DESC, p.id DESC`, [id]);
-    const validos = pagos.filter((p) => !p.anulado).sort((a, b) => aFecha(a.fecha).localeCompare(aFecha(b.fecha)) || a.id - b.id);
+    const reales = ordenarPagos(pagos.filter((p) => !p.anulado));
+    const auto = pagosImplicitos(id, cuotas, reales);
+    const validos = ordenarPagos([...reales, ...auto]);
     const st = estadoClinica(cuotas, validos);
     const [recibos] = await pool.query("SELECT id, numero, periodo, monto, estado FROM recibos_licencia WHERE clinica_id=?", [id]).catch(() => [[]]);
     const reciboPor = new Map(recibos.map((r) => [r.periodo, r]));
@@ -408,7 +443,10 @@ router.get("/clinica/:id", auth("SUPER_ADMIN"), async (req, res) => {
       pagado: r2(validos.filter((p) => p.tipo !== "descuento").reduce((a, p) => a + Number(p.monto), 0)),
       descuentos: r2(validos.filter((p) => p.tipo === "descuento").reduce((a, p) => a + Number(p.monto), 0)),
       detalle: st.detalle.map((d) => ({ ...d, recibo: reciboPor.get(d.periodo) || null })).reverse(),
-      pagos: pagos.map((p) => ({ ...p, numero: numeroPago(p.id), fecha: aFecha(p.fecha), monto: Number(p.monto), tiene_comprobante: !!p.tiene_comprobante })),
+      pagos: [
+        ...auto.map((p) => ({ ...p, numero: "Automático" })),
+        ...pagos.map((p) => ({ ...p, numero: numeroPago(p.id), fecha: aFecha(p.fecha), monto: Number(p.monto), tiene_comprobante: !!p.tiene_comprobante })),
+      ],
     } });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -610,8 +648,8 @@ router.post("/clinica/:id/recordatorio", auth("SUPER_ADMIN"), async (req, res) =
     if (!c) return res.status(404).json({ ok: false, msg: "Clínica no encontrada" });
     if (!c.email) return res.status(400).json({ ok: false, msg: "La clínica no tiene correo registrado." });
     const cuotas = (await calendarioCuotas(id)).get(id) || [];
-    const [pagos] = await pool.query("SELECT monto FROM pagos_licencia WHERE clinica_id=? AND anulado=0 ORDER BY fecha, id", [id]);
-    const st = estadoClinica(cuotas, pagos);
+    const [pagos] = await pool.query("SELECT id, fecha, monto FROM pagos_licencia WHERE clinica_id=? AND anulado=0 ORDER BY fecha, id", [id]);
+    const st = estadoClinica(cuotas, ordenarPagos([...pagos, ...pagosImplicitos(id, cuotas, pagos)]));
     if (!(st.saldo > 0)) return res.status(400).json({ ok: false, msg: "Esta clínica no tiene saldo pendiente." });
     const [[banco]] = await pool.query("SELECT banco, titular, numero_cuenta FROM config_pagos WHERE id=1").catch(() => [[null]]);
     const pend = st.detalle.filter((q) => q.vencida && q.falta > 0);
