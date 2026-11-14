@@ -142,6 +142,14 @@ const diaDeCobro = (y, m, dia) => { // m: 1..12; el día se ajusta al último de
   const ultimo = new Date(y, m, 0).getDate();
   return `${y}-${pad(m)}-${pad(Math.min(dia, ultimo))}`;
 };
+/** Meses entre dos fechas YYYY-MM-DD, redondeado (30 jul → 30 ene = 6). */
+function mesesDelPeriodo(ini, fin) {
+  const [a, b, c] = ini.split("-").map(Number), [x, y, z] = fin.split("-").map(Number);
+  let meses = (x - a) * 12 + (y - b);
+  if (z - c >= 15) meses += 1;
+  else if (c - z > 15) meses -= 1;
+  return Math.max(1, meses);
+}
 const r2 = (n) => Math.round(Number(n || 0) * 100) / 100;
 
 async function columnasHistorial() {
@@ -202,10 +210,12 @@ async function calendarioCuotas(clinicaId = null) {
     const dia = Math.min(28, Math.max(1, Number(f.dia_facturacion) || Number(ini.slice(8, 10))));
     const mapa = porClinica.get(f.clinica_id) || new Map();
     let [y, m] = ini.split("-").map(Number);
+    // Número de cuotas = meses del periodo (redondeado): un semestral son 6 y un anual 12,
+    // aunque el día de cobro se ajuste (máx. 28) o el periodo empiece a fin de mes.
+    const nCuotas = mesesDelPeriodo(ini, fin);
     // Primer cobro: el día de inicio (el mes de la contratación también se paga)
-    for (let i = 0; i < 240; i++) {
+    for (let i = 0; i < nCuotas; i++) {
       const fecha = i === 0 ? ini : diaDeCobro(y, m, dia);
-      if (fecha >= fin) break;
       if (i === 0 || fecha > ini) {
         const periodo = fecha.slice(0, 7);
         // Si dos licencias cubren el mismo mes, cuenta la registrada después (corrección)

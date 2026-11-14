@@ -347,6 +347,107 @@ function ModalCuota({ clinica, lista, onCerrar, onGuardado }) {
   );
 }
 
+/** Confirmar la cuota de varias clínicas a la vez (mismo plan y mismo precio). */
+function ModalVarias({ clinicas, lista, onCerrar, onGuardado }) {
+  const candidatas = clinicas.filter((c) => ["semestral", "anual"].includes(c.plan_tipo) && c.cuota_fuente !== "licencia");
+  const [plan, setPlan] = useState(candidatas.some((c) => c.plan_tipo === "semestral") ? "semestral" : "anual");
+  const delPlan = candidatas.filter((c) => c.plan_tipo === plan);
+  const meses = plan === "anual" ? 12 : 6;
+  const precioNivel = (n) => lista?.precios?.[`${n}_${plan}`] || null;
+  const [nivel, setNivel] = useState("");
+  const [total, setTotal] = useState("");
+  const [forma, setForma] = useState("contado");
+  const [marcadas, setMarcadas] = useState(() => new Set(candidatas.filter((c) => c.cuota_fuente === "sin_nivel").map((c) => c.id)));
+  const [guardando, setGuardando] = useState(false);
+  const [error, setError] = useState("");
+  const moneda = lista?.moneda || "HNL";
+  const elegidas = delPlan.filter((c) => marcadas.has(c.id));
+  const cambiarPlan = (p) => { setPlan(p); setNivel(""); setTotal(""); };
+  const elegirNivel = (n) => { setNivel(n); const t = precioNivel(n); if (t) setTotal(String(t)); };
+  const marcar = (id) => setMarcadas((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const guardar = async () => {
+    setError("");
+    if (!(Number(total) > 0)) return setError(`Escriba el precio del plan ${PLAN[plan].toLowerCase()}.`);
+    if (!elegidas.length) return setError("Marque al menos una clínica.");
+    setGuardando(true);
+    let ok = 0;
+    for (const c of elegidas) {
+      try {
+        await api.put(`/cobranza/clinica/${c.id}/cuota`, { monto_mensual: Math.round((Number(total) / meses) * 100) / 100, moneda, nivel: nivel || null, forma_pago: forma });
+        ok += 1;
+      } catch { /* sigue con las demás */ }
+    }
+    onGuardado(`Cuota confirmada en ${ok} de ${elegidas.length} clínica(s): ${dinero(total, moneda)} por plan ${PLAN[plan].toLowerCase()}.`);
+  };
+  return (
+    <Ventana titulo="Confirmar cuotas de varias clínicas" icono="bi-ui-checks" onCerrar={onCerrar} ancho={560}>
+      <label style={lbl}>Tipo de plan</label>
+      <div className="d-grid gap-2 mb-3" style={{ gridTemplateColumns: "repeat(2,minmax(0,1fr))" }}>
+        {["semestral", "anual"].map((p) => (
+          <button key={p} type="button" onClick={() => cambiarPlan(p)}
+            style={{ borderRadius: 12, padding: "9px 8px", cursor: "pointer", fontWeight: 800, background: plan === p ? `${C.accent}26` : "transparent", border: `1px solid ${plan === p ? C.accent : C.border}`, color: C.text }}>
+            {PLAN[p]} <span style={{ color: C.muted, fontWeight: 600 }}>({candidatas.filter((c) => c.plan_tipo === p).length})</span>
+          </button>
+        ))}
+      </div>
+      <label style={lbl}>Nivel <span style={{ fontWeight: 400 }}>(opcional, llena el precio de la lista)</span></label>
+      <div className="d-flex gap-2 flex-wrap mb-2">
+        {NIVELES.map((n) => {
+          const t = precioNivel(n.k);
+          return (
+            <button key={n.k} type="button" disabled={!t} onClick={() => elegirNivel(n.k)}
+              style={{ borderRadius: 10, padding: "6px 10px", fontSize: "0.8rem", fontWeight: 700, cursor: t ? "pointer" : "not-allowed", opacity: t ? 1 : 0.5,
+                background: nivel === n.k ? `${C.accent}26` : "transparent", border: `1px solid ${nivel === n.k ? C.accent : C.border}`, color: C.text }}>
+              {n.t}{t ? ` · ${dineroCorto(t, moneda)}` : ""}
+            </button>
+          );
+        })}
+      </div>
+      <div className="row g-2">
+        <div className="col-7">
+          <label style={lbl}>Precio del plan {PLAN[plan].toLowerCase()} ({SIMBOLO[moneda] || moneda})</label>
+          <input style={{ ...inp, fontWeight: 800, fontSize: "1.05rem" }} type="number" min="0" step="0.01" inputMode="decimal" value={total}
+            onChange={(e) => { setTotal(e.target.value); setNivel(""); }} placeholder={plan === "semestral" ? "Ej.: 4200" : "Ej.: 8400"} />
+          {Number(total) > 0 && <div style={{ fontSize: "0.74rem", color: C.muted, marginTop: 4 }}>= {dinero(Number(total) / meses, moneda)} al mes</div>}
+        </div>
+        <div className="col-5">
+          <label style={lbl}>¿Cómo pagan?</label>
+          <select style={inp} value={forma} onChange={(e) => setForma(e.target.value)}>
+            <option value="contado">Un solo pago</option>
+            <option value="mensual">Mensual</option>
+          </select>
+        </div>
+      </div>
+      <div className="d-flex align-items-center mt-3 mb-2">
+        <label style={{ ...lbl, marginBottom: 0 }}>Clínicas con plan {PLAN[plan].toLowerCase()} ({elegidas.length} marcadas)</label>
+        <button type="button" onClick={() => setMarcadas((s) => { const n = new Set(s); const todas = delPlan.every((c) => n.has(c.id)); delPlan.forEach((c) => (todas ? n.delete(c.id) : n.add(c.id))); return n; })}
+          style={{ marginLeft: "auto", background: "none", border: "none", color: C.accent, fontSize: "0.76rem", fontWeight: 700, cursor: "pointer" }}>
+          {delPlan.every((c) => marcadas.has(c.id)) ? "Quitar todas" : "Marcar todas"}
+        </button>
+      </div>
+      <div style={{ border: `1px solid ${C.border}`, borderRadius: 12, maxHeight: 260, overflowY: "auto" }}>
+        {delPlan.length === 0 && <div style={{ padding: 14, color: C.muted, fontSize: "0.84rem" }}>No hay clínicas {PLAN[plan].toLowerCase()}es por confirmar.</div>}
+        {delPlan.map((c) => (
+          <label key={c.id} style={{ display: "flex", alignItems: "center", gap: 10, padding: "8px 12px", borderBottom: `1px solid ${C.border}`, cursor: "pointer", fontSize: "0.86rem" }}>
+            <input type="checkbox" checked={marcadas.has(c.id)} onChange={() => marcar(c.id)} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              <b>{c.nombre}</b>
+              <span style={{ display: "block", fontSize: "0.72rem", color: C.muted }}>
+                {fFecha(c.licencia_inicio)} → {fFecha(c.licencia_fin)} · {c.cuota_fuente === "sin_nivel" ? "nivel sin registrar" : `ahora ${dinero((c.cuota_mensual || 0) * (c.meses_plan || meses), c.moneda)}`}
+              </span>
+            </span>
+          </label>
+        ))}
+      </div>
+      {error && <div style={{ color: C.danger, fontSize: "0.85rem", marginTop: 10 }}><i className="bi bi-exclamation-circle me-1" />{error}</div>}
+      <button type="button" disabled={guardando} onClick={guardar}
+        style={{ width: "100%", marginTop: 14, background: `linear-gradient(135deg, ${C.accent}, #1565c0)`, color: "#fff", border: "none", borderRadius: 12, padding: "11px", fontWeight: 800, cursor: "pointer" }}>
+        {guardando ? <span className="spinner-border spinner-border-sm me-2" /> : <i className="bi bi-check2-all me-2" />}Confirmar {elegidas.length} clínica(s)
+      </button>
+    </Ventana>
+  );
+}
+
 function ModalCuenta({ clinica, onCerrar, onPagar, onCambio }) {
   const [d, setD] = useState(null);
   const [recarga, setRecarga] = useState(0);
@@ -492,6 +593,7 @@ export default function Cobranza() {
   const [pago, setPago] = useState(null);     // { clinica } | {}
   const [cuenta, setCuenta] = useState(null); // clinica
   const [cuota, setCuota] = useState(null);   // clinica
+  const [varias, setVarias] = useState(false);
   const [aviso, setAviso] = useState("");
 
   const cargar = useCallback(() => {
@@ -543,7 +645,7 @@ export default function Cobranza() {
     setExportando(false);
   };
 
-  const guardado = (msg) => { setPago(null); setCuota(null); setAviso(msg); cargar(); setTimeout(() => setAviso(""), 4000); };
+  const guardado = (msg) => { setPago(null); setCuota(null); setVarias(false); setAviso(msg); cargar(); setTimeout(() => setAviso(""), 4000); };
 
   if (error) return <div className="p-4" style={{ color: C.danger }}><i className="bi bi-exclamation-triangle me-2" />{error}</div>;
   if (!d) return <div className="p-5 text-center" style={{ color: C.muted }}><span className="spinner-border spinner-border-sm me-2" />Cargando cobranza…</div>;
@@ -625,7 +727,10 @@ export default function Cobranza() {
       {d.clinicas.some((c) => c.cuota_estimada) && (
         <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e", borderRadius: 12, padding: "10px 14px", marginBottom: 12, fontSize: "0.86rem" }}>
           <i className="bi bi-magic me-2" />
-          {d.clinicas.filter((c) => c.cuota_estimada).length} clínica(s) con plan semestral o anual no tienen registrado si su plan es Básico, Avanzado o Empresarial, y se calcularon con el precio Básico. Indique su nivel con «Confirmar cuota».
+          {d.clinicas.filter((c) => c.cuota_estimada).length} clínica(s) con plan semestral o anual no tienen registrado cuánto pagan (se calcularon con el precio Básico de la lista).
+          <button type="button" onClick={() => setVarias(true)} style={{ marginLeft: 8, background: "#92400e", color: "#fff", border: "none", borderRadius: 8, padding: "4px 10px", fontSize: "0.8rem", fontWeight: 700, cursor: "pointer" }}>
+            <i className="bi bi-ui-checks me-1" />Confirmar varias a la vez
+          </button>
         </div>
       )}
       {!d.clinicas.some((c) => c.cuota_estimada) && d.clinicas.some((c) => ["semestral", "anual"].includes(c.plan_tipo) && !c.cuota_mensual) && (
@@ -797,6 +902,7 @@ export default function Cobranza() {
       </div>
 
       {pago && <ModalPago clinicas={d.clinicas} inicial={pago.clinica} onCerrar={() => setPago(null)} onGuardado={guardado} />}
+      {varias && <ModalVarias clinicas={d.clinicas} lista={d.lista_precios} onCerrar={() => setVarias(false)} onGuardado={guardado} />}
       {cuota && <ModalCuota clinica={cuota} lista={d.lista_precios} onCerrar={() => setCuota(null)} onGuardado={guardado} />}
       {cuenta && <ModalCuenta clinica={cuenta} onCerrar={() => setCuenta(null)} onPagar={(c) => { setCuenta(null); setPago({ clinica: c }); }} onCambio={cargar} />}
     </div>
