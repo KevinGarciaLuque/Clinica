@@ -73,6 +73,47 @@ async function listaPrecios() {
   }
   return { moneda, precios };
 }
+/**
+ * Plan real de cada clínica (nivel y, si se sabe, monto acordado), buscando en:
+ *  1) el nivel confirmado en Cobranza (clinicas.lic_nivel),
+ *  2) la solicitud de plan desde la página pública con la que se creó la clínica
+ *     (nivel elegido y monto aprobado),
+ *  3) el historial de licencias («Plan Avanzado — Semestral» en las notas).
+ * Devuelve Map clinica_id → { nivel, fuente, monto_total, plan }
+ */
+async function planesDetectados() {
+  const res = new Map();
+  const ETQ = { "básico": "basico", basico: "basico", avanzado: "avanzado", empresarial: "empresarial" };
+  const [h] = await pool.query(
+    "SELECT clinica_id, plan_tipo, notas FROM licencias_historial WHERE notas IS NOT NULL ORDER BY creado_en, id").catch(() => [[]]);
+  h.forEach((x) => {
+    const m = String(x.notas).match(/Plan\s+(B[áa]sico|Avanzado|Empresarial)/i);
+    if (m) res.set(x.clinica_id, { nivel: ETQ[m[1].toLowerCase()], fuente: "historial", monto_total: null, plan: x.plan_tipo });
+  });
+  const [sp] = await pool.query(
+    `SELECT clinica_id, nivel_plan, plan_solicitado, monto, moneda FROM solicitudes_plan_publico
+      WHERE clinica_id IS NOT NULL AND estado='aprobada' ORDER BY atendida_en, id`).catch(() => [[]]);
+  sp.forEach((x) => res.set(x.clinica_id, {
+    nivel: NIVELES.includes(x.nivel_plan) ? x.nivel_plan : "basico", fuente: "solicitud",
+    monto_total: Number(x.monto) > 0 ? Number(x.monto) : null, moneda: x.moneda || null, plan: x.plan_solicitado,
+  }));
+  const [cl] = await pool.query("SELECT id, lic_nivel FROM clinicas WHERE lic_nivel IS NOT NULL").catch(() => [[]]);
+  cl.forEach((x) => { if (NIVELES.includes(x.lic_nivel)) res.set(x.id, { ...(res.get(x.id) || {}), nivel: x.lic_nivel, fuente: "confirmado", monto_total: null }); });
+  return res;
+}
+
+/** Cuota de una clínica sin monto en su licencia: con su plan real (o Básico si no se sabe). */
+function cuotaPorPlan(lista, c, det) {
+  const meses = c.plan_tipo === "anual" ? 12 : 6;
+  // El monto aprobado en su solicitud vale si es del mismo tipo de plan que tiene ahora
+  if (det?.monto_total && det.plan === c.plan_tipo) {
+    return { monto: r2(det.monto_total / meses), moneda: det.moneda || lista.moneda, nivel: det.nivel, fuente: "solicitud_monto" };
+  }
+  const nivel = det?.nivel || "basico";
+  const m = cuotaDeLista(lista, c.plan_tipo, nivel);
+  return m ? { monto: m, moneda: lista.moneda, nivel, fuente: det?.nivel ? det.fuente : "sin_nivel" } : null;
+}
+
 /** Forma de pago de la licencia actual: la guardada; si no hay, las estimadas por lista
  *  se toman de contado (la lista de precios es por todo el plan) y las demás, mensual. */
 function formaDe(c) {
@@ -128,6 +169,7 @@ async function calendarioCuotas(clinicaId = null) {
   // Licencia actual de cada clínica (semestral / anual). Si no tiene monto mensual,
   // la cuota se estima con la lista de precios (nivel guardado o Básico).
   const lista = await listaPrecios();
+  const detectados = await planesDetectados();
   const [cl] = await pool.query(
     `SELECT id AS clinica_id, plan_tipo, licencia_inicio AS inicio, licencia_fin AS fin,
             lic_monto_mensual AS monto_mensual, lic_moneda AS moneda, lic_dia_facturacion AS dia_facturacion, lic_nivel AS nivel,
@@ -139,8 +181,8 @@ async function calendarioCuotas(clinicaId = null) {
   cl.forEach((c) => {
     if (Number(c.monto_mensual) > 0) actuales.push({ ...c, forma_pago: formaDe(c), creado_en: null });
     else {
-      const m = cuotaDeLista(lista, c.plan_tipo, c.nivel);
-      if (m) estimadas.push({ ...c, forma_pago: formaDe(c), monto_mensual: m, moneda: lista.moneda, estimada: true, creado_en: null });
+      const q = cuotaPorPlan(lista, c, detectados.get(c.clinica_id));
+      if (q) estimadas.push({ ...c, forma_pago: formaDe(c), monto_mensual: q.monto, moneda: q.moneda, estimada: q.fuente === "sin_nivel", creado_en: null });
     }
   });
   // Si el plan actual se paga de una sola vez, el historial mensual de ese mismo periodo no cuenta
@@ -235,6 +277,7 @@ router.get("/resumen", auth("SUPER_ADMIN"), async (req, res) => {
          FROM clinicas ORDER BY nombre`);
     const [extra] = await pool.query("SELECT id, lic_monto_mensual, lic_moneda, lic_dia_facturacion, lic_nivel, lic_forma_pago FROM clinicas").catch(() => [[]]);
     const lista = await listaPrecios();
+    const detectados = await planesDetectados();
     const extraPor = new Map(extra.map((e) => [e.id, e]));
     const calendario = await calendarioCuotas();
     const [pagos] = await pool.query(
@@ -251,10 +294,13 @@ router.get("/resumen", auth("SUPER_ADMIN"), async (req, res) => {
       const st = estadoClinica(cuotas, pg, hoy);
       const ex = extraPor.get(c.id) || {};
       const vigente = c.licencia_fin && aFecha(c.licencia_fin) >= hoy && c.plan_tipo !== "trial";
-      const estimada = !(Number(ex.lic_monto_mensual) > 0) && ["semestral", "anual"].includes(c.plan_tipo);
-      const cuotaLista = estimada ? cuotaDeLista(lista, c.plan_tipo, ex.lic_nivel) : null;
-      const moneda = (estimada ? lista.moneda : ex.lic_moneda) || cuotas[cuotas.length - 1]?.moneda || "HNL";
-      const cuota = vigente ? Number((estimada ? cuotaLista : ex.lic_monto_mensual) || 0) : 0;
+      const porLista = !(Number(ex.lic_monto_mensual) > 0) && ["semestral", "anual"].includes(c.plan_tipo);
+      const q = porLista ? cuotaPorPlan(lista, c, detectados.get(c.id)) : null;
+      const estimada = porLista && q?.fuente === "sin_nivel";
+      const cuotaLista = q?.monto || null;
+      const moneda = (porLista ? q?.moneda || lista.moneda : ex.lic_moneda) || cuotas[cuotas.length - 1]?.moneda || "HNL";
+      const cuota = vigente ? Number((porLista ? cuotaLista : ex.lic_monto_mensual) || 0) : 0;
+      const det = detectados.get(c.id);
       if (cuota > 0 && c.activo) sumarPorMoneda(totales.mensual_esperado, moneda, cuota);
       if (st.saldo > 0) sumarPorMoneda(totales.por_cobrar, moneda, st.saldo);
       if (st.saldo < 0) sumarPorMoneda(totales.a_favor, moneda, -st.saldo);
@@ -267,7 +313,8 @@ router.get("/resumen", auth("SUPER_ADMIN"), async (req, res) => {
         plan_tipo: c.plan_tipo, licencia_inicio: aFecha(c.licencia_inicio), licencia_fin: aFecha(c.licencia_fin),
         vigente: !!vigente, cuota_mensual: cuota || (cuotas[cuotas.length - 1]?.monto ?? null), moneda,
         dia_facturacion: ex.lic_dia_facturacion || null,
-        nivel: ex.lic_nivel || null, cuota_estimada: estimada && !!cuotaLista,
+        nivel: ex.lic_nivel || q?.nivel || det?.nivel || null, cuota_estimada: estimada && !!cuotaLista,
+        cuota_fuente: porLista ? (q?.fuente || null) : "licencia",
         forma_pago: ["semestral", "anual"].includes(c.plan_tipo) ? formaDe({ forma_pago: ex.lic_forma_pago, monto_mensual: ex.lic_monto_mensual }) : null,
         meses_plan: c.plan_tipo === "anual" ? 12 : c.plan_tipo === "semestral" ? 6 : null,
         en_prueba: c.plan_tipo === "trial",

@@ -625,7 +625,7 @@ export default function Cobranza() {
       {d.clinicas.some((c) => c.cuota_estimada) && (
         <div style={{ background: "#fef3c7", border: "1px solid #fcd34d", color: "#92400e", borderRadius: 12, padding: "10px 14px", marginBottom: 12, fontSize: "0.86rem" }}>
           <i className="bi bi-magic me-2" />
-          {d.clinicas.filter((c) => c.cuota_estimada).length} clínica(s) tienen la cuota <b>estimada</b> con la lista de precios (nivel Básico si no se indicó otro), porque se activaron sin monto. Confirme cada una con «Confirmar cuota».
+          {d.clinicas.filter((c) => c.cuota_estimada).length} clínica(s) con plan semestral o anual no tienen registrado si su plan es Básico, Avanzado o Empresarial, y se calcularon con el precio Básico. Indique su nivel con «Confirmar cuota».
         </div>
       )}
       {!d.clinicas.some((c) => c.cuota_estimada) && d.clinicas.some((c) => ["semestral", "anual"].includes(c.plan_tipo) && !c.cuota_mensual) && (
@@ -729,13 +729,27 @@ export default function Cobranza() {
                     {c.dias_restantes > 0 ? `Prueba · ${c.dias_restantes} día${c.dias_restantes === 1 ? "" : "s"}` : "Prueba terminada"}
                   </span>
                 ) : <b style={{ fontSize: "0.9rem" }}>{c.cuota_mensual ? dinero(c.cuota_mensual, c.moneda) : "—"}</b>}
-                {c.cuota_estimada && <div><Chip color={C.warning} icon="bi-magic">estimada{c.nivel ? "" : " · Básico"}</Chip></div>}
-                {["semestral", "anual"].includes(c.plan_tipo) && (c.cuota_estimada || !c.cuota_mensual) && (
+                {c.cuota_fuente && c.cuota_fuente !== "licencia" && (() => {
+                  const nv = NIVELES.find((n) => n.k === c.nivel)?.t || "Básico";
+                  const f = {
+                    confirmado: { col: C.success, ic: "bi-check-circle", t: `Plan ${nv}` },
+                    solicitud_monto: { col: C.accent, ic: "bi-file-earmark-check", t: `${nv} · monto aprobado` },
+                    solicitud: { col: C.accent, ic: "bi-file-earmark-check", t: `Plan ${nv} · su solicitud` },
+                    historial: { col: C.accent, ic: "bi-clock-history", t: `Plan ${nv} · su licencia` },
+                    sin_nivel: { col: C.warning, ic: "bi-question-circle", t: "Nivel sin registrar · Básico" },
+                  }[c.cuota_fuente];
+                  return f ? (
+                    <div style={{ marginTop: 3, display: "inline-flex", alignItems: "center", gap: 4, maxWidth: "100%", color: f.col, background: `${f.col}1f`, border: `1px solid ${f.col}55`, borderRadius: 8, padding: "2px 7px", fontSize: "0.7rem", fontWeight: 700, lineHeight: 1.25 }}>
+                      <i className={`bi ${f.ic}`} /><span style={{ minWidth: 0 }}>{f.t}</span>
+                    </div>
+                  ) : null;
+                })()}
+                {["semestral", "anual"].includes(c.plan_tipo) && ((c.cuota_fuente && !["licencia", "confirmado"].includes(c.cuota_fuente)) || !c.cuota_mensual) && (
                   <button type="button" onClick={() => setCuota(c)} style={{ display: "block", background: "none", border: "none", padding: 0, marginTop: 3, color: C.accent, fontSize: "0.74rem", fontWeight: 700, cursor: "pointer" }}>
                     <i className="bi bi-pencil-square me-1" />{c.cuota_mensual ? "Confirmar cuota" : "Definir cuota"}
                   </button>
                 )}
-                {!c.cuota_estimada && c.cuota_mensual > 0 && (
+                {["licencia", "confirmado"].includes(c.cuota_fuente) && c.cuota_mensual > 0 && (
                   <button type="button" onClick={() => setCuota(c)} style={{ display: "block", background: "none", border: "none", padding: 0, marginTop: 2, color: C.muted, fontSize: "0.7rem", cursor: "pointer" }}>
                     Cambiar
                   </button>
