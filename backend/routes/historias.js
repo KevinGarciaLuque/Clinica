@@ -89,6 +89,16 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
     params.push(limit, offset);
 
     const [rows] = await pool.query(sql, params);
+    // Consultas con registro de Estética (valoración, procedimiento o control)
+    if (rows.length) {
+      try {
+        const [est] = await pool.query(
+          "SELECT historia_id, tipo FROM estetica_registros WHERE clinica_id = ? AND activo = 1 AND historia_id IN (?)",
+          [cid, rows.map((r) => r.id)]);
+        const porHistoria = new Map(est.map((e) => [e.historia_id, e.tipo]));
+        rows.forEach((r) => { r.estetica_tipo = porHistoria.get(r.id) || null; });
+      } catch { /* clínica sin la tabla de estética todavía */ }
+    }
     res.json({ ok: true, data: rows });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -173,7 +183,16 @@ router.get("/:id", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA"
       items: leerItems(p.items_json),
     }));
 
-    res.json({ ok: true, data: { ...hist, prescripciones: presc, estudios } });
+    // Registro de Estética de esta consulta (si la clínica lo usa)
+    let estetica = null;
+    try {
+      const [[e]] = await pool.query(
+        "SELECT tipo, datos FROM estetica_registros WHERE historia_id = ? AND clinica_id = ? AND activo = 1 ORDER BY id DESC LIMIT 1",
+        [hist.id, hist.clinica_id]);
+      if (e) { let d = {}; try { d = JSON.parse(e.datos); } catch { /* datos dañados */ } estetica = { tipo: e.tipo, datos: d }; }
+    } catch { /* sin tabla de estética */ }
+
+    res.json({ ok: true, data: { ...hist, prescripciones: presc, estudios, estetica } });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }

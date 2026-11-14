@@ -69,7 +69,9 @@ export function nombreMedico(m, { conEspecialidad = false, sep = "–", titulo }
   if (display) return display;
   const nom = (m.nombres ?? m.medico_nombres ?? m.med_nombres ?? "").trim();
   const ape = (m.apellidos ?? m.medico_apellidos ?? m.med_apellidos ?? "").trim();
-  const base = `${prefijoDr(t, sexoMedico(m))}${nom} ${ape}`.replace(/\s+/g, " ").trim();
+  // Si el nombre ya trae el título («Dra. Gina») no se agrega otro («Dr. Dra. Gina»)
+  const yaTiene = /^(dr|dra|doctor|doctora|lic|licda?)\.?\s/i.test(nom);
+  const base = `${yaTiene ? "" : prefijoDr(t, sexoMedico(m))}${nom} ${ape}`.replace(/\s+/g, " ").trim();
   const esp = m.especialidad ?? "";
   return conEspecialidad ? base + sufijoEsp(esp, sep, t) : base;
 }

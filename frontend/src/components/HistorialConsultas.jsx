@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
 import { VITALS_FIELDS } from "../pages/ConsultaMedica/helpers";
 import TarjetaHistorial from "./TarjetaHistorial";
+import { nombreZona, FASES_CONTROL } from "../utils/esteticaCatalogos";
 
 /**
  * Historial de consultas del paciente con el mismo diseño del Historial de Nutrición:
@@ -22,7 +23,9 @@ const SECCIONES = {
   estudios: { nombre: "Estudios", color: "#0ea5e9", icono: "bi-eyedropper" },
   documentos: { nombre: "Documentos", color: "#64748b", icono: "bi-paperclip" },
   eco: { nombre: "Ecocardiograma", color: "#dc2626", icono: "bi-heart-pulse-fill" },
+  estetica: { nombre: "Estética", color: "#db2777", icono: "bi-stars" },
 };
+const VISITA_ESTETICA = { valoracion: "Valoración", procedimiento: "Día del procedimiento", seguimiento: "Control post-procedimiento" };
 
 const hay = (v) => v !== null && v !== undefined && String(v).trim() !== "";
 const json = (v, def) => { if (!v) return def; try { return typeof v === "string" ? JSON.parse(v) : v; } catch { return def; } };
@@ -40,7 +43,74 @@ function seccionesDe(h, docs) {
   if (Number(h.n_estudios) > 0) s.push("estudios");
   if (docs?.length) s.push("documentos");
   if (Number(h.tiene_eco) === 1) s.push("eco");
+  if (h.estetica_tipo) s.push("estetica");
   return s;
+}
+
+/** Contenido de la tarjeta de Estética según el tipo de visita */
+function DetalleEstetica({ e }) {
+  if (!e) return <div className="small text-muted">Cargando…</div>;
+  const d = e.datos || {};
+  const lista = (v) => (Array.isArray(v) && v.length ? v.join(", ") : null);
+  const fecha = (v) => (v ? dayjs(String(v).slice(0, 10)).format("DD/MM/YYYY") : null);
+  const sub = (t) => <div className="mt-2 mb-1" style={{ fontSize: "0.74rem", fontWeight: 800, color: "#9d174d", textTransform: "uppercase", letterSpacing: ".04em" }}>{t}</div>;
+  return (
+    <div>
+      <span className="badge mb-2" style={{ background: "#fdf2f8", color: "#be185d", fontWeight: 700 }}>{VISITA_ESTETICA[e.tipo] || e.tipo}</span>
+      {e.tipo === "procedimiento" && (() => {
+        const zonas = Object.entries(d.zonas || {});
+        const total = zonas.reduce((t, [, c]) => t + (parseFloat(c) || 0), 0);
+        const productos = (d.productos || []).filter((p) => p && (p.producto || p.lote));
+        return (
+          <>
+            <Fila label="Procedimiento" valor={d.nombre} />
+            <Fila label="Anestesia" valor={d.anestesia} />
+            <Fila label="Técnica" valor={d.tecnica} />
+            {productos.length > 0 && <>{sub("Producto y lote")}{productos.map((p, i) => (
+              <Fila key={i} label={p.producto || "Producto"} valor={[p.lote && `Lote ${p.lote}`, p.vence && `vence ${p.vence}`, p.cantidad && `${p.cantidad} ${d.unidad || ""}`].filter(Boolean).join(" · ")} />
+            ))}</>}
+            {(zonas.length > 0 || (d.zonas_cuerpo || []).length > 0) && <>{sub(`Zonas tratadas${total ? ` · total ${total} ${d.unidad || ""}` : ""}`)}
+              {zonas.map(([z, c]) => <Fila key={z} label={nombreZona(z)} valor={c ? `${c} ${d.unidad || ""}` : "✓"} />)}
+              <Fila label="Cuerpo" valor={lista(d.zonas_cuerpo)} />
+            </>}
+            <Fila label="Tolerancia" valor={d.tolerancia} />
+            <Fila label="Complicaciones" valor={d.complicaciones} />
+            {d.paquete?.nombre && <Fila label="Paquete" valor={`${d.paquete.nombre} (${d.paquete.sesiones} sesiones)`} />}
+            {hay(d.indicaciones) && <>{sub("Indicaciones para la casa")}<Texto>{d.indicaciones}</Texto></>}
+            {(d.controles_agendados || []).length > 0 && <>{sub("Controles agendados")}
+              {d.controles_agendados.map((c) => <Fila key={`${c.fase}-${c.fecha}`} label={c.label} valor={`${fecha(c.fecha)}${c.hora ? ` ${c.hora}` : ""}`} />)}
+            </>}
+            <Fila label="Mantenimiento" valor={fecha(d.mantenimiento_fecha)} />
+            {d.satisfaccion && <Fila label="Calificación del paciente" valor={`${"★".repeat(d.satisfaccion.estrellas)}${"☆".repeat(5 - d.satisfaccion.estrellas)}`} />}
+          </>
+        );
+      })()}
+      {e.tipo === "valoracion" && (
+        <>
+          <Fila label="Motivo" valor={d.motivo} />
+          <Fila label="Expectativas" valor={d.expectativas} />
+          <Fila label="Zonas" valor={lista([...(d.zonas || []).map(nombreZona), ...(d.zonas_cuerpo || [])])} />
+          <Fila label="Contraindicaciones" valor={lista(d.contraindicaciones) || "Ninguna"} />
+          <Fila label="Recomendado" valor={lista(d.sugeridos)} />
+          <Fila label="Plan" valor={d.plan} />
+          <Fila label="Observaciones" valor={d.observaciones} />
+        </>
+      )}
+      {e.tipo === "seguimiento" && (
+        <>
+          <Fila label="Procedimiento" valor={d.procedimiento} />
+          <Fila label="Momento" valor={FASES_CONTROL.find((f) => f.key === d.fase)?.label || d.fase} />
+          <Fila label="Dolor" valor={hay(d.dolor_eva) ? `${d.dolor_eva}/10` : null} />
+          <Fila label="Edema" valor={d.edema} />
+          <Fila label="Cicatriz / piel" valor={d.cicatriz} />
+          <Fila label="Resultado" valor={d.resultado} />
+          <Fila label="Próximo control" valor={fecha(d.proxima_cita)} />
+          <Fila label="Necesita retoque" valor={d.necesita_retoq ? "Sí" : null} />
+          {hay(d.indicaciones) && <>{sub("Indicaciones")}<Texto>{d.indicaciones}</Texto></>}
+        </>
+      )}
+    </div>
+  );
 }
 
 function Tarjeta({ tipo, children, ancha }) {
@@ -165,7 +235,7 @@ export default function HistorialConsultas({
                         {h.firma_digital_url && <span className="badge" style={{ background: "#1a2744", fontSize: "0.62rem" }}>✍ FIRMA DIGITAL</span>}
                         {secc.map((s) => (
                           <span key={s} style={{ fontSize: "0.72rem", fontWeight: 700, borderRadius: 999, padding: "1px 9px", background: `${SECCIONES[s].color}1f`, color: SECCIONES[s].color }}>
-                            {SECCIONES[s].nombre}{s === "recetas" && Number(h.n_recetas) > 1 ? ` (${h.n_recetas})` : ""}
+                            {SECCIONES[s].nombre}{s === "recetas" && Number(h.n_recetas) > 1 ? ` (${h.n_recetas})` : ""}{s === "estetica" && VISITA_ESTETICA[h.estetica_tipo] ? ` · ${VISITA_ESTETICA[h.estetica_tipo]}` : ""}
                           </span>
                         ))}
                       </div>
@@ -266,6 +336,9 @@ export default function HistorialConsultas({
                                 );
                               })}
                             </Tarjeta>
+                          )}
+                          {secc.includes("estetica") && (
+                            <Tarjeta tipo="estetica" ancha><DetalleEstetica e={det ? det.estetica : null} /></Tarjeta>
                           )}
                           {!secc.length && <div className="text-muted small">Esta consulta no tiene datos registrados todavía.</div>}
                         </div>
