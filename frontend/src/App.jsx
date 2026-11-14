@@ -55,6 +55,7 @@ const AlmacenamientoAdmin = lazy(() => import("./pages/superadmin/Almacenamiento
 const NovedadesAdmin          = lazy(() => import("./pages/superadmin/NovedadesAdmin"));
 const SoporteHistorial         = lazy(() => import("./pages/superadmin/SoporteHistorial"));
 const SolicitudesPlan          = lazy(() => import("./pages/superadmin/SolicitudesPlan"));
+const Cobranza                 = lazy(() => import("./pages/superadmin/Cobranza"));
 const ResenasMedicos           = lazy(() => import("./pages/superadmin/ResenasMedicos"));
 const SuperAdminPersonalizacion = lazy(() => import("./pages/superadmin/SuperAdminPersonalizacion"));
 const LandingPageAdmin          = lazy(() => import("./pages/superadmin/LandingPageAdmin"));
@@ -264,6 +265,11 @@ export default function App() {
         <Route path="/superadmin/soporte" element={
           <RolRoute roles={["SUPER_ADMIN"]}>
             <SoporteHistorial />
+          </RolRoute>
+        } />
+        <Route path="/superadmin/cobranza" element={
+          <RolRoute roles={["SUPER_ADMIN"]}>
+            <Cobranza />
           </RolRoute>
         } />
         <Route path="/superadmin/solicitudes-plan" element={

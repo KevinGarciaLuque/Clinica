@@ -186,6 +186,7 @@ app.use("/api/catalogos-procedimientos", require("./routes/catalogosProcedimient
 app.use("/api/registro", require("./routes/registro"));
 app.use("/api/planes-publicos", require("./routes/planesPublicos"));
 app.use("/api/facturacion-licencias", require("./routes/facturacionLicencias"));
+app.use("/api/cobranza", require("./routes/cobranza"));
 app.use("/api/resenas", require("./routes/resenas"));
 app.use("/api/database", require("./routes/database"));
 app.use("/api/galeria-estetica", require("./routes/galeriaEstetica"));

@@ -61,6 +61,7 @@ const GESTION_ORDEN = ["/estadisticas", "/facturacion", "/caja", "/finanzas", "/
 const superItems = [
   { to: "/superadmin/clinicas",        label: "Clínicas",        icon: "bi-building-fill" },
   { to: "/superadmin/solicitudes-plan", label: "Solicitudes de Plan", icon: "bi-credit-card-fill" },
+  { to: "/superadmin/cobranza",        label: "Cobranza",        icon: "bi-cash-coin" },
   { to: "/superadmin/resenas",         label: "Reseñas",          icon: "bi-star-fill" },
   { to: "/superadmin/reportes",        label: "Reportes",         icon: "bi-bar-chart-line-fill" },
   { to: "/superadmin/almacenamiento",  label: "Almacenamiento",   icon: "bi-hdd-stack-fill" },
