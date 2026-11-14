@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import { VITALS_FIELDS } from "../pages/ConsultaMedica/helpers";
 import TarjetaHistorial from "./TarjetaHistorial";
 import { nombreZona, FASES_CONTROL } from "../utils/esteticaCatalogos";
+import { DERMA_CAMPOS, valorDerma, leerJson, tieneDerma } from "../utils/impresionConsulta";
 
 /**
  * Historial de consultas del paciente con el mismo diseño del Historial de Nutrición:
@@ -24,6 +25,7 @@ const SECCIONES = {
   documentos: { nombre: "Documentos", color: "#64748b", icono: "bi-paperclip" },
   eco: { nombre: "Ecocardiograma", color: "#dc2626", icono: "bi-heart-pulse-fill" },
   estetica: { nombre: "Estética", color: "#db2777", icono: "bi-stars" },
+  derma: { nombre: "Dermatología", color: "#0891b2", icono: "bi-bandaid" },
 };
 const VISITA_ESTETICA = { valoracion: "Valoración", procedimiento: "Día del procedimiento", seguimiento: "Control post-procedimiento" };
 
@@ -44,6 +46,7 @@ function seccionesDe(h, docs) {
   if (docs?.length) s.push("documentos");
   if (Number(h.tiene_eco) === 1) s.push("eco");
   if (h.estetica_tipo) s.push("estetica");
+  if (Number(h.tiene_derma) === 1) s.push("derma");
   return s;
 }
 
@@ -175,6 +178,24 @@ export default function HistorialConsultas({
         .hc-desplegable { display: grid; transition: grid-template-rows .35s ease, opacity .3s ease; }
         @media (prefers-reduced-motion: reduce) { .hc-desplegable { transition: none; } }
         .hc-cab:hover { background: #fafbff; }
+        .hc-fila { display: flex; align-items: center; }
+        .hc-acciones { display: flex; gap: 6px; align-items: center; flex-shrink: 0; padding: 0 4px; }
+        .hc-accion { display: inline-flex; align-items: center; gap: 6px; border-radius: 999px; padding: 6px 13px; font-size: .8rem; font-weight: 700;
+          border: 1px solid transparent; cursor: pointer; transition: transform .15s, box-shadow .15s, background .15s; white-space: nowrap; }
+        .hc-accion:hover { transform: translateY(-1px); box-shadow: 0 4px 10px rgba(15,23,42,.12); }
+        .hc-accion:focus-visible { outline: 2px solid #6366f1; outline-offset: 2px; }
+        .hc-principal { background: linear-gradient(135deg, #4f46e5, #6366f1); color: #fff; }
+        .hc-editar { background: #eef2ff; color: #4338ca; border-color: #c7d2fe; }
+        .hc-imprimir { background: #f8fafc; color: #334155; border-color: #e2e8f0; }
+        .hc-eco { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+        .hc-flecha { background: none; border: none; color: #64748b; padding: 12px 16px 12px 8px; align-self: stretch; cursor: pointer; }
+        .hc-flecha:hover { color: #4338ca; }
+        @media (max-width: 767px) {
+          .hc-fila { flex-wrap: wrap; }
+          .hc-fila .hc-cab { flex: 1 1 0; }
+          .hc-acciones { order: 3; width: 100%; padding: 0 12px 12px; }
+          .hc-accion { flex: 1 1 0; justify-content: center; padding: 7px 8px; }
+        }
       `}</style>
       <div className="d-flex flex-wrap align-items-center gap-2 mb-3">
         <div style={{ fontSize: "0.92rem" }}>
@@ -221,7 +242,7 @@ export default function HistorialConsultas({
                 background: abierta ? (firmada ? "#16a34a" : "#f59e0b") : "#fff", border: `2px solid ${firmada ? "#16a34a" : "#f59e0b"}`,
               }} />
               <div style={{ background: "#fff", borderRadius: 12, border: `1px solid ${abierta ? "#a5b4fc" : "#e5e7eb"}`, boxShadow: "0 1px 4px rgba(0,0,0,.05)", overflow: "hidden" }}>
-                <div className="d-flex align-items-stretch">
+                <div className="hc-fila">
                   <button type="button" onClick={() => alternar(h.id)} className="hc-cab flex-grow-1 text-start d-flex align-items-center gap-3"
                     style={{ background: "none", border: "none", padding: "12px 16px", cursor: "pointer", minWidth: 0 }}>
                     <div className="text-center" style={{ minWidth: 52 }}>
@@ -248,7 +269,26 @@ export default function HistorialConsultas({
                       {resumenVit.length > 0 && <div style={{ fontSize: "0.8rem", color: "#475569" }}>{resumenVit.join(" · ")}</div>}
                       <div style={{ fontSize: "0.75rem", color: "#94a3b8" }}>{nombreMedico(h)}{especialidad ? ` (${especialidad})` : ""}</div>
                     </div>
-                    <i className="bi bi-chevron-down" style={{ color: "#64748b", transition: "transform .35s ease", transform: abierta ? "rotate(180deg)" : "none" }} />
+                  </button>
+                  {/* Acciones: siempre visibles, aunque la consulta esté cerrada */}
+                  <div className="hc-acciones">
+                    <button type="button" className="hc-accion hc-principal" onClick={() => onAbrir(h)} title={firmada ? "Ver consulta completa" : "Continuar consulta"}>
+                      <i className="bi bi-box-arrow-up-right" /><span>{firmada ? "Ver consulta" : "Continuar"}</span>
+                    </button>
+                    <button type="button" className="hc-accion hc-editar" onClick={() => onEditar(h)} title="Editar">
+                      <i className="bi bi-pencil-square" /><span>Editar</span>
+                    </button>
+                    <button type="button" className="hc-accion hc-imprimir" onClick={() => onImprimir(h)} title="Imprimir">
+                      <i className="bi bi-printer" /><span>Imprimir</span>
+                    </button>
+                    {Number(h.tiene_eco) === 1 && (
+                      <button type="button" className="hc-accion hc-eco" onClick={() => onImprimirEco(h)} title="Imprimir ecocardiograma">
+                        <i className="bi bi-heart-pulse" /><span>Eco</span>
+                      </button>
+                    )}
+                  </div>
+                  <button type="button" className="hc-flecha" onClick={() => alternar(h.id)} aria-label={abierta ? "Cerrar consulta" : "Abrir consulta"} aria-expanded={abierta}>
+                    <i className="bi bi-chevron-down" style={{ transition: "transform .35s ease", transform: abierta ? "rotate(180deg)" : "none" }} />
                   </button>
                 </div>
 
@@ -256,22 +296,6 @@ export default function HistorialConsultas({
                   <div style={{ overflow: "hidden", minHeight: 0 }}>
                     {(abierta || montadas.has(h.id)) && (
                       <div style={{ padding: 16, borderTop: "1px solid #eef2ff" }}>
-                        <div className="d-flex flex-wrap gap-2 mb-3">
-                          <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => onAbrir(h)}>
-                            <i className="bi bi-box-arrow-up-right me-1" />{firmada ? "Ver consulta completa" : "Continuar consulta"}
-                          </button>
-                          <button type="button" className="btn btn-sm btn-outline-primary" onClick={() => onEditar(h)}>
-                            <i className="bi bi-pencil-square me-1" />Editar
-                          </button>
-                          <button type="button" className="btn btn-sm btn-outline-secondary" onClick={() => onImprimir(h)}>
-                            <i className="bi bi-printer me-1" />Imprimir
-                          </button>
-                          {Number(h.tiene_eco) === 1 && (
-                            <button type="button" className="btn btn-sm btn-outline-danger" onClick={() => onImprimirEco(h)}>
-                              <i className="bi bi-heart-pulse me-1" />Imprimir eco
-                            </button>
-                          )}
-                        </div>
                         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))", gap: 12 }}>
                           {secc.includes("vitales") && (
                             <Tarjeta tipo="vitales">
@@ -334,6 +358,14 @@ export default function HistorialConsultas({
                                     <span className="text-truncate">{d.nombre}</span>
                                   </a>
                                 );
+                              })}
+                            </Tarjeta>
+                          )}
+                          {secc.includes("derma") && (!det || tieneDerma(det.datos_derma)) && (
+                            <Tarjeta tipo="derma">
+                              {!det ? <div className="small text-muted">Cargando…</div> : DERMA_CAMPOS.map(([k, l]) => {
+                                const v = leerJson(det.datos_derma)[k];
+                                return <Fila key={k} label={l} valor={v === false || v === null || v === undefined || String(v).trim() === "" ? null : valorDerma(v)} />;
                               })}
                             </Tarjeta>
                           )}

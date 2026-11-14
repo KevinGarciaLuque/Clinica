@@ -64,6 +64,10 @@ router.get("/", auth("ADMIN","MEDICO","PSICOLOGO","ENFERMERA","RECEPCIONISTA","S
         ? "(h.datos_cardio_eco IS NOT NULL) AS tiene_eco"
         : "0 AS tiene_eco",
       cols.has("diagnostico_desc") ? "h.diagnostico_desc" : "NULL AS diagnostico_desc",
+      // ¿Tiene datos en la pestaña Dermatología? (para mostrarlos en el historial)
+      cols.has("datos_derma")
+        ? "(h.datos_derma IS NOT NULL AND JSON_VALID(h.datos_derma) AND JSON_LENGTH(h.datos_derma) > 0) AS tiene_derma"
+        : "0 AS tiene_derma",
       // Cuántas recetas y estudios tiene cada consulta (etiquetas del historial)
       "(SELECT COUNT(*) FROM prescripciones pr WHERE pr.historia_id = h.id) AS n_recetas",
       "(SELECT COUNT(*) FROM estudios_solicitudes es WHERE es.historia_id = h.id) AS n_estudios",

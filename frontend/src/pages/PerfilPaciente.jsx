@@ -33,6 +33,7 @@ import HistorialNutricion from "../components/HistorialNutricion";
 import HistorialConsultas from "../components/HistorialConsultas";
 import { listarEstetica } from "../utils/esteticaDatos";
 import EsteticaPaciente from "../components/EsteticaPaciente";
+import { htmlEstetica, htmlDerma } from "../utils/impresionConsulta";
 
 const API_BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000");
 
@@ -440,6 +441,7 @@ export default function PerfilPaciente() {
   ${det.subjetivo ? `<div class="section"><div class="section-title">Motivo / Anamnesis</div><p>${det.subjetivo}</p></div>` : ""}
   ${det.examen_fisico ? `<div class="section"><div class="section-title">Examen Físico</div><pre>${det.examen_fisico}</pre></div>` : ""}
   ${det.plan ? `<div class="section"><div class="section-title">Plan de tratamiento</div><pre>${det.plan}</pre></div>` : ""}
+  ${htmlDerma(det.datos_derma)}${htmlEstetica(det.estetica)}
   ${prescHtml}${estudiosHtml}
   <div class="firma">
     <div class="firma-box">
