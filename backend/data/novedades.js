@@ -346,4 +346,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "nueva-consulta-rediseno",
+    version: "1.45",
+    titulo: "Ventana «Nueva consulta» más clara",
+    descripcion: "Cuando el paciente no tiene cita hoy, la ventana «Nueva consulta» ahora es más sencilla: «Atender ahora» o «Programar para otro momento», con su médico ya elegido. Desde la pestaña Estética también pasa por aquí, así la atención queda registrada en la agenda.",
+    icono: "bi-clipboard2-pulse",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];

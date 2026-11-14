@@ -19,7 +19,12 @@ function getTiposConsulta(tipoClave) {
     : TIPOS_CONSULTA_BASE;
 }
 
-export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psicologia = false }) {
+/**
+ * Ventana «Nueva Consulta» cuando el paciente no tiene cita hoy: se registra una cita
+ * para ahora (y se abre la consulta) o se programa para otra fecha.
+ * contexto / motivoInicial / tipoSugerido: opcionales (ej. desde la pestaña Estética).
+ */
+export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psicologia = false, contexto = "", motivoInicial = "", tipoSugerido = "" }) {
   const { user } = useAuth();
   const [modo, setModo]           = useState(null);
   const [medicos, setMedicos]     = useState([]);
@@ -29,8 +34,10 @@ export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psi
   const [horaFin, setHoraFin]     = useState("");
   const [slots, setSlots]         = useState([]);
   const [slotSel, setSlotSel]     = useState("");
-  const [tipo, setTipo]           = useState("PRIMERA_VEZ");
-  const [motivo, setMotivo]       = useState("");
+  // tipoSugerido puede ser una lista: se usa el primero que exista en los tipos de la clínica
+  const candidatos = [].concat(tipoSugerido || []);
+  const [tipo, setTipo]           = useState(candidatos[0] || "PRIMERA_VEZ");
+  const [motivo, setMotivo]       = useState(motivoInicial);
   const [saving, setSaving]       = useState(false);
   const [err, setErr]             = useState("");
   const [tipoClinica, setTipoClinica] = useState("");
@@ -39,9 +46,16 @@ export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psi
 
   useEffect(() => {
     api.get("/usuarios/medicos")
-      .then(r => setMedicos(r.data.data || []))
+      .then(r => {
+        const lista = r.data.data || [];
+        setMedicos(lista);
+        // Si quien abre la ventana es uno de los médicos, ya queda elegido
+        const yo = lista.find(m => String(m.id) === String(user?.id ?? user?.uid));
+        if (yo) setMedicoId(curr => curr || String(yo.id));
+        else if (lista.length === 1) setMedicoId(curr => curr || String(lista[0].id));
+      })
       .catch(() => {});
-  }, []);
+  }, [user?.id, user?.uid]);
 
   useEffect(() => {
     api.get("/clinicas")
@@ -59,9 +73,9 @@ export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psi
 
   useEffect(() => {
     if (!tiposConsulta.includes(tipo)) {
-      setTipo(tiposConsulta[0] || "PRIMERA_VEZ");
+      setTipo(candidatos.find(c => tiposConsulta.includes(c)) || tiposConsulta[0] || "PRIMERA_VEZ");
     }
-  }, [tiposConsulta, tipo]);
+  }, [tiposConsulta, tipo]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!medicoId || !fechaSel) { setSlots([]); return; }
@@ -142,152 +156,163 @@ export default function ModalConsultaSinCita({ paciente, onClose, onCreated, psi
     }
   };
 
-  const headerColor = psicologia ? "#673ab7" : "#0d6efd";
+  const color = psicologia ? "#673ab7" : "#0d6efd";
+  const iniciales = `${(paciente.nombres || "?")[0] || ""}${(paciente.apellidos || "")[0] || ""}`.toUpperCase();
+  const nombreTipo = (t) => String(t).replace(/_/g, " ").toLowerCase().replace(/^./, c => c.toUpperCase());
+  const lbl = { fontSize: "0.78rem", fontWeight: 700, color: "#475569", marginBottom: 4, display: "block" };
+  const chip = (activo) => ({
+    borderRadius: 999, padding: "5px 12px", fontSize: "0.8rem", fontWeight: 600, cursor: "pointer",
+    border: `1px solid ${activo ? color : "#cbd5e1"}`, background: activo ? color : "#fff", color: activo ? "#fff" : "#334155",
+  });
+  const camposComunes = (
+    <>
+      <div className="mb-3">
+        <label style={lbl}>{psicologia ? "Psicólogo/a" : "Médico"}</label>
+        <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
+          <option value="">— Selecciona —</option>
+          {medicos.map(m => (
+            <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true, titulo: !psicologia })}</option>
+          ))}
+        </select>
+      </div>
+      {!psicologia && (
+        <div className="mb-3">
+          <label style={lbl}>Tipo de consulta</label>
+          {tiposConsulta.length <= 6 ? (
+            <div className="d-flex flex-wrap gap-1">
+              {tiposConsulta.map(t => <button key={t} type="button" style={chip(tipo === t)} onClick={() => setTipo(t)}>{nombreTipo(t)}</button>)}
+            </div>
+          ) : (
+            <select className="form-select" value={tipo} onChange={e => setTipo(e.target.value)}>
+              {tiposConsulta.map(t => <option key={t} value={t}>{nombreTipo(t)}</option>)}
+            </select>
+          )}
+        </div>
+      )}
+      <div className="mb-1">
+        <label style={lbl}>Motivo <span className="text-muted fw-normal">(opcional)</span></label>
+        <input className="form-control" value={motivo} onChange={e => setMotivo(e.target.value)} placeholder="Ej.: control, dolor, revisión…" />
+      </div>
+    </>
+  );
 
   return (
-    <div className="modal show d-block" style={{ background: "rgba(0,0,0,.5)", zIndex: 9998 }}>
-      <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: modo === "seleccionar" ? 600 : 500 }}>
-        <div className="modal-content">
-          <div className="modal-header" style={{ background: headerColor, color: "#fff" }}>
-            <h5 className="modal-title">
-              <i className={`bi ${psicologia ? "bi-activity" : "bi-clipboard2-pulse"} me-2`}></i>
-              {psicologia ? "Nueva Sesión Psicológica" : "Nueva Consulta"}
-            </h5>
-            <button className="btn-close btn-close-white" onClick={onClose} />
-          </div>
-          <div className="modal-body">
-            <div className="alert alert-warning py-2 mb-3">
-              <i className="bi bi-exclamation-triangle me-2"></i>
-              <strong>{paciente.nombres} {paciente.apellidos}</strong> no tiene {psicologia ? "sesión" : "consulta"} agendada para hoy.
+    <div className="modal show d-block" style={{ background: "rgba(15,23,42,.55)", zIndex: 9998 }} onClick={onClose}>
+      <div className="modal-dialog modal-dialog-centered" style={{ maxWidth: modo === "seleccionar" ? 580 : 500, margin: "12px auto", padding: "0 10px" }} onClick={e => e.stopPropagation()}>
+        <div className="modal-content" style={{ borderRadius: 18, overflow: "hidden", border: "none", boxShadow: "0 24px 60px rgba(15,23,42,.35)" }}>
+          {/* Encabezado con el paciente */}
+          <div style={{ background: `linear-gradient(135deg, ${color}, ${psicologia ? "#9575cd" : "#3b82f6"})`, color: "#fff", padding: "16px 18px" }}>
+            <div className="d-flex align-items-center gap-2">
+              <i className={`bi ${psicologia ? "bi-activity" : "bi-clipboard2-pulse"}`} style={{ fontSize: "1.2rem" }} />
+              <span style={{ fontWeight: 800, fontSize: "1.1rem" }}>{psicologia ? "Nueva sesión psicológica" : "Nueva consulta"}</span>
+              <button type="button" className="btn-close btn-close-white ms-auto" aria-label="Cerrar" onClick={onClose} />
             </div>
-
-            {err && <div className="alert alert-danger py-2 mb-3">{err}</div>}
-
-            {!modo && (
-              <div className="text-center py-2">
-                <p className="mb-3">¿Desea {psicologia ? "iniciar una sesión" : "agendar una consulta"}?</p>
-                <div className="d-flex justify-content-center gap-3">
-                  <button className="btn btn-success px-4" onClick={() => psicologia ? agendarAhora() : setModo("ahora")}>
-                    <i className="bi bi-clock-fill me-2"></i>Ahora
-                  </button>
-                  <button className="btn btn-primary px-4" onClick={() => setModo("seleccionar")}>
-                    <i className="bi bi-calendar-event me-2"></i>Programar
-                  </button>
+            <div className="d-flex align-items-center gap-2 mt-3">
+              <div style={{ width: 42, height: 42, borderRadius: "50%", background: "rgba(255,255,255,.22)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 800, flexShrink: 0 }}>{iniciales}</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontWeight: 700, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{paciente.nombres} {paciente.apellidos}</div>
+                <div style={{ fontSize: "0.8rem", opacity: 0.9 }}>
+                  <i className="bi bi-calendar-x me-1" />No tiene {psicologia ? "sesión" : "cita"} para hoy
+                  {contexto && <span style={{ marginLeft: 8, background: "rgba(255,255,255,.22)", borderRadius: 999, padding: "1px 8px", fontWeight: 700 }}>{contexto}</span>}
                 </div>
               </div>
+            </div>
+          </div>
+
+          <div className="modal-body" style={{ padding: 18 }}>
+            {err && <div className="alert alert-danger py-2 mb-3"><i className="bi bi-exclamation-circle me-2" />{err}</div>}
+
+            {!modo && (
+              <>
+                <div className="text-muted mb-3" style={{ fontSize: "0.88rem" }}>Para que la atención quede registrada en la agenda, elija una opción:</div>
+                <div className="d-grid gap-2">
+                  {[
+                    { k: "ahora", icono: "bi-lightning-charge-fill", c: "#16a34a", t: psicologia ? "Iniciar sesión ahora" : "Atender ahora", d: `Se registra la cita de hoy a las ${dayjs().format("h:mm A")} y se abre la ${psicologia ? "sesión" : "consulta"}.` },
+                    { k: "seleccionar", icono: "bi-calendar-plus", c: color, t: "Programar para otro momento", d: "Elija fecha y hora; queda en la agenda." },
+                  ].map(o => (
+                    <button key={o.k} type="button" disabled={saving}
+                      onClick={() => (o.k === "ahora" && psicologia ? agendarAhora() : setModo(o.k))}
+                      className="d-flex align-items-center gap-3 text-start w-100"
+                      style={{ border: `1.5px solid ${o.c}33`, background: `${o.c}0a`, borderRadius: 14, padding: "14px 14px", cursor: "pointer" }}>
+                      <span style={{ width: 44, height: 44, borderRadius: 12, background: o.c, color: "#fff", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.25rem", flexShrink: 0 }}>
+                        {saving && o.k === "ahora" ? <span className="spinner-border spinner-border-sm" /> : <i className={`bi ${o.icono}`} />}
+                      </span>
+                      <span style={{ minWidth: 0 }}>
+                        <span style={{ display: "block", fontWeight: 800, color: "#0f172a" }}>{o.t}</span>
+                        <span style={{ display: "block", fontSize: "0.8rem", color: "#64748b" }}>{o.d}</span>
+                      </span>
+                      <i className="bi bi-chevron-right ms-auto" style={{ color: "#94a3b8" }} />
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
 
             {modo === "ahora" && !psicologia && (
               <div>
-                <p className="text-muted small mb-2">
-                  Se creará una cita para <strong>ahora ({dayjs().format("h:mm A")})</strong> con duración de 30 minutos.
-                </p>
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Médico</label>
-                  <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
-                    <option value="">— Selecciona —</option>
-                    {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true })}</option>
-                    ))}
-                  </select>
+                <div className="d-flex align-items-center gap-2 mb-3" style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", color: "#166534", borderRadius: 10, padding: "8px 12px", fontSize: "0.85rem" }}>
+                  <i className="bi bi-clock-fill" />Cita de hoy a las <strong>{dayjs().format("h:mm A")}</strong> · 30 minutos
                 </div>
-                <div className="row g-2 mb-3">
-                  <div className="col-6">
-                    <label className="form-label fw-semibold">Tipo</label>
-                    <select className="form-select form-select-sm" value={tipo} onChange={e => setTipo(e.target.value)}>
-                      {tiposConsulta.map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-6">
-                    <label className="form-label fw-semibold">Motivo</label>
-                    <input className="form-control form-control-sm" value={motivo}
-                      onChange={e => setMotivo(e.target.value)} placeholder="Opcional" />
-                  </div>
-                </div>
+                {camposComunes}
               </div>
             )}
 
             {modo === "seleccionar" && (
               <div>
                 <div className="mb-3">
-                  <label className="form-label fw-semibold">{psicologia ? "Psicólogo/a" : "Médico"}</label>
-                  <select className="form-select" value={medicoId} onChange={e => setMedicoId(e.target.value)}>
-                    <option value="">— Selecciona —</option>
-                    {medicos.map(m => (
-                      <option key={m.id} value={m.id}>{nombreMedico(m, { conEspecialidad: true, titulo: !psicologia })}</option>
-                    ))}
-                  </select>
+                  <label style={lbl}>Fecha</label>
+                  <input type="date" className="form-control" value={fechaSel} min={dayjs().format("YYYY-MM-DD")}
+                    onChange={e => { setFechaSel(e.target.value); setSlotSel(""); }} />
                 </div>
-                <div className="mb-3">
-                  <label className="form-label fw-semibold">Fecha</label>
-                  <input type="date" className="form-control" value={fechaSel}
-                    onChange={e => setFechaSel(e.target.value)} />
-                </div>
-                {slots.length > 0 && (
-                  <div className="mb-3">
-                    <label className="form-label fw-semibold">Horarios disponibles</label>
-                    <div className="d-flex flex-wrap gap-1">
-                      {slots.map(s => (
-                        <button key={s.inicio} type="button"
-                          className={`btn btn-sm ${slotSel === s.inicio ? "btn-primary" : "btn-outline-primary"}`}
-                          onClick={() => selSlot(s)}>
-                          {dayjs(s.inicio).format("h:mm A")}
-                        </button>
-                      ))}
+                {camposComunes}
+                <div className="mt-3">
+                  {slots.length > 0 && (
+                    <div className="mb-2">
+                      <label style={lbl}>Horarios disponibles</label>
+                      <div className="d-flex flex-wrap gap-1">
+                        {slots.map(s => (
+                          <button key={s.inicio} type="button" style={chip(slotSel === s.inicio)} onClick={() => selSlot(s)}>
+                            {dayjs(s.inicio).format("h:mm A")}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                )}
-                {medicoId && fechaSel && slots.length === 0 && (
-                  <small className="text-muted d-block mb-2">Sin horarios disponibles. Ingresa hora manualmente.</small>
-                )}
-                <div className="row g-2 mb-3">
-                  <div className="col-6">
-                    <label className="form-label fw-semibold">Hora inicio</label>
-                    <input type="time" className="form-control" value={horaInicio}
-                      onChange={e => setHoraInicio(e.target.value)} />
-                  </div>
-                  <div className="col-6">
-                    <label className="form-label fw-semibold">Hora fin</label>
-                    <input type="time" className="form-control" value={horaFin}
-                      onChange={e => setHoraFin(e.target.value)} />
-                  </div>
-                </div>
-                <div className="row g-2 mb-3">
-                  <div className="col-6">
-                    <label className="form-label fw-semibold">Tipo</label>
-                    <select className="form-select form-select-sm" value={tipo} onChange={e => setTipo(e.target.value)}>
-                      {tiposConsulta.map(t => <option key={t}>{t}</option>)}
-                    </select>
-                  </div>
-                  <div className="col-6">
-                    <label className="form-label fw-semibold">Motivo</label>
-                    <input className="form-control form-control-sm" value={motivo}
-                      onChange={e => setMotivo(e.target.value)} placeholder="Opcional" />
+                  )}
+                  {medicoId && fechaSel && slots.length === 0 && (
+                    <small className="text-muted d-block mb-2">No hay horarios libres en la agenda: escriba la hora.</small>
+                  )}
+                  <div className="row g-2">
+                    <div className="col-6">
+                      <label style={lbl}>Desde</label>
+                      <input type="time" className="form-control" value={horaInicio} onChange={e => { setHoraInicio(e.target.value); setSlotSel(""); }} />
+                    </div>
+                    <div className="col-6">
+                      <label style={lbl}>Hasta</label>
+                      <input type="time" className="form-control" value={horaFin} onChange={e => { setHoraFin(e.target.value); setSlotSel(""); }} />
+                    </div>
                   </div>
                 </div>
               </div>
             )}
           </div>
 
-          {modo && (
-            <div className="modal-footer">
-              <button className="btn btn-outline-secondary" onClick={() => { setModo(null); setErr(""); }}>
-                <i className="bi bi-arrow-left me-1"></i>Volver
-              </button>
-              <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-              <button
-                className={`btn ${modo === "ahora" ? "btn-success" : "btn-primary"}`}
-                disabled={saving}
-                onClick={modo === "ahora" ? agendarAhora : agendarSeleccionado}>
-                {saving ? "Creando…" : modo === "ahora" ? "Agendar y Consultar" : "Agendar Cita"}
-              </button>
-            </div>
-          )}
-          {!modo && (
-            <div className="modal-footer">
-              <button className="btn btn-secondary" onClick={onClose}>Cancelar</button>
-            </div>
-          )}
+          <div className="modal-footer" style={{ borderTop: "1px solid #f1f5f9", padding: "12px 18px", gap: 8 }}>
+            {modo ? (
+              <>
+                <button className="btn btn-light me-auto" onClick={() => { setModo(null); setErr(""); }}>
+                  <i className="bi bi-arrow-left me-1" />Volver
+                </button>
+                <button className="btn fw-bold px-4" disabled={saving}
+                  style={{ background: modo === "ahora" ? "#16a34a" : color, color: "#fff", borderRadius: 10 }}
+                  onClick={modo === "ahora" ? agendarAhora : agendarSeleccionado}>
+                  {saving ? <><span className="spinner-border spinner-border-sm me-2" />Creando…</>
+                    : modo === "ahora" ? <><i className="bi bi-play-fill me-1" />Iniciar consulta</> : <><i className="bi bi-calendar-check me-1" />Agendar cita</>}
+                </button>
+              </>
+            ) : (
+              <button className="btn btn-light" onClick={onClose}>Cancelar</button>
+            )}
+          </div>
         </div>
       </div>
     </div>

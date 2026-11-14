@@ -46,7 +46,7 @@ const VISITAS = [
   { id: "seguimiento", icono: "bi-heart-pulse", texto: "Control", ayuda: "Revisión después" },
 ];
 
-export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = () => true }) {
+export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = () => true, onNuevaConsulta }) {
   const navigate = useNavigate();
   const [recarga, setRecarga] = useState(0);
   const [ventana, setVentana] = useState(null); // { tipo: "presupuesto"|"consentimiento"|"ficha"|"firmar"|"enviar", ... }
@@ -245,7 +245,10 @@ export default function EsteticaPaciente({ pacienteId, paciente, tieneModulo = (
     else if (a.tipo === "pdf") pdfPresupuesto(a.presupuesto);
     else setVentana(a);
   };
-  const nuevaAtencion = (tipo) => navigate(`/consulta-medica?paciente_id=${pacienteId}&estetica=${tipo}`);
+  // Pasa por «Nueva Consulta» (cita de ahora o programada) para que quede registrada la atención
+  const nuevaAtencion = (tipo) => (onNuevaConsulta
+    ? onNuevaConsulta(`&estetica=${tipo}`)
+    : navigate(`/consulta-medica?paciente_id=${pacienteId}&estetica=${tipo}`));
   const comparables = Object.keys(POSES).filter((pose) => fotos.filter((f) => f.pose === pose).length >= 2);
   const sugeridos = [...new Set([ultimoProc?.nombre, ...pendientes.flatMap((p) => (p.procedimientos || []).map((x) => x.nombre))].filter(Boolean))];
 

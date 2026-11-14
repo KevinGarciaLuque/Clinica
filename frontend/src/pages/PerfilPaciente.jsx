@@ -85,6 +85,13 @@ function Dato({ col, label, value }) {
   );
 }
 
+// Datos que se sugieren en «Nueva consulta» cuando se abre desde la pestaña Estética
+const VISITA_ESTETICA = {
+  valoracion: { contexto: "Estética · Valoración", motivoInicial: "Valoración estética", tipoSugerido: ["Consulta estética", "PRIMERA_VEZ"] },
+  procedimiento: { contexto: "Estética · Procedimiento", motivoInicial: "Procedimiento estético", tipoSugerido: ["Consulta estética", "CONTROL"] },
+  seguimiento: { contexto: "Estética · Control", motivoInicial: "Control estético", tipoSugerido: ["Revisión postprocedimiento", "CONTROL"] },
+};
+
 export default function PerfilPaciente() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -164,6 +171,7 @@ export default function PerfilPaciente() {
   const [detalle,      setDetalle]      = useState({});
   const [alergiasPac,  setAlergiasPac]  = useState([]);
   const [showConsultaModal, setShowConsultaModal] = useState(false);
+  const extraConsultaRef = useRef("");
   const [consultaPaciente,  setConsultaPaciente]  = useState(null);
   const [checkingCita, setCheckingCita] = useState(false);
   const [showReminderModal, setShowReminderModal] = useState(false);
@@ -701,8 +709,10 @@ export default function PerfilPaciente() {
   const soloPsicologia  = tieneModulo("consulta_psicologica") && !tieneModulo("consulta");
   const soloOdontologia = tieneModulo("consulta_odontologica") && !tieneModulo("consulta");
 
-  const handleConsultaClick = async (pacienteTarget) => {
+  // extra: parámetros que se agregan a la consulta (ej. "&estetica=procedimiento" desde la pestaña Estética)
+  const handleConsultaClick = async (pacienteTarget, extra = "") => {
     if (!pacienteTarget?.id) return;
+    extraConsultaRef.current = extra;
     if (soloOdontologia) {
       // Si el paciente tiene cita hoy, la consulta se abre ligada a ella: al iniciar pasa a
       // EN ATENCIÓN y al firmar se completa. Sin cita (paciente de paso) se abre igual que antes.
@@ -732,7 +742,7 @@ export default function PerfilPaciente() {
         if (soloPsicologia) {
           navigate(`/psicologia/consulta?paciente_id=${pacienteTarget.id}&sesion_id=nueva`);
         } else {
-          navigate(rutaConsulta(funcionClinica, pacienteTarget.id, citasHoy[0].id));
+          navigate(rutaConsulta(funcionClinica, pacienteTarget.id, citasHoy[0].id) + extra);
         }
       } else {
         setConsultaPaciente(pacienteTarget);
@@ -2119,7 +2129,8 @@ export default function PerfilPaciente() {
             </h5>
           </div>
           <div className="card-body">
-            <EsteticaPaciente pacienteId={id} paciente={paciente} tieneModulo={tieneModulo} />
+            <EsteticaPaciente pacienteId={id} paciente={paciente} tieneModulo={tieneModulo}
+              onNuevaConsulta={(extra) => handleConsultaClick(paciente, extra)} />
           </div>
         </div>
       )}
@@ -2478,6 +2489,7 @@ export default function PerfilPaciente() {
         <ModalConsultaSinCita
           paciente={consultaPaciente}
           psicologia={soloPsicologia}
+          {...(VISITA_ESTETICA[(extraConsultaRef.current.match(/estetica=(\w+)/) || [])[1]] || {})}
           onClose={() => { setShowConsultaModal(false); setConsultaPaciente(null); }}
           onCreated={(citaId) => {
             setShowConsultaModal(false);
@@ -2486,7 +2498,7 @@ export default function PerfilPaciente() {
             } else if (soloOdontologia) {
               navigate(`/odontologia/consulta?paciente_id=${consultaPaciente.id}${citaId ? `&cita_id=${citaId}` : ''}`);
             } else {
-              navigate(rutaConsulta(funcionClinica, consultaPaciente.id, citaId));
+              navigate(rutaConsulta(funcionClinica, consultaPaciente.id, citaId) + extraConsultaRef.current);
             }
             setConsultaPaciente(null);
           }}
