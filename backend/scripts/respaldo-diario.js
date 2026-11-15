@@ -44,32 +44,51 @@ async function asegurarTabla() {
  * Respaldos guardados antes de corregir la subida quedaron sin el nombre del archivo.
  * Se busca en la nube el archivo subido a esa misma hora y se guarda para la próxima vez.
  */
+let ultimoConteoNube = null;
 async function archivoDe(fila) {
   if (fila.archivo) return fila.archivo;
+  // Se listan los respaldos en la nube (con o sin carpeta en el nombre, según la cuenta)
   const lista = [];
-  let cursor;
-  for (let i = 0; i < 5; i++) {
-    const r = await cloudinary.api.resources({ resource_type: "raw", type: "authenticated", prefix: `${CARPETA}/`, max_results: 500, next_cursor: cursor });
-    lista.push(...(r.resources || []));
-    cursor = r.next_cursor;
-    if (!cursor) break;
+  for (const prefijo of [`${CARPETA}/`, undefined]) {
+    let cursor;
+    for (let i = 0; i < 6; i++) {
+      const r = await cloudinary.api.resources({
+        resource_type: "raw", type: "authenticated", max_results: 500, next_cursor: cursor,
+        ...(prefijo ? { prefix: prefijo } : {}),
+      });
+      lista.push(...(r.resources || []).filter((x) => String(x.public_id).includes("respaldo_")));
+      cursor = r.next_cursor;
+      if (!cursor) break;
+    }
+    if (lista.length) break;
   }
+  ultimoConteoNube = lista.length;
+  if (!lista.length) {
+    console.warn("[Respaldo] No hay respaldos en la nube para recuperar el archivo del registro", fila.id);
+    return null;
+  }
+  // 1) Mismo tamaño exacto (se guarda en el registro); 2) la hora más cercana (margen de un día,
+  //    por si la base de datos guarda la hora local y la nube la hora internacional)
   const t = new Date(fila.creado_en).getTime();
-  // El registro se guarda justo después de subir: el archivo es el más cercano antes de esa hora
-  let mejor = null;
-  for (const x of lista) {
-    const dif = t - new Date(x.created_at).getTime();
-    if (dif >= -5 * 60 * 1000 && dif <= 60 * 60 * 1000 && (!mejor || Math.abs(dif) < Math.abs(mejor.dif))) mejor = { id: x.public_id, dif };
+  const dif = (x) => Math.abs(t - new Date(x.created_at).getTime());
+  const mismoTam = fila.tamanio_bytes ? lista.filter((x) => Number(x.bytes) === Number(fila.tamanio_bytes)) : [];
+  const candidatos = (mismoTam.length ? mismoTam : lista.filter((x) => dif(x) <= 26 * 3600 * 1000)).sort((a, b) => dif(a) - dif(b));
+  const elegido = candidatos[0];
+  if (!elegido) {
+    console.warn("[Respaldo] Ningún archivo coincide con el registro", fila.id, fila.creado_en, fila.tamanio_bytes, `(${lista.length} en la nube)`);
+    return null;
   }
-  if (!mejor) return null;
-  await pool.query("UPDATE backups_log SET archivo = ? WHERE id = ? AND (archivo IS NULL OR archivo = '')", [mejor.id, fila.id]).catch(() => {});
-  return mejor.id;
+  // Un mismo archivo no se asigna a dos registros
+  const [[usado]] = await pool.query("SELECT id FROM backups_log WHERE archivo = ? AND id <> ? LIMIT 1", [elegido.public_id, fila.id]);
+  if (usado) return null;
+  await pool.query("UPDATE backups_log SET archivo = ? WHERE id = ? AND (archivo IS NULL OR archivo = '')", [elegido.public_id, fila.id]).catch(() => {});
+  return elegido.public_id;
 }
 
 async function rotar() {
   const conservar = Math.max(3, Number(process.env.RESPALDO_CONSERVAR) || 14);
   const [viejos] = await pool.query(
-    `SELECT id, archivo, creado_en FROM backups_log
+    `SELECT id, archivo, creado_en, tamanio_bytes FROM backups_log
      WHERE tipo = 'NUBE' AND estado = 'OK' AND clinica_id IS NULL
      ORDER BY creado_en DESC, id DESC LIMIT 1000 OFFSET ?`, [conservar]);
   for (const r of viejos) {
@@ -152,4 +171,4 @@ function enlaceDescarga(publicId) {
   });
 }
 
-module.exports = { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe };
+module.exports = { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe, conteoNube: () => ultimoConteoNube };

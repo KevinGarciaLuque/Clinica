@@ -257,7 +257,7 @@ router.post("/truncate", auth("SUPER_ADMIN"), async (req, res) => {
 /* ─────────────────────────────────────────────────────────
    Respaldos automáticos (Cloudinary privado)
 ──────────────────────────────────────────────────────────── */
-const { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe } = require("../scripts/respaldo-diario");
+const { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe, conteoNube } = require("../scripts/respaldo-diario");
 
 router.get("/respaldos", auth("SUPER_ADMIN"), async (req, res) => {
   try {
@@ -275,10 +275,15 @@ router.get("/respaldos", auth("SUPER_ADMIN"), async (req, res) => {
 router.get("/respaldos/:id/descargar", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const [[r]] = await pool.query(
-      "SELECT id, archivo, creado_en FROM backups_log WHERE id = ? AND tipo = 'NUBE' AND estado = 'OK'", [req.params.id]);
+      "SELECT id, archivo, creado_en, tamanio_bytes FROM backups_log WHERE id = ? AND tipo = 'NUBE' AND estado = 'OK'", [req.params.id]);
     if (!r) return res.status(404).json({ ok: false, msg: "Respaldo no encontrado" });
     const archivo = await archivoDe(r);
-    if (!archivo) return res.status(404).json({ ok: false, msg: "No se encontró el archivo de este respaldo en la nube." });
+    if (!archivo) {
+      const n = conteoNube();
+      return res.status(404).json({ ok: false, msg: n === 0
+        ? "Este respaldo no llegó a guardarse en la nube (no hay ningún archivo de respaldo allí). Use «Respaldar ahora» para crear uno nuevo; los próximos ya se guardan bien."
+        : `No se encontró el archivo de este respaldo en la nube (hay ${n} respaldo${n === 1 ? "" : "s"} allí, pero ninguno coincide). Use «Respaldar ahora» para crear uno nuevo.` });
+    }
     res.json({ ok: true, url: enlaceDescarga(archivo) });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
