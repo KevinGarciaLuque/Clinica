@@ -40,15 +40,42 @@ async function asegurarTabla() {
   ) ENGINE=InnoDB`);
 }
 
+/**
+ * Respaldos guardados antes de corregir la subida quedaron sin el nombre del archivo.
+ * Se busca en la nube el archivo subido a esa misma hora y se guarda para la próxima vez.
+ */
+async function archivoDe(fila) {
+  if (fila.archivo) return fila.archivo;
+  const lista = [];
+  let cursor;
+  for (let i = 0; i < 5; i++) {
+    const r = await cloudinary.api.resources({ resource_type: "raw", type: "authenticated", prefix: `${CARPETA}/`, max_results: 500, next_cursor: cursor });
+    lista.push(...(r.resources || []));
+    cursor = r.next_cursor;
+    if (!cursor) break;
+  }
+  const t = new Date(fila.creado_en).getTime();
+  // El registro se guarda justo después de subir: el archivo es el más cercano antes de esa hora
+  let mejor = null;
+  for (const x of lista) {
+    const dif = t - new Date(x.created_at).getTime();
+    if (dif >= -5 * 60 * 1000 && dif <= 60 * 60 * 1000 && (!mejor || Math.abs(dif) < Math.abs(mejor.dif))) mejor = { id: x.public_id, dif };
+  }
+  if (!mejor) return null;
+  await pool.query("UPDATE backups_log SET archivo = ? WHERE id = ? AND (archivo IS NULL OR archivo = '')", [mejor.id, fila.id]).catch(() => {});
+  return mejor.id;
+}
+
 async function rotar() {
   const conservar = Math.max(3, Number(process.env.RESPALDO_CONSERVAR) || 14);
   const [viejos] = await pool.query(
-    `SELECT id, archivo FROM backups_log
+    `SELECT id, archivo, creado_en FROM backups_log
      WHERE tipo = 'NUBE' AND estado = 'OK' AND clinica_id IS NULL
      ORDER BY creado_en DESC, id DESC LIMIT 1000 OFFSET ?`, [conservar]);
   for (const r of viejos) {
     try {
-      await cloudinary.uploader.destroy(r.archivo, { resource_type: "raw", type: "authenticated", invalidate: true });
+      const archivo = await archivoDe(r).catch(() => null);
+      if (archivo) await cloudinary.uploader.destroy(archivo, { resource_type: "raw", type: "authenticated", invalidate: true });
       await pool.query("DELETE FROM backups_log WHERE id = ?", [r.id]);
     } catch (e) {
       console.error("[Respaldo] No se pudo eliminar respaldo antiguo", r.archivo, e.message);
@@ -78,24 +105,29 @@ async function ejecutarRespaldo({ origen = "automatico" } = {}) {
     const { tablas, filas } = await generarRespaldoSql(tmp);
     const bytes = fs.statSync(tmp).size;
 
-    const subida = await cloudinary.uploader.upload_large(tmp, {
-      resource_type: "raw",
-      type: "authenticated",
-      folder: CARPETA,
-      public_id: nombre,
-      overwrite: false,
-      chunk_size: 6_000_000,
+    // upload_large (archivos grandes, por partes) solo entrega el resultado por callback:
+    // con «await» directo no llega el public_id y el respaldo quedaba sin archivo para descargar.
+    const subida = await new Promise((resolve, reject) => {
+      cloudinary.uploader.upload_large(tmp, {
+        resource_type: "raw",
+        type: "authenticated",
+        folder: CARPETA,
+        public_id: nombre,
+        overwrite: false,
+        chunk_size: 6_000_000,
+      }, (err, res) => (err ? reject(err) : resolve(res)));
     });
+    const publicId = subida?.public_id || `${CARPETA}/${nombre}`;
 
     await pool.query(
       "INSERT INTO backups_log (clinica_id, tipo, archivo, tamanio_bytes, estado) VALUES (NULL, 'NUBE', ?, ?, 'OK')",
-      [subida.public_id, bytes]);
+      [publicId, bytes]);
     const rotados = await rotar();
 
     const seg = ((Date.now() - inicio) / 1000).toFixed(1);
     console.log(`💾 [Respaldo ${origen}] OK: ${tablas} tablas, ${filas} filas, ${(bytes / 1024).toFixed(0)} KB en ${seg}s` +
       (rotados ? `, ${rotados} antiguo(s) eliminado(s)` : ""));
-    return { ok: true, archivo: subida.public_id, bytes, tablas, filas };
+    return { ok: true, archivo: publicId, bytes, tablas, filas };
   } catch (err) {
     console.error(`❌ [Respaldo ${origen}] Error:`, err.message);
     try {
@@ -120,4 +152,4 @@ function enlaceDescarga(publicId) {
   });
 }
 
-module.exports = { ejecutarRespaldo, enlaceDescarga, asegurarTabla };
+module.exports = { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe };
