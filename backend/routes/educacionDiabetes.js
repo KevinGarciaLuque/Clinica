@@ -68,6 +68,26 @@ const SECCIONES = [
 const jsonOrNull = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
 
 // GET /api/educacion-diabetes/sesiones?paciente_id=&page=1&limit=20
+// GET /api/educacion-diabetes/recientes → pacientes atendidos últimamente en Educación en Diabetes
+router.get("/recientes", auth(...ROLES), async (req, res) => {
+  try {
+    const cid = req.user.clinica_id;
+    const [rows] = await pool.query(`
+      SELECT p.id, p.nombres, p.apellidos, p.dni, p.fecha_nacimiento, p.sexo,
+             MAX(x.fecha) AS ultima, SUM(x.tipo = 'ses') AS sesiones
+        FROM (
+          SELECT paciente_id, fecha, 'ses' AS tipo FROM sesiones_educacion_diabetes WHERE clinica_id = ?
+          UNION ALL
+          SELECT paciente_id, fecha, 'mcg' AS tipo FROM informes_mcg WHERE clinica_id = ?
+        ) x
+        JOIN pacientes p ON p.id = x.paciente_id AND p.clinica_id = ?
+       GROUP BY p.id
+       ORDER BY ultima DESC
+       LIMIT 30`, [cid, cid, cid]);
+    res.json({ ok: true, data: rows });
+  } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
+});
+
 router.get("/sesiones", auth(...ROLES), async (req, res) => {
   try {
     const cid = req.user.clinica_id;

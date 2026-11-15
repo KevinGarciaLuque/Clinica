@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import SelectorPacienteModulo from "../../components/SelectorPacienteModulo";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import {
@@ -353,33 +354,10 @@ export default function ConsultaEducacion() {
       <div className="edu-root">
         <div className="edu-main">
           {!paciente ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-              <div style={{ textAlign: "center", maxWidth: 340 }}>
-                <div style={{
-                  width: 76, height: 76, borderRadius: "50%", margin: "0 auto 20px",
-                  background: `linear-gradient(135deg, ${TEAL_LIGHT}, #ecfeff)`,
-                  border: `1px solid ${TEAL}30`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <i className="bi bi-mortarboard-fill" style={{ fontSize: 30, color: TEAL }} />
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 6 }}>
-                  Educación en Diabetes
-                </div>
-                <div style={{ fontSize: 13.5, color: "#94a3b8", lineHeight: 1.6 }}>
-                  Abre a un paciente desde <strong>Consulta</strong> (citas de hoy) o búscalo en
-                  el módulo de <strong>Pacientes</strong> para ver sus sesiones educativas e informes MCG.
-                </div>
-                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
-                  <button onClick={() => navigate("/consulta")} style={btn(TEAL)}>
-                    <i className="bi bi-clipboard2-pulse" /> Ir a Consulta
-                  </button>
-                  <button onClick={() => navigate("/pacientes")} style={btn(TEAL, true)}>
-                    <i className="bi bi-people" /> Ir a Pacientes
-                  </button>
-                </div>
-              </div>
-            </div>
+            <SelectorPacienteModulo titulo="Educación en Diabetes" descripcion="Elija un paciente para ver sus sesiones educativas e informes MCG."
+              icono="bi-mortarboard-fill" color={TEAL} recientesUrl="/educacion-diabetes/recientes" etiquetaRecientes="Pacientes en educación"
+              conteo={(p) => (p.sesiones ? `${p.sesiones} sesión${p.sesiones > 1 ? "es" : ""}` : null)}
+              onElegir={(p) => navigate(`/educacion/consulta?paciente_id=${p.id}`)} />
           ) : (
             <>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>

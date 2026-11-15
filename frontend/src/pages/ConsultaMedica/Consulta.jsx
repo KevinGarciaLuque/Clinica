@@ -581,6 +581,22 @@ export default function Consulta() {
               }}>
               <i className="bi bi-plus-lg"></i> Nueva Consulta
             </button>
+            {/* Clínicas de endocrinología: abrir los módulos de diabetes de este paciente */}
+            {[
+              { clave: "control_seguimiento_dm1", ruta: "/endocrinologia/seguimiento", texto: "Control de Seguimiento", icono: "bi-droplet-half", c1: "#f97316", c2: "#ea580c" },
+              { clave: "educacion_diabetes", ruta: "/educacion/consulta", texto: "Educación en Diabetes", icono: "bi-mortarboard-fill", c1: "#14b8a6", c2: "#0d9488" },
+            ].filter((m) => modulos.some((x) => x.clave === m.clave)).map((m) => (
+              <button key={m.clave} type="button"
+                onClick={() => navigate(`${m.ruta}?paciente_id=${paciente.id}${citaId ? `&cita_id=${citaId}` : ""}`)}
+                title={`Abrir ${m.texto} de este paciente`}
+                style={{
+                  background: `linear-gradient(135deg, ${m.c1}, ${m.c2})`, border: "none", borderRadius: 8, color: "#fff",
+                  padding: "6px 14px", fontSize: "0.8rem", cursor: "pointer", fontWeight: 600,
+                  display: "flex", alignItems: "center", gap: 6, boxShadow: `0 2px 6px ${m.c1}55`,
+                }}>
+                <i className={`bi ${m.icono}`} /> {m.texto}
+              </button>
+            ))}
             {esVideo && (
               <button
                 onClick={() => abrirVideollamada(citaId)}

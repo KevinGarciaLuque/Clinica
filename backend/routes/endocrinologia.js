@@ -93,6 +93,28 @@ const jsonOrNull = (v) => (v === undefined || v === null ? null : JSON.stringify
 // ═══════════════════════════════════════════════════════════════════════════════
 
 // GET /api/endocrinologia/historia/:paciente_id
+// GET /api/endocrinologia/recientes → pacientes atendidos últimamente en el Control de Seguimiento
+router.get("/recientes", auth(...ROLES), async (req, res) => {
+  try {
+    const cid = req.user.clinica_id;
+    const [rows] = await pool.query(`
+      SELECT p.id, p.nombres, p.apellidos, p.dni, p.fecha_nacimiento, p.sexo,
+             MAX(x.fecha) AS ultima, SUM(x.tipo = 'seg') AS seguimientos
+        FROM (
+          SELECT paciente_id, fecha, 'seg' AS tipo FROM seguimientos_endocrinologia WHERE clinica_id = ?
+          UNION ALL
+          SELECT paciente_id, fecha, 'plan' AS tipo FROM planes_endocrinologia WHERE clinica_id = ?
+          UNION ALL
+          SELECT paciente_id, DATE(COALESCE(actualizado_en, creado_en)) AS fecha, 'hist' AS tipo FROM historia_endocrinologia WHERE clinica_id = ?
+        ) x
+        JOIN pacientes p ON p.id = x.paciente_id AND p.clinica_id = ?
+       GROUP BY p.id
+       ORDER BY ultima DESC
+       LIMIT 30`, [cid, cid, cid, cid]);
+    res.json({ ok: true, data: rows });
+  } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
+});
+
 router.get("/historia/:paciente_id", auth(...ROLES), async (req, res) => {
   try {
     const [[row]] = await pool.query(

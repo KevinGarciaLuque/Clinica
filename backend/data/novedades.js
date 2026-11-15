@@ -373,4 +373,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "diabetes-elegir-paciente",
+    version: "1.48",
+    modulos: ["control_seguimiento_dm1", "educacion_diabetes"],
+    titulo: "Control de Seguimiento y Educación más a mano",
+    descripcion: "Al entrar a Control de Seguimiento o Educación en Diabetes puede buscar al paciente ahí mismo y ver las citas de hoy y los pacientes atendidos últimamente. Y desde la consulta médica, los botones «Control de Seguimiento» y «Educación en Diabetes» abren esos módulos del mismo paciente.",
+    icono: "bi-droplet-half",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

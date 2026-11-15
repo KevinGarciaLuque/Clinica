@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
+import SelectorPacienteModulo from "../../components/SelectorPacienteModulo";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import TabHistoria from "./TabHistoria";
@@ -675,33 +676,10 @@ export default function ConsultaEndocrinologia() {
       <div className="endo-root">
         <div className="endo-main">
           {!paciente ? (
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "center", minHeight: "60vh" }}>
-              <div style={{ textAlign: "center", maxWidth: 340 }}>
-                <div style={{
-                  width: 76, height: 76, borderRadius: "50%", margin: "0 auto 20px",
-                  background: `linear-gradient(135deg, ${ORANGE}18, #fff7ed)`,
-                  border: `1px solid ${ORANGE}30`,
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                  <i className="bi bi-droplet-half" style={{ fontSize: 30, color: ORANGE }} />
-                </div>
-                <div style={{ fontSize: 16, fontWeight: 700, color: "#1e293b", marginBottom: 6 }}>
-                  Control de Seguimiento
-                </div>
-                <div style={{ fontSize: 13.5, color: "#94a3b8", lineHeight: 1.6 }}>
-                  Abre a un paciente desde <strong>Consulta</strong> (citas de hoy) o búscalo en
-                  el módulo de <strong>Pacientes</strong> para ver su historia, seguimientos y plan de tratamiento.
-                </div>
-                <div style={{ display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap", marginTop: 18 }}>
-                  <button onClick={() => navigate("/consulta")} style={btn(ORANGE)}>
-                    <i className="bi bi-clipboard2-pulse" /> Ir a Consulta
-                  </button>
-                  <button onClick={() => navigate("/pacientes")} style={btn(ORANGE, true)}>
-                    <i className="bi bi-people" /> Ir a Pacientes
-                  </button>
-                </div>
-              </div>
-            </div>
+            <SelectorPacienteModulo titulo="Control de Seguimiento" descripcion="Elija un paciente para ver su historia, seguimientos y plan de tratamiento."
+              icono="bi-droplet-half" color={ORANGE} recientesUrl="/endocrinologia/recientes" etiquetaRecientes="Pacientes en seguimiento"
+              conteo={(p) => (p.seguimientos ? `${p.seguimientos} seguimiento${p.seguimientos > 1 ? "s" : ""}` : null)}
+              onElegir={(p) => navigate(`/endocrinologia/seguimiento?paciente_id=${p.id}`)} />
           ) : (
             <>
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
