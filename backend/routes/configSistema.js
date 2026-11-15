@@ -149,7 +149,7 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
 
 const { asegurarRecargos } = require("../utils/formasPago");
 // Recargo (%) por pagar el plan en partes
-const RECARGOS_CAMPOS = ["recargo_trimestral_pct", "recargo_bimestral_pct", "recargo_mensual_pct"];
+const RECARGOS_CAMPOS = ["recargo_dos_pagos_pct", "recargo_trimestral_pct", "recargo_bimestral_pct", "recargo_mensual_pct"];
 
 // Nivel × duración de pago que soporta cada precio configurable
 const PRECIOS_CAMPOS = [

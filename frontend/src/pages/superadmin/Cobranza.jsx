@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import api from "../../api/api";
-import { FORMAS_PAGO, numeroPagos } from "../../utils/planes";
+import { FORMAS_PAGO, numeroPagos, formasOfrecidas, mesesPorPago } from "../../utils/planes";
 
 // Super admin → Cobranza: cuánto le toca pagar a cada clínica, cuánto ha pagado,
 // quién está atrasado y cuánto dinero se ha generado. Los pagos se registran aquí.
@@ -311,7 +311,7 @@ function ModalCuota({ clinica, lista, onCerrar, onGuardado }) {
       </div>
       <label style={{ ...lbl, marginTop: 14 }}>¿Cómo paga?</label>
       <div className="d-grid gap-2" style={{ gridTemplateColumns: "repeat(2,minmax(0,1fr))" }}>
-        {Object.entries(FORMAS_PAGO).map(([k, f]) => {
+        {formasOfrecidas().map(([k, f]) => {
           const n = numeroPagos(plan, k);
           return { k, t: f.label, d: n > 1 ? `${n} pagos${Number(monto) > 0 ? ` de ${dinero((Number(monto) * meses) / n, moneda)}` : ""}` : `Todo al inicio (${meses} meses)` };
         }).map((o) => (
@@ -417,7 +417,7 @@ function ModalVarias({ clinicas, lista, onCerrar, onGuardado }) {
         <div className="col-5">
           <label style={lbl}>¿Cómo pagan?</label>
           <select style={inp} value={forma} onChange={(e) => setForma(e.target.value)}>
-            {Object.entries(FORMAS_PAGO).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
+            {formasOfrecidas().map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
           </select>
         </div>
       </div>
@@ -837,9 +837,9 @@ export default function Cobranza() {
                     <b style={{ fontSize: "0.9rem" }}>{dinero(c.cuota_mensual * c.meses_plan, c.moneda)}</b>
                     <div style={{ fontSize: "0.72rem", color: C.muted }}>pago único · {dinero(c.cuota_mensual, c.moneda)}/mes</div>
                   </>
-                ) : ["trimestral", "bimestral"].includes(c.forma_pago) && c.cuota_mensual > 0 ? (
+                ) : ["dos_pagos", "trimestral", "bimestral"].includes(c.forma_pago) && c.cuota_mensual > 0 ? (
                   <>
-                    <b style={{ fontSize: "0.9rem" }}>{dinero(c.cuota_mensual * FORMAS_PAGO[c.forma_pago].cada, c.moneda)}</b>
+                    <b style={{ fontSize: "0.9rem" }}>{dinero(c.cuota_mensual * mesesPorPago(c.plan_tipo, c.forma_pago), c.moneda)}</b>
                     <div style={{ fontSize: "0.72rem", color: C.muted }}>{FORMAS_PAGO[c.forma_pago].label.toLowerCase()} · {numeroPagos(c.plan_tipo, c.forma_pago)} pagos</div>
                   </>
                 ) : c.en_prueba ? (

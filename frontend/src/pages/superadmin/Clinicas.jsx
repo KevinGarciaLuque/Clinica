@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import ClinicaDetallesModal from "../../components/ClinicaDetallesModal";
 import { setClinicaActiva } from "../../utils/clinicaActiva";
-import { FORMAS_PAGO, numeroPagos } from "../../utils/planes";
+import { FORMAS_PAGO, formasOfrecidas, numeroPagos } from "../../utils/planes";
 
 /* ── Paleta ────────────────────────────────────────────────── */
 const C = {
@@ -2250,7 +2250,7 @@ export default function Clinicas() {
                     Forma de pago
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
-                    {Object.entries(FORMAS_PAGO).map(([k, f]) => {
+                    {formasOfrecidas().map(([k, f]) => {
                       const sel = (licenciaForm.forma_pago || "contado") === k;
                       const n = numeroPagos(licenciaForm.plan_tipo, k);
                       const total = Number(licenciaForm.monto) || (Number(licenciaForm.monto_mensual) * (licenciaForm.plan_tipo === "anual" ? 12 : 6)) || 0;

@@ -128,6 +128,13 @@ async function sincronizarDesdeArchivo() {
         [n.modulos.join(",").slice(0, 300), String(n.clave).slice(0, 80)]);
     }
   }
+  // Corrección única: la novedad de formas de pago cambió (ahora solo 1 o 2 pagos)
+  await pool.query("CREATE TABLE IF NOT EXISTS migraciones_unicas (clave VARCHAR(100) PRIMARY KEY, aplicada_en DATETIME DEFAULT CURRENT_TIMESTAMP)");
+  const [m] = await pool.query("INSERT IGNORE INTO migraciones_unicas (clave) VALUES ('novedad_plan_pago_en_partes_v2')");
+  if (m.affectedRows) {
+    const n = lista.find((x) => x.clave === "plan-pago-en-partes");
+    if (n) await pool.query("UPDATE novedades SET titulo = ?, descripcion = ? WHERE clave = ?", [n.titulo, n.descripcion, n.clave]);
+  }
 }
 
 // Las vistas registradas antes de existir novedades_lecturas solo guardaban "hasta qué

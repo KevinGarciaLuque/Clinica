@@ -14,7 +14,7 @@ const pool = require("../db");
 const auth = require("../middlewares/auth");
 const { uploadComprobante } = require("../middlewares/upload");
 const { enviarEmail } = require("../utils/mailer");
-const { FORMAS, formaValida, asegurarRecargos } = require("../utils/formasPago");
+const { formaValida, asegurarRecargos, mesesPorPago } = require("../utils/formasPago");
 
 const DIAS_GRACIA = 10; // después de esto la cuota se considera atrasada
 const METODOS = ["TRANSFERENCIA", "DEPOSITO", "EFECTIVO", "TARJETA", "OTRO"];
@@ -68,7 +68,7 @@ async function listaPrecios() {
   const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1").catch(() => [[null]]);
   const moneda = row?.moneda || "HNL";
   const recargos = {};
-  for (const f of ["trimestral", "bimestral", "mensual"]) recargos[f] = Number(row?.[`recargo_${f}_pct`]) || 0;
+  for (const f of ["dos_pagos", "trimestral", "bimestral", "mensual"]) recargos[f] = Number(row?.[`recargo_${f}_pct`]) || 0;
   const precios = {};
   for (const n of NIVELES) {
     for (const plan of ["semestral", "anual"]) {
@@ -231,7 +231,7 @@ async function calendarioCuotas(clinicaId = null) {
       m += 1; if (m > 12) { m = 1; y += 1; }
     }
     // Cada 2 o 3 meses: las cuotas mensuales del periodo se juntan en pagos de N meses
-    const cada = FORMAS[f.forma_pago]?.cada;
+    const cada = mesesPorPago(f.forma_pago, nCuotas);
     if (cada && cada > 1) {
       const mensuales = [...mapa.values()].filter((q) => q.fecha_cobro >= ini && q.fecha_cobro < fin && !q.unico && !q.bloque)
         .sort((a, b) => a.fecha_cobro.localeCompare(b.fecha_cobro));

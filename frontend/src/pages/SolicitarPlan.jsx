@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
-import { NIVELES_PLAN, DURACION_LABEL, duracionesDisponibles, precioClave, FORMAS_PAGO, montoPorForma } from "../utils/planes";
+import { NIVELES_PLAN, DURACION_LABEL, duracionesDisponibles, precioClave, FORMAS_PAGO, formasOfrecidas, montoPorForma } from "../utils/planes";
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 
@@ -426,14 +426,16 @@ export default function SolicitarPlan() {
                     <div className="sp-full">
                       <label className="sp-label">¿Cómo prefieres pagar?</label>
                       <div className="sp-formas">
-                        {Object.entries(FORMAS_PAGO).map(([k, f]) => {
+                        {formasOfrecidas().map(([k, f]) => {
                           const c = calcForma(k);
                           const sel = form.forma_pago === k;
                           return (
                             <button key={k} type="button" className="sp-forma" data-sel={sel ? "1" : "0"} onClick={() => setForm((x) => ({ ...x, forma_pago: k }))}>
                               <span className="t">{f.label}</span>
                               <span className="m">
-                                {c ? (c.pagos > 1 ? `${c.pagos} pagos de ${formatearMonto(c.porPago, pagos.moneda)}` : formatearMonto(c.total, pagos.moneda)) : "—"}
+                                {c ? (c.pagos > 1
+                                  ? `${formatearMonto(c.porPago, pagos.moneda)} c/u · hoy y a los ${form.plan_solicitado === "anual" ? 6 : 3} meses`
+                                  : formatearMonto(c.total, pagos.moneda)) : "—"}
                               </span>
                               {k === "contado" && <span className="b">Mejor precio</span>}
                             </button>

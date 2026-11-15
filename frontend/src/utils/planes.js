@@ -33,14 +33,28 @@ export function planCompletoLabel(nivel, duracion) {
 // la forma de pago dice en cuántas partes se paga).
 export const FORMAS_PAGO = {
   contado:    { label: "Un solo pago",   cada: null, corto: "Pago único" },
+  dos_pagos:  { label: "2 pagos",        cada: null, partes: 2, corto: "2 pagos" },
   trimestral: { label: "Cada 3 meses",   cada: 3,    corto: "Trimestral" },
   bimestral:  { label: "Cada 2 meses",   cada: 2,    corto: "Bimestral" },
   mensual:    { label: "Mes a mes",      cada: 1,    corto: "Mensual" },
 };
 
+// Las que se ofrecen hoy; las demás siguen funcionando para clínicas que ya las tienen.
+export const FORMAS_OFRECIDAS = ["contado", "dos_pagos"];
+export const formasOfrecidas = () => FORMAS_OFRECIDAS.map((k) => [k, FORMAS_PAGO[k]]);
+
+/** Cada cuántos meses se paga (2 pagos de un semestral = cada 3 meses). */
+export function mesesPorPago(duracion, forma) {
+  const meses = duracion === "anual" ? 12 : 6;
+  const f = FORMAS_PAGO[forma];
+  if (!f) return null;
+  return f.partes ? Math.ceil(meses / f.partes) : f.cada;
+}
+
 export function numeroPagos(duracion, forma) {
   const meses = duracion === "anual" ? 12 : duracion === "semestral" ? 6 : 0;
   if (!meses) return 0;
+  if (FORMAS_PAGO[forma]?.partes) return FORMAS_PAGO[forma].partes;
   const cada = FORMAS_PAGO[forma]?.cada;
   return cada ? Math.ceil(meses / cada) : 1;
 }

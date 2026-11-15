@@ -367,8 +367,8 @@ module.exports = [
   {
     clave: "plan-pago-en-partes",
     version: "1.47",
-    titulo: "Pague su plan en partes",
-    descripcion: "Su plan Semestral o Anual ahora se puede pagar en un solo pago, cada 3 meses, cada 2 meses o mes a mes. Si paga en partes, Medic-KG le avisa unos días antes de cada pago.",
+    titulo: "Pague su plan en 2 pagos",
+    descripcion: "Su plan Semestral o Anual ahora se puede pagar en un solo pago o en 2 pagos (semestral: hoy y a los 3 meses; anual: hoy y a los 6 meses). Si paga en 2 pagos, Medic-KG le avisa unos días antes del segundo.",
     icono: "bi-calendar2-range",
     audiencia: "MEDICOS",
     importante: false,
