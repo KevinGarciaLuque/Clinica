@@ -32,6 +32,7 @@ import { edadDetallada } from "../utils/edadDetallada";
 import HistorialNutricion from "../components/HistorialNutricion";
 import HistorialConsultas from "../components/HistorialConsultas";
 import { listarEstetica } from "../utils/esteticaDatos";
+import TarjetaDiabetes from "../components/TarjetaDiabetes";
 import EsteticaPaciente from "../components/EsteticaPaciente";
 import { htmlEstetica, htmlDerma } from "../utils/impresionConsulta";
 
@@ -131,12 +132,14 @@ export default function PerfilPaciente() {
   });
   
   // Pestaña activa
-  const VALID_TABS = ["datos", "endo_historia", "endo_seguimientos", "educacion", "historial", "evolucion", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "cuenta", "estetica", "crecimiento", "vacunas", "eliminar"];
+  const VALID_TABS = ["datos", "diabetes", "endo_historia", "endo_seguimientos", "educacion", "historial", "evolucion", "historial_odonto", "hoja_nefrologia", "psicologia", "examenes", "cuenta", "estetica", "crecimiento", "vacunas", "eliminar"];
   const tabParam = searchParams.get("tab");
   // Pestaña inicial: "Evolución" en clínicas con consulta médica (recepción sigue
   // entrando a "Datos Generales", que es lo que más usa); si no, "Datos Generales"
   const tabInicial = tieneModulo("consulta") && user?.tipo !== "RECEPCIONISTA" ? "evolucion" : "datos";
-  const [tab, setTab] = useState(VALID_TABS.includes(tabParam) ? tabParam : tabInicial);
+  // Las pestañas viejas de endocrinología ahora están dentro de «Diabetes»
+  const [tab, setTab] = useState(["endo_historia", "endo_seguimientos"].includes(tabParam) ? "diabetes" : VALID_TABS.includes(tabParam) ? tabParam : tabInicial);
+  const [vistaDiabetes, setVistaDiabetes] = useState(tabParam === "endo_historia" ? "historia" : "seguimientos");
   
   // Edición datos generales
   const [editandoDatos, setEditandoDatos] = useState(false);
@@ -929,8 +932,7 @@ export default function PerfilPaciente() {
       : []),
     ...(tieneModulo("control_seguimiento_dm1")
       ? [
-          { key: "endo_historia", label: "Historia Clínica", short: "Hist. Endo", icon: "bi-file-earmark-medical", color: "#ea580c" },
-          { key: "endo_seguimientos", label: "Seguimientos", short: "Seguimiento", icon: "bi-graph-up-arrow", color: "#ea580c" },
+          { key: "diabetes", label: "Diabetes", short: "Diabetes", icon: "bi-droplet-half", color: "#ea580c" },
         ]
       : []),
     ...(tieneModulo("educacion_diabetes")
@@ -1709,6 +1711,8 @@ export default function PerfilPaciente() {
           {/* Sub-tab: Historial de Consultas */}
           {subTabHistorial === "consultas" && (
             <HistorialConsultas
+              diabetesPacienteId={tieneModulo("control_seguimiento_dm1") ? id : null}
+              educacionPacienteId={tieneModulo("educacion_diabetes") ? id : null}
               historias={historias}
               docsPorHistoria={docsPorHistoria}
               detalle={detalle}
@@ -2237,16 +2241,27 @@ export default function PerfilPaciente() {
       {/* ─────────────────────────────────────────────────────── */}
       {/* TAB: HISTORIA CLÍNICA — ENDOCRINOLOGÍA */}
       {/* ─────────────────────────────────────────────────────── */}
-      {tab === "endo_historia" && tieneModulo("control_seguimiento_dm1") && (
-        <HistoriaEndocrinologiaTab paciente={paciente} pacienteId={id} />
+      {tab === "diabetes" && tieneModulo("control_seguimiento_dm1") && (
+        <div>
+          <TarjetaDiabetes pacienteId={id} puedeEnviarEducacion={tieneModulo("educacion_diabetes")} />
+          <div className="d-flex gap-2 flex-wrap mb-3">
+            {[["seguimientos", "Seguimientos", "bi-graph-up-arrow"], ["historia", "Historia de diabetes", "bi-file-earmark-medical"]].map(([k, t, ic]) => (
+              <button key={k} type="button" onClick={() => setVistaDiabetes(k)}
+                style={{ display: "inline-flex", alignItems: "center", gap: 6, borderRadius: 999, padding: "6px 14px", fontSize: "0.85rem", fontWeight: 700, cursor: "pointer",
+                  border: `1px solid ${vistaDiabetes === k ? "#ea580c" : "#fed7aa"}`, background: vistaDiabetes === k ? "#ea580c" : "#fff", color: vistaDiabetes === k ? "#fff" : "#c2410c" }}>
+                <i className={`bi ${ic}`} />{t}
+              </button>
+            ))}
+          </div>
+          {vistaDiabetes === "historia"
+            ? <HistoriaEndocrinologiaTab paciente={paciente} pacienteId={id} />
+            : <SeguimientosEndocrinologia pacienteId={id} />}
+        </div>
       )}
 
       {/* ─────────────────────────────────────────────────────── */}
       {/* TAB: SEGUIMIENTOS — ENDOCRINOLOGÍA */}
       {/* ─────────────────────────────────────────────────────── */}
-      {tab === "endo_seguimientos" && tieneModulo("control_seguimiento_dm1") && (
-        <SeguimientosEndocrinologia pacienteId={id} />
-      )}
 
       {/* ─────────────────────────────────────────────────────── */}
       {/* TAB: EDUCACIÓN EN DIABETES */}

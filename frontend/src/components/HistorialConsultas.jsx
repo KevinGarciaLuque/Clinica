@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import dayjs from "dayjs";
+import api from "../api/api";
 import { VITALS_FIELDS } from "../pages/ConsultaMedica/helpers";
 import TarjetaHistorial from "./TarjetaHistorial";
 import { nombreZona, FASES_CONTROL } from "../utils/esteticaCatalogos";
@@ -26,14 +27,18 @@ const SECCIONES = {
   eco: { nombre: "Ecocardiograma", color: "#dc2626", icono: "bi-heart-pulse-fill" },
   estetica: { nombre: "Estética", color: "#db2777", icono: "bi-stars" },
   derma: { nombre: "Dermatología", color: "#0891b2", icono: "bi-bandaid" },
+  diabetes: { nombre: "Seguimiento de diabetes", color: "#ea580c", icono: "bi-droplet-half" },
+  educacion_dm: { nombre: "Educación en diabetes", color: "#0d9488", icono: "bi-mortarboard" },
 };
+const TEMAS_EDU = { alimentacion: "Alimentación", conteo_cho: "Conteo de carbohidratos", ajuste_insulina: "Ajuste de insulina", hipoglucemia: "Hipoglucemia",
+  ejercicio: "Ejercicio", cgm: "Sensor (MCG)", glucometro: "Glucómetro", cuidado_pies: "Cuidado de pies", metas_glucosa: "Metas de glucosa", lectura_etiquetas: "Lectura de etiquetas" };
 const VISITA_ESTETICA = { valoracion: "Valoración", procedimiento: "Día del procedimiento", seguimiento: "Control post-procedimiento" };
 
 const hay = (v) => v !== null && v !== undefined && String(v).trim() !== "";
 const json = (v, def) => { if (!v) return def; try { return typeof v === "string" ? JSON.parse(v) : v; } catch { return def; } };
 const fechaLarga = (f) => { const d = dayjs(f); return `${d.date()} de ${MESES_LARGO[d.month()]} de ${d.year()}`; };
 
-function seccionesDe(h, docs) {
+function seccionesDe(h, docs, delDia) {
   const v = json(h.objetivo, {});
   const s = [];
   if (VITALS_FIELDS.some((f) => hay(v[f.key]))) s.push("vitales");
@@ -47,6 +52,8 @@ function seccionesDe(h, docs) {
   if (Number(h.tiene_eco) === 1) s.push("eco");
   if (h.estetica_tipo) s.push("estetica");
   if (Number(h.tiene_derma) === 1) s.push("derma");
+  if (delDia?.seguimientos?.length) s.push("diabetes");
+  if (delDia?.sesiones?.length) s.push("educacion_dm");
   return s;
 }
 
@@ -133,10 +140,63 @@ function Fila({ label, valor }) {
 
 const Texto = ({ children }) => <div style={{ fontSize: "0.86rem", whiteSpace: "pre-wrap", color: "#0f172a" }}>{children}</div>;
 
+/** Resumen del seguimiento de diabetes (Control de Seguimiento) registrado el día de la consulta. */
+function DetalleDiabetes({ s }) {
+  const cm = json(s.control_metabolico, {}), an = json(s.antropometria, {}), cv = json(s.cardiovascular, {});
+  const ta = json(s.terapia_adherencia, {}), pl = json(s.plan, {});
+  const esq = ta.esquema || {};
+  const tir = cm.mcg?.tir || cm.glucometro?.tir;
+  return (
+    <>
+      <Fila label="HbA1c" valor={hay(cm.hba1c) ? `${cm.hba1c}%` : null} />
+      <Fila label="Tiempo en rango" valor={hay(tir) ? `${tir}%` : null} />
+      <Fila label="Peso" valor={hay(an.peso) ? `${an.peso} kg${hay(an.imc) ? ` · IMC ${an.imc}` : ""}` : null} />
+      <Fila label="Presión" valor={hay(cv.pa_sistolica) ? `${cv.pa_sistolica}/${cv.pa_diastolica || "—"} mmHg` : null} />
+      <Fila label="Esquema" valor={[esq.basal_bolo && "Basal-bolo", esq.bomba && "Bomba", esq.otro && (esq.otro_texto || "Otro")].filter(Boolean).join(", ") || null} />
+      <Fila label="Diagnósticos" valor={pl.diagnosticos || null} />
+      <Fila label="Plan" valor={pl.plan_accion || null} />
+      <Fila label="Próximo control" valor={pl.proximo_seguimiento?.fecha ? dayjs(pl.proximo_seguimiento.fecha).format("DD/MM/YYYY") : null} />
+      {s.medico_nombre && <div className="small text-muted mt-1">Registrado por {s.medico_nombre}</div>}
+    </>
+  );
+}
+
+function DetalleEducacion({ x }) {
+  const pe = json(x.plan_educativo, {});
+  const temas = Object.entries(pe.temas || {}).filter(([, v]) => v).map(([k]) => TEMAS_EDU[k] || k);
+  return (
+    <>
+      <Fila label="Temas" valor={temas.join(", ") || null} />
+      <Fila label="Objetivos" valor={x.objetivos_paciente || null} />
+      <Fila label="Próxima cita" valor={pe.proxima_cita ? dayjs(pe.proxima_cita).format("DD/MM/YYYY") : null} />
+      {x.educador_nombre && <div className="small text-muted mt-1">Educador: {x.educador_nombre}</div>}
+    </>
+  );
+}
+
 export default function HistorialConsultas({
   historias, docsPorHistoria = {}, detalle = {}, onCargarDetalle, nombreMedico, especialidadDe,
   onAbrir, onEditar, onImprimir, onImprimirEco, onPdfReceta, enlaceDocumento, tiposDoc = [], vacio,
+  diabetesPacienteId = null, educacionPacienteId = null,
 }) {
+  // Seguimientos de diabetes y sesiones educativas: se muestran en la consulta del mismo día
+  const [diaDm, setDiaDm] = useState({});
+  useEffect(() => {
+    if (!diabetesPacienteId && !educacionPacienteId) return undefined;
+    let vivo = true;
+    Promise.all([
+      diabetesPacienteId ? api.get("/endocrinologia/seguimientos", { params: { paciente_id: diabetesPacienteId, limit: 200 } }).then((r) => r.data.data || []).catch(() => []) : [],
+      educacionPacienteId ? api.get("/educacion-diabetes/sesiones", { params: { paciente_id: educacionPacienteId, limit: 200 } }).then((r) => r.data.data || []).catch(() => []) : [],
+    ]).then(([segs, ses]) => {
+      if (!vivo) return;
+      const m = {};
+      const dia = (f) => String(f || "").slice(0, 10);
+      segs.forEach((s) => { const k = dia(s.fecha); (m[k] = m[k] || { seguimientos: [], sesiones: [] }).seguimientos.push(s); });
+      ses.forEach((s) => { const k = dia(s.fecha); (m[k] = m[k] || { seguimientos: [], sesiones: [] }).sesiones.push(s); });
+      setDiaDm(m);
+    });
+    return () => { vivo = false; };
+  }, [diabetesPacienteId, educacionPacienteId]);
   const [abiertas, setAbiertas] = useState(null); // null = solo la más reciente
   const [montadas, setMontadas] = useState(() => new Set());
   const [desde, setDesde] = useState("");
@@ -224,7 +284,8 @@ export default function HistorialConsultas({
           const fecha = dayjs(h.creado_en);
           const vit = json(h.objetivo, {});
           const docs = docsPorHistoria[h.id] || [];
-          const secc = seccionesDe(h, docs);
+          const delDia = diaDm[dayjs(h.creado_en).format("YYYY-MM-DD")];
+          const secc = seccionesDe(h, docs, delDia);
           const det = detalle[h.id];
           const firmada = h.estado === "FIRMADA";
           const resumenVit = [
@@ -372,6 +433,12 @@ export default function HistorialConsultas({
                           {secc.includes("estetica") && (
                             <Tarjeta tipo="estetica"><DetalleEstetica e={det ? det.estetica : null} /></Tarjeta>
                           )}
+                          {secc.includes("diabetes") && delDia.seguimientos.map((sg) => (
+                            <Tarjeta key={`dm${sg.id}`} tipo="diabetes"><DetalleDiabetes s={sg} /></Tarjeta>
+                          ))}
+                          {secc.includes("educacion_dm") && delDia.sesiones.map((x) => (
+                            <Tarjeta key={`ed${x.id}`} tipo="educacion_dm"><DetalleEducacion x={x} /></Tarjeta>
+                          ))}
                           {!secc.length && <div className="text-muted small">Esta consulta no tiene datos registrados todavía.</div>}
                         </div>
                       </div>

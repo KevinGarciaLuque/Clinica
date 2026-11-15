@@ -403,4 +403,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "diabetes-perfil-una-pestana",
+    version: "1.51",
+    modulos: ["control_seguimiento_dm1", "educacion_diabetes"],
+    titulo: "Perfil del paciente: pestaña «Diabetes»",
+    descripcion: "En el perfil del paciente, la historia de diabetes y los seguimientos quedaron juntos en una sola pestaña «Diabetes», con el resumen «Cómo va su diabetes» arriba. Y en el Historial Clínico, cada consulta muestra el seguimiento de diabetes y la sesión educativa de ese mismo día.",
+    icono: "bi-droplet-half",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];
