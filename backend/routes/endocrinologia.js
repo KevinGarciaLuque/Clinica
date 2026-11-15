@@ -403,6 +403,58 @@ router.delete("/planes/:id", auth(...ROLES_ESCRITURA), async (req, res) => {
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
 });
 
+// ── Datos que ya existen en otras partes (para no escribirlos dos veces) ──
+const numDe = (v) => { const m = String(v ?? "").replace(",", ".").match(/-?\d+(\.\d+)?/); return m ? parseFloat(m[0]) : null; };
+const LABS = [
+  { clave: "hba1c", re: /hba1c|a1c|hemoglobina\s+glic|glicosilada|glucosilada/i },
+  { clave: "ldl", re: /\bldl\b/i },
+  { clave: "hdl", re: /\bhdl\b/i },
+  { clave: "colesterol_total", re: /colesterol\s+total|^\s*colesterol\s*$/i },
+  { clave: "trigliceridos", re: /triglic/i },
+  { clave: "albumina_creatinina", re: /alb[uú]mina.{0,6}creatinina|microalb|relaci[oó]n\s+alb/i },
+  { clave: "egfr", re: /\btfg|filtrado\s+glomerular|egfr/i },
+];
+/** Resultados de laboratorio cargados en Estudios: el último de cada uno y la serie de HbA1c. */
+async function labsDePaciente(cid, pid) {
+  const [rows] = await pool.query(
+    `SELECT r.nombre_examen, r.valor_resultado, DATE_FORMAT(r.cargado_en, '%Y-%m-%d') AS fecha
+       FROM estudios_resultados r JOIN estudios_solicitudes s ON s.id = r.solicitud_id
+      WHERE r.clinica_id = ? AND s.paciente_id = ? AND r.valor_resultado IS NOT NULL
+      ORDER BY r.cargado_en DESC, r.id DESC LIMIT 300`, [cid, pid]).catch(() => [[]]);
+  const ultimo = {}, serieA1c = [];
+  for (const r of rows) {
+    const lab = LABS.find((l) => l.re.test(String(r.nombre_examen || "")));
+    const v = numDe(r.valor_resultado);
+    if (!lab || v == null) continue;
+    if (!ultimo[lab.clave]) ultimo[lab.clave] = { valor: v, fecha: r.fecha };
+    if (lab.clave === "hba1c") serieA1c.push({ fecha: r.fecha, valor: v, fuente: "estudios" });
+  }
+  return { ultimo, serieA1c };
+}
+
+// GET /api/endocrinologia/datos-previos/:paciente_id → últimos signos vitales (consulta de los
+// últimos 30 días) y laboratorios de Estudios, para llenar solos el nuevo seguimiento.
+router.get("/datos-previos/:paciente_id", auth(...ROLES), async (req, res) => {
+  try {
+    const cid = req.user.clinica_id, pid = req.params.paciente_id;
+    const [hs] = await pool.query(
+      `SELECT objetivo, DATE_FORMAT(creado_en,'%Y-%m-%d') AS fecha FROM historias_clinicas
+        WHERE paciente_id=? AND clinica_id=? AND objetivo IS NOT NULL AND creado_en >= DATE_SUB(NOW(), INTERVAL 30 DAY)
+        ORDER BY creado_en DESC LIMIT 5`, [pid, cid]).catch(() => [[]]);
+    let vitales = null;
+    for (const h of hs) {
+      let o = h.objetivo;
+      if (typeof o === "string") { try { o = JSON.parse(o); } catch { o = null; } }
+      if (!o || typeof o !== "object") continue;
+      const v = {};
+      for (const k of ["pa", "fc", "fr", "spo2", "peso", "talla"]) if (o[k] != null && String(o[k]).trim() !== "") v[k] = String(o[k]).trim();
+      if (Object.keys(v).length) { vitales = { ...v, fecha: h.fecha }; break; }
+    }
+    const { ultimo } = await labsDePaciente(cid, pid);
+    res.json({ ok: true, data: { vitales, labs: ultimo } });
+  } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
+});
+
 // GET /api/endocrinologia/tablero/:paciente_id → «Cómo va su diabetes»: HbA1c y su tendencia,
 // tiempo en rango, peso, tratamiento, próxima cita, educación y exámenes anuales vencidos.
 router.get("/tablero/:paciente_id", auth(...ROLES), async (req, res) => {
@@ -446,6 +498,17 @@ router.get("/tablero/:paciente_id", auth(...ROLES), async (req, res) => {
       if (pl.proximo_seguimiento?.fecha) proximo = { fecha: F(pl.proximo_seguimiento.fecha), tipo: pl.proximo_seguimiento.tipo || "" };
     }
 
+    // Laboratorios cargados en Estudios: cuentan también (HbA1c, colesterol, riñón)
+    const labs = await labsDePaciente(cid, pid);
+    for (const p of labs.serieA1c) if (!hba1c.some((h) => h.fecha === p.fecha)) hba1c.push(p);
+    const masNuevo = (actual, lab, texto) => (lab && (!actual || lab.fecha > actual.fecha) ? { fecha: lab.fecha, valor: texto } : actual);
+    const L = labs.ultimo;
+    if (L.hba1c) ult.hba1c = masNuevo(ult.hba1c, L.hba1c, `${L.hba1c.valor}%`);
+    const lip = L.ldl || L.colesterol_total;
+    if (lip) ult.lipidos = masNuevo(ult.lipidos, lip, [L.ldl && `LDL ${L.ldl.valor}`, L.colesterol_total && `CT ${L.colesterol_total.valor}`].filter(Boolean).join(" · "));
+    const rin = L.albumina_creatinina || L.egfr;
+    if (rin) ult.rinon = masNuevo(ult.rinon, rin, [L.albumina_creatinina && `Alb/Cr ${L.albumina_creatinina.valor}`, L.egfr && `TFGe ${L.egfr.valor}`].filter(Boolean).join(" · "));
+
     // Exámenes que se repiten: HbA1c cada 3 meses; ojo, riñón, pies y colesterol una vez al año
     const REGLAS = [
       { clave: "hba1c", nombre: "HbA1c", cada: 90, texto: "cada 3 meses" },
@@ -466,9 +529,21 @@ router.get("/tablero/:paciente_id", auth(...ROLES), async (req, res) => {
       const [[ses]] = await pool.query(
         `SELECT fecha, plan_educativo FROM sesiones_educacion_diabetes WHERE clinica_id=? AND paciente_id=? ORDER BY fecha DESC, id DESC LIMIT 1`, [cid, pid]);
       const [[{ n }]] = await pool.query("SELECT COUNT(*) AS n FROM sesiones_educacion_diabetes WHERE clinica_id=? AND paciente_id=?", [cid, pid]);
+      const TEMAS = { alimentacion: "Alimentación", conteo_cho: "Conteo de carbohidratos", ajuste_insulina: "Ajuste de insulina",
+        hipoglucemia: "Hipoglucemia", ejercicio: "Ejercicio", cgm: "Sensor (MCG)", glucometro: "Glucómetro", cuidado_pies: "Cuidado de pies",
+        metas_glucosa: "Metas de glucosa", lectura_etiquetas: "Lectura de etiquetas", tecnica_insulina: "Técnica de insulina" };
       if (ses) {
         const pe = J(ses.plan_educativo);
-        educacion = { ultima: F(ses.fecha), sesiones: Number(n), proxima: F(pe.proxima_cita) };
+        const temas = Object.entries(pe.temas || {}).filter(([, v]) => v).map(([k]) => TEMAS[k] || k);
+        educacion = { ultima: F(ses.fecha), sesiones: Number(n), proxima: F(pe.proxima_cita), temas };
+      }
+      // Envío a educación pendiente (el médico lo derivó y aún no hay sesión)
+      const [[der]] = await pool.query(
+        `SELECT creado_en, temas FROM derivaciones_educacion WHERE clinica_id=? AND paciente_id=? AND estado='PENDIENTE' ORDER BY id DESC LIMIT 1`,
+        [cid, pid]).catch(() => [[null]]);
+      if (der) {
+        const t = J(der.temas);
+        educacion = { ...(educacion || { sesiones: 0 }), pendiente: { fecha: F(der.creado_en), temas: (Array.isArray(t) ? t : []).map((k) => TEMAS[k] || k) } };
       }
     } catch { /* módulo de educación no instalado */ }
 

@@ -24,12 +24,13 @@ function Fila({ p, color, sub, onClick }) {
   );
 }
 
-export default function SelectorPacienteModulo({ titulo, descripcion, icono, color, recientesUrl, etiquetaRecientes, conteo, onElegir }) {
+export default function SelectorPacienteModulo({ titulo, descripcion, icono, color, recientesUrl, etiquetaRecientes, conteo, onElegir, derivacionesUrl = null }) {
   const [q, setQ] = useState("");
   const [resultados, setResultados] = useState([]);
   const [buscando, setBuscando] = useState(false);
   const [recientes, setRecientes] = useState(null);
   const [citas, setCitas] = useState(null);
+  const [derivados, setDerivados] = useState([]);
 
   useEffect(() => {
     api.get(recientesUrl).then((r) => setRecientes(r.data.data || [])).catch(() => setRecientes([]));
@@ -37,7 +38,8 @@ export default function SelectorPacienteModulo({ titulo, descripcion, icono, col
     api.get("/citas", { params: { desde: hoy, hasta: hoy } })
       .then((r) => setCitas((r.data.data || []).filter((c) => !["CANCELADA", "NO_ASISTIO"].includes(c.estado) && c.paciente_id)))
       .catch(() => setCitas([]));
-  }, [recientesUrl]);
+    if (derivacionesUrl) api.get(derivacionesUrl).then((r) => setDerivados(r.data.data || [])).catch(() => {});
+  }, [recientesUrl, derivacionesUrl]);
 
   useEffect(() => {
     const t = q.trim();
@@ -97,6 +99,21 @@ export default function SelectorPacienteModulo({ titulo, descripcion, icono, col
           </div>
         )}
       </div>
+
+      {derivados.length > 0 && (
+        <div className="spm-card" style={{ marginBottom: 14, borderColor: `${color}55` }}>
+          <div className="spm-card-h" style={{ background: `${color}0f` }}>
+            <i className="bi bi-send-check" style={{ color }} />Enviados por el médico
+            <span style={{ marginLeft: "auto", background: color, color: "#fff", borderRadius: 999, padding: "0 8px", fontSize: ".72rem" }}>{derivados.length}</span>
+          </div>
+          {derivados.map((x) => (
+            <Fila key={x.id} color={color}
+              p={{ id: x.paciente_id, nombres: x.nombres, apellidos: x.apellidos }}
+              sub={[x.temas_texto?.length ? x.temas_texto.join(", ") : null, x.nota, `${String(x.medico || "").trim() || "médico"} · ${fechaCorta(x.creado_en)}`].filter(Boolean).join(" · ")}
+              onClick={() => onElegir({ id: x.paciente_id, nombres: x.nombres, apellidos: x.apellidos })} />
+          ))}
+        </div>
+      )}
 
       <div className="spm-dos">
         <div className="spm-card">

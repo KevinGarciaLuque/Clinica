@@ -393,4 +393,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "diabetes-equipo-y-datos-automaticos",
+    version: "1.50",
+    modulos: ["control_seguimiento_dm1", "educacion_diabetes"],
+    titulo: "Diabetes: menos escritura y trabajo en equipo",
+    descripcion: "Al crear un seguimiento se llenan solos el peso, la talla y la presión de la consulta, y la HbA1c, el colesterol y la microalbuminuria cargados en Estudios. Con «Enviar a educación» el médico elige qué reforzar y el educador recibe el aviso; al entrar a Educación ve los pacientes enviados y lo que pidió el médico.",
+    icono: "bi-people",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import SelectorPacienteModulo from "../../components/SelectorPacienteModulo";
+import TarjetaDiabetes from "../../components/TarjetaDiabetes";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import {
@@ -198,12 +199,47 @@ function PrintSesion({ sesion, paciente, user, logoUrl, headerCfg, onClose }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+/** Lo que el médico pidió reforzar («Enviar a educación») y aún no se atiende. */
+function DerivacionesPaciente({ pacienteId, recarga }) {
+  const [lista, setLista] = useState([]);
+  const [rec, setRec] = useState(0);
+  useEffect(() => {
+    let vivo = true;
+    api.get("/educacion-diabetes/derivaciones", { params: { paciente_id: pacienteId } })
+      .then((r) => { if (vivo) setLista((r.data.data || []).filter((x) => x.estado === "PENDIENTE")); })
+      .catch(() => {});
+    return () => { vivo = false; };
+  }, [pacienteId, recarga, rec]);
+  if (!lista.length) return null;
+  return (
+    <div style={{ background: "#f0fdfa", border: "1px solid #99f6e4", borderLeft: `4px solid ${TEAL}`, borderRadius: 12, padding: "10px 14px", marginBottom: 14 }}>
+      {lista.map((x) => (
+        <div key={x.id} style={{ display: "flex", alignItems: "flex-start", gap: 10, flexWrap: "wrap", padding: "4px 0" }}>
+          <i className="bi bi-send-check" style={{ color: TEAL, fontSize: "1.1rem", marginTop: 2 }} />
+          <div style={{ flex: "1 1 240px", minWidth: 0 }}>
+            <div style={{ fontWeight: 700, color: "#134e4a", fontSize: 14 }}>
+              {String(x.medico || "").trim() || "El médico"} lo envió a educación el {dayjs(x.creado_en).format("DD/MM/YYYY")}
+            </div>
+            {x.temas_texto?.length > 0 && <div style={{ fontSize: 13, color: "#0f766e" }}>Reforzar: <b>{x.temas_texto.join(", ")}</b></div>}
+            {x.nota && <div style={{ fontSize: 13, color: "#475569", fontStyle: "italic" }}>«{x.nota}»</div>}
+          </div>
+          <button type="button" onClick={() => api.put(`/educacion-diabetes/derivaciones/${x.id}/atender`).then(() => setRec((n) => n + 1)).catch(() => {})}
+            style={{ background: "#fff", border: `1px solid ${TEAL}`, color: TEAL, borderRadius: 8, padding: "4px 10px", fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            <i className="bi bi-check2 me-1" />Marcar atendido
+          </button>
+        </div>
+      ))}
+      <div style={{ fontSize: 11.5, color: "#64748b", marginTop: 4 }}>Se marca solo como atendido al guardar una sesión educativa nueva.</div>
+    </div>
+  );
+}
+
 /**
  * pacienteIdFijo / embebido: se usa también como pestaña dentro de la Consulta Médica
  * (sin encabezado propio y con el paciente de la consulta).
  */
 export default function ConsultaEducacion({ pacienteIdFijo = null, embebido = false } = {}) {
-  const { user } = useAuth();
+  const { user, modulos } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
@@ -364,6 +400,7 @@ export default function ConsultaEducacion({ pacienteIdFijo = null, embebido = fa
             <SelectorPacienteModulo titulo="Educación en Diabetes" descripcion="Elija un paciente para ver sus sesiones educativas e informes MCG."
               icono="bi-mortarboard-fill" color={TEAL} recientesUrl="/educacion-diabetes/recientes" etiquetaRecientes="Pacientes en educación"
               conteo={(p) => (p.sesiones ? `${p.sesiones} sesión${p.sesiones > 1 ? "es" : ""}` : null)}
+              derivacionesUrl="/educacion-diabetes/derivaciones?estado=PENDIENTE"
               onElegir={(p) => navigate(`/educacion/consulta?paciente_id=${p.id}`)} />
           ) : (
             <>
@@ -383,6 +420,9 @@ export default function ConsultaEducacion({ pacienteIdFijo = null, embebido = fa
                 </div>
               </div>
               )}
+
+              {!embebido && (modulos || []).some((m) => m.clave === "control_seguimiento_dm1") && <TarjetaDiabetes pacienteId={paciente.id} recarga={sesiones.length} />}
+              <DerivacionesPaciente pacienteId={paciente.id} recarga={sesiones.length} />
 
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                 {[["sesiones", "Sesiones Educativas", "bi-mortarboard"], ["informes_mcg", "Informes MCG", "bi-file-earmark-medical"]].map(([v, txt, icon]) => (

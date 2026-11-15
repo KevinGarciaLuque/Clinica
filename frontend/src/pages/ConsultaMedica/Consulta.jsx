@@ -633,7 +633,7 @@ export default function Consulta() {
 
         {/* ── Cómo va su diabetes (clínicas de endocrinología) ── */}
         {esDiabetes && (paciente?.id || pacId) && (
-          <TarjetaDiabetes pacienteId={paciente?.id || pacId} recarga={tab} onAbrirSeguimiento={() => setTab("diabetes")} />
+          <TarjetaDiabetes pacienteId={paciente?.id || pacId} recarga={tab} onAbrirSeguimiento={() => setTab("diabetes")} puedeEnviarEducacion={esEducacionDm} />
         )}
 
         {alertMsg && (
@@ -748,7 +748,7 @@ export default function Consulta() {
           {(tab === "diabetes" || tab === "educacion_dm") && (paciente?.id || pacId) && (
             <Suspense fallback={<div className="text-center text-muted py-4"><span className="spinner-border spinner-border-sm me-2" />Cargando…</div>}>
               {tab === "diabetes"
-                ? <ConsultaEndocrinologia embebido pacienteIdFijo={paciente?.id || pacId} />
+                ? <ConsultaEndocrinologia embebido pacienteIdFijo={paciente?.id || pacId} vitalesConsulta={vitals} />
                 : <ConsultaEducacion embebido pacienteIdFijo={paciente?.id || pacId} />}
             </Suspense>
           )}

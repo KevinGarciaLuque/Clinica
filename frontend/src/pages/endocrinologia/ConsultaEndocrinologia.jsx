@@ -387,8 +387,8 @@ function PrintPlan({ registro, historia, paciente, user, logoUrl, headerCfg, onC
  * pacienteIdFijo / embebido: se usa también como pestaña dentro de la Consulta Médica
  * (sin encabezado propio y con el paciente de la consulta).
  */
-export default function ConsultaEndocrinologia({ pacienteIdFijo = null, embebido = false } = {}) {
-  const { user } = useAuth();
+export default function ConsultaEndocrinologia({ pacienteIdFijo = null, embebido = false, vitalesConsulta = null } = {}) {
+  const { user, modulos } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
@@ -530,6 +530,54 @@ export default function ConsultaEndocrinologia({ pacienteIdFijo = null, embebido
     setSeccionesAbiertas(esInicial ? SECCIONES_DEF.map(s => s.key) : []);
     setFechaSeguimiento(hoy);
     setTab("seguimientos");
+    prellenarSeguimiento(base);
+  };
+
+  // No escribir dos veces: signos vitales de la consulta y laboratorios de Estudios
+  const prellenarSeguimiento = async (base) => {
+    if (!paciente?.id) return;
+    let d = {};
+    try { d = (await api.get(`/endocrinologia/datos-previos/${paciente.id}`)).data.data || {}; } catch { /* sin datos previos */ }
+    const enConsulta = Object.fromEntries(Object.entries(vitalesConsulta || {}).filter(([, x]) => x !== "" && x != null));
+    const v = { ...(d.vitales || {}), ...enConsulta };
+    const origenV = Object.keys(enConsulta).length ? "esta consulta" : d.vitales ? `la consulta del ${dayjs(d.vitales.fecha).format("DD/MM/YYYY")}` : null;
+    const L = d.labs || {};
+    const n = structuredClone(base);
+    const llenos = [];
+    const poner = (obj, campo, valor, etiqueta) => {
+      if (valor == null || valor === "" || (obj[campo] != null && obj[campo] !== "")) return false;
+      obj[campo] = String(valor); if (etiqueta && !llenos.includes(etiqueta)) llenos.push(etiqueta); return true;
+    };
+    const an = n.antropometria, cv = n.cardiovascular, cm = n.control_metabolico, ne = n.nefropatia, lp = n.cardiovascular.perfil_lipidico;
+    poner(an, "peso", v.peso, "peso");
+    poner(an, "talla", v.talla, "talla");
+    const pesoN = parseFloat(an.peso), tallaN = parseFloat(an.talla);
+    if (pesoN > 0 && tallaN > 0 && !an.imc) { const m = tallaN > 3 ? tallaN / 100 : tallaN; an.imc = (pesoN / (m * m)).toFixed(1); }
+    if (v.pa && /\d+\s*\/\s*\d+/.test(v.pa)) {
+      const [sis, dia] = v.pa.split("/").map((x) => x.trim());
+      poner(cv, "pa_sistolica", sis, "presión"); poner(cv, "pa_diastolica", dia);
+    }
+    poner(cv, "fc", v.fc, "pulso"); poner(cv, "fr", v.fr, "respiración"); poner(cv, "sato2", v.spo2, "saturación");
+    const deLab = [];
+    if (L.hba1c && poner(cm, "hba1c", L.hba1c.valor)) { cm.hba1c_fecha = L.hba1c.fecha; deLab.push(`HbA1c ${L.hba1c.valor}%`); }
+    let lipido = false;
+    for (const k of ["colesterol_total", "ldl", "hdl", "trigliceridos"]) if (L[k] && poner(lp, k, L[k].valor)) { lipido = true; lp.fecha = L[k].fecha; }
+    if (lipido) deLab.push("perfil de colesterol");
+    if (L.albumina_creatinina && poner(ne, "albumina_creatinina", L.albumina_creatinina.valor)) { ne.fecha_alb = L.albumina_creatinina.fecha; deLab.push("albúmina/creatinina"); }
+    if (L.egfr && poner(ne, "egfr", L.egfr.valor)) { ne.fecha_egfr = L.egfr.fecha; deLab.push("TFGe"); }
+    if (!llenos.length && !deLab.length) return;
+    setFormSeguimiento((prev) => (prev === base ? n : prev));
+    // Las secciones que se llenaron quedan marcadas (solo se guardan las marcadas)
+    const conDatos = [];
+    if (an.peso || an.talla) conDatos.push("antropometria");
+    if (cv.pa_sistolica || cv.fc || cv.fr || cv.sato2 || lipido) conDatos.push("cardiovascular");
+    if (cm.hba1c && deLab.some((x) => x.startsWith("HbA1c"))) conDatos.push("control_metabolico");
+    if (deLab.some((x) => x.startsWith("albúmina") || x === "TFGe")) conDatos.push("nefropatia");
+    setSeccionesAbiertas((prev) => [...new Set([...prev, ...conDatos])]);
+    const partes = [];
+    if (llenos.length && origenV) partes.push(`${llenos.join(", ")} (de ${origenV})`);
+    if (deLab.length) partes.push(`${deLab.join(", ")} (de Estudios)`);
+    setMsg({ tipo: "ok", texto: `Se llenaron solos: ${partes.join(" · ")}. Revíselos antes de guardar.` });
   };
 
   const cargarSeguimiento = async (id) => {
@@ -708,7 +756,8 @@ export default function ConsultaEndocrinologia({ pacienteIdFijo = null, embebido
               </div>
 
               )}
-              {!embebido && <TarjetaDiabetes pacienteId={paciente.id} recarga={`${seguimientos.length}-${seguimientoActivo ? 1 : 0}`} />}
+              {!embebido && <TarjetaDiabetes pacienteId={paciente.id} recarga={`${seguimientos.length}-${seguimientoActivo ? 1 : 0}`}
+                puedeEnviarEducacion={(modulos || []).some((m) => m.clave === "educacion_diabetes")} />}
 
               {msg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, marginBottom: 14, fontSize: 13, fontWeight: 600, background: msg.tipo === "ok" ? "rgba(16,185,129,.1)" : "rgba(239,68,68,.1)", color: msg.tipo === "ok" ? "#059669" : "#dc2626" }}>

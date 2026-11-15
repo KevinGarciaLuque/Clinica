@@ -68,6 +68,108 @@ const SECCIONES = [
 const jsonOrNull = (v) => (v === undefined || v === null ? null : JSON.stringify(v));
 
 // GET /api/educacion-diabetes/sesiones?paciente_id=&page=1&limit=20
+// ═══════════ Derivaciones del médico al educador («Enviar a educación») ═══════════
+const sse     = require("../utils/sseManager");
+const webPush = require("../utils/webPush");
+const TEMAS_TXT = {
+  alimentacion: "Alimentación", conteo_cho: "Conteo de carbohidratos", ajuste_insulina: "Ajuste de insulina",
+  hipoglucemia: "Hipoglucemia", ejercicio: "Ejercicio", cgm: "Uso del sensor (MCG)", glucometro: "Glucómetro",
+  cuidado_pies: "Cuidado de pies", metas_glucosa: "Metas de glucosa", lectura_etiquetas: "Lectura de etiquetas",
+  tecnica_insulina: "Técnica de insulina",
+};
+let derivacionesOk = false;
+async function asegurarDerivaciones() {
+  if (derivacionesOk) return;
+  await pool.query(`
+    CREATE TABLE IF NOT EXISTS derivaciones_educacion (
+      id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+      clinica_id  INT UNSIGNED NOT NULL,
+      paciente_id INT UNSIGNED NOT NULL,
+      medico_id   INT UNSIGNED NULL,
+      temas       JSON NULL,
+      nota        VARCHAR(500) NULL,
+      estado      ENUM('PENDIENTE','ATENDIDA') NOT NULL DEFAULT 'PENDIENTE',
+      sesion_id   INT UNSIGNED NULL,
+      creado_en   DATETIME DEFAULT CURRENT_TIMESTAMP,
+      atendida_en DATETIME NULL,
+      INDEX idx_de_clinica (clinica_id, estado),
+      INDEX idx_de_paciente (paciente_id)
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4`);
+  derivacionesOk = true;
+}
+const temasTexto = (t) => { let l = t; if (typeof l === "string") { try { l = JSON.parse(l); } catch { l = []; } } return (Array.isArray(l) ? l : []).map((k) => TEMAS_TXT[k] || k); };
+
+// POST /api/educacion-diabetes/derivaciones  { paciente_id, temas: [...], nota }
+router.post("/derivaciones", auth("SUPER_ADMIN","ADMIN","MEDICO","ENFERMERA","PSICOLOGO"), async (req, res) => {
+  try {
+    await asegurarDerivaciones();
+    const cid = req.user.clinica_id;
+    const { paciente_id, temas, nota } = req.body || {};
+    const [[p]] = await pool.query("SELECT id, nombres, apellidos FROM pacientes WHERE id=? AND clinica_id=?", [paciente_id, cid]);
+    if (!p) return res.status(404).json({ ok: false, msg: "Paciente no encontrado" });
+    const lista = (Array.isArray(temas) ? temas : []).map(String).slice(0, 15);
+    const [r] = await pool.query(
+      "INSERT INTO derivaciones_educacion (clinica_id, paciente_id, medico_id, temas, nota) VALUES (?,?,?,?,?)",
+      [cid, p.id, req.user.id, JSON.stringify(lista), nota ? String(nota).slice(0, 500) : null]);
+
+    // Aviso al educador (o educadores) de la clínica
+    let avisados = 0;
+    try {
+      const [col] = await pool.query("SHOW COLUMNS FROM usuarios LIKE 'funcion_clinica'");
+      if (col.length) {
+        const [eds] = await pool.query(
+          "SELECT id FROM usuarios WHERE clinica_id=? AND activo=1 AND funcion_clinica='EDUCADOR_DIABETES' AND id<>?", [cid, req.user.id]);
+        const [[m]] = await pool.query("SELECT nombres, apellidos FROM usuarios WHERE id=?", [req.user.id]);
+        const quien = m ? `${m.nombres || ""} ${m.apellidos || ""}`.trim() : "El médico";
+        const t = temasTexto(lista);
+        const mensaje = `${quien} envió a ${p.nombres} ${p.apellidos} a educación${t.length ? `: ${t.join(", ")}` : ""}`.slice(0, 300);
+        if (eds.length) {
+          await pool.query(
+            "INSERT INTO notificaciones_usuario (usuario_id, clinica_id, tipo, mensaje, paciente_id) VALUES ?",
+            [eds.map((e) => [e.id, cid, "derivacion_educacion", mensaje, p.id])]).catch(() => {});
+          eds.forEach((e) => sse.notifyUser(e.id, "notificacion_portal", { tipo: "derivacion_educacion", mensaje, paciente_id: p.id }));
+          await webPush.sendToUsers(pool, eds.map((e) => e.id), {
+            title: "Paciente enviado a educación", body: mensaje, tag: `derivacion_${r.insertId}`,
+            data: { url: `/educacion/consulta?paciente_id=${p.id}` },
+          }).catch(() => {});
+          avisados = eds.length;
+        }
+      }
+    } catch (e) { console.error("[derivacion aviso]", e.message); }
+    res.status(201).json({ ok: true, id: r.insertId, avisados });
+  } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
+});
+
+// GET /api/educacion-diabetes/derivaciones?paciente_id=  |  ?estado=PENDIENTE
+router.get("/derivaciones", auth(...ROLES, "PSICOLOGO"), async (req, res) => {
+  try {
+    await asegurarDerivaciones();
+    const cid = req.user.clinica_id;
+    const cond = ["d.clinica_id = ?"], val = [cid];
+    if (req.query.paciente_id) { cond.push("d.paciente_id = ?"); val.push(req.query.paciente_id); }
+    if (req.query.estado === "PENDIENTE") cond.push("d.estado = 'PENDIENTE'");
+    const [rows] = await pool.query(
+      `SELECT d.id, d.paciente_id, d.temas, d.nota, d.estado, d.creado_en, d.atendida_en,
+              p.nombres, p.apellidos, p.dni, p.fecha_nacimiento,
+              CONCAT(COALESCE(u.nombres,''),' ',COALESCE(u.apellidos,'')) AS medico
+         FROM derivaciones_educacion d
+         JOIN pacientes p ON p.id = d.paciente_id
+         LEFT JOIN usuarios u ON u.id = d.medico_id
+        WHERE ${cond.join(" AND ")}
+        ORDER BY d.estado = 'PENDIENTE' DESC, d.creado_en DESC LIMIT 50`, val);
+    res.json({ ok: true, data: rows.map((x) => ({ ...x, temas_texto: temasTexto(x.temas) })) });
+  } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
+});
+
+// PUT /api/educacion-diabetes/derivaciones/:id/atender
+router.put("/derivaciones/:id/atender", auth(...ROLES_ESCRITURA), async (req, res) => {
+  try {
+    await asegurarDerivaciones();
+    await pool.query("UPDATE derivaciones_educacion SET estado='ATENDIDA', atendida_en=NOW() WHERE id=? AND clinica_id=?", [req.params.id, req.user.clinica_id]);
+    res.json({ ok: true });
+  } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
+});
+
 // GET /api/educacion-diabetes/recientes → pacientes atendidos últimamente en Educación en Diabetes
 router.get("/recientes", auth(...ROLES), async (req, res) => {
   try {
@@ -153,6 +255,11 @@ router.post("/sesiones", auth(...ROLES_ESCRITURA), async (req, res) => {
       jsonOrNull(req.body.plan_educativo), jsonOrNull(req.body.evaluacion_educativa),
       JSON.stringify(secciones),
     ]);
+    // Las derivaciones pendientes del médico para este paciente quedan atendidas con esta sesión
+    await asegurarDerivaciones().catch(() => {});
+    await pool.query(
+      "UPDATE derivaciones_educacion SET estado='ATENDIDA', atendida_en=NOW(), sesion_id=? WHERE clinica_id=? AND paciente_id=? AND estado='PENDIENTE'",
+      [result.insertId, cid, paciente_id]).catch(() => {});
     res.status(201).json({ ok: true, id: result.insertId });
   } catch (e) { res.status(500).json({ ok: false, msg: e.message }); }
 });
