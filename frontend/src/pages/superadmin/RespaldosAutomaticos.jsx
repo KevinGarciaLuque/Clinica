@@ -15,6 +15,7 @@ function fmtBytes(b) {
 
 export default function RespaldosAutomaticos() {
   const [lista, setLista] = useState(null);
+  const [bajando, setBajando] = useState(null);
   const [error, setError] = useState(null);
   const [ejecutando, setEjecutando] = useState(false);
   const [msg, setMsg] = useState(null);
@@ -42,9 +43,23 @@ export default function RespaldosAutomaticos() {
   const descargar = async (id) => {
     try {
       const r = await api.get(`/database/respaldos/${id}/descargar`);
-      window.open(r.data.url, "_blank", "noopener");
+      if (!r.data.unir) { window.open(r.data.url, "_blank", "noopener"); return; }
+      // Guardado en partes: el servidor las une y entrega un solo archivo
+      setBajando(id);
+      const f = await api.get(`/database/respaldos/${id}/archivo`, { responseType: "blob", timeout: 0 });
+      const url = URL.createObjectURL(f.data);
+      const a = document.createElement("a");
+      a.href = url; a.download = r.data.nombre || "respaldo.sql.gz";
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
     } catch (e) {
-      setMsg({ ok: false, text: e.response?.data?.msg || "No se pudo generar el enlace de descarga." });
+      let text = e.response?.data?.msg;
+      if (!text && e.response?.data instanceof Blob) {
+        try { text = JSON.parse(await e.response.data.text()).msg; } catch { /* sin detalle */ }
+      }
+      setMsg({ ok: false, text: text || "No se pudo descargar el respaldo." });
+    } finally {
+      setBajando(null);
     }
   };
 
@@ -115,8 +130,8 @@ export default function RespaldosAutomaticos() {
                   <td className="text-end">{fmtBytes(r.tamanio_bytes)}</td>
                   <td className="text-end">
                     {r.estado === "OK" && (
-                      <button className="btn btn-link btn-sm p-0" onClick={() => descargar(r.id)}>
-                        <i className="bi bi-download me-1" />Descargar
+                      <button className="btn btn-link btn-sm p-0" onClick={() => descargar(r.id)} disabled={bajando != null}>
+                        {bajando === r.id ? <><span className="spinner-border spinner-border-sm me-1" />Descargando…</> : <><i className="bi bi-download me-1" />Descargar</>}
                       </button>
                     )}
                   </td>

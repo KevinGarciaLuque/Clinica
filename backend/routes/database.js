@@ -257,7 +257,7 @@ router.post("/truncate", auth("SUPER_ADMIN"), async (req, res) => {
 /* ─────────────────────────────────────────────────────────
    Respaldos automáticos (Cloudinary privado)
 ──────────────────────────────────────────────────────────── */
-const { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe, conteoNube } = require("../scripts/respaldo-diario");
+const { ejecutarRespaldo, enlaceDescarga, asegurarTabla, archivoDe, piezasDe, conteoNube } = require("../scripts/respaldo-diario");
 
 router.get("/respaldos", auth("SUPER_ADMIN"), async (req, res) => {
   try {
@@ -275,8 +275,10 @@ router.get("/respaldos", auth("SUPER_ADMIN"), async (req, res) => {
 router.get("/respaldos/:id/descargar", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     const [[r]] = await pool.query(
-      "SELECT id, archivo, creado_en, tamanio_bytes FROM backups_log WHERE id = ? AND tipo = 'NUBE' AND estado = 'OK'", [req.params.id]);
+      "SELECT id, archivo, creado_en, tamanio_bytes, partes FROM backups_log WHERE id = ? AND tipo = 'NUBE' AND estado = 'OK'", [req.params.id]);
     if (!r) return res.status(404).json({ ok: false, msg: "Respaldo no encontrado" });
+    // Respaldo guardado en partes: el navegador lo pide a /archivo y el servidor las une
+    if (r.partes && r.archivo) return res.json({ ok: true, unir: true, nombre: r.archivo.split("/").pop() });
     const archivo = await archivoDe(r);
     if (!archivo) {
       const n = conteoNube();
@@ -287,6 +289,34 @@ router.get("/respaldos/:id/descargar", auth("SUPER_ADMIN"), async (req, res) => 
     res.json({ ok: true, url: enlaceDescarga(archivo) });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
+  }
+});
+
+/** Descarga de un respaldo guardado en partes: se bajan de la nube en orden y se envían como un solo archivo. */
+router.get("/respaldos/:id/archivo", auth("SUPER_ADMIN"), async (req, res) => {
+  try {
+    await asegurarTabla();
+    const [[r]] = await pool.query(
+      "SELECT id, archivo, partes FROM backups_log WHERE id = ? AND tipo = 'NUBE' AND estado = 'OK'", [req.params.id]);
+    if (!r || !r.archivo) return res.status(404).json({ ok: false, msg: "Respaldo no encontrado" });
+    const piezas = piezasDe(r.archivo, r.partes);
+    // Se revisa la primera parte antes de empezar a enviar, para poder responder con un error claro
+    let resp = await fetch(enlaceDescarga(piezas[0]));
+    if (!resp.ok) return res.status(404).json({ ok: false, msg: "No se pudo leer el respaldo en la nube." });
+    res.setHeader("Content-Type", "application/gzip");
+    res.setHeader("Content-Disposition", `attachment; filename="${r.archivo.split("/").pop()}"`);
+    for (let i = 0; i < piezas.length; i++) {
+      if (i > 0) {
+        resp = await fetch(enlaceDescarga(piezas[i]));
+        if (!resp.ok) throw new Error(`No se pudo leer la parte ${i + 1} de ${piezas.length}`);
+      }
+      res.write(Buffer.from(await resp.arrayBuffer()));
+    }
+    res.end();
+  } catch (e) {
+    console.error("[Respaldo] Error al descargar", req.params.id, e.message);
+    if (!res.headersSent) res.status(500).json({ ok: false, msg: e.message });
+    else res.destroy(e);
   }
 });
 
