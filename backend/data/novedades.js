@@ -383,4 +383,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "diabetes-en-la-consulta",
+    version: "1.49",
+    modulos: ["control_seguimiento_dm1", "educacion_diabetes"],
+    titulo: "Diabetes dentro de la consulta",
+    descripcion: "En la Consulta Médica ahora están las pestañas «Diabetes» (historia, seguimientos y plan) y «Educación», con el mismo paciente y sin cambiar de pantalla. Arriba verá «Cómo va su diabetes»: HbA1c y si mejoró, tiempo en rango, peso, tratamiento, próximo control y los exámenes que ya tocan (fondo de ojo, riñón, pies, colesterol).",
+    icono: "bi-droplet-half",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

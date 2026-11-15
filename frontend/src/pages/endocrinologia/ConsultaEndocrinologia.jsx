@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
 import SelectorPacienteModulo from "../../components/SelectorPacienteModulo";
+import TarjetaDiabetes from "../../components/TarjetaDiabetes";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import TabHistoria from "./TabHistoria";
@@ -382,12 +383,16 @@ function PrintPlan({ registro, historia, paciente, user, logoUrl, headerCfg, onC
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function ConsultaEndocrinologia() {
+/**
+ * pacienteIdFijo / embebido: se usa también como pestaña dentro de la Consulta Médica
+ * (sin encabezado propio y con el paciente de la consulta).
+ */
+export default function ConsultaEndocrinologia({ pacienteIdFijo = null, embebido = false } = {}) {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
-  const [tab, setTab] = useState("historia");
+  const [tab, setTab] = useState(embebido ? "seguimientos" : "historia");
   const [paciente, setPaciente] = useState(null);
 
   const [historia, setHistoria] = useState(null);
@@ -440,16 +445,16 @@ export default function ConsultaEndocrinologia() {
   }, [user?.clinica_id]);
 
   useEffect(() => {
-    const pid = params.get("paciente_id");
+    const pid = pacienteIdFijo || params.get("paciente_id");
     if (!pid) return;
     api.get(`/pacientes/${pid}`)
       .then(r => {
         const p = r.data?.data || r.data;
-        if (p?.id) seleccionarPaciente(p, params.get("seguimiento_id"));
+        if (p?.id) seleccionarPaciente(p, embebido ? null : params.get("seguimiento_id"));
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [params, pacienteIdFijo]);
 
   useEffect(() => {
     if (params.get("print") === "1" && seguimientoActivo && seguimientoActivo !== "nuevo") {
@@ -660,8 +665,10 @@ export default function ConsultaEndocrinologia() {
     <>
       <style>{`
         .endo-root { display: flex; height: 100%; position: relative; }
+        .endo-emb { padding: 0 !important; background: transparent !important; overflow: visible !important; }
         .endo-main { flex: 1; padding: 16px 20px; overflow-y: auto; min-width: 0; background: #f1f5f9; }
-        .endo-tabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 2px solid #fed7aa; }
+        .endo-tabs { display: flex; gap: 2px; margin-bottom: 16px; border-bottom: 2px solid #fed7aa; overflow-x: auto; scrollbar-width: none; }
+        .endo-tabs .endo-tab-btn { white-space: nowrap; flex-shrink: 0; }
         .endo-tab-btn { background: none; border: none; cursor: pointer; padding: 10px 16px; font-size: 0.85rem; display: flex; align-items: center; gap: 6px; border-bottom: 3px solid transparent; margin-bottom: -2px; }
         .endo-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
         .endo-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
@@ -674,14 +681,17 @@ export default function ConsultaEndocrinologia() {
       `}</style>
 
       <div className="endo-root">
-        <div className="endo-main">
-          {!paciente ? (
+        <div className={`endo-main${embebido ? " endo-emb" : ""}`}>
+          {!paciente && embebido ? (
+            <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}><span className="spinner-border spinner-border-sm me-2" />Cargando…</div>
+          ) : !paciente ? (
             <SelectorPacienteModulo titulo="Control de Seguimiento" descripcion="Elija un paciente para ver su historia, seguimientos y plan de tratamiento."
               icono="bi-droplet-half" color={ORANGE} recientesUrl="/endocrinologia/recientes" etiquetaRecientes="Pacientes en seguimiento"
               conteo={(p) => (p.seguimientos ? `${p.seguimientos} seguimiento${p.seguimientos > 1 ? "s" : ""}` : null)}
               onElegir={(p) => navigate(`/endocrinologia/seguimiento?paciente_id=${p.id}`)} />
           ) : (
             <>
+              {!embebido && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{paciente.nombres} {paciente.apellidos}</div>
@@ -696,6 +706,9 @@ export default function ConsultaEndocrinologia() {
                 </button>
                 </div>
               </div>
+
+              )}
+              {!embebido && <TarjetaDiabetes pacienteId={paciente.id} recarga={`${seguimientos.length}-${seguimientoActivo ? 1 : 0}`} />}
 
               {msg && (
                 <div style={{ padding: "10px 16px", borderRadius: 10, marginBottom: 14, fontSize: 13, fontWeight: 600, background: msg.tipo === "ok" ? "rgba(16,185,129,.1)" : "rgba(239,68,68,.1)", color: msg.tipo === "ok" ? "#059669" : "#dc2626" }}>

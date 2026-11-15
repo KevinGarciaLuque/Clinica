@@ -198,7 +198,11 @@ function PrintSesion({ sesion, paciente, user, logoUrl, headerCfg, onClose }) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-export default function ConsultaEducacion() {
+/**
+ * pacienteIdFijo / embebido: se usa también como pestaña dentro de la Consulta Médica
+ * (sin encabezado propio y con el paciente de la consulta).
+ */
+export default function ConsultaEducacion({ pacienteIdFijo = null, embebido = false } = {}) {
   const { user } = useAuth();
   const [params] = useSearchParams();
   const navigate = useNavigate();
@@ -239,16 +243,16 @@ export default function ConsultaEducacion() {
   }, [user?.clinica_id]);
 
   useEffect(() => {
-    const pid = params.get("paciente_id");
+    const pid = pacienteIdFijo || params.get("paciente_id");
     if (!pid) return;
     api.get(`/pacientes/${pid}`)
       .then(r => {
         const p = r.data?.data || r.data;
-        if (p?.id) seleccionarPaciente(p, params.get("sesion_id"));
+        if (p?.id) seleccionarPaciente(p, embebido ? null : params.get("sesion_id"));
       })
       .catch(() => {});
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [params]);
+  }, [params, pacienteIdFijo]);
 
   useEffect(() => {
     if (params.get("print") === "1" && sesionActiva && sesionActiva !== "nueva") {
@@ -340,6 +344,7 @@ export default function ConsultaEducacion() {
     <>
       <style>{`
         .edu-root { display: flex; height: 100%; position: relative; }
+        .edu-emb { padding: 0 !important; background: transparent !important; overflow: visible !important; }
         .edu-main { flex: 1; padding: 16px 20px; overflow-y: auto; min-width: 0; background: #f1f5f9; }
         .edu-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 14px; }
         .edu-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-bottom: 14px; }
@@ -352,14 +357,17 @@ export default function ConsultaEducacion() {
       `}</style>
 
       <div className="edu-root">
-        <div className="edu-main">
-          {!paciente ? (
+        <div className={`edu-main${embebido ? " edu-emb" : ""}`}>
+          {!paciente && embebido ? (
+            <div style={{ padding: 30, textAlign: "center", color: "#94a3b8" }}><span className="spinner-border spinner-border-sm me-2" />Cargando…</div>
+          ) : !paciente ? (
             <SelectorPacienteModulo titulo="Educación en Diabetes" descripcion="Elija un paciente para ver sus sesiones educativas e informes MCG."
               icono="bi-mortarboard-fill" color={TEAL} recientesUrl="/educacion-diabetes/recientes" etiquetaRecientes="Pacientes en educación"
               conteo={(p) => (p.sesiones ? `${p.sesiones} sesión${p.sesiones > 1 ? "es" : ""}` : null)}
               onElegir={(p) => navigate(`/educacion/consulta?paciente_id=${p.id}`)} />
           ) : (
             <>
+              {!embebido && (
               <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 10, marginBottom: 12 }}>
                 <div>
                   <div style={{ fontSize: 18, fontWeight: 800, color: "#1e293b" }}>{paciente.nombres} {paciente.apellidos}</div>
@@ -374,6 +382,7 @@ export default function ConsultaEducacion() {
                 </button>
                 </div>
               </div>
+              )}
 
               <div style={{ display: "flex", gap: 8, marginBottom: 16 }}>
                 {[["sesiones", "Sesiones Educativas", "bi-mortarboard"], ["informes_mcg", "Informes MCG", "bi-file-earmark-medical"]].map(([v, txt, icon]) => (

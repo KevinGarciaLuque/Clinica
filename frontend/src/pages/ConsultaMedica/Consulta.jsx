@@ -2,7 +2,7 @@
  * FASE 4 — Consulta SOAP (Historia Clínica Electrónica)
  * URL: /consulta-medica?paciente_id=&cita_id=&historia_id=
  */
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from "react";
 import { createPortal } from "react-dom";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import dayjs from "dayjs";
@@ -30,6 +30,10 @@ import EcocardiogramaTab, { PrintEco } from "./EcocardiogramaTab";
 import NutricionTab from "./NutricionTab";
 import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
 import EsteticaTab from "./EsteticaTab";
+import TarjetaDiabetes from "../../components/TarjetaDiabetes";
+// Módulos de diabetes como pestañas de la consulta (se cargan solo si se abren)
+const ConsultaEndocrinologia = lazy(() => import("../endocrinologia/ConsultaEndocrinologia"));
+const ConsultaEducacion = lazy(() => import("../educacion/ConsultaEducacion"));
 
 // ═══════════════════════════════════════════════════════════════════════════════
 export default function Consulta() {
@@ -386,9 +390,13 @@ export default function Consulta() {
 
   const esDerma = modulos.some(m => m.ruta?.startsWith("/estetica/"));
   const esCardioEco = modulos.some(m => m.clave === "cardiologia_ecocardiograma");
+  const esDiabetes = modulos.some(m => m.clave === "control_seguimiento_dm1");
+  const esEducacionDm = modulos.some(m => m.clave === "educacion_diabetes");
 
   const TAB_LIST = [
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
+    ...(esDiabetes ? [{ id: "diabetes", icon: "bi-droplet-half", label: "Diabetes" }] : []),
+    ...(esEducacionDm ? [{ id: "educacion_dm", icon: "bi-mortarboard-fill", label: "Educación" }] : []),
     ...(esEstetica ? [{ id: "estetica", icon: "bi-stars", label: "Estética" }] : []),
     ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
     ...(esCardioEco ? [{ id: "cardio_eco", icon: "bi-heart-pulse-fill", label: "Ecocardiograma" }] : []),
@@ -583,11 +591,11 @@ export default function Consulta() {
             </button>
             {/* Clínicas de endocrinología: abrir los módulos de diabetes de este paciente */}
             {[
-              { clave: "control_seguimiento_dm1", ruta: "/endocrinologia/seguimiento", texto: "Control de Seguimiento", icono: "bi-droplet-half", c1: "#f97316", c2: "#ea580c" },
-              { clave: "educacion_diabetes", ruta: "/educacion/consulta", texto: "Educación en Diabetes", icono: "bi-mortarboard-fill", c1: "#14b8a6", c2: "#0d9488" },
+              { clave: "control_seguimiento_dm1", tab: "diabetes", texto: "Control de Seguimiento", icono: "bi-droplet-half", c1: "#f97316", c2: "#ea580c" },
+              { clave: "educacion_diabetes", tab: "educacion_dm", texto: "Educación en Diabetes", icono: "bi-mortarboard-fill", c1: "#14b8a6", c2: "#0d9488" },
             ].filter((m) => modulos.some((x) => x.clave === m.clave)).map((m) => (
               <button key={m.clave} type="button"
-                onClick={() => navigate(`${m.ruta}?paciente_id=${paciente.id}${citaId ? `&cita_id=${citaId}` : ""}`)}
+                onClick={() => { setTab(m.tab); setTimeout(() => document.querySelector("[data-consulta-tabs]")?.scrollIntoView({ behavior: "smooth", block: "start" }), 50); }}
                 title={`Abrir ${m.texto} de este paciente`}
                 style={{
                   background: `linear-gradient(135deg, ${m.c1}, ${m.c2})`, border: "none", borderRadius: 8, color: "#fff",
@@ -623,6 +631,11 @@ export default function Consulta() {
           <PacienteResumenCard resumen={resumenPac} />
         )}
 
+        {/* ── Cómo va su diabetes (clínicas de endocrinología) ── */}
+        {esDiabetes && (paciente?.id || pacId) && (
+          <TarjetaDiabetes pacienteId={paciente?.id || pacId} recarga={tab} onAbrirSeguimiento={() => setTab("diabetes")} />
+        )}
+
         {alertMsg && (
           <div className={`alert alert-${alertMsg.type} py-2 alert-dismissible mb-3`} style={{ borderRadius: 10 }}>
             {alertMsg.msg}
@@ -631,7 +644,7 @@ export default function Consulta() {
         )}
 
         {/* ── Tabs principales ── */}
-        <div style={{
+        <div data-consulta-tabs="1" style={{
           background: "linear-gradient(135deg, #1a2744 0%, #243b72 100%)",
           borderRadius: "12px 12px 0 0",
           display: "flex",
@@ -729,6 +742,15 @@ export default function Consulta() {
               firmada={soloLectura}
               onAutoSave={async () => handleSave(false)}
             />
+          )}
+
+          {/* ── Diabetes y Educación: los módulos completos, con el paciente de la consulta ── */}
+          {(tab === "diabetes" || tab === "educacion_dm") && (paciente?.id || pacId) && (
+            <Suspense fallback={<div className="text-center text-muted py-4"><span className="spinner-border spinner-border-sm me-2" />Cargando…</div>}>
+              {tab === "diabetes"
+                ? <ConsultaEndocrinologia embebido pacienteIdFijo={paciente?.id || pacId} />
+                : <ConsultaEducacion embebido pacienteIdFijo={paciente?.id || pacId} />}
+            </Suspense>
           )}
 
           {/* ── Estética ── */}
