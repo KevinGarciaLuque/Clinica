@@ -22,6 +22,13 @@ const cloudinary = require("../utils/cloudinary");
 const streamifier = require("streamifier");
 const { uploadComprobante } = require("../middlewares/upload");
 const { aplicarPresetModulosClinica } = require("./clinicas");
+const { formaValida, numeroPagos, FORMAS } = require("../utils/formasPago");
+
+/** Guarda la forma de pago elegida (columna opcional; si no existe, no rompe). */
+async function guardarFormaPago(id, plan, forma) {
+  const f = plan === "trial" ? null : (formaValida(forma) || "contado");
+  await pool.query("UPDATE solicitudes_plan_publico SET forma_pago=? WHERE id=?", [f, id]).catch(() => {});
+}
 const sse     = require("../utils/sseManager");
 const webPush = require("../utils/webPush");
 const {
@@ -92,12 +99,13 @@ router.post("/iniciar", solicitarLimiter, async (req, res) => {
     }
 
     const token = crypto.randomBytes(20).toString("hex");
-    await pool.query(
+    const [rIni] = await pool.query(
       `INSERT INTO solicitudes_plan_publico
          (nombres, apellidos, email, telefono, nombre_clinica, nivel_plan, plan_solicitado, mensaje, estado, token, datos_confirmados_en)
        VALUES (?,?,?,?,?,?,?,?, 'iniciada', ?, NOW())`,
       [nombres, apellidos, email, telefono || null, nombre_clinica, nivel, plan_solicitado, mensaje || null, token]
     );
+    await guardarFormaPago(rIni.insertId, plan_solicitado, req.body.forma_pago);
 
     const [[cuenta]] = await pool.query("SELECT banco, titular, numero_cuenta, numero_cci, moneda FROM config_pagos WHERE id=1 LIMIT 1");
 
@@ -176,6 +184,7 @@ router.post("/solicitar", solicitarLimiter, uploadComprobante.single("comprobant
       );
       solicitudId = r.insertId;
     }
+    await guardarFormaPago(solicitudId, plan_solicitado, req.body.forma_pago);
     const planNombre = planCompletoLabel(nivel, plan_solicitado);
 
     // Notifica a todos los SUPER_ADMIN activos
@@ -301,6 +310,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
     );
 
     const montoFinal = monto != null && monto !== "" ? Number(monto) : null;
+    let montoPrimerPago = montoFinal;
     await pool.query(
       `UPDATE solicitudes_plan_publico
        SET estado='aprobada', clinica_id=?, usuario_id=?, atendida_por=?, atendida_en=NOW(), monto=?, moneda=?
@@ -344,6 +354,24 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
           [rc.numero, clinicaId]
         );
         if (rc.error) emailErrors.push(`contrato: ${rc.error}`);
+
+        // Forma de pago elegida por el médico y primer pago (con el comprobante que subió)
+        try {
+          const cob = require("./cobranza");
+          await cob.asegurarTabla();
+          const forma = formaValida(solicitud.forma_pago) || "contado";
+          await pool.query("UPDATE clinicas SET lic_forma_pago=?, lic_nivel=? WHERE id=?", [forma, solicitud.nivel_plan || null, clinicaId]);
+          if (montoFinal > 0) {
+            const n = numeroPagos(solicitud.plan_solicitado, forma) || 1;
+            montoPrimerPago = Math.round((montoFinal / n) * 100) / 100;
+            await cob.registrarPago({
+              clinicaId, monto: montoPrimerPago, moneda: monedaFinal, metodo: "TRANSFERENCIA",
+              referencia: `Solicitud SP-${String(id).padStart(6, "0")}`,
+              notas: n > 1 ? `Pago 1 de ${n} (${FORMAS[forma].label.toLowerCase()})` : "Pago del plan completo",
+              comprobanteUrl: solicitud.comprobante_url || null, creadoPor: req.user.id,
+            });
+          }
+        } catch (e) { console.error("[aprobar forma de pago]", e.message); }
       }
     } catch (e) { console.error("[aprobar contrato]", e.message); emailErrors.push(`contrato: ${e.message}`); }
 
@@ -377,7 +405,7 @@ router.post("/solicitudes/:id/aprobar", auth("SUPER_ADMIN"), async (req, res) =>
         nombres: `${solicitud.nombres} ${solicitud.apellidos}`,
         clinicaNombre: solicitud.nombre_clinica,
         planNombre,
-        monto: montoFinal,
+        monto: montoPrimerPago,
         moneda: moneda || "HNL",
         fecha: new Date().toLocaleDateString("es-PE"),
         numeroRecibo: `SP-${String(id).padStart(6, "0")}`,

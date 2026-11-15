@@ -4,6 +4,7 @@ import { useNavigate } from "react-router-dom";
 import api from "../../api/api";
 import ClinicaDetallesModal from "../../components/ClinicaDetallesModal";
 import { setClinicaActiva } from "../../utils/clinicaActiva";
+import { FORMAS_PAGO, numeroPagos } from "../../utils/planes";
 
 /* ── Paleta ────────────────────────────────────────────────── */
 const C = {
@@ -82,7 +83,7 @@ export default function Clinicas() {
   // Modal de gestión de licencia
   const [showLicenciaModal, setShowLicenciaModal]     = useState(false);
   const [clinicaLicencia, setClinicaLicencia]         = useState(null);
-  const LIC_FORM_BASE = { plan_tipo: "anual", inicio_manual: "", fin_manual: "", meses_manual: "", monto: "", monto_mensual: "", moneda: "HNL", dia_facturacion: "", clausulas_contrato: "", notas: "" };
+  const LIC_FORM_BASE = { plan_tipo: "anual", forma_pago: "contado", registrar_pago: true, inicio_manual: "", fin_manual: "", meses_manual: "", monto: "", monto_mensual: "", moneda: "HNL", dia_facturacion: "", clausulas_contrato: "", notas: "" };
   const [licenciaForm, setLicenciaForm]               = useState(LIC_FORM_BASE);
   const [licenciaGuardando, setLicenciaGuardando]     = useState(false);
 
@@ -407,8 +408,13 @@ export default function Clinicas() {
 
   const abrirLicencia = (c) => {
     setClinicaLicencia(c);
-    setLicenciaForm({ ...LIC_FORM_BASE, plan_tipo: c.plan_tipo || "anual", moneda: c.lic_moneda || "HNL" });
+    setLicenciaForm({ ...LIC_FORM_BASE, plan_tipo: c.plan_tipo || "anual", moneda: c.lic_moneda || "HNL", forma_pago: c.lic_forma_pago || "contado" });
     setShowLicenciaModal(true);
+    // Forma de pago actual de la clínica (para renovar igual)
+    api.get(`/clinicas/${c.id}/licencia`).then((r) => {
+      const f = r.data?.data?.forma_pago;
+      if (f) setLicenciaForm((x) => ({ ...x, forma_pago: f }));
+    }).catch(() => {});
     setError("");
   };
 
@@ -2241,7 +2247,25 @@ export default function Clinicas() {
               {licenciaForm.plan_tipo !== "trial" && (
                 <div style={{ borderTop: `1px dashed ${C.border}`, paddingTop: 14, display: "flex", flexDirection: "column", gap: 12 }}>
                   <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
-                    Facturación mensual
+                    Forma de pago
+                  </div>
+                  <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
+                    {Object.entries(FORMAS_PAGO).map(([k, f]) => {
+                      const sel = (licenciaForm.forma_pago || "contado") === k;
+                      const n = numeroPagos(licenciaForm.plan_tipo, k);
+                      const total = Number(licenciaForm.monto) || (Number(licenciaForm.monto_mensual) * (licenciaForm.plan_tipo === "anual" ? 12 : 6)) || 0;
+                      return (
+                        <button key={k} type="button" onClick={() => setLicenciaForm({ ...licenciaForm, forma_pago: k })}
+                          style={{ textAlign: "left", borderRadius: 10, padding: "8px 10px", cursor: "pointer",
+                            background: sel ? "rgba(33,150,243,.15)" : "transparent", border: `1px solid ${sel ? "#2196f3" : C.border}`, color: sel ? "#90caf9" : C.muted }}>
+                          <div style={{ fontWeight: 700, fontSize: 13 }}>{f.label}</div>
+                          <div style={{ fontSize: 11 }}>{n > 1 ? `${n} pagos${total ? ` de ${(total / n).toLocaleString("en-US", { maximumFractionDigits: 2 })}` : ""}` : "todo al inicio"}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div style={{ fontSize: 12, fontWeight: 600, color: C.muted, textTransform: "uppercase", letterSpacing: ".05em" }}>
+                    Montos
                   </div>
                   <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(130px, 1fr))", gap: 12 }}>
                     <Field label="Cuota mensual" hint="(sin impuesto)">
@@ -2289,6 +2313,13 @@ export default function Clinicas() {
                       onChange={(e) => setLicenciaForm({ ...licenciaForm, clausulas_contrato: e.target.value })}
                     />
                   </Field>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: C.text || "#e2e8f0", cursor: "pointer" }}>
+                    <input type="checkbox" checked={!!licenciaForm.registrar_pago}
+                      onChange={(e) => setLicenciaForm({ ...licenciaForm, registrar_pago: e.target.checked })} />
+                    {numeroPagos(licenciaForm.plan_tipo, licenciaForm.forma_pago || "contado") > 1
+                      ? "Ya recibí el primer pago (registrarlo en Cobranza)"
+                      : "Ya recibí el pago del plan (registrarlo en Cobranza)"}
+                  </label>
                   <div style={{ fontSize: 11.5, color: C.muted }}>
                     Al activar se envía el <strong>contrato de servicio</strong> por correo. El primer
                     <strong> recibo mensual</strong> se emite el mes siguiente, en el día de cobro indicado.

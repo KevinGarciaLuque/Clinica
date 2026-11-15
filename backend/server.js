@@ -499,6 +499,12 @@ const pool = require("./db");
       `);
       console.log("✅ [auto-migrate] solicitudes_plan_publico.nivel_plan agregado");
     }
+    // Forma de pago elegida por el médico (un solo pago, cada 3 / 2 meses, mes a mes)
+    const [colFormaPago] = await pool.query(`SHOW COLUMNS FROM solicitudes_plan_publico LIKE 'forma_pago'`);
+    if (!colFormaPago.length) {
+      await pool.query("ALTER TABLE solicitudes_plan_publico ADD COLUMN forma_pago VARCHAR(12) NULL");
+      console.log("✅ [auto-migrate] solicitudes_plan_publico.forma_pago agregado");
+    }
 
     // Tabla catálogo de procedimientos dermatológicos/estéticos
     await pool.query(`

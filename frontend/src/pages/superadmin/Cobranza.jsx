@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import api from "../../api/api";
+import { FORMAS_PAGO, numeroPagos } from "../../utils/planes";
 
 // Super admin → Cobranza: cuánto le toca pagar a cada clínica, cuánto ha pagado,
 // quién está atrasado y cuánto dinero se ha generado. Los pagos se registran aquí.
@@ -310,7 +311,10 @@ function ModalCuota({ clinica, lista, onCerrar, onGuardado }) {
       </div>
       <label style={{ ...lbl, marginTop: 14 }}>¿Cómo paga?</label>
       <div className="d-grid gap-2" style={{ gridTemplateColumns: "repeat(2,minmax(0,1fr))" }}>
-        {[{ k: "contado", t: "Un solo pago", d: `Todo el plan al inicio (${meses} meses)` }, { k: "mensual", t: "Mensual", d: "Una cuota cada mes" }].map((o) => (
+        {Object.entries(FORMAS_PAGO).map(([k, f]) => {
+          const n = numeroPagos(plan, k);
+          return { k, t: f.label, d: n > 1 ? `${n} pagos${Number(monto) > 0 ? ` de ${dinero((Number(monto) * meses) / n, moneda)}` : ""}` : `Todo al inicio (${meses} meses)` };
+        }).map((o) => (
           <button key={o.k} type="button" onClick={() => setForma(o.k)}
             style={{ borderRadius: 12, padding: "9px 8px", cursor: "pointer", textAlign: "center", background: forma === o.k ? `${C.success}22` : "transparent", border: `1px solid ${forma === o.k ? C.success : C.border}`, color: C.text }}>
             <div style={{ fontWeight: 800, fontSize: "0.85rem" }}>{o.t}</div>
@@ -319,12 +323,12 @@ function ModalCuota({ clinica, lista, onCerrar, onGuardado }) {
         ))}
       </div>
       <div className="row g-2 mt-2">
-        <div className={forma === "mensual" ? "col-7" : "col-12"}>
+        <div className={forma !== "contado" ? "col-7" : "col-12"}>
           <label style={lbl}>Cuota mensual ({SIMBOLO[moneda] || moneda})</label>
           <input style={{ ...inp, fontWeight: 800, fontSize: "1.05rem" }} type="number" min="0" step="0.01" inputMode="decimal" value={monto}
             onChange={(e) => { setMonto(e.target.value); }} />
         </div>
-        {forma === "mensual" && (
+        {forma !== "contado" && (
           <div className="col-5">
             <label style={lbl}>Día de cobro</label>
             <input style={inp} type="number" min="1" max="28" value={dia} onChange={(e) => setDia(e.target.value)} />
@@ -335,7 +339,7 @@ function ModalCuota({ clinica, lista, onCerrar, onGuardado }) {
         <div style={{ color: C.muted, fontSize: "0.8rem", marginTop: 8 }}>
           {forma === "contado"
             ? <>Se cobra <b style={{ color: C.text }}>un solo pago de {dinero(Number(monto) * meses, moneda)}</b> el {fFecha(clinica.licencia_inicio)} por los {meses} meses.</>
-            : <>Total del plan: <b style={{ color: C.text }}>{dinero(Number(monto) * meses, moneda)}</b> en {meses} cuotas.</>}
+            : <>Total del plan: <b style={{ color: C.text }}>{dinero(Number(monto) * meses, moneda)}</b> en {numeroPagos(plan, forma)} pagos de {dinero((Number(monto) * meses) / numeroPagos(plan, forma), moneda)} ({FORMAS_PAGO[forma]?.label.toLowerCase()}).</>}
         </div>
       )}
       {error && <div style={{ color: C.danger, fontSize: "0.85rem", marginTop: 10 }}><i className="bi bi-exclamation-circle me-1" />{error}</div>}
@@ -413,8 +417,7 @@ function ModalVarias({ clinicas, lista, onCerrar, onGuardado }) {
         <div className="col-5">
           <label style={lbl}>¿Cómo pagan?</label>
           <select style={inp} value={forma} onChange={(e) => setForma(e.target.value)}>
-            <option value="contado">Un solo pago</option>
-            <option value="mensual">Mensual</option>
+            {Object.entries(FORMAS_PAGO).map(([k, f]) => <option key={k} value={k}>{f.label}</option>)}
           </select>
         </div>
       </div>
@@ -479,7 +482,7 @@ function ModalCuenta({ clinica, onCerrar, onPagar, onCambio }) {
           <>
             {/* Contacto y plan */}
             <div className="d-flex flex-wrap gap-2 align-items-center mb-3" style={{ fontSize: "0.82rem", color: C.muted }}>
-              <Chip color={C.accent} icon="bi-award">{PLAN[d.clinica.plan_tipo] || d.clinica.plan_tipo}{clinica.forma_pago ? ` · ${clinica.forma_pago === "contado" ? "pago único" : "mensual"}` : ""}</Chip>
+              <Chip color={C.accent} icon="bi-award">{PLAN[d.clinica.plan_tipo] || d.clinica.plan_tipo}{clinica.forma_pago ? ` · ${(FORMAS_PAGO[clinica.forma_pago]?.label || "").toLowerCase()}` : ""}</Chip>
               {d.clinica.licencia_inicio && <span><i className="bi bi-calendar-range me-1" />{fFecha(d.clinica.licencia_inicio)} → {fFecha(d.clinica.licencia_fin)}</span>}
               {d.clinica.email && <a href={`mailto:${d.clinica.email}`} style={{ color: C.muted }}><i className="bi bi-envelope me-1" />{d.clinica.email}</a>}
               {tel && <a href={`https://wa.me/${tel.length === 8 ? `504${tel}` : tel}`} target="_blank" rel="noreferrer" style={{ color: "#25d366" }}><i className="bi bi-whatsapp me-1" />{d.clinica.telefono}</a>}
@@ -516,9 +519,9 @@ function ModalCuenta({ clinica, onCerrar, onPagar, onCambio }) {
                   return (
                     <div key={q.periodo} style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderBottom: `1px solid ${C.border}`, flexWrap: "wrap", fontSize: "0.85rem" }}>
                       <div style={{ minWidth: 120, flex: "1 1 120px" }}>
-                        <div style={{ fontWeight: 700 }}>{q.unico ? `Plan ${PLAN[q.plan_tipo] || ""} · pago único` : fMes(q.periodo, true)}</div>
+                        <div style={{ fontWeight: 700 }}>{q.unico ? `Plan ${PLAN[q.plan_tipo] || ""} · pago único` : q.bloque ? `Pago ${q.bloque.n} de ${q.bloque.de}` : fMes(q.periodo, true)}</div>
                         <div style={{ fontSize: "0.72rem", color: C.muted }}>
-                          {q.unico ? `Del ${fFecha(q.fecha_cobro)} al ${fFecha(q.hasta)} (${q.meses} meses)` : `Cobro: ${fFecha(q.fecha_cobro)}`}{q.recibo ? ` · ${q.recibo.numero}` : ""}{q.estimada ? " · estimada" : ""}
+                          {q.unico ? `Del ${fFecha(q.fecha_cobro)} al ${fFecha(q.hasta)} (${q.meses} meses)` : q.bloque ? `Cobro: ${fFecha(q.fecha_cobro)} · cubre ${q.bloque.meses} meses (hasta ${fFecha(q.hasta)})` : `Cobro: ${fFecha(q.fecha_cobro)}`}{q.recibo ? ` · ${q.recibo.numero}` : ""}{q.estimada ? " · estimada" : ""}
                         </div>
                       </div>
                       <div style={{ textAlign: "right", flex: "0 0 auto" }}>
@@ -631,7 +634,7 @@ export default function Cobranza() {
     setVerExport(false);
     descargarCsv(`cobranza-clinicas-${hoyTexto()}.csv`, [
       ["Clínica", "Estado", "Plan", "Forma de pago", "Cuota mensual", "Total del plan", "Moneda", "Inicio", "Vence", "Le toca a hoy", "Pagado", "Descuentos", "Saldo", "Próximo cobro", "Último pago", "Correo", "Teléfono"],
-      ...d.clinicas.map((c) => [c.nombre, ESTADO_TXT[c.estado] || c.estado, PLAN[c.plan_tipo] || c.plan_tipo, c.forma_pago === "contado" ? "Pago único" : c.forma_pago === "mensual" ? "Mensual" : "",
+      ...d.clinicas.map((c) => [c.nombre, ESTADO_TXT[c.estado] || c.estado, PLAN[c.plan_tipo] || c.plan_tipo, FORMAS_PAGO[c.forma_pago]?.label || "",
         c.cuota_mensual ?? "", c.cuota_mensual && c.meses_plan ? Math.round(c.cuota_mensual * c.meses_plan * 100) / 100 : "", c.moneda, c.licencia_inicio || "", c.licencia_fin || "",
         c.esperado, c.pagado, c.descuentos || 0, c.saldo, c.proxima_cuota?.fecha || "", c.ultimo_pago?.fecha || "", c.email || "", c.telefono || ""]),
     ]);
@@ -833,6 +836,11 @@ export default function Cobranza() {
                   <>
                     <b style={{ fontSize: "0.9rem" }}>{dinero(c.cuota_mensual * c.meses_plan, c.moneda)}</b>
                     <div style={{ fontSize: "0.72rem", color: C.muted }}>pago único · {dinero(c.cuota_mensual, c.moneda)}/mes</div>
+                  </>
+                ) : ["trimestral", "bimestral"].includes(c.forma_pago) && c.cuota_mensual > 0 ? (
+                  <>
+                    <b style={{ fontSize: "0.9rem" }}>{dinero(c.cuota_mensual * FORMAS_PAGO[c.forma_pago].cada, c.moneda)}</b>
+                    <div style={{ fontSize: "0.72rem", color: C.muted }}>{FORMAS_PAGO[c.forma_pago].label.toLowerCase()} · {numeroPagos(c.plan_tipo, c.forma_pago)} pagos</div>
                   </>
                 ) : c.en_prueba ? (
                   <span style={{ color: C.violet, fontSize: "0.82rem", fontWeight: 700 }}>

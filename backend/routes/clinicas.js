@@ -641,7 +641,23 @@ router.get("/mi-licencia",
       `SELECT id, plan_solicitado, tipo_solicitud, creado_en FROM solicitudes_licencia
        WHERE clinica_id=? AND estado='pendiente' ORDER BY id DESC LIMIT 1`, [cid]).catch(() => [[null]]);
     const dias = diasHasta(c.licencia_fin);
+    // Próximo pago del plan (para el aviso a la clínica cuando paga en partes)
+    let pago = null;
+    try {
+      const { estadoCuentaClinica } = require("./cobranza");
+      const [[fp]] = await pool.query("SELECT lic_forma_pago FROM clinicas WHERE id=?", [cid]);
+      const st = await estadoCuentaClinica(cid);
+      const q = st.detalle.find((x) => x.falta > 0);
+      if (q) {
+        pago = {
+          fecha: q.fecha_cobro, monto: q.falta, moneda: q.moneda, forma_pago: fp?.lic_forma_pago || null,
+          numero: q.bloque?.n || null, de: q.bloque?.de || null,
+          dias: Math.round((new Date(`${q.fecha_cobro}T12:00:00`) - new Date(`${new Date().toISOString().slice(0, 10)}T12:00:00`)) / 86400000),
+        };
+      }
+    } catch { /* sin datos de cobranza */ }
     res.json({ ok: true, data: {
+      pago,
       plan_tipo: c.plan_tipo || "trial",
       licencia_inicio: c.licencia_inicio || null,
       licencia_fin: c.licencia_fin || null,
@@ -1173,10 +1189,12 @@ router.get("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
       [req.params.id]
     );
 
+    const [[fp]] = await pool.query("SELECT lic_forma_pago FROM clinicas WHERE id=?", [req.params.id]).catch(() => [[null]]);
     res.json({
       ok: true,
       data: {
         plan_tipo:       plan_tipo || "trial",
+        forma_pago:      fp?.lic_forma_pago || null,
         licencia_inicio: licencia_inicio || null,
         licencia_fin:    licencia_fin    || null,
         dias_restantes:  dias,
@@ -1272,6 +1290,27 @@ router.post("/:id/licencia", auth("SUPER_ADMIN"), async (req, res) => {
          : (notas || null),
        montoTotal, montoMensual, monedaFinal, duracionMeses || null, diaFact]
     );
+
+    // ── Forma de pago (un solo pago / cada 3 / cada 2 meses / mes a mes) y pago recibido ──
+    if (plan_tipo !== "trial") {
+      try {
+        const { formaValida, numeroPagos } = require("../utils/formasPago");
+        const cob = require("./cobranza");
+        await cob.asegurarTabla();
+        const forma = formaValida(req.body.forma_pago) || "contado";
+        await pool.query("UPDATE clinicas SET lic_forma_pago=? WHERE id=?", [forma, req.params.id]);
+        const totalPlan = montoMensual != null && duracionMeses > 0 ? montoMensual * duracionMeses : (montoTotal || 0);
+        if (req.body.registrar_pago && totalPlan > 0) {
+          const n = numeroPagos(plan_tipo, forma) || 1;
+          await cob.registrarPago({
+            clinicaId: Number(req.params.id), fecha: inicio.toISOString().slice(0, 10),
+            monto: Math.round((totalPlan / n) * 100) / 100, moneda: monedaFinal, metodo: "OTRO",
+            notas: n > 1 ? `Pago 1 de ${n} — registrado al activar la licencia` : "Pago del plan — registrado al activar la licencia",
+            creadoPor: req.user.id,
+          });
+        }
+      } catch (e) { console.error("[licencia forma de pago]", e.message); }
+    }
 
     // ── Emitir contrato de servicio (salvo trial o si se pide omitir) ──
     let contrato = null;

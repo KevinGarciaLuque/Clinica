@@ -5,7 +5,7 @@
 import { useEffect, useState } from "react";
 import api from "../../api/api";
 import { MONEDAS } from "../../utils/monedas";
-import { planCompletoLabel, precioClave } from "../../utils/planes";
+import { planCompletoLabel, precioClave, FORMAS_PAGO, montoPorForma } from "../../utils/planes";
 
 const ROLES_USUARIO = [
   { id: "ADMIN",         label: "Administrador de la clínica" },
@@ -54,9 +54,10 @@ export default function SolicitudesPlan() {
 
   const abrirAprobar = (sol) => {
     setModal(sol);
-    const precioSugerido = sol.plan_solicitado === "trial"
-      ? ""
-      : pagosCfg?.[precioClave(sol.nivel_plan, sol.plan_solicitado)] ?? "";
+    // Total del plan con el recargo de la forma de pago que eligió el médico
+    const calc = sol.plan_solicitado === "trial" ? null
+      : montoPorForma(pagosCfg?.[precioClave(sol.nivel_plan, sol.plan_solicitado)], sol.plan_solicitado, sol.forma_pago || "contado", pagosCfg || {});
+    const precioSugerido = calc ? calc.total : "";
     setForm({
       slug: sol.nombre_clinica.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, ""),
       tipo_id: "", es_pediatrica: false, monto: precioSugerido, moneda: pagosCfg?.moneda || "HNL",
@@ -203,6 +204,11 @@ export default function SolicitudesPlan() {
                   <div className="text-muted small mb-1">{sol.email} · {sol.telefono || "sin teléfono"}</div>
                   <div className="small mb-2"><strong>Clínica:</strong> {sol.nombre_clinica}</div>
                   <span className="badge bg-primary-subtle text-primary-emphasis">{planCompletoLabel(sol.nivel_plan, sol.plan_solicitado)}</span>
+                  {sol.plan_solicitado !== "trial" && (
+                    <span className="badge bg-warning-subtle text-warning-emphasis ms-1">
+                      <i className="bi bi-calendar2-range me-1" />{FORMAS_PAGO[sol.forma_pago || "contado"]?.label || "Un solo pago"}
+                    </span>
+                  )}
                   {sol.monto != null && (
                     <span className="badge bg-success-subtle text-success-emphasis ms-1">{sol.moneda} {Number(sol.monto).toFixed(2)}</span>
                   )}
@@ -250,6 +256,11 @@ export default function SolicitudesPlan() {
                     <span className="badge bg-primary-subtle text-primary-emphasis">
                       Plan solicitado: {planCompletoLabel(modal.nivel_plan, modal.plan_solicitado)}
                     </span>
+                    {modal.plan_solicitado !== "trial" && (
+                      <span className="badge bg-warning-subtle text-warning-emphasis ms-1">
+                        Forma de pago: {FORMAS_PAGO[modal.forma_pago || "contado"]?.label || "Un solo pago"}
+                      </span>
+                    )}
                   </div>
                   <button type="button" className="btn-close" onClick={() => setModal(null)} />
                 </div>
@@ -294,9 +305,19 @@ export default function SolicitudesPlan() {
                   </div>
                   <div className="row g-2">
                     <div className="col-8">
-                      <label className="form-label small fw-semibold">Monto cobrado (para el recibo)</label>
+                      <label className="form-label small fw-semibold">Total del plan</label>
                       <input type="number" step="0.01" className="form-control" value={form.monto}
                              onChange={(e) => setForm((f) => ({ ...f, monto: e.target.value }))} />
+                      {(() => {
+                        const n = modal.plan_solicitado === "trial" ? 0 : (montoPorForma(form.monto, modal.plan_solicitado, modal.forma_pago || "contado")?.pagos || 1);
+                        return Number(form.monto) > 0 && n > 0 ? (
+                          <div className="small text-muted mt-1">
+                            {n > 1
+                              ? <>Paga en <b>{n} pagos de {form.moneda} {(Number(form.monto) / n).toFixed(2)}</b>. El primero (el de su comprobante) queda registrado en Cobranza.</>
+                              : <>Un solo pago. Queda registrado en Cobranza con su comprobante.</>}
+                          </div>
+                        ) : null;
+                      })()}
                     </div>
                     <div className="col-4">
                       <label className="form-label small fw-semibold">Moneda</label>

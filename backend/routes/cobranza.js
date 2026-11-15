@@ -14,6 +14,7 @@ const pool = require("../db");
 const auth = require("../middlewares/auth");
 const { uploadComprobante } = require("../middlewares/upload");
 const { enviarEmail } = require("../utils/mailer");
+const { FORMAS, formaValida, asegurarRecargos } = require("../utils/formasPago");
 
 const DIAS_GRACIA = 10; // después de esto la cuota se considera atrasada
 const METODOS = ["TRANSFERENCIA", "DEPOSITO", "EFECTIVO", "TARJETA", "OTRO"];
@@ -56,14 +57,18 @@ async function asegurarTabla() {
   if (!tiene("comprobante_tipo")) await pool.query("ALTER TABLE pagos_licencia ADD COLUMN comprobante_tipo VARCHAR(60) NULL");
   if (!tiene("comprobante_nombre")) await pool.query("ALTER TABLE pagos_licencia ADD COLUMN comprobante_nombre VARCHAR(160) NULL");
   if (!tiene("recibo_enviado_en")) await pool.query("ALTER TABLE pagos_licencia ADD COLUMN recibo_enviado_en DATETIME NULL");
+  if (!tiene("comprobante_url")) await pool.query("ALTER TABLE pagos_licencia ADD COLUMN comprobante_url VARCHAR(500) NULL");
   tablaOk = true;
 }
 
 const NIVELES = ["basico", "avanzado", "empresarial"];
 /** Lista de precios (Página Pública → precios): total por periodo según nivel y plan. */
 async function listaPrecios() {
+  await asegurarRecargos(pool).catch(() => {});
   const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1").catch(() => [[null]]);
   const moneda = row?.moneda || "HNL";
+  const recargos = {};
+  for (const f of ["trimestral", "bimestral", "mensual"]) recargos[f] = Number(row?.[`recargo_${f}_pct`]) || 0;
   const precios = {};
   for (const n of NIVELES) {
     for (const plan of ["semestral", "anual"]) {
@@ -71,7 +76,7 @@ async function listaPrecios() {
       precios[`${n}_${plan}`] = v != null && Number(v) > 0 ? Number(v) : null;
     }
   }
-  return { moneda, precios };
+  return { moneda, precios, recargos };
 }
 /**
  * Plan real de cada clínica (nivel y, si se sabe, monto acordado), buscando en:
@@ -110,14 +115,16 @@ function cuotaPorPlan(lista, c, det) {
     return { monto: r2(det.monto_total / meses), moneda: det.moneda || lista.moneda, nivel: det.nivel, fuente: "solicitud_monto" };
   }
   const nivel = det?.nivel || "basico";
-  const m = cuotaDeLista(lista, c.plan_tipo, nivel);
+  const base = cuotaDeLista(lista, c.plan_tipo, nivel);
+  const forma = formaDe(c);
+  const m = base ? r2(base * (1 + (forma === "contado" ? 0 : (lista.recargos?.[forma] || 0)) / 100)) : null;
   return m ? { monto: m, moneda: lista.moneda, nivel, fuente: det?.nivel ? det.fuente : "sin_nivel" } : null;
 }
 
 /** Forma de pago de la licencia actual: la guardada; si no hay, las estimadas por lista
  *  se toman de contado (la lista de precios es por todo el plan) y las demás, mensual. */
 function formaDe(c) {
-  if (c.forma_pago === "contado" || c.forma_pago === "mensual") return c.forma_pago;
+  if (formaValida(c.forma_pago)) return c.forma_pago;
   return Number(c.monto_mensual) > 0 ? "mensual" : "contado";
 }
 
@@ -194,7 +201,7 @@ async function calendarioCuotas(clinicaId = null) {
     }
   });
   // Si el plan actual se paga de una sola vez, el historial mensual de ese mismo periodo no cuenta
-  const contado = new Map([...actuales, ...estimadas].filter((c) => c.forma_pago === "contado").map((c) => [c.clinica_id, c]));
+  const contado = new Map([...actuales, ...estimadas].filter((c) => c.forma_pago !== "mensual").map((c) => [c.clinica_id, c]));
   for (let i = filas.length - 1; i >= 0; i--) {
     const c = contado.get(filas[i].clinica_id);
     if (c && aFecha(filas[i].inicio) < aFecha(c.fin) && aFecha(filas[i].fin) > aFecha(c.inicio)) filas.splice(i, 1);
@@ -222,6 +229,21 @@ async function calendarioCuotas(clinicaId = null) {
         mapa.set(periodo, { periodo, fecha_cobro: fecha, monto: r2(f.monto_mensual), moneda: f.moneda || "HNL", plan_tipo: f.plan_tipo, ...(f.estimada ? { estimada: true } : {}) });
       }
       m += 1; if (m > 12) { m = 1; y += 1; }
+    }
+    // Cada 2 o 3 meses: las cuotas mensuales del periodo se juntan en pagos de N meses
+    const cada = FORMAS[f.forma_pago]?.cada;
+    if (cada && cada > 1) {
+      const mensuales = [...mapa.values()].filter((q) => q.fecha_cobro >= ini && q.fecha_cobro < fin && !q.unico && !q.bloque)
+        .sort((a, b) => a.fecha_cobro.localeCompare(b.fecha_cobro));
+      mensuales.forEach((q) => mapa.delete(q.periodo));
+      const grupos = [];
+      for (let k = 0; k < mensuales.length; k += cada) grupos.push(mensuales.slice(k, k + cada));
+      grupos.forEach((g, k) => {
+        const hasta = grupos[k + 1]?.[0]?.fecha_cobro || fin;
+        mapa.set(g[0].periodo, { periodo: g[0].periodo, fecha_cobro: g[0].fecha_cobro, monto: r2(g.reduce((a, q) => a + q.monto, 0)),
+          moneda: g[0].moneda, plan_tipo: f.plan_tipo, bloque: { n: k + 1, de: grupos.length, meses: g.length }, hasta,
+          ...(f.estimada ? { estimada: true } : {}) });
+      });
     }
     // Un solo pago por todo el plan: un único cargo el día de inicio
     if (f.forma_pago === "contado") {
@@ -428,7 +450,7 @@ router.get("/clinica/:id", auth("SUPER_ADMIN"), async (req, res) => {
     const [pagos] = await pool.query(
       `SELECT p.id, p.clinica_id, p.fecha, p.monto, p.moneda, p.metodo, p.referencia, p.notas, p.periodo, p.tipo,
               p.anulado, p.anulado_en, p.creado_en, p.recibo_enviado_en, p.comprobante_nombre,
-              (p.comprobante IS NOT NULL) AS tiene_comprobante, u.nombres AS registrado_por
+              (p.comprobante IS NOT NULL OR p.comprobante_url IS NOT NULL) AS tiene_comprobante, u.nombres AS registrado_por
          FROM pagos_licencia p LEFT JOIN usuarios u ON u.id = p.creado_por
         WHERE p.clinica_id = ? ORDER BY p.fecha DESC, p.id DESC`, [id]);
     const reales = ordenarPagos(pagos.filter((p) => !p.anulado));
@@ -468,7 +490,7 @@ router.put("/clinica/:id/cuota", auth("SUPER_ADMIN"), async (req, res) => {
     await pool.query(
       "UPDATE clinicas SET lic_monto_mensual=?, lic_moneda=?, lic_dia_facturacion=?, lic_nivel=?, lic_forma_pago=? WHERE id=?",
       [r2(m), String(moneda || "HNL").slice(0, 8), dia, NIVELES.includes(nivel) ? nivel : null,
-       forma_pago === "contado" ? "contado" : "mensual", id]);
+       formaValida(forma_pago) || "mensual", id]);
     res.json({ ok: true });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
@@ -629,7 +651,8 @@ router.post("/pagos/:id/enviar-recibo", auth("SUPER_ADMIN"), async (req, res) =>
 router.get("/pagos/:id/comprobante", auth("SUPER_ADMIN"), async (req, res) => {
   try {
     await asegurarTabla();
-    const [[p]] = await pool.query("SELECT comprobante, comprobante_tipo, comprobante_nombre FROM pagos_licencia WHERE id=?", [req.params.id]);
+    const [[p]] = await pool.query("SELECT comprobante, comprobante_tipo, comprobante_nombre, comprobante_url FROM pagos_licencia WHERE id=?", [req.params.id]);
+    if (!p?.comprobante && p?.comprobante_url) return res.json({ ok: true, url: p.comprobante_url });
     if (!p?.comprobante) return res.status(404).json({ ok: false, msg: "Este pago no tiene comprobante." });
     res.setHeader("Content-Type", p.comprobante_tipo || "application/octet-stream");
     res.setHeader("Content-Disposition", `inline; filename="${String(p.comprobante_nombre || "comprobante").replace(/"/g, "")}"`);
@@ -691,5 +714,26 @@ router.get("/pagos", auth("SUPER_ADMIN"), async (req, res) => {
   }
 });
 
+/** Estado de cuenta de una clínica (lo usa el aviso de pago de la propia clínica). */
+async function estadoCuentaClinica(id) {
+  await asegurarTabla();
+  const cuotas = (await calendarioCuotas(id)).get(id) || [];
+  const [pagos] = await pool.query("SELECT id, fecha, monto FROM pagos_licencia WHERE clinica_id=? AND anulado=0 ORDER BY fecha, id", [id]);
+  const st = estadoClinica(cuotas, ordenarPagos([...pagos, ...pagosImplicitos(id, cuotas, pagos)]));
+  return { ...st, cuotas };
+}
+
+/** Registra un pago (lo usa la aprobación de una solicitud de plan con su comprobante). */
+async function registrarPago({ clinicaId, fecha, monto, moneda = "HNL", metodo = "TRANSFERENCIA", referencia = null, notas = null, creadoPor = null, comprobanteUrl = null }) {
+  await asegurarTabla();
+  const [r] = await pool.query(
+    `INSERT INTO pagos_licencia (clinica_id, fecha, monto, moneda, metodo, referencia, notas, creado_por, tipo, comprobante_url) VALUES (?,?,?,?,?,?,?,?, 'pago', ?)`,
+    [clinicaId, fecha || hoyTexto(), r2(monto), moneda, metodo, referencia, notas, creadoPor, comprobanteUrl]);
+  return r.insertId;
+}
+
 module.exports = router;
+module.exports.estadoCuentaClinica = estadoCuentaClinica;
+module.exports.registrarPago = registrarPago;
+module.exports.asegurarTabla = asegurarTabla;
 module.exports.METODOS = METODOS;

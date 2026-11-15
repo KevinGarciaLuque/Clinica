@@ -1178,6 +1178,7 @@ function TabPagos() {
     precio_basico_semestral: "", precio_basico_anual: "",
     precio_avanzado_semestral: "", precio_avanzado_anual: "",
     precio_empresarial_semestral: "", precio_empresarial_anual: "",
+    recargo_trimestral_pct: "", recargo_bimestral_pct: "", recargo_mensual_pct: "",
   });
   const [cargando, setCargando]   = useState(true);
   const [guardando, setGuardando] = useState(false);
@@ -1195,6 +1196,7 @@ function TabPagos() {
             next[`precio_${n.id}_semestral`] = d[`precio_${n.id}_semestral`] ?? "";
             next[`precio_${n.id}_anual`]     = d[`precio_${n.id}_anual`] ?? "";
           }
+          for (const f of ["trimestral", "bimestral", "mensual"]) next[`recargo_${f}_pct`] = d[`recargo_${f}_pct`] ?? "";
           return next;
         });
       })
@@ -1297,6 +1299,31 @@ function TabPagos() {
             </div>
           </div>
         ))}
+      </div>
+
+      <div className="mb-4">
+        <h6 className="fw-bold mb-1"><i className="bi bi-calendar2-range me-2" />Pagar el plan en partes</h6>
+        <p className="small text-muted mb-3">
+          Los planes Semestral y Anual se pueden pagar en un solo pago o en partes. Ponga cuánto más (en %) cuesta pagar en partes;
+          déjelo vacío para cobrar lo mismo. Ejemplo: semestral de L 4,200 con 11% mes a mes = 6 pagos de L 777.
+        </p>
+        <div className="row g-3">
+          {[["trimestral", "Cada 3 meses"], ["bimestral", "Cada 2 meses"], ["mensual", "Mes a mes"]].map(([k, t]) => (
+            <div key={k} className="col-md-4">
+              <label className="form-label small fw-bold">{t} · recargo %</label>
+              <div className="input-group">
+                <input type="number" step="0.5" min="0" className="form-control" value={form[`recargo_${k}_pct`]}
+                       onChange={e => set(`recargo_${k}_pct`, e.target.value)} placeholder="0" />
+                <span className="input-group-text">%</span>
+              </div>
+              {Number(form.precio_basico_semestral) > 0 && (
+                <div className="small text-muted mt-1">
+                  Básico semestral: {{ trimestral: 2, bimestral: 3, mensual: 6 }[k]} pagos de L {(Number(form.precio_basico_semestral) * (1 + (Number(form[`recargo_${k}_pct`]) || 0) / 100) / ({ trimestral: 2, bimestral: 3, mensual: 6 }[k])).toLocaleString("en-US", { maximumFractionDigits: 2 })}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
       </div>
 
       <div style={{ display: "flex", justifyContent: "flex-end" }}>

@@ -364,4 +364,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "plan-pago-en-partes",
+    version: "1.47",
+    titulo: "Pague su plan en partes",
+    descripcion: "Su plan Semestral o Anual ahora se puede pagar en un solo pago, cada 3 meses, cada 2 meses o mes a mes. Si paga en partes, Medic-KG le avisa unos días antes de cada pago.",
+    icono: "bi-calendar2-range",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

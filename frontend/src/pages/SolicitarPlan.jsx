@@ -11,7 +11,7 @@ import { useState, useEffect, useMemo } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import axios from "axios";
 import { SIMBOLO_MONEDA } from "../utils/monedas";
-import { NIVELES_PLAN, DURACION_LABEL, duracionesDisponibles, precioClave } from "../utils/planes";
+import { NIVELES_PLAN, DURACION_LABEL, duracionesDisponibles, precioClave, FORMAS_PAGO, montoPorForma } from "../utils/planes";
 
 const BASE = (import.meta.env.VITE_API_URL || "http://localhost:5000") + "/api";
 
@@ -57,6 +57,7 @@ export default function SolicitarPlan() {
   const [form, setForm] = useState({
     nombres: "", apellidos: "", email: "", telefono: "",
     nombre_clinica: "", nivel_plan: nivelInicial, plan_solicitado: planInicial, mensaje: "",
+    forma_pago: "contado",
   });
   const [archivo, setArchivo]   = useState(null);
   const [preview, setPreview]   = useState(null);
@@ -148,9 +149,13 @@ export default function SolicitarPlan() {
   };
 
   const esGratis = form.plan_solicitado === "trial";
-  const montoPlan = esGratis
-    ? null
-    : (pagos ? formatearMonto(pagos[precioClave(form.nivel_plan, form.plan_solicitado)], pagos.moneda) : null);
+  const precioBase = pagos ? pagos[precioClave(form.nivel_plan, form.plan_solicitado)] : null;
+  const calcForma = (f) => (esGratis ? null : montoPorForma(precioBase, form.plan_solicitado, f, pagos || {}));
+  const calc = calcForma(form.forma_pago);
+  const enPartes = !!calc && calc.pagos > 1;
+  // Lo que se transfiere ahora: el plan completo o el primer pago
+  const montoPlan = esGratis ? null : (calc ? formatearMonto(calc.porPago, pagos.moneda) : null);
+  const totalPlan = calc ? formatearMonto(calc.total, pagos.moneda) : null;
   const planLabel = `${NIVELES_PLAN[form.nivel_plan].label} · ${DURACION_LABEL[form.plan_solicitado]}`;
 
   const styles = (
@@ -207,6 +212,14 @@ export default function SolicitarPlan() {
       .sp-main h2 { font-size: 19px; font-weight: 800; color: #0f172a; margin: 0 0 22px; }
 
       .sp-stepper { display: flex; margin-bottom: 28px; }
+      .sp-formas { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .sp-forma { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+        border: 1.5px solid #e3e8ef; background: #fff; border-radius: 12px; padding: 10px 12px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+      .sp-forma:hover { border-color: #93c5fd; }
+      .sp-forma[data-sel="1"] { border-color: #0d6efd; box-shadow: 0 0 0 3px rgba(13,110,253,.12); background: #f8fbff; }
+      .sp-forma .t { font-weight: 700; font-size: 13.5px; color: #0f172a; }
+      .sp-forma .m { font-size: 12.5px; color: #475569; }
+      .sp-forma .b { position: absolute; top: -8px; right: 8px; background: #10b981; color: #fff; font-size: 10px; font-weight: 700; border-radius: 999px; padding: 1px 8px; }
       .sp-step { position: relative; flex: 1; display: flex; flex-direction: column;
         align-items: center; gap: 8px; }
       .sp-step-line { position: absolute; height: 2px; top: 17px; right: 50%; width: 100%;
@@ -344,9 +357,10 @@ export default function SolicitarPlan() {
               <div className="k">Plan seleccionado</div>
               <div className="plan">{planLabel}</div>
               <div className="price">
-                {esGratis ? "Gratis" : (montoPlan || "—")}
-                {!esGratis && <small> / período</small>}
+                {esGratis ? "Gratis" : enPartes ? (montoPlan || "—") : (totalPlan || "—")}
+                {!esGratis && <small>{enPartes ? ` × ${calc.pagos} pagos` : " / período"}</small>}
               </div>
+              {enPartes && <div style={{ position: "relative", fontSize: 12, color: "rgba(226,232,240,.7)", marginTop: 6 }}>{FORMAS_PAGO[form.forma_pago].label} · total {totalPlan}</div>}
             </div>
 
             <ul className="sp-perks">
@@ -408,6 +422,29 @@ export default function SolicitarPlan() {
                       ))}
                     </select>
                   </div>
+                  {!esGratis && (
+                    <div className="sp-full">
+                      <label className="sp-label">¿Cómo prefieres pagar?</label>
+                      <div className="sp-formas">
+                        {Object.entries(FORMAS_PAGO).map(([k, f]) => {
+                          const c = calcForma(k);
+                          const sel = form.forma_pago === k;
+                          return (
+                            <button key={k} type="button" className="sp-forma" data-sel={sel ? "1" : "0"} onClick={() => setForm((x) => ({ ...x, forma_pago: k }))}>
+                              <span className="t">{f.label}</span>
+                              <span className="m">
+                                {c ? (c.pagos > 1 ? `${c.pagos} pagos de ${formatearMonto(c.porPago, pagos.moneda)}` : formatearMonto(c.total, pagos.moneda)) : "—"}
+                              </span>
+                              {k === "contado" && <span className="b">Mejor precio</span>}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      <div style={{ fontSize: 12, color: "#64748b", marginTop: 6 }}>
+                        Tu plan {DURACION_LABEL[form.plan_solicitado]?.toLowerCase()} se mantiene; solo eliges en cuántas partes lo pagas.
+                      </div>
+                    </div>
+                  )}
                   <div className="sp-full">
                     <label className="sp-label">Mensaje <span style={{ color: "#94a3b8", fontWeight: 500 }}>(opcional)</span></label>
                     <textarea className="sp-textarea" name="mensaje" rows={2} value={form.mensaje} onChange={cambio} placeholder="¿Algo que quieras contarnos?" />
@@ -415,7 +452,7 @@ export default function SolicitarPlan() {
                 </div>
 
                 <div className="sp-total">
-                  <span className="k">Total a transferir</span>
+                  <span className="k">{enPartes ? "Primer pago a transferir" : "Total a transferir"}</span>
                   <span className="v">{esGratis ? "Gratis" : (montoPlan || "—")}</span>
                 </div>
 
@@ -431,7 +468,7 @@ export default function SolicitarPlan() {
             {paso === 2 && (
               <div>
                 <p className="sp-note">
-                  Transfiere {esGratis ? "" : montoPlan ? <strong>{montoPlan}</strong> : ""} del plan{" "}
+                  Transfiere {esGratis ? "" : montoPlan ? <strong>{montoPlan}</strong> : ""}{enPartes ? " (tu primer pago)" : ""} del plan{" "}
                   <strong>{planLabel}</strong> a la siguiente cuenta:
                 </p>
                 <div className="sp-bank">

@@ -147,6 +147,10 @@ router.put("/", auth("SUPER_ADMIN"), async (req, res) => {
   }
 });
 
+const { asegurarRecargos } = require("../utils/formasPago");
+// Recargo (%) por pagar el plan en partes
+const RECARGOS_CAMPOS = ["recargo_trimestral_pct", "recargo_bimestral_pct", "recargo_mensual_pct"];
+
 // Nivel × duración de pago que soporta cada precio configurable
 const PRECIOS_CAMPOS = [
   "precio_basico_semestral",      "precio_basico_anual",
@@ -159,9 +163,10 @@ const PRECIOS_CAMPOS = [
 // se entregan en POST /api/planes-publicos/iniciar tras registrar la solicitud.
 router.get("/pagos", async (req, res) => {
   try {
+    await asegurarRecargos(pool).catch(() => {});
     const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1");
     const precios = {};
-    for (const campo of PRECIOS_CAMPOS) precios[campo] = row?.[campo] ?? null;
+    for (const campo of [...PRECIOS_CAMPOS, ...RECARGOS_CAMPOS]) precios[campo] = row?.[campo] ?? null;
     res.json({
       ok: true,
       data: {
@@ -179,9 +184,10 @@ router.get("/pagos", async (req, res) => {
 // Incluye los datos de la cuenta bancaria, para el CMS.
 router.get("/pagos-completo", auth("SUPER_ADMIN"), async (req, res) => {
   try {
+    await asegurarRecargos(pool).catch(() => {});
     const [[row]] = await pool.query("SELECT * FROM config_pagos WHERE id=1 LIMIT 1");
     const precios = {};
-    for (const campo of PRECIOS_CAMPOS) precios[campo] = row?.[campo] ?? null;
+    for (const campo of [...PRECIOS_CAMPOS, ...RECARGOS_CAMPOS]) precios[campo] = row?.[campo] ?? null;
     res.json({
       ok: true,
       data: {
@@ -216,6 +222,10 @@ router.put("/pagos", auth("SUPER_ADMIN"), async (req, res) => {
          ${PRECIOS_CAMPOS.map((c) => `${c}=VALUES(${c})`).join(", ")}`,
       [banco || null, titular || null, numero_cuenta || null, numero_cci || null, moneda || "HNL", ...precios]
     );
+    // Recargos por pagar en partes (columnas opcionales)
+    await asegurarRecargos(pool).catch(() => {});
+    const recargos = RECARGOS_CAMPOS.map((c) => { const v = req.body[c]; return v === "" || v == null ? null : Math.max(0, Number(v)); });
+    await pool.query(`UPDATE config_pagos SET ${RECARGOS_CAMPOS.map((c) => `${c}=?`).join(", ")} WHERE id=1`, recargos).catch(() => {});
     res.json({ ok: true, msg: "Configuración de pagos guardada" });
   } catch (e) {
     console.error("[config-sistema PUT pagos]", e);

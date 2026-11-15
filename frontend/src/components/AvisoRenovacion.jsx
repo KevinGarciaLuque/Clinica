@@ -37,7 +37,7 @@ export default function AvisoRenovacion() {
 
   // Se muestra una vez por cada día de aviso (10, 5, 4, 3, 2, 1)
   const toca = !!lic && lic.plan_tipo !== "trial" && !lic.vencida && DIAS_AVISO.includes(lic.dias_restantes);
-  if (!toca || cerrado === clave || leer(clave)) return null;
+  if (!toca || cerrado === clave || leer(clave)) return <AvisoPago lic={lic} clinicaId={user?.clinica_id} />;
 
   const cerrar = () => { guardar(clave, "1"); setCerrado(clave); };
   const solicitar = () => {
@@ -88,6 +88,60 @@ export default function AvisoRenovacion() {
               {pendiente ? "Entendido" : "Recordarme después"}
             </button>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const SIMBOLO = { HNL: "L", USD: "$", EUR: "€" };
+const DIAS_AVISO_PAGO = [5, 3, 1, 0];
+const hoyTexto = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+
+/**
+ * Aviso de pago para las clínicas que pagan su plan en partes (cada mes, 2 o 3 meses):
+ * 5, 3 y 1 día antes, el día del pago y, si se atrasa, una vez al día.
+ */
+function AvisoPago({ lic, clinicaId }) {
+  const [cerrado, setCerrado] = useState(null);
+  const p = lic?.pago;
+  if (!p || !p.forma_pago || p.forma_pago === "contado" || lic.plan_tipo === "trial") return null;
+  const atrasado = p.dias < 0;
+  if (!atrasado && !DIAS_AVISO_PAGO.includes(p.dias)) return null;
+  const clave = `aviso_pago_${clinicaId}_${p.fecha}_${atrasado ? hoyTexto() : p.dias}`;
+  if (cerrado === clave || leer(clave)) return null;
+  const cerrar = () => { guardar(clave, "1"); setCerrado(clave); };
+  const color = atrasado ? "#dc2626" : p.dias <= 1 ? "#ea580c" : "#2563eb";
+  const monto = `${SIMBOLO[p.moneda] || p.moneda || "L"} ${Number(p.monto).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  const fecha = new Date(`${p.fecha}T12:00:00`).toLocaleDateString("es", { weekday: "long", day: "numeric", month: "long" });
+  const titulo = atrasado
+    ? `Su pago está atrasado ${Math.abs(p.dias)} día${Math.abs(p.dias) === 1 ? "" : "s"}`
+    : p.dias === 0 ? "Hoy le toca su pago" : p.dias === 1 ? "Mañana le toca su pago" : `En ${p.dias} días le toca su pago`;
+
+  return (
+    <div style={{ position: "fixed", inset: 0, zIndex: 9990, background: "rgba(15,23,42,.6)", display: "flex", alignItems: "center", justifyContent: "center", padding: 14 }} onClick={cerrar}>
+      <div style={{ background: "#fff", borderRadius: 20, width: "100%", maxWidth: 420, overflow: "hidden", boxShadow: "0 24px 60px rgba(0,0,0,.35)" }} onClick={(e) => e.stopPropagation()}>
+        <div style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)`, color: "#fff", padding: "22px 22px 18px", textAlign: "center", position: "relative" }}>
+          <button type="button" className="btn-close btn-close-white" aria-label="Cerrar" onClick={cerrar} style={{ position: "absolute", top: 14, right: 14 }} />
+          <div style={{ width: 64, height: 64, borderRadius: "50%", background: "rgba(255,255,255,.22)", margin: "0 auto 10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "1.8rem" }}>
+            <i className={`bi ${atrasado ? "bi-exclamation-triangle-fill" : "bi-calendar-check"}`} />
+          </div>
+          <div style={{ fontWeight: 800, fontSize: "1.12rem" }}>{titulo}</div>
+          <div style={{ fontSize: "0.86rem", opacity: 0.95, marginTop: 2 }}>{atrasado ? `Tocaba el ${fecha}` : `El ${fecha}`}</div>
+        </div>
+        <div style={{ padding: 20 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: "#f8fafc", border: "1px solid #e2e8f0", borderRadius: 12, padding: "12px 14px" }}>
+            <span style={{ color: "#475569", fontSize: "0.88rem" }}>{p.numero ? `Pago ${p.numero} de ${p.de}` : "Su pago"}</span>
+            <b style={{ fontSize: "1.25rem", color: "#0f172a" }}>{monto}</b>
+          </div>
+          <p style={{ color: "#475569", fontSize: "0.88rem", margin: "12px 0 0" }}>
+            {atrasado
+              ? "Para seguir usando Medic-KG sin interrupciones, realice su pago lo antes posible. Si ya pagó, puede ignorar este aviso."
+              : "Realice su transferencia a la cuenta de siempre y envíe el comprobante a Medic-KG. ¡Gracias!"}
+          </p>
+          <button type="button" className="btn w-100 mt-3 fw-bold" style={{ background: color, color: "#fff", borderRadius: 12, padding: "10px" }} onClick={cerrar}>
+            Entendido
+          </button>
         </div>
       </div>
     </div>
