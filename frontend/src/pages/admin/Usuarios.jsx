@@ -296,9 +296,9 @@ export default function Usuarios() {
       ) : (
         <div style={{
           background: "#fff", borderRadius: 12, border: "1px solid #e2e8f0",
-          overflow: "hidden", boxShadow: "0 1px 4px rgba(0,0,0,.06)",
+          overflowX: "auto", WebkitOverflowScrolling: "touch", boxShadow: "0 1px 4px rgba(0,0,0,.06)",
         }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+          <table style={{ width: "100%", minWidth: 860, borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: "#f8fafc", borderBottom: "2px solid #e2e8f0" }}>
                 {["Usuario", "Email", "Tipo", "Especialidad", "Estado", "Acciones"].map(h => (
@@ -307,6 +307,8 @@ export default function Usuarios() {
                     fontSize: 11, fontWeight: 700, color: "#64748b",
                     textTransform: "uppercase", letterSpacing: "0.5px",
                     whiteSpace: "nowrap",
+                    // «Acciones» queda fija a la derecha: siempre se ve aunque la tabla se deslice
+                    ...(h === "Acciones" ? { position: "sticky", right: 0, background: "#f8fafc", boxShadow: "-6px 0 8px -6px rgba(0,0,0,.12)", zIndex: 1 } : {}),
                   }}>{h}</th>
                 ))}
               </tr>
@@ -336,7 +338,7 @@ export default function Usuarios() {
                     </div>
                   </td>
                   <td style={{ padding: "12px 14px" }}>
-                    <span style={{ fontSize: 12, color: "#475569" }}>{u.email}</span>
+                    <span style={{ fontSize: 12, color: "#475569", whiteSpace: "nowrap" }}>{u.email}</span>
                   </td>
                   <td style={{ padding: "12px 14px" }}>
                     <TipoBadge tipo={u.tipo} />
@@ -361,8 +363,8 @@ export default function Usuarios() {
                       {u.activo ? "Activo" : "Inactivo"}
                     </span>
                   </td>
-                  <td style={{ padding: "12px 14px" }}>
-                    <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+                  <td style={{ padding: "12px 14px", position: "sticky", right: 0, background: "#fff", boxShadow: "-6px 0 8px -6px rgba(0,0,0,.12)", zIndex: 1 }}>
+                    <div style={{ display: "flex", gap: 4, flexWrap: "nowrap" }}>
                       <ActionBtn icon="bi-pencil-fill" color="#3b82f6" title="Editar" onClick={() => abrirEditar(u)} />
                       <ActionBtn
                         icon={u.activo ? "bi-pause-fill" : "bi-play-fill"}
