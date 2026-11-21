@@ -1,4 +1,5 @@
 import { useState } from "react";
+import Colapsable, { FlechaGiro } from "../../components/Colapsable";
 import dayjs from "dayjs";
 import { prefijoDr, tituloMedicoActivo } from "../../utils/medico";
 
@@ -153,12 +154,13 @@ export default function PacienteResumenCard({ resumen }) {
           style={{ color: "#9ca3af", fontSize: "0.78rem", display: "flex", alignItems: "center", gap: 4, cursor: "pointer" }}
         >
           <span style={{ fontSize: "0.72rem" }}>{expandido ? "Cerrar" : "Ver detalle"}</span>
-          <i className={`bi bi-chevron-${expandido ? "up" : "down"}`} style={{ fontSize: "0.72rem" }}></i>
+          <FlechaGiro abierto={expandido} style={{ fontSize: "0.72rem" }} />
         </div>
       </div>
 
       {/* Detalle expandible */}
-      {expandido && actual && (
+      {actual && (
+        <Colapsable abierto={expandido}>
         <div style={{ borderTop: "1px solid #dbeafe", padding: "14px 16px", background: "#f8faff" }}>
           {/* Médico y fecha */}
           <div style={{ display: "flex", flexWrap: "wrap", gap: 16, marginBottom: 12, fontSize: "0.8rem" }}>
@@ -230,6 +232,7 @@ export default function PacienteResumenCard({ resumen }) {
             </div>
           )}
         </div>
+        </Colapsable>
       )}
     </div>
   );

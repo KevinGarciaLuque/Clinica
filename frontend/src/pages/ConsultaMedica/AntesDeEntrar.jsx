@@ -2,6 +2,7 @@
 // Alergias (siempre visibles), antecedentes, últimos signos vitales, medicamentos de
 // la última receta, estudios, asistencia, control pendiente y saldo.
 import { useEffect, useState } from "react";
+import Colapsable, { FlechaGiro } from "../../components/Colapsable";
 import dayjs from "dayjs";
 import api from "../../api/api";
 import { edadDetallada } from "../../utils/edadDetallada";
@@ -106,7 +107,7 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
         </a>
         {hayDetalle ? (
           <button type="button" onClick={alternar} className="btn btn-link btn-sm p-0" style={{ fontSize: "0.76rem", textDecoration: "none" }}>
-            {plegado ? <>Ver resumen <i className="bi bi-chevron-down" /></> : <>Ocultar <i className="bi bi-chevron-up" /></>}
+            {plegado ? "Ver resumen" : "Ocultar"} <FlechaGiro abierto={!plegado} />
           </button>
         ) : null}
       </div>
@@ -126,7 +127,8 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
         )}
       </div>
 
-      {!plegado && hayDetalle ? (
+      {hayDetalle ? (
+        <Colapsable abierto={!plegado}>
         <div className="ade-grid">
           {avisos.length > 0 && (
             <Bloque icono="bi-bell" color="#f59e0b" titulo="Tener en cuenta">
@@ -193,6 +195,7 @@ export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
             </Bloque>
           )}
         </div>
+        </Colapsable>
       ) : null}
     </div>
   );
