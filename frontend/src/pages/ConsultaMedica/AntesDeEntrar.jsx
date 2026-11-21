@@ -52,10 +52,14 @@ function Tendencia({ actual, anterior, unidad }) {
   );
 }
 
-export default function AntesDeEntrar({ pacienteId, excluirHistoria }) {
+export default function AntesDeEntrar({ pacienteId, excluirHistoria, plegadoPorDefecto = false }) {
   const [d, setD] = useState(null);
   const [plegado, setPlegado] = useState(() => {
-    try { return localStorage.getItem(CLAVE_PLEGADO) === "1"; } catch { return false; }
+    // Si la persona ya eligió (plegar o desplegar), se respeta; si no, rige el valor por defecto
+    try {
+      const guardado = localStorage.getItem(CLAVE_PLEGADO);
+      return guardado === null ? plegadoPorDefecto : guardado === "1";
+    } catch { return plegadoPorDefecto; }
   });
 
   const [evo, setEvo] = useState([]); // puntos de atención de la Evolución del paciente

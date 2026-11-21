@@ -685,7 +685,7 @@ export default function Consulta() {
 
         {/* ── Antes de entrar: alergias, signos, receta, estudios, avisos ── */}
         {(paciente?.id || pacId) && (
-          <AntesDeEntrar pacienteId={paciente?.id || pacId} excluirHistoria={hid} />
+          <AntesDeEntrar pacienteId={paciente?.id || pacId} excluirHistoria={hid} plegadoPorDefecto={tabsEspecialidad(modulos).length > 0} />
         )}
 
         {/* ── Tarjeta nuevo / subsecuente ── */}
