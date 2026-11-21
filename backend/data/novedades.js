@@ -461,4 +461,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "estudios-con-qr",
+    version: "1.57",
+    titulo: "Solicitud de estudios con código QR",
+    descripcion: "La solicitud de estudios impresa ahora lleva un código QR en el encabezado, igual que la receta. Al escanearlo se abre una página de verificación con los estudios solicitados, el médico y el estado de cada uno (sin mostrar resultados). También se corrigió el rótulo «URGENTE», que salía con un símbolo extraño.",
+    icono: "bi-qr-code",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];
