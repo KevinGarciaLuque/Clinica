@@ -433,4 +433,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "consulta-abre-en-la-especialidad",
+    version: "1.54",
+    modulos: ["escalas_paliativos", "control_seguimiento_dm1", "educacion_diabetes", "nutricion_consulta", "cardiologia_ecocardiograma", "ficha_estetica"],
+    titulo: "La consulta abre en su especialidad",
+    descripcion: "En la Consulta Médica, la pestaña propia de su especialidad (Escalas, Diabetes, Nutrición, Estética, Ecocardiograma…) ahora va antes del SOAP y es la que se abre al entrar. El SOAP queda a su lado, un clic más. Las clínicas sin pestaña de especialidad siguen abriendo en el SOAP.",
+    icono: "bi-layout-text-sidebar-reverse",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

@@ -38,6 +38,24 @@ const ConsultaEndocrinologia = lazy(() => import("../endocrinologia/ConsultaEndo
 const ConsultaEducacion = lazy(() => import("../educacion/ConsultaEducacion"));
 
 // ═══════════════════════════════════════════════════════════════════════════════
+/**
+ * Pestañas propias de la especialidad de la clínica (según sus módulos), en orden de prioridad.
+ * La primera es la que se abre al entrar a la consulta y va antes del SOAP; si la clínica no
+ * tiene ninguna (medicina general, pediatría…), la consulta abre en el SOAP como siempre.
+ */
+function tabsEspecialidad(modulos) {
+  const tiene = (f) => modulos.some(f);
+  return [
+    tiene(m => m.clave === "escalas_paliativos") && { id: "escalas", icon: "bi-activity", label: "Escalas" },
+    tiene(m => m.clave === "control_seguimiento_dm1") && { id: "diabetes", icon: "bi-droplet-half", label: "Diabetes" },
+    tiene(m => m.clave === "educacion_diabetes") && { id: "educacion_dm", icon: "bi-mortarboard-fill", label: "Educación" },
+    tiene(m => m.ruta?.startsWith("/estetica/")) && { id: "estetica", icon: "bi-stars", label: "Estética" },
+    tiene(m => m.ruta?.startsWith("/estetica/")) && { id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" },
+    tiene(m => m.clave === "cardiologia_ecocardiograma") && { id: "cardio_eco", icon: "bi-heart-pulse-fill", label: "Ecocardiograma" },
+    tiene(m => m.clave === "nutricion_consulta") && { id: "nutricion", icon: "bi-apple", label: "Nutrición" },
+  ].filter(Boolean);
+}
+
 export default function Consulta() {
   const [params]   = useSearchParams();
   const navigate   = useNavigate();
@@ -57,7 +75,7 @@ export default function Consulta() {
 
   // ?estetica=valoracion|procedimiento|seguimiento (desde el perfil: «Nueva atención estética»)
   const visitaEstetica = ["valoracion", "procedimiento", "seguimiento"].includes(params.get("estetica")) ? params.get("estetica") : null;
-  const [tab,       setTab]       = useState(visitaEstetica ? "estetica" : modulos.some(m => m.clave === "escalas_paliativos") ? "escalas" : "soap");
+  const [tab,       setTab]       = useState(visitaEstetica ? "estetica" : (tabsEspecialidad(modulos)[0]?.id || "soap"));
   const [historia,  setHistoria]  = useState(null);   // loaded historia object
   const [hid,       setHid]       = useState(historiaId || null); // historia id (created or loaded)
   const [paciente,  setPaciente]  = useState(null);
@@ -439,20 +457,12 @@ export default function Consulta() {
   // ── UI ───────────────────────────────────────────────────────────────────────
   const edad = edadDetallada(paciente?.fecha_nacimiento);
 
-  const esDerma = modulos.some(m => m.ruta?.startsWith("/estetica/"));
-  const esCardioEco = modulos.some(m => m.clave === "cardiologia_ecocardiograma");
   const esDiabetes = modulos.some(m => m.clave === "control_seguimiento_dm1");
   const esEducacionDm = modulos.some(m => m.clave === "educacion_diabetes");
 
   const TAB_LIST = [
+    ...tabsEspecialidad(modulos),   // la especialidad de la clínica va primero y es la que se abre
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
-    ...(esPaliativos ? [{ id: "escalas", icon: "bi-activity", label: "Escalas" }] : []),
-    ...(esDiabetes ? [{ id: "diabetes", icon: "bi-droplet-half", label: "Diabetes" }] : []),
-    ...(esEducacionDm ? [{ id: "educacion_dm", icon: "bi-mortarboard-fill", label: "Educación" }] : []),
-    ...(esEstetica ? [{ id: "estetica", icon: "bi-stars", label: "Estética" }] : []),
-    ...(esDerma ? [{ id: "derma", icon: "bi-bandaid-fill", label: "Dermatología" }] : []),
-    ...(esCardioEco ? [{ id: "cardio_eco", icon: "bi-heart-pulse-fill", label: "Ecocardiograma" }] : []),
-    ...(esNutricion ? [{ id: "nutricion", icon: "bi-apple", label: "Nutrición" }] : []),
     { id: "rx",           icon: "bi-capsule",          label: "Prescripción" },
     { id: "estudios",     icon: "bi-eyedropper",       label: "Estudios" },
     { id: "antecedentes", icon: "bi-folder2-open",     label: "Antecedentes" },
