@@ -60,7 +60,7 @@ export default function EvolucionEscalas({ registros, pacienteId, datos, histori
     return m;
   }, [base, datos, historiaId]);
 
-  const ids = ESCALAS.filter((e) => porEscala[e.id]?.length).map((e) => e.id);
+  const ids = ESCALAS.filter((e) => e.tipo !== "guia" && porEscala[e.id]?.length).map((e) => e.id);
   const fechas = useMemo(() => {
     const s = new Set();
     ids.forEach((id) => porEscala[id].forEach((r) => s.add(r.fecha)));

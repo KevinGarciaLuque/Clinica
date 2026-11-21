@@ -3,6 +3,7 @@ import dayjs from "dayjs";
 import api from "../../api/api";
 import { useAuth } from "../../auth/AuthContext";
 import { VITALS_FIELDS } from "./helpers";
+import { esLineaEscalas } from "../../utils/paliativosEscalas";
 
 // ══════════════════════════════════════════════════════════════════════
 // Textarea con predicción de texto IA por especialidad
@@ -219,7 +220,7 @@ function CieBuscador({ value, desc, onChange, onClear, readOnly, placeholder = "
 // ══════════════════════════════════════════════════════════════════════
 // TAB: SOAP
 // ══════════════════════════════════════════════════════════════════════
-export default function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registrarCurva, setRegistrarCurva }) {
+export default function SoapTab({ soap, setSoap, vitals, setVitals, firmada, paciente, registrarCurva, setRegistrarCurva, paliativos, lineaEscalas }) {
   const { user } = useAuth();
   const especialidad = user?.especialidad || "Medicina General";
   const cie10Ref = useRef(null);
@@ -328,7 +329,7 @@ export default function SoapTab({ soap, setSoap, vitals, setVitals, firmada, pac
             </div>
             <span style={{ fontWeight: 700, fontSize: "0.9rem", color: "#111827" }}>Signos Vitales</span>
             {/* Switch curva de crecimiento — solo pacientes < 19 años */}
-            {esPediatrico && !firmada && (
+            {esPediatrico && !firmada && !paliativos && (
               <div className="d-flex align-items-center gap-2 ms-auto">
                 <i className="bi bi-graph-up-arrow" style={{ color: registrarCurva ? "#16a34a" : "#9ca3af", fontSize: "0.82rem" }}></i>
                 <span style={{ fontSize: "0.75rem", color: registrarCurva ? "#15803d" : "#6b7280", fontWeight: registrarCurva ? 600 : 400, whiteSpace: "nowrap" }}>
@@ -360,7 +361,7 @@ export default function SoapTab({ soap, setSoap, vitals, setVitals, firmada, pac
             )}
           </div>
           <div className="row g-2">
-            {VITALS_FIELDS.filter(f => !f.pediatricOnly || esPediatrico).map(f => (
+            {VITALS_FIELDS.filter(f => (!f.pediatricOnly || esPediatrico) && !(paliativos && ["talla", "imc", "sc", "pc"].includes(f.key))).map(f => (
               <div key={f.key} className="col-6 col-md-3">
                 <div style={{ background: "#f8fafc", borderRadius: 8, padding: "8px 10px", border: "1px solid #e5e7eb" }}>
                   <div style={{ fontSize: "0.68rem", color: "#6b7280", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: 4 }}>
@@ -419,6 +420,16 @@ export default function SoapTab({ soap, setSoap, vitals, setVitals, firmada, pac
             </div>
             <span style={{ fontWeight: 700, fontSize: "0.88rem", color: "#1e3a5f" }}>Objetivo</span>
             <small style={{ color: "#9ca3af", fontSize: "0.72rem" }}>Hallazgos al examen físico</small>
+            {paliativos && lineaEscalas && !firmada && (
+              <button type="button" className="btn btn-sm btn-outline-primary ms-auto" style={{ fontSize: "0.72rem", padding: "2px 8px" }}
+                title="Agrega al Objetivo el resultado de las escalas aplicadas hoy"
+                onClick={() => setSoap(s => {
+                  const resto = String(s.examen_fisico || "").split("\n").filter(l => !esLineaEscalas(l)).join("\n").trimEnd();
+                  return { ...s, examen_fisico: resto ? `${resto}\n${lineaEscalas}` : lineaEscalas };
+                })}>
+                <i className="bi bi-activity me-1" />Agregar escalas de hoy
+              </button>
+            )}
           </div>
           <SoapTextareaIA
             campo="objetivo" rows={4}

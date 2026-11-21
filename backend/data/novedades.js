@@ -423,4 +423,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: true,
   },
+  {
+    clave: "paliativos-consulta-simplificada",
+    version: "1.53",
+    modulos: ["escalas_paliativos"],
+    titulo: "Paliativos: consulta más ágil",
+    descripcion: "La consulta de paliativos ahora abre directo en «Escalas». En el SOAP quedan solo los signos vitales que importan (sin talla, IMC, superficie corporal ni curva de crecimiento) y el botón «Agregar escalas de hoy» pasa el resultado de las escalas al Objetivo. Nueva guía «Objetivos de cuidado y familia» para registrar preferencias, voluntades anticipadas, cuidador y plan para la familia.",
+    icono: "bi-activity",
+    audiencia: "MEDICOS",
+    importante: false,
+  },
 ];

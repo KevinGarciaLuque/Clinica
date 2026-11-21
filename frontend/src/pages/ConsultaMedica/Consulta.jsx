@@ -31,7 +31,7 @@ import NutricionTab from "./NutricionTab";
 import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
 import EsteticaTab from "./EsteticaTab";
 import EscalasPaliativosTab from "./EscalasPaliativosTab";
-import { ESCALA_POR_ID, calcular, paraGuardar } from "../../utils/paliativosEscalas";
+import { ESCALA_POR_ID, calcular, paraGuardar, lineaEscalas } from "../../utils/paliativosEscalas";
 import TarjetaDiabetes from "../../components/TarjetaDiabetes";
 // Módulos de diabetes como pestañas de la consulta (se cargan solo si se abren)
 const ConsultaEndocrinologia = lazy(() => import("../endocrinologia/ConsultaEndocrinologia"));
@@ -57,7 +57,7 @@ export default function Consulta() {
 
   // ?estetica=valoracion|procedimiento|seguimiento (desde el perfil: «Nueva atención estética»)
   const visitaEstetica = ["valoracion", "procedimiento", "seguimiento"].includes(params.get("estetica")) ? params.get("estetica") : null;
-  const [tab,       setTab]       = useState(visitaEstetica ? "estetica" : "soap");
+  const [tab,       setTab]       = useState(visitaEstetica ? "estetica" : modulos.some(m => m.clave === "escalas_paliativos") ? "escalas" : "soap");
   const [historia,  setHistoria]  = useState(null);   // loaded historia object
   const [hid,       setHid]       = useState(historiaId || null); // historia id (created or loaded)
   const [paciente,  setPaciente]  = useState(null);
@@ -751,6 +751,8 @@ export default function Consulta() {
               paciente={paciente}
               registrarCurva={registrarCurva}
               setRegistrarCurva={setRegistrarCurva}
+              paliativos={esPaliativos}
+              lineaEscalas={esPaliativos ? lineaEscalas(datosPal) : ""}
             />
           )}
 

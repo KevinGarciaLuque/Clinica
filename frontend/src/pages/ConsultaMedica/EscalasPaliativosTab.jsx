@@ -266,7 +266,7 @@ export default function EscalasPaliativosTab({ datos, setDatos, firmada, histori
   const termino = q.trim().toLowerCase();
   const lista = ESCALAS.filter((e) => {
     if (termino) return `${e.nombre} ${e.sub} ${e.desc}`.toLowerCase().includes(termino);
-    if (grupo === "rapida") return e.rapida;
+    if (grupo === "rapida") return e.rapida || e.destacada;
     if (grupo === "hoy") return aplicadas.includes(e.id);
     return e.grupo === grupo;
   });

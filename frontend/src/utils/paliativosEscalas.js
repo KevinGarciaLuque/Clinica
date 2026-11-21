@@ -541,6 +541,18 @@ export const ESCALAS = [
 
   // ═══ 8. FAMILIA, CUIDADOR Y DUELO ═══
   {
+    id: "objetivos", grupo: "familia", nombre: "Objetivos de cuidado y familia", sub: "Preferencias, voluntades anticipadas y cuidador", destacada: true,
+    desc: "Registro de lo que el paciente y su familia quieren para esta etapa. No tiene puntaje.", ref: "Guía de planificación anticipada de cuidados", tipo: "guia",
+    items: [
+      { id: "preferencias", t: "Objetivos y preferencias del paciente", h: "¿Qué es lo más importante para el paciente ahora? ¿Qué quiere lograr o evitar?" },
+      { id: "voluntades", t: "Voluntades anticipadas", h: "Decisiones sobre reanimación, hospitalización, sedación, procedimientos y quién decide si el paciente no puede." },
+      { id: "lugar", t: "Lugar de atención y de fallecimiento preferido", h: "Casa, hospital, otro; y si es posible cumplirlo." },
+      { id: "cuidador", t: "Cuidador principal y red de apoyo", h: "Quién cuida, disponibilidad, otros apoyos y necesidades del cuidador." },
+      { id: "plan_familia", t: "Plan para la familia", h: "Información dada, dudas pendientes, acuerdos y próximos pasos." },
+    ],
+    nota: "Es un registro de entrevista, sin puntuación.",
+  },
+  {
     id: "zarit", grupo: "familia", nombre: "Zarit", sub: "Sobrecarga del cuidador", desc: "Veintidós ítems de 1 (nunca) a 5 (casi siempre).", ref: "Zarit et al., 1980; Martín et al., 1996", tipo: "items", lab: ["", "Nunca", "Rara vez", "Algunas veces", "Bastantes veces", "Casi siempre"],
     items: [
       "¿Siente que su familiar pide más ayuda de la que realmente necesita?", "¿Siente que, por el tiempo que dedica a su familiar, ya no tiene tiempo suficiente para usted?",
@@ -888,3 +900,20 @@ export function paraGuardar(esc, resp) {
   const c = calcular(esc, resp);
   return { respuestas: resp, puntaje: c.puntaje, nivel_texto: resumenCorto(esc, c).slice(0, 120) || null, nivel_color: colorResultado(c) };
 }
+
+const MARCA_SOAP = "Escalas de hoy:";
+/** Línea de texto con las escalas aplicadas hoy, para pegar en el Objetivo del SOAP. Vacía si no hay. */
+export function lineaEscalas(datos) {
+  const partes = [];
+  for (const esc of ESCALAS) {
+    if (esc.tipo === "guia" || !datos?.[esc.id]) continue;
+    const c = calcular(esc, datos[esc.id].respuestas);
+    if (c.vacio) continue;
+    const p = c.puntaje !== null && c.puntaje !== undefined ? String(c.puntaje).replace(".", ",") : null;
+    const max = esc.tipo === "items" && c.max && esc.total ? `/${String(c.max).replace(".", ",")}` : "";
+    const texto = p !== null ? `${p}${max}${c.banda?.t ? ` (${c.banda.t})` : ""}` : resumenCorto(esc, c);
+    partes.push(`${esc.nombre} ${texto}`);
+  }
+  return partes.length ? `${MARCA_SOAP} ${partes.join("; ")}.` : "";
+}
+export const esLineaEscalas = (l) => l.startsWith(MARCA_SOAP);
