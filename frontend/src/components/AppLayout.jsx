@@ -3,6 +3,7 @@ import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
 import AvisoRenovacion from "./AvisoRenovacion";
+import AvisoNuevaVersion from "./AvisoNuevaVersion";
 import LicenciaVencidaModal from "./LicenciaVencidaModal";
 import DictadoVoz from "./DictadoVoz";
 import AvisoReloj from "./AvisoReloj";
@@ -36,6 +37,8 @@ export default function AppLayout() {
       <LicenciaVencidaModal />
       {/* Aviso de renovación a los 10, 5, 4, 3, 2 y 1 días */}
       <AvisoRenovacion />
+      {/* Aviso «Hay una nueva versión» con botón Actualizar */}
+      <AvisoNuevaVersion />
 
       {/* 🎤 Dictado por voz en los campos de texto grandes */}
       <DictadoVoz />

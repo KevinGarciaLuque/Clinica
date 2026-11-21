@@ -443,4 +443,13 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "aviso-nueva-version",
+    version: "1.55",
+    titulo: "Aviso de «Hay una nueva versión»",
+    descripcion: "Cuando publicamos mejoras, el sistema ya abierto le avisa con un cuadro «Hay una nueva versión» y el botón Actualizar. Si está en medio de una consulta puede elegir «Después» y se lo recordará en 30 minutos.",
+    icono: "bi-arrow-repeat",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];
