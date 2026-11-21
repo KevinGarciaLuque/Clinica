@@ -1025,7 +1025,7 @@ const pool = require("./db");
         "Medicina Interna", "Medicina Familiar", "Cirugía General", "Neurocirugía", "Oncología",
         "Hematología", "Infectología", "Geriatría", "Anestesiología", "Medicina del Deporte",
         "Neonatología", "Ortodoncia", "Odontopediatría", "Terapia del Lenguaje",
-        "Terapia Ocupacional", "Optometría", "Medicina Veterinaria",
+        "Terapia Ocupacional", "Optometría", "Medicina Veterinaria", "Cuidados Paliativos",
       ];
       // Se compara sin mayúsculas ni tildes para no repetir una que ya exista escrita distinto
       const clave = (t) => String(t).normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
