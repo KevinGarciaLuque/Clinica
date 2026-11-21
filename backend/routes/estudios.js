@@ -188,6 +188,19 @@ router.get("/pdf", auth(), async (req, res) => {
       } catch { firmaBuffer = null; }
     }
 
+    // 5c. QR de verificación: lleva a la página pública /ex/<código> (solo lectura), como el de la receta
+    let qrBuffer = null;
+    const QR_SIZE = 62;
+    try {
+      const codigoQr = require("../utils/codigoEstudios").crearCodigo(estudios.map((s) => s.id));
+      if (codigoQr) {
+        const QRCode = require("qrcode");
+        const { urlPublica } = require("../utils/urlPublica");
+        const dataUrl = await QRCode.toDataURL(`${urlPublica()}/ex/${codigoQr}`, { width: 240, margin: 1, errorCorrectionLevel: "M" });
+        qrBuffer = Buffer.from(dataUrl.split(",")[1], "base64");
+      }
+    } catch { qrBuffer = null; }
+
     // 6. Fuentes
     const fontMap = { "Arial":"Helvetica","Helvetica":"Helvetica","Times":"Times-Roman","Times New Roman":"Times-Roman","Georgia":"Times-Roman","Verdana":"Helvetica","Tahoma":"Helvetica" };
     const resolveFont = (cssFont) => {
@@ -220,7 +233,7 @@ router.get("/pdf", auth(), async (req, res) => {
     const doctorH = tMedico ? doc.heightOfString(tMedico, { width: pageW - 100 }) : 0;
     const credH   = tCred   ? doc.fontSize(8).heightOfString(tCred, { width: pageW - 100 }) : 0;
     const logoSize = logoBuffer ? 70 : 0;
-    const headerH  = Math.max(logoSize + 20, clinicH + doctorH + credH + 26);
+    const headerH  = Math.max(logoSize + 20, clinicH + doctorH + credH + 26, qrBuffer ? QR_SIZE + 20 : 0);
     const topY     = 14;
 
     doc.rect(marginL, topY, pageW, headerH).fill(tColor);
@@ -233,7 +246,7 @@ router.get("/pdf", auth(), async (req, res) => {
       doc.image(logoBuffer, marginL + 10, topY + 10, { fit: [logoSize, logoSize] });
       textX = marginL + logoSize + 20;
     }
-    const textW = marginL + pageW - textX - 10;
+    const textW = marginL + pageW - textX - 10 - (qrBuffer ? QR_SIZE + 12 : 0); // deja lugar al QR
     let hY = topY + 8;
     doc.fillColor(tTextColor).fontSize(clinicFontPt).font(clinicaFonts.bold)
        .text(tClinica, textX, hY, { width: textW });
@@ -247,6 +260,11 @@ router.get("/pdf", auth(), async (req, res) => {
     if (tCred) {
       doc.fillColor(tTextColor + "bf").fontSize(8).font(medicoFonts.normal)
          .text(tCred, textX, hY + 4, { width: textW });
+    }
+
+    // QR de verificación en la esquina derecha del encabezado
+    if (qrBuffer) {
+      try { doc.image(qrBuffer, marginL + pageW - QR_SIZE - 10, topY + (headerH - QR_SIZE) / 2, { width: QR_SIZE, height: QR_SIZE }); } catch { /* QR inválido: se omite */ }
     }
 
     // ── Info paciente ────────────────────────────────────────────────
@@ -279,7 +297,7 @@ router.get("/pdf", auth(), async (req, res) => {
       estudios.forEach((s, i) => {
         const tipo    = s.tipo || "LABORATORIO";
         const desc    = s.descripcion || "";
-        const urgente = s.urgente ? " ⚠ URGENTE" : "";
+        const urgente = s.urgente ? "  (URGENTE)" : ""; // la tipografía del PDF no soporta el símbolo ⚠
 
         doc.fillColor(tColor).fontSize(9.5).font("Helvetica-Bold")
            .text(`${i + 1}. [${tipo}]${urgente}`, marginL + 10, bodyY, { width: pageW - 20 });

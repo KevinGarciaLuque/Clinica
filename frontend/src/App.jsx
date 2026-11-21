@@ -28,6 +28,7 @@ const VerificarEmail    = lazy(() => import("./pages/VerificarEmail"));
 const OlvideContrasena      = lazy(() => import("./pages/OlvideContrasena"));
 const RestablecerContrasena = lazy(() => import("./pages/RestablecerContrasena"));
 const RecetaPublica     = lazy(() => import("./pages/RecetaPublica"));
+const EstudiosPublica   = lazy(() => import("./pages/EstudiosPublica"));
 const PublicClinicaPage = lazy(() => import("./pages/PublicClinicaPage"));
 const DirectorioMedicos = lazy(() => import("./pages/DirectorioMedicos"));
 const SolicitarPlan     = lazy(() => import("./pages/SolicitarPlan"));
@@ -142,6 +143,7 @@ export default function App() {
       <Route path="/olvide-password"       element={<OlvideContrasena />} />
       <Route path="/restablecer-password"  element={<RestablecerContrasena />} />
       <Route path="/rx/:codigo"       element={<RecetaPublica />} />
+      <Route path="/ex/:codigo"       element={<EstudiosPublica />} />
       <Route path="/p/:slug"          element={<PublicClinicaPage />} />
       <Route path="/dr/:slug"         element={<PerfilMedicoPage />} />
       <Route path="/opinion/:token"   element={<OpinionPaciente />} />

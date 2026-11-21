@@ -209,6 +209,7 @@ app.use("/api/nefrologia",     require("./routes/nefrologia"));
 app.use("/api/endocrinologia", require("./routes/endocrinologia"));
 app.use("/api/educacion-diabetes", require("./routes/educacionDiabetes"));
 app.use("/rx",                 require("./routes/rx"));
+app.use("/ex",                 require("./routes/estudiosPublico"));
 app.use("/api/public",         require("./routes/public"));
 app.use("/api/cita-publica",   require("./routes/citaPublica"));
 app.use("/api/portal",         require("./routes/portalPaciente"));
