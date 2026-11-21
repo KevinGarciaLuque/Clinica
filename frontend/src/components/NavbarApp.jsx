@@ -1,6 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useRef } from "react";
 import { useAuth } from "../auth/AuthContext";
+import IdentidadClinica from "./IdentidadClinica";
 import { useConfigSistema } from "../context/ConfigSistemaContext";
 import api from "../api/api";
 import ModalAyudaSoporte from "./ModalAyudaSoporte";
@@ -554,6 +555,8 @@ export default function NavbarApp({ onMenuClick }) {
 
       {/* Centro: ✨ Novedades de la plataforma */}
       <div className="nav-centro" style={{ flex: 1, display: "flex", justifyContent: "center", alignItems: "center", gap: 8, minWidth: 0 }}>
+        {/* Identidad de la clínica (especialidad + nombre); en pantallas angostas va en una franja bajo la barra */}
+        <div className="d-none d-xl-flex" style={{ minWidth: 0 }}><IdentidadClinica modo="pill" /></div>
         {/* 🔎 Búsqueda rápida (Ctrl+K) */}
         <SelectorSucursal />
         <BuscadorRapido />

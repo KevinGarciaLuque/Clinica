@@ -452,4 +452,13 @@ module.exports = [
     audiencia: "TODOS",
     importante: false,
   },
+  {
+    clave: "identidad-de-la-clinica",
+    version: "1.56",
+    titulo: "Su clínica y especialidad siempre a la vista",
+    descripcion: "En la barra superior ahora aparece el nombre de su clínica y su especialidad (por ejemplo «Cardiología · Clínica Kadie Paz»), con el color de su tipo de clínica. En el teléfono se ve en una franja justo debajo de la barra.",
+    icono: "bi-hospital",
+    audiencia: "TODOS",
+    importante: false,
+  },
 ];

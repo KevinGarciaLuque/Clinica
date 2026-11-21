@@ -4,6 +4,7 @@ import NavbarApp from "./NavbarApp";
 import Sidebar from "./Sidebar";
 import AvisoRenovacion from "./AvisoRenovacion";
 import AvisoNuevaVersion from "./AvisoNuevaVersion";
+import IdentidadClinica from "./IdentidadClinica";
 import LicenciaVencidaModal from "./LicenciaVencidaModal";
 import DictadoVoz from "./DictadoVoz";
 import AvisoReloj from "./AvisoReloj";
@@ -45,6 +46,7 @@ export default function AppLayout() {
 
       {/* ── Navbar fija arriba ── */}
       <NavbarApp onMenuClick={() => setMobileOpen(o => !o)} />
+      <div className="d-xl-none" style={{ flexShrink: 0 }}><IdentidadClinica modo="franja" /></div>
 
       {/* ── Línea animada sobre el borde ── */}
       <div className="navline-bar" style={{

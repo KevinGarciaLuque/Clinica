@@ -31,6 +31,10 @@ export function AuthProvider({ children }) {
 
   // Preferencia de la clínica: mostrar "Dr./Dra." + especialidad junto al nombre
   // del médico. Default true (comportamiento histórico) hasta que el servidor diga lo contrario.
+  // Identidad de la clínica (nombre y especialidad) para mostrarla a la vista
+  const [clinicaInfo, setClinicaInfo] = useState(() => {
+    try { const raw = localStorage.getItem("clinica_info"); return raw ? JSON.parse(raw) : null; } catch { return null; }
+  });
   const [tituloMedico, setTituloMedico] = useState(() => {
     const raw = localStorage.getItem("titulo_medico");
     return raw ? JSON.parse(raw) : true;
@@ -71,6 +75,9 @@ export function AuthProvider({ children }) {
       const valor = res.data?.data?.titulo_medico !== 0;
       localStorage.setItem("titulo_medico", JSON.stringify(valor));
       setTituloMedico(valor);
+      const info = res.data?.data?.clinica || null;
+      if (info) localStorage.setItem("clinica_info", JSON.stringify(info)); else localStorage.removeItem("clinica_info");
+      setClinicaInfo(info);
       return valor;
     } catch {
       return true;
@@ -162,12 +169,14 @@ export function AuthProvider({ children }) {
     localStorage.removeItem("licencia_info");
     localStorage.removeItem("tiene_recepcionista");
     localStorage.removeItem("titulo_medico");
+    localStorage.removeItem("clinica_info");
     limpiarClinicaActiva();
     setUser(null);
     setModulos([]);
     setLicenciaInfo(null);
     setTieneRecepcionista(false);
     setTituloMedico(true);
+    setClinicaInfo(null);
   };
 
   /** Actualiza el usuario en estado y localStorage (tras editar perfil) */
@@ -180,7 +189,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, tieneRecepcionista, tituloMedico, login, verificar2FA, loginConGoogle, logout, cargarModulos, cargarTieneRecepcionista, cargarPreferenciasClinica, updateUser }}>
+    <AuthContext.Provider value={{ user, isAuth, modulos, licenciaInfo, tieneRecepcionista, tituloMedico, clinicaInfo, login, verificar2FA, loginConGoogle, logout, cargarModulos, cargarTieneRecepcionista, cargarPreferenciasClinica, updateUser }}>
       {children}
     </AuthContext.Provider>
   );

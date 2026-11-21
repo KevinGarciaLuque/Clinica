@@ -339,11 +339,25 @@ router.get("/preferencias", auth("SUPER_ADMIN","ADMIN","MEDICO","PSICOLOGO","REC
     await ensureTituloMedicoColumn();
     const clinicaId = req.user.super ? req.tenant?.clinica_id : req.user.clinica_id;
     if (!clinicaId) return res.json({ ok: true, data: { titulo_medico: 1 } });
+    // Además de la preferencia, se devuelve la identidad de la clínica (nombre y especialidad)
+    // para mostrarla a la vista en la barra superior.
     const [[row]] = await pool.query(
-      "SELECT titulo_medico FROM clinicas WHERE id=?",
+      `SELECT c.titulo_medico, c.nombre, c.es_pediatrica,
+              t.clave AS tipo_clave, t.nombre AS tipo_nombre, t.icono AS tipo_icono, t.color AS tipo_color
+       FROM clinicas c LEFT JOIN tipos_clinica t ON t.id = c.tipo_id WHERE c.id=?`,
       [clinicaId]
     );
-    res.json({ ok: true, data: { titulo_medico: row ? Number(row.titulo_medico) : 1 } });
+    res.json({
+      ok: true,
+      data: {
+        titulo_medico: row ? Number(row.titulo_medico) : 1,
+        clinica: row ? {
+          nombre: row.nombre,
+          es_pediatrica: !!row.es_pediatrica,
+          tipo: row.tipo_nombre ? { clave: row.tipo_clave, nombre: row.tipo_nombre, icono: row.tipo_icono, color: row.tipo_color } : null,
+        } : null,
+      },
+    });
   } catch (e) {
     res.status(500).json({ ok: false, msg: e.message });
   }
