@@ -46,27 +46,31 @@ function TimePicker12h({ value, onChange, label, required }) {
 
   const HORAS = ["1","2","3","4","5","6","7","8","9","10","11","12"];
   const MINS  = ["00","05","10","15","20","25","30","35","40","45","50","55"];
+  if (m && !MINS.includes(m)) MINS.push(m); // hora guardada con minutos fuera de la lista: no se pierde
+
+  // Selectores flexibles (antes tenían ancho fijo y el número quedaba cortado en el teléfono)
+  const sel = { minWidth: 0, flex: "1 1 0", paddingLeft: 10, paddingRight: 26, backgroundPosition: "right 8px center", fontSize: "1.05rem", fontWeight: 600, height: 46 };
 
   return (
     <div>
-      {label && <label className="form-label">{label}</label>}
-      <div className="input-group">
-        <select className="form-select" style={{ maxWidth: 70 }} value={h}
+      {label && <label style={{ fontWeight: 600, fontSize: "0.83rem", color: "#374151", display: "block", marginBottom: 6 }}>{label}</label>}
+      <div style={{ display: "flex", gap: 6 }}>
+        <select className="form-select" style={sel} value={h} aria-label="Hora"
           onChange={e => emit(e.target.value, m, ampm)} required={required}>
           <option value="">--</option>
           {HORAS.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select className="form-select" style={{ maxWidth: 70 }} value={m}
+        <select className="form-select" style={sel} value={m} aria-label="Minutos"
           onChange={e => emit(h, e.target.value, ampm)}>
           {MINS.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
-        <select className="form-select" style={{ maxWidth: 72 }} value={ampm}
+        <select className="form-select" style={{ ...sel, flex: "1.15 1 0" }} value={ampm} aria-label="AM o PM"
           onChange={e => emit(h, m, e.target.value)}>
           <option value="AM">AM</option>
           <option value="PM">PM</option>
         </select>
       </div>
-      {value && <small className="text-muted">{h}:{m} {ampm}</small>}
+      {value && h && <div style={{ marginTop: 6, fontSize: "1.1rem", fontWeight: 700, color: "#1a2744" }}>{h}:{m} {ampm}</div>}
     </div>
   );
 }
@@ -445,7 +449,7 @@ export default function Horarios() {
                     {DIAS.map((d, i) => <option key={i} value={i}>{d}</option>)}
                   </select>
                 </div>
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(250px, 1fr))", gap: 14 }}>
                   <TimePicker12h label="Hora inicio" value={form.hora_inicio}
                     onChange={(v) => setForm({ ...form, hora_inicio: v })} required />
                   <TimePicker12h label="Hora fin" value={form.hora_fin}
