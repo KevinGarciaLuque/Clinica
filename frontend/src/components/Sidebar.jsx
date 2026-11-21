@@ -80,7 +80,7 @@ function SidebarIcon({ icon, style }) {
 }
 
 // Módulos que son funciones DENTRO de la consulta (pestañas), no ítems de menú.
-const MODULOS_NO_MENU = new Set(["cardiologia_ecocardiograma", "nutricion_consulta"]);
+const MODULOS_NO_MENU = new Set(["cardiologia_ecocardiograma", "nutricion_consulta", "escalas_paliativos"]);
 
 /** Convierte respuesta del API de módulos a items del sidebar */
 function modulosToItems(modulos) {

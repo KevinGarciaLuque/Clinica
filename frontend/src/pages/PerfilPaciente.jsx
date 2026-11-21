@@ -30,6 +30,7 @@ import { EXAMEN_CLINICO_GRUPOS, HIGIENE_DETALLE_CAMPOS } from "./odontologia/con
 import { fechaLocal } from "../utils/fechaNacimiento";
 import { edadDetallada } from "../utils/edadDetallada";
 import HistorialNutricion from "../components/HistorialNutricion";
+import { EvolucionEscalasPaciente } from "../components/EvolucionEscalas";
 import HistorialConsultas from "../components/HistorialConsultas";
 import { listarEstetica } from "../utils/esteticaDatos";
 import TarjetaDiabetes from "../components/TarjetaDiabetes";
@@ -1687,6 +1688,17 @@ export default function PerfilPaciente() {
                 Alergias y Antecedentes
               </button>
             </li>
+            {tieneModulo("escalas_paliativos") && (
+              <li className="nav-item">
+                <button
+                  className={`nav-link ${subTabHistorial === "escalas" ? "active" : ""}`}
+                  onClick={() => setSubTabHistorial("escalas")}
+                >
+                  <i className="bi bi-activity me-1" />
+                  Escalas de paliativos
+                </button>
+              </li>
+            )}
             {tieneModulo("nutricion_consulta") && (
               <li className="nav-item">
                 <button
@@ -1702,6 +1714,9 @@ export default function PerfilPaciente() {
 
           {/* Sub-tab: Historial de Nutrición (consultas con la hoja de nutrición) */}
           {subTabHistorial === "nutricion" && <HistorialNutricion pacienteId={id} />}
+
+          {/* Sub-tab: Escalas de paliativos (mapa de calor de evolución) */}
+          {subTabHistorial === "escalas" && <EvolucionEscalasPaciente pacienteId={id} />}
 
           {/* Sub-tab: Alergias y Antecedentes */}
           {subTabHistorial === "antecedentes" && (

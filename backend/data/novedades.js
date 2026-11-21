@@ -413,4 +413,14 @@ module.exports = [
     audiencia: "MEDICOS",
     importante: false,
   },
+  {
+    clave: "escalas-cuidados-paliativos",
+    version: "1.52",
+    modulos: ["escalas_paliativos"],
+    titulo: "Escalas de cuidados paliativos en la consulta",
+    descripcion: "Nueva pestaña «Escalas» junto al SOAP con 58 escalas validadas (ESAS, PPS, EVA, DN4, Borg, Zarit, HADS, CAM, Ramsay y más, también pediátricas). Se responde con toques de color, el puntaje y la interpretación se calculan solos, y la «Valoración rápida» recorre las más usadas. En «Evolución» verá un mapa de calor para comparar al paciente de una consulta a otra.",
+    icono: "bi-activity",
+    audiencia: "MEDICOS",
+    importante: true,
+  },
 ];

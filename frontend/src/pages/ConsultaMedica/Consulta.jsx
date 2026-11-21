@@ -30,6 +30,8 @@ import EcocardiogramaTab, { PrintEco } from "./EcocardiogramaTab";
 import NutricionTab from "./NutricionTab";
 import { descargarBlob, compartirEnTelefono, imprimirHtml, errorDeBlob } from "../../utils/descargarPdf";
 import EsteticaTab from "./EsteticaTab";
+import EscalasPaliativosTab from "./EscalasPaliativosTab";
+import { ESCALA_POR_ID, calcular, paraGuardar } from "../../utils/paliativosEscalas";
 import TarjetaDiabetes from "../../components/TarjetaDiabetes";
 // Módulos de diabetes como pestañas de la consulta (se cargan solo si se abren)
 const ConsultaEndocrinologia = lazy(() => import("../endocrinologia/ConsultaEndocrinologia"));
@@ -99,6 +101,13 @@ export default function Consulta() {
   const [datosEst, setDatosEstBase] = useState({});
   const [estTocada, setEstTocada] = useState(false);
   const setDatosEst = useCallback((v) => { setEstTocada(true); setDatosEstBase(v); }, []);
+  // Pestaña Escalas (clínicas de cuidados paliativos): se guarda aparte, junto con la consulta
+  const esPaliativos = modulos.some(m => m.clave === "escalas_paliativos");
+  const [datosPal, setDatosPalBase] = useState({});   // { <escala>: { respuestas, notas } }
+  const [histPal, setHistPal] = useState([]);         // aplicaciones anteriores del paciente (mapa de calor)
+  const palTocada = useRef(false);
+  const palGuardadas = useRef(new Set());
+  const setDatosPal = useCallback((fn) => { palTocada.current = true; setDatosPalBase(fn); }, []);
   const soloLectura = firmada && !editMode;
 
   // ── carga inicial ────────────────────────────────────────────────────────────
@@ -212,6 +221,46 @@ export default function Consulta() {
       if (reg) setDatosEstBase({ tipo_visita: reg.tipo, [reg.tipo]: reg.datos, _creado_en: reg.datos?.creado_en || reg.creado_en });
     }).catch(() => {});
   }, [esEstetica, hid]);
+
+  // ── paliativos: escalas de esta consulta y del resto de la historia del paciente ──
+  const cargarHistPal = useCallback(async (pid) => {
+    const r = await api.get(`/paliativos/paciente/${pid}/evolucion`).catch(() => null);
+    if (r) setHistPal(r.data.data || []);
+  }, []);
+  useEffect(() => {
+    const pid = paciente?.id || pacId;
+    if (!esPaliativos || !pid) return;
+    cargarHistPal(pid);
+  }, [esPaliativos, paciente?.id, pacId, cargarHistPal]);
+  useEffect(() => {
+    if (!esPaliativos || !hid) return;
+    api.get(`/paliativos/historia/${hid}`).then((r) => {
+      if (palTocada.current) return; // no pisar lo que la doctora ya está llenando
+      const lista = r.data.data || [];
+      palGuardadas.current = new Set(lista.map((x) => x.escala));
+      setDatosPalBase(Object.fromEntries(lista.map((x) => [x.escala, { respuestas: x.respuestas || {}, notas: x.notas || "" }])));
+    }).catch(() => {});
+  }, [esPaliativos, hid]);
+
+  const guardarPaliativos = useCallback(async (historiaId) => {
+    if (!esPaliativos || !historiaId || !palTocada.current) return;
+    const escalas = {};
+    for (const [id, d] of Object.entries(datosPal)) {
+      const esc = ESCALA_POR_ID[id];
+      if (!esc || calcular(esc, d.respuestas).vacio) continue;
+      escalas[id] = { ...paraGuardar(esc, d.respuestas), notas: d.notas || null };
+    }
+    for (const id of palGuardadas.current) if (!escalas[id]) escalas[id] = null; // las que se limpiaron
+    if (!Object.keys(escalas).length) { palTocada.current = false; return; }
+    try {
+      await api.put(`/paliativos/historia/${historiaId}`, { escalas });
+      palGuardadas.current = new Set(Object.keys(escalas).filter((k) => escalas[k]));
+      palTocada.current = false;
+      cargarHistPal(paciente?.id || pacId);
+    } catch {
+      setAlertMsg({ type: "warning", msg: "La consulta se guardó, pero no se pudieron guardar las escalas. Intente de nuevo." });
+    }
+  }, [esPaliativos, datosPal, cargarHistPal, paciente?.id, pacId]);
 
   const guardarEstetica = useCallback(async (historiaId) => {
     const tipoVisita = datosEst.tipo_visita;
@@ -336,18 +385,20 @@ export default function Consulta() {
         await registrarEnCurva();
         await guardarNutricion(r.data.id);
         await guardarEstetica(r.data.id);
+        await guardarPaliativos(r.data.id);
         return r.data.id;
       }
       await registrarEnCurva();
       await guardarNutricion(hid);
       await guardarEstetica(hid);
+      await guardarPaliativos(hid);
       return hid;
     } catch (e) {
       setAlertMsg({ type: "danger", msg: e.response?.data?.msg || "Error al guardar" });
     } finally {
       setSaving(false);
     }
-  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion, guardarEstetica]);
+  }, [soap, vitals, hid, paciente, pacId, citaId, firmada, editMode, datosDerma, datosEco, registrarEnCurva, guardarNutricion, guardarEstetica, guardarPaliativos]);
 
   // Siempre la versión más reciente de handleSave (para guardar desde ventanas que cambian datos)
   const guardarRef = useRef(null);
@@ -395,6 +446,7 @@ export default function Consulta() {
 
   const TAB_LIST = [
     { id: "soap",         icon: "bi-clipboard2-pulse", label: "SOAP" },
+    ...(esPaliativos ? [{ id: "escalas", icon: "bi-activity", label: "Escalas" }] : []),
     ...(esDiabetes ? [{ id: "diabetes", icon: "bi-droplet-half", label: "Diabetes" }] : []),
     ...(esEducacionDm ? [{ id: "educacion_dm", icon: "bi-mortarboard-fill", label: "Educación" }] : []),
     ...(esEstetica ? [{ id: "estetica", icon: "bi-stars", label: "Estética" }] : []),
@@ -794,6 +846,17 @@ export default function Consulta() {
               onPdf={descargarPlanNutricion}
               registrarCurva={registrarCurva}
               setRegistrarCurva={setRegistrarCurva}
+            />
+          )}
+
+          {/* ── Escalas de cuidados paliativos ── */}
+          {tab === "escalas" && (
+            <EscalasPaliativosTab
+              datos={datosPal}
+              setDatos={setDatosPal}
+              firmada={soloLectura}
+              historial={histPal}
+              historiaId={hid}
             />
           )}
 

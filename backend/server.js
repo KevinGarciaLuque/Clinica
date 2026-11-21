@@ -168,6 +168,7 @@ app.use("/api/caja", require("./routes/caja"));
 app.use("/api/finanzas", require("./routes/finanzas"));
 app.use("/api/sucursales", require("./routes/sucursales"));
 app.use("/api/nutricion", require("./routes/nutricion"));
+app.use("/api/paliativos", require("./routes/paliativos"));
 app.use("/api/estetica-datos", require("./routes/esteticaDatos"));
 app.use("/api/estetica-publico", require("./routes/esteticaPublico"));
 app.use("/api/recordatorios-whatsapp", require("./routes/recordatoriosWhatsapp"));
@@ -979,6 +980,30 @@ const pool = require("./db");
       console.log("✅ [auto-migrate] módulo nutrición OK");
     } catch (e) {
       console.warn("⚠️  [auto-migrate] módulo nutrición:", e.message);
+    }
+
+    // Cuidados paliativos: tipo de clínica nuevo + pestaña "Escalas" dentro de la consulta
+    // (ESAS, PPS, EVA, Zarit, etc. con puntaje y mapa de calor). Solo se activa en clínicas de
+    // tipo paliativos; el SUPER_ADMIN puede activarlo en otras.
+    try {
+      await pool.query(
+        `INSERT IGNORE INTO tipos_clinica (clave, nombre, icono, color, descripcion)
+         VALUES ('paliativos', 'Cuidados Paliativos', 'bi-heart-pulse', '#7E57C2', 'Control de síntomas, escalas de valoración y acompañamiento al paciente y su familia')`
+      );
+      await pool.query(
+        `INSERT IGNORE INTO modulos_sistema (clave, nombre, icono, ruta, disponible, orden, descripcion, para_normal, para_pediatrica)
+         VALUES ('escalas_paliativos', 'Escalas de paliativos', 'bi-activity', '/consulta', 1, 47, 'Escalas de síntomas, dolor, función, ánimo y familia con puntaje y mapa de calor en la consulta', 1, 1)`
+      );
+      await pool.query(
+        `INSERT IGNORE INTO tipo_clinica_modulos (tipo_id, modulo_id)
+         SELECT tc.id, ms.id FROM tipos_clinica tc, modulos_sistema ms
+         WHERE tc.clave = 'paliativos'
+           AND ms.clave IN ('dashboard','pacientes','citas','plantillas','consulta','historia_clinica','estudios','recordatorios','escalas_paliativos')`
+      );
+      await require("./routes/paliativos").asegurarTablas();
+      console.log("✅ [auto-migrate] módulo paliativos OK");
+    } catch (e) {
+      console.warn("⚠️  [auto-migrate] módulo paliativos:", e.message);
     }
 
     // Estética: ficha, presupuestos, consentimientos y seguimiento post-op en el servidor
