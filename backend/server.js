@@ -1001,6 +1001,21 @@ const pool = require("./db");
            AND ms.clave IN ('dashboard','pacientes','citas','plantillas','consulta','historia_clinica','estudios','recordatorios','escalas_paliativos')`
       );
       await require("./routes/paliativos").asegurarTablas();
+      // Una sola vez: las clínicas de paliativos creadas como «pediátricas» quedaron con las
+      // escalas desactivadas (el preset pediátrico se aplicaba primero). Se activan; después el
+      // SUPER_ADMIN puede desactivarlas si quiere y no se vuelve a tocar.
+      const [[hecho]] = await pool.query("SELECT clave FROM migraciones_unicas WHERE clave = 'paliativos_escalas_clinicas_existentes'");
+      if (!hecho) {
+        const [r] = await pool.query(
+          `INSERT INTO clinica_modulos (clinica_id, modulo_id, habilitado)
+           SELECT c.id, ms.id, 1 FROM clinicas c
+           INNER JOIN tipos_clinica tc ON tc.id = c.tipo_id AND tc.clave = 'paliativos'
+           INNER JOIN modulos_sistema ms ON ms.clave = 'escalas_paliativos'
+           ON DUPLICATE KEY UPDATE habilitado = 1`
+        );
+        await pool.query("INSERT IGNORE INTO migraciones_unicas (clave) VALUES ('paliativos_escalas_clinicas_existentes')");
+        console.log(`✅ [auto-migrate] escalas de paliativos activadas en clínicas existentes (${r.affectedRows} fila(s), una sola vez)`);
+      }
       console.log("✅ [auto-migrate] módulo paliativos OK");
     } catch (e) {
       console.warn("⚠️  [auto-migrate] módulo paliativos:", e.message);

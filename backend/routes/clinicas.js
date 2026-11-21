@@ -140,8 +140,9 @@ async function aplicarPresetModulosClinica(clinicaId, tipoId, esPediatrica) {
   else if (esDental) dental.forEach((k) => enabled.add(k));
   else if (esEndo)   endocrino.forEach((k) => enabled.add(k));
   else if (esNutri)  nutri.forEach((k) => enabled.add(k));
-  else if (esPaliativos) paliativos.forEach((k) => enabled.add(k));
   else               generalExtras.forEach((k) => enabled.add(k));
+  // Paliativos va aparte de la cadena: una clínica de paliativos pediátrica también necesita sus escalas
+  if (esPaliativos) paliativos.forEach((k) => enabled.add(k));
 
   for (const m of mods) {
     await pool.query(
